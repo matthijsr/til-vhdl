@@ -1,18 +1,21 @@
 use std::convert::TryInto;
 
-use crate::common::{util::log2_ceil, Error, NonNegative, PathName, Positive, Result};
+use crate::common::{
+    error::{Error, Result},
+    integers::{NonNegative, Positive},
+    name::PathName,
+    util::log2_ceil,
+};
 
-use super::{Complexity, Fields, SignalList};
+use super::{complexity::Complexity, fields::Fields};
 
 /// Physical stream.
 ///
 /// A physical stream carries a stream of elements, dimensionality information
 /// for said elements, and (optionally) user-defined transfer information from
-/// a source to a sink.
+/// a source to a sink
 ///
-/// [Reference]
-///
-/// [Reference]: https://abs-tudelft.github.io/tydi/specification/physical.html#physical-stream-specification
+/// [Reference](https://abs-tudelft.github.io/tydi/specification/physical.html#physical-stream-specification)
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhysicalStream {
     /// Element content.
@@ -179,41 +182,5 @@ impl PhysicalStream {
     /// Returns the bit count of the user fields in this physical stream.
     pub fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
-    }
-
-    /// Returns the signal list for this physical stream.
-    pub fn signal_list(&self) -> SignalList {
-        let opt = |x| if x == 0 { None } else { Some(x) };
-        SignalList {
-            data: opt(self.data_bit_count()),
-            last: opt(self.last_bit_count()),
-            stai: opt(self.stai_bit_count()),
-            endi: opt(self.endi_bit_count()),
-            strb: opt(self.strb_bit_count()),
-            user: opt(self.user_bit_count()),
-        }
-    }
-
-    /// Returns the combined bit count of all signals in this physical stream.
-    /// This excludes the `valid` and `ready` signals.
-    pub fn bit_count(&self) -> NonNegative {
-        self.data_bit_count()
-            + self.last_bit_count()
-            + self.stai_bit_count()
-            + self.endi_bit_count()
-            + self.strb_bit_count()
-            + self.user_bit_count()
-    }
-}
-
-impl From<&PhysicalStream> for SignalList {
-    fn from(physical_stream: &PhysicalStream) -> SignalList {
-        physical_stream.signal_list()
-    }
-}
-
-impl From<PhysicalStream> for SignalList {
-    fn from(physical_stream: PhysicalStream) -> SignalList {
-        physical_stream.signal_list()
     }
 }

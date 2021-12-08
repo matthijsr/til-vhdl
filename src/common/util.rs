@@ -1,4 +1,4 @@
-use super::{NonNegative, Positive};
+use super::integers::{NonNegative, Positive};
 
 /// Returns ⌈log2(x)⌉.
 pub(crate) const fn log2_ceil(x: Positive) -> NonNegative {

@@ -1,6 +1,10 @@
 use indexmap::IndexMap;
 
-use crate::common::{BitCount, Error, PathName, Result};
+use crate::common::{
+    error::{Error, Result},
+    integers::BitCount,
+    name::PathName,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fields(IndexMap<PathName, BitCount>);

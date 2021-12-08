@@ -2,22 +2,25 @@ use std::{convert::TryInto, error};
 
 use indexmap::IndexMap;
 
-use crate::common::{util::log2_ceil, BitCount, Error, Name, NonNegative, Result};
+use crate::common::{
+    error::{Error, Result},
+    name::Name,
+};
 
 use super::LogicalType;
 
+/// The Group stream type acts as a product type (composition).
 ///
-///
-/// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#union)
+/// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#group)
 #[derive(Debug, Clone, PartialEq)]
-pub struct Union(pub(super) IndexMap<Name, LogicalType>);
+pub struct Group(pub(super) IndexMap<Name, LogicalType>);
 
-impl Union {
-    /// Returns a new Union logical stream type. Returns an error when either
+impl Group {
+    /// Returns a new Group logical stream type. Returns an error when either
     /// the name or logical stream type conversion fails, or when there are
     /// duplicate names.
     pub fn try_new(
-        union: impl IntoIterator<
+        group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
                 impl TryInto<LogicalType, Error = impl Into<Box<dyn error::Error>>>,
@@ -25,7 +28,7 @@ impl Union {
         >,
     ) -> Result<Self> {
         let mut map = IndexMap::new();
-        for (name, stream) in union
+        for (name, stream) in group
             .into_iter()
             .map(
                 |(name, stream)| match (name.try_into(), stream.try_into()) {
@@ -40,36 +43,20 @@ impl Union {
                 .map(|_| -> Result<()> { Err(Error::UnexpectedDuplicate) })
                 .transpose()?;
         }
-        Ok(Union(map))
+        Ok(Group(map))
     }
 
-    /// Returns the tag name and width of this union.
-    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html)
-    pub fn tag(&self) -> Option<(String, BitCount)> {
-        if self.0.len() > 1 {
-            Some((
-                "tag".to_string(),
-                BitCount::new(log2_ceil(
-                    BitCount::new(self.0.len() as NonNegative).unwrap(),
-                ))
-                .unwrap(),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// Returns an iterator over the fields of the Union.
+    /// Returns an iterator over the fields of the Group.
     pub fn iter(&self) -> impl Iterator<Item = (&Name, &LogicalType)> {
         self.0.iter()
     }
 }
 
-impl From<Union> for LogicalType {
-    /// Wraps this union in a [`LogicalType`].
+impl From<Group> for LogicalType {
+    /// Wraps this group in a [`LogicalType`].
     ///
     /// [`LogicalType`]: ./enum.LogicalType.html
-    fn from(union: Union) -> Self {
-        LogicalType::Union(union)
+    fn from(group: Group) -> Self {
+        LogicalType::Group(group)
     }
 }

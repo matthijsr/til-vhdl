@@ -1,6 +1,9 @@
 use std::{cmp::Ordering, convert::TryFrom, fmt, str::FromStr};
 
-use crate::common::{Error, NonNegative, Result};
+use crate::common::{
+    error::{Error, Result},
+    integers::NonNegative,
+};
 
 /// Interface complexity level.
 ///
@@ -26,9 +29,7 @@ use crate::common::{Error, NonNegative, Result};
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
-/// [Reference]
-///
-/// [Reference]: https://abs-tudelft.github.io/tydi/specification/physical.html#complexity-c
+/// [Reference](https://abs-tudelft.github.io/tydi/specification/physical.html#complexity-c)
 #[derive(Debug, Clone)]
 pub struct Complexity {
     /// The complexity level.
