@@ -1,0 +1,14 @@
+[project]
+name = "til-vhdl"
+version = "0.1.0"
+edition = "2018"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# vhdl_lang = "0.17.0"
+indexmap = "1.7.0"
+log = "0.4.14"
+salsa = "0.16.1"
+tydi-intern = { path = "../intern" }

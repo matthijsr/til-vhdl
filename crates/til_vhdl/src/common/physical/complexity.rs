@@ -30,7 +30,7 @@ use crate::common::{
 /// ```
 ///
 /// [Reference](https://abs-tudelft.github.io/tydi/specification/physical.html#complexity-c)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct Complexity {
     /// The complexity level.
     level: Vec<NonNegative>,

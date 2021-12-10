@@ -1,6 +1,13 @@
 use std::{convert::TryInto, error};
 
-use crate::common::{error::{Error, Result}, integers::{NonNegative, Positive}, name::Name};
+use crate::common::{
+    error::{Error, Result},
+    integers::{NonNegative, Positive},
+    name::Name,
+};
+
+pub(crate) use field::*;
+pub(crate) mod field;
 
 pub(crate) use group::*;
 pub(crate) mod group;
@@ -28,7 +35,7 @@ pub(crate) mod union;
 /// ```
 ///
 /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#logical-stream-type)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogicalType {
     /// The Null stream type indicates the transferrence of one-valued data: it
     /// is only valid value is ∅ (null).

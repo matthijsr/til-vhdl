@@ -1,10 +1,15 @@
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
+
+use salsa::Database;
+use tydi_intern::Id;
 
 use crate::common::{
     error::{Error, Result},
     integers::{NonNegative, PositiveReal},
     physical::complexity::Complexity,
 };
+use crate::ir::Ir;
 
 use super::LogicalType;
 
@@ -19,7 +24,7 @@ pub struct Stream {
     ///
     /// Any logical stream type representing the data type carried by the
     /// logical stream.
-    data: Box<LogicalType>,
+    data: Id<LogicalType>,
     /// Throughput ratio of the stream.
     ///
     /// Positive real number, representing the minimum number of elements that
@@ -54,7 +59,7 @@ pub struct Stream {
     /// An optional logical stream type consisting of only
     /// element-manipulating nodes, representing the user data carried by
     /// this logical stream.
-    user: Option<Box<LogicalType>>,
+    user: Id<LogicalType>,
     /// Stream carries extra information.
     ///
     /// Keep specifies whether the stream carries "extra" information
@@ -69,42 +74,33 @@ pub struct Stream {
 impl Stream {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        data: LogicalType,
+        data: Id<LogicalType>,
         throughput: PositiveReal,
         dimensionality: NonNegative,
         synchronicity: Synchronicity,
         complexity: impl Into<Complexity>,
         direction: Direction,
-        user: Option<LogicalType>,
+        user: Id<LogicalType>,
         keep: bool,
     ) -> Self {
         Stream {
-            data: Box::new(data),
+            data: data,
             throughput,
             dimensionality,
             synchronicity,
             complexity: complexity.into(),
             direction,
-            user: user.map(Box::new),
+            user: user,
             keep,
         }
     }
 
-    pub fn new_basic(data: LogicalType) -> Self {
-        Stream {
-            data: Box::new(data),
-            throughput: PositiveReal::new(1.).unwrap(),
-            dimensionality: 0,
-            synchronicity: Synchronicity::Sync,
-            complexity: Complexity::default(),
-            direction: Direction::Forward,
-            user: None,
-            keep: false,
-        }
+    pub fn data(&self, db: &dyn Ir) -> LogicalType {
+        db.lookup_intern_type(self.data)
     }
 
-    pub fn data(&self) -> &LogicalType {
-        &self.data
+    pub fn user(&self, db: &dyn Ir) -> LogicalType {
+        db.lookup_intern_type(self.user)
     }
 
     /// Returns the direction of this stream.
@@ -130,25 +126,8 @@ impl Stream {
     /// Returns true if this stream is null i.e. it results in no signals.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub fn is_null(&self) -> bool {
-        self.data.is_null()
-            && (self.user.is_some() && self.user.as_ref().unwrap().is_null())
-            && !self.keep
-    }
-
-    /// Set the throughput ratio of this stream.
-    fn set_throughput(&mut self, throughput: PositiveReal) {
-        self.throughput = throughput;
-    }
-
-    /// Set the synchronicity of this stream.
-    fn set_synchronicity(&mut self, synchronicity: Synchronicity) {
-        self.synchronicity = synchronicity;
-    }
-
-    /// Set the dimensionality of this stream.
-    fn set_dimensionality(&mut self, dimensionality: NonNegative) {
-        self.dimensionality = dimensionality;
+    pub fn is_null(&self, db: &dyn Ir) -> bool {
+        self.data(db).is_null() && self.user(db).is_null() && !self.keep
     }
 }
 
@@ -161,9 +140,29 @@ impl From<Stream> for LogicalType {
     }
 }
 
+impl Hash for Stream {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        (
+            &self.complexity,
+            &self.data,
+            &self.dimensionality,
+            &self.direction,
+            &self.keep,
+            &self.synchronicity,
+            &self.user,
+        )
+            .hash(state);
+    }
+}
+
+impl Eq for Stream {}
+
 /// The synchronicity of the elements in the child stream with respect to the
 /// elements in the parent stream.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Synchronicity {
     /// Indicating that there is a one-to-one relation between the parent and
     /// child elements, and the dimensionality information of the parent stream
@@ -211,7 +210,7 @@ impl FromStr for Synchronicity {
 /// [Reference]
 ///
 /// [Reference]: https://abs-tudelft.github.io/tydi/specification/logical.html#stream
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Direction {
     /// Forward indicates that the child stream flows in the same direction as
     /// its parent, complementing the data of its parent in some way.
