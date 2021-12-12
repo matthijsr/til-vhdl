@@ -1,4 +1,4 @@
-#[salsa::database(til_vhdl::ir::IrStorage)]
+#[salsa::database(super::IrStorage)]
 #[derive(Default)]
 pub struct Database {
     storage: salsa::Storage<Database>,

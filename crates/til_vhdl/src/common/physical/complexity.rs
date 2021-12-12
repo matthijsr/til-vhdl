@@ -136,7 +136,7 @@ impl Complexity {
     /// assert!(Complexity::new(vec![]).is_err());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new(level: impl IntoIterator<Item = NonNegative>) -> Result<Self> {
+    pub(crate) fn new(level: impl IntoIterator<Item = NonNegative>) -> Result<Self> {
         let level = level.into_iter().collect::<Vec<NonNegative>>();
         if level.is_empty() {
             Err(Error::InvalidArgument(
@@ -159,7 +159,7 @@ impl Complexity {
     /// assert_eq!(c, Complexity::new(vec![4])?);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new_major(level: NonNegative) -> Self {
+    pub(crate) fn new_major(level: NonNegative) -> Self {
         Complexity { level: vec![level] }
     }
 
@@ -174,7 +174,7 @@ impl Complexity {
     /// assert_eq!(c.level(), &[3, 14]);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn level(&self) -> &[NonNegative] {
+    pub(crate) fn level(&self) -> &[NonNegative] {
         self.level.as_ref()
     }
 
@@ -188,7 +188,7 @@ impl Complexity {
     /// let c = Complexity::new(vec![3, 14])?;
     /// assert_eq!(c.major(), 3);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
-    pub fn major(&self) -> NonNegative {
+    pub(crate) fn major(&self) -> NonNegative {
         self.level[0]
     }
 }

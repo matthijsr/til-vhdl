@@ -10,7 +10,7 @@ use crate::common::{
 pub struct Fields(IndexMap<PathName, BitCount>);
 
 impl Fields {
-    pub fn new(iter: impl IntoIterator<Item = (PathName, BitCount)>) -> Result<Self> {
+    pub(crate) fn new(iter: impl IntoIterator<Item = (PathName, BitCount)>) -> Result<Self> {
         let fields = iter.into_iter();
         let (lower, upper) = fields.size_hint();
         let mut map = IndexMap::with_capacity(upper.unwrap_or(lower));
@@ -36,15 +36,15 @@ impl Fields {
         Ok(())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&PathName, &BitCount)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&PathName, &BitCount)> {
         self.0.iter()
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &PathName> {
+    pub(crate) fn keys(&self) -> impl Iterator<Item = &PathName> {
         self.0.keys()
     }
 
-    pub fn values(&self) -> impl Iterator<Item = &BitCount> {
+    pub(crate) fn values(&self) -> impl Iterator<Item = &BitCount> {
         self.0.values()
     }
 }

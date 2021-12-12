@@ -1,9 +1,12 @@
 use std::{convert::TryInto, error};
 
-use crate::common::{
-    error::{Error, Result},
-    integers::{NonNegative, Positive},
-    name::Name,
+use crate::{
+    common::{
+        error::{Error, Result},
+        integers::{NonNegative, Positive},
+        name::Name,
+    },
+    ir::{Identifier, Ir},
 };
 
 pub(crate) use field::*;
@@ -15,6 +18,7 @@ pub(crate) mod group;
 pub(crate) use stream::*;
 pub(crate) mod stream;
 
+use tydi_intern::Id;
 pub(crate) use union::*;
 pub(crate) mod union;
 
@@ -78,7 +82,7 @@ impl LogicalType {
     /// assert_eq!(zero, Err(Error::InvalidArgument("bit count cannot be zero".to_string())));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn try_new_bits(bit_count: NonNegative) -> Result<Self> {
+    pub(crate) fn try_new_bits(bit_count: NonNegative) -> Result<Self> {
         Ok(LogicalType::Bits(Positive::new(bit_count).ok_or_else(
             || Error::InvalidArgument("bit count cannot be zero".to_string()),
         )?))
@@ -118,26 +122,30 @@ impl LogicalType {
     /// ```
     ///
     /// [`Group`]: ./struct.Group.html
-    pub fn try_new_group(
+    pub(crate) fn try_new_group(
+        db: &dyn Ir,
+        parent_id: Id<Identifier>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
-                impl TryInto<LogicalType, Error = impl Into<Box<dyn error::Error>>>,
+                Id<LogicalType>,
             ),
         >,
     ) -> Result<Self> {
-        Group::try_new(group).map(Into::into)
+        Group::try_new(db, parent_id, group).map(Into::into)
     }
 
-    pub fn try_new_union(
+    pub(crate) fn try_new_union(
+        db: &dyn Ir,
+        parent_id: Id<Identifier>,
         union: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
-                impl TryInto<LogicalType, Error = impl Into<Box<dyn error::Error>>>,
+                Id<LogicalType>,
             ),
         >,
     ) -> Result<Self> {
-        Union::try_new(union).map(Into::into)
+        Union::try_new(db, parent_id, union).map(Into::into)
     }
 
     /// Returns true if this logical stream consists of only element-
@@ -154,13 +162,17 @@ impl LogicalType {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn is_element_only(&self) -> bool {
+    pub(crate) fn is_element_only(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null | LogicalType::Bits(_) => true,
             LogicalType::Group(Group(fields)) | LogicalType::Union(Union(fields)) => {
-                fields.values().all(|stream| stream.is_element_only())
+                fields.into_iter().all(|field_id| {
+                    db.lookup_intern_field(field_id.clone())
+                        .typ(db)
+                        .is_element_only(db)
+                })
             }
-            LogicalType::Stream(stream) => stream.data().is_element_only(),
+            LogicalType::Stream(stream) => stream.data(db).is_element_only(db),
         }
     }
 
@@ -168,14 +180,19 @@ impl LogicalType {
     /// signals.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub fn is_null(&self) -> bool {
+    pub(crate) fn is_null(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null => true,
-            LogicalType::Group(Group(fields)) => fields.values().all(|stream| stream.is_null()),
+            LogicalType::Group(Group(fields)) => fields
+                .into_iter()
+                .all(|field_id| db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)),
             LogicalType::Union(Union(fields)) => {
-                fields.len() == 1 && fields.values().all(|stream| stream.is_null())
+                fields.len() == 1
+                    && fields.into_iter().all(|field_id| {
+                        db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)
+                    })
             }
-            LogicalType::Stream(stream) => stream.is_null(),
+            LogicalType::Stream(stream) => stream.is_null(db),
             LogicalType::Bits(_) => false,
         }
     }

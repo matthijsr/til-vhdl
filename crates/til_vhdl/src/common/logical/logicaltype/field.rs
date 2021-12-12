@@ -12,19 +12,27 @@ pub(crate) struct Field {
 }
 
 impl Field {
-    pub fn new(db: &dyn Ir, base_id: &Vec<Name>, name: Name, typ: Id<LogicalType>) -> Field {
+    pub(crate) fn new(db: &dyn Ir, base_id: &Vec<Name>, name: Name, typ: Id<LogicalType>) -> Field {
         if base_id.is_empty() {
             Field {
                 name: db.intern_identifier(vec![name]),
                 typ: typ,
             }
         } else {
-            let id = base_id.clone();
+            let mut id = base_id.clone();
             id.push(name);
             Field {
                 name: db.intern_identifier(id),
                 typ: typ,
             }
         }
+    }
+
+    pub(crate) fn name(&self, db: &dyn Ir) -> Identifier {
+        db.lookup_intern_identifier(self.name)
+    }
+
+    pub(crate) fn typ(&self, db: &dyn Ir) -> LogicalType {
+        db.lookup_intern_type(self.typ)
     }
 }

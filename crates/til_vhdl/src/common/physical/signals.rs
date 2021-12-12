@@ -27,18 +27,18 @@ pub struct IndexSignal {
 }
 
 impl IndexSignal {
-    pub fn new(element_lanes: Positive) -> IndexSignal {
+    pub(crate) fn new(element_lanes: Positive) -> IndexSignal {
         IndexSignal {
             bit_count: log2_ceil(element_lanes),
             element_lanes: element_lanes,
         }
     }
 
-    pub fn bit_count(&self) -> NonNegative {
+    pub(crate) fn bit_count(&self) -> NonNegative {
         self.bit_count
     }
 
-    pub fn element_lanes(&self) -> Positive {
+    pub(crate) fn element_lanes(&self) -> Positive {
         self.element_lanes
     }
 
@@ -50,41 +50,41 @@ impl IndexSignal {
         )
     }
 
-    pub fn max(&self) -> String {
+    pub(crate) fn max(&self) -> String {
         self.format_number(self.element_lanes.get() - 1)
     }
 
-    pub fn min(&self) -> String {
+    pub(crate) fn min(&self) -> String {
         self.format_number(0)
     }
 }
 
 impl Signal {
-    pub fn new_data(stream: &PhysicalStream) -> Signal {
+    pub(crate) fn new_data(stream: &PhysicalStream) -> Signal {
         Signal::Data(stream.data_bit_count())
     }
 
-    pub fn new_last(stream: &PhysicalStream) -> Signal {
+    pub(crate) fn new_last(stream: &PhysicalStream) -> Signal {
         Signal::Last(stream.last_bit_count() * stream.element_lanes().get())
     }
 
-    pub fn new_stai(stream: &PhysicalStream) -> Signal {
+    pub(crate) fn new_stai(stream: &PhysicalStream) -> Signal {
         Signal::StartIndex(IndexSignal::new(stream.element_lanes()))
     }
 
-    pub fn new_endi(stream: &PhysicalStream) -> Signal {
+    pub(crate) fn new_endi(stream: &PhysicalStream) -> Signal {
         Signal::EndIndex(IndexSignal::new(stream.element_lanes()))
     }
 
-    pub fn new_strb(stream: &PhysicalStream) -> Signal {
+    pub(crate) fn new_strb(stream: &PhysicalStream) -> Signal {
         Signal::Strobe(stream.element_lanes().get())
     }
 
-    pub fn new_user(stream: &PhysicalStream) -> Signal {
+    pub(crate) fn new_user(stream: &PhysicalStream) -> Signal {
         Signal::User(stream.user_bit_count())
     }
 
-    pub fn default(&self) -> String {
+    pub(crate) fn default(&self) -> String {
         match self {
             Signal::Valid | Signal::Ready => "1".to_string(),
             Signal::Data(bit_count)

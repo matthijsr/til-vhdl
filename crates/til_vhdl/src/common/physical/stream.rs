@@ -31,7 +31,7 @@ pub struct PhysicalStream {
 }
 
 impl PhysicalStream {
-    pub fn try_new<T, U>(
+    pub(crate) fn try_new<T, U>(
         element_fields: T,
         element_lanes: usize,
         dimensionality: usize,
@@ -91,7 +91,7 @@ impl PhysicalStream {
     }
     /// Constructs a new PhysicalStream using provided arguments. Returns an
     /// error when provided argument are not valid.
-    pub fn new(
+    pub(crate) fn new(
         element_fields: impl Into<Fields>,
         element_lanes: Positive,
         dimensionality: NonNegative,
@@ -108,34 +108,34 @@ impl PhysicalStream {
     }
 
     /// Returns the element fields in this physical stream.
-    pub fn element_fields(&self) -> &Fields {
+    pub(crate) fn element_fields(&self) -> &Fields {
         &self.element_fields
     }
 
     /// Returns the number of element lanes in this physical stream.
-    pub fn element_lanes(&self) -> Positive {
+    pub(crate) fn element_lanes(&self) -> Positive {
         self.element_lanes
     }
 
     /// Returns the dimensionality of this physical stream.
-    pub fn dimensionality(&self) -> NonNegative {
+    pub(crate) fn dimensionality(&self) -> NonNegative {
         self.dimensionality
     }
 
     /// Returns the complexity of this physical stream.
-    pub fn complexity(&self) -> &Complexity {
+    pub(crate) fn complexity(&self) -> &Complexity {
         &self.complexity
     }
 
     /// Returns the user fields in this physical stream.
-    pub fn user(&self) -> &Fields {
+    pub(crate) fn user(&self) -> &Fields {
         &self.user
     }
 
     /// Returns the bit count of the data (element) fields in this physical
     /// stream. The bit count is equal to the combined bit count of all fields
     /// multiplied by the number of lanes.
-    pub fn data_bit_count(&self) -> NonNegative {
+    pub(crate) fn data_bit_count(&self) -> NonNegative {
         self.element_fields
             .values()
             .map(|b| b.get())
@@ -145,13 +145,13 @@ impl PhysicalStream {
 
     /// Returns the number of last bits in this physical stream. The number of
     /// last bits equals the dimensionality.
-    pub fn last_bit_count(&self) -> NonNegative {
+    pub(crate) fn last_bit_count(&self) -> NonNegative {
         self.dimensionality
     }
 
     /// Returns the number of `stai` (start index) bits in this physical
     /// stream.
-    pub fn stai_bit_count(&self) -> NonNegative {
+    pub(crate) fn stai_bit_count(&self) -> NonNegative {
         if self.complexity.major() >= 6 && self.element_lanes.get() > 1 {
             log2_ceil(self.element_lanes)
         } else {
@@ -160,7 +160,7 @@ impl PhysicalStream {
     }
 
     /// Returns the number of `endi` (end index) bits in this physical stream.
-    pub fn endi_bit_count(&self) -> NonNegative {
+    pub(crate) fn endi_bit_count(&self) -> NonNegative {
         if (self.complexity.major() >= 5 || self.dimensionality >= 1)
             && self.element_lanes.get() > 1
         {
@@ -171,7 +171,7 @@ impl PhysicalStream {
     }
 
     /// Returns the number of `strb` (strobe) bits in this physical stream.
-    pub fn strb_bit_count(&self) -> NonNegative {
+    pub(crate) fn strb_bit_count(&self) -> NonNegative {
         if self.complexity.major() >= 7 || self.dimensionality >= 1 {
             self.element_lanes.get()
         } else {
@@ -180,7 +180,7 @@ impl PhysicalStream {
     }
 
     /// Returns the bit count of the user fields in this physical stream.
-    pub fn user_bit_count(&self) -> NonNegative {
+    pub(crate) fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
     }
 }

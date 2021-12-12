@@ -11,6 +11,8 @@ pub(crate) use port::Port;
 pub mod port;
 pub(crate) use streamlet::Streamlet;
 pub mod streamlet;
+pub(crate) use db::Database;
+pub mod db;
 
 /// List of all the nodes
 pub(crate) type LogicalType = logical::logicaltype::LogicalType;

@@ -1,56 +1,64 @@
 use std::{convert::TryInto, error};
 
 use indexmap::IndexMap;
+use tydi_intern::Id;
 
-use crate::common::{
-    error::{Error, Result},
-    integers::{BitCount, NonNegative},
-    name::Name,
-    util::log2_ceil,
+use crate::{
+    common::{
+        error::{Error, Result},
+        integers::{BitCount, NonNegative},
+        name::Name,
+        util::log2_ceil,
+    },
+    ir::{Identifier, Ir},
 };
 
-use super::LogicalType;
+use super::{Field, LogicalType};
 
 ///
 ///
 /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#union)
-#[derive(Debug, Clone, PartialEq)]
-pub struct Union(pub(super) IndexMap<Name, LogicalType>);
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Union(pub(super) Vec<Id<Field>>);
 
 impl Union {
     /// Returns a new Union logical stream type. Returns an error when either
     /// the name or logical stream type conversion fails, or when there are
     /// duplicate names.
-    pub fn try_new(
+    pub(crate) fn try_new(
+        db: &dyn Ir,
+        parent_id: Id<Identifier>,
         union: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
-                impl TryInto<LogicalType, Error = impl Into<Box<dyn error::Error>>>,
+                Id<LogicalType>,
             ),
         >,
     ) -> Result<Self> {
         let mut map = IndexMap::new();
-        for (name, stream) in union
+        for (name, typ) in union
             .into_iter()
-            .map(
-                |(name, stream)| match (name.try_into(), stream.try_into()) {
-                    (Ok(name), Ok(stream)) => Ok((name, stream)),
-                    (Err(name), _) => Err(Error::from(name.into())),
-                    (_, Err(stream)) => Err(Error::from(stream.into())),
-                },
-            )
+            .map(|(name, typ)| match (name.try_into(), typ) {
+                (Ok(name), _) => Ok((name, typ)),
+                (Err(name), _) => Err(Error::from(name.into())),
+            })
             .collect::<Result<Vec<_>>>()?
         {
-            map.insert(name, stream)
+            map.insert(name, typ)
                 .map(|_| -> Result<()> { Err(Error::UnexpectedDuplicate) })
                 .transpose()?;
         }
-        Ok(Union(map))
+        let base_id = db.lookup_intern_identifier(parent_id);
+        let fields = map
+            .into_iter()
+            .map(|(name, typ)| db.intern_field(Field::new(db, &base_id, name, typ)))
+            .collect();
+        Ok(Union(fields))
     }
 
     /// Returns the tag name and width of this union.
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html)
-    pub fn tag(&self) -> Option<(String, BitCount)> {
+    pub(crate) fn tag(&self) -> Option<(String, BitCount)> {
         if self.0.len() > 1 {
             Some((
                 "tag".to_string(),
@@ -62,11 +70,6 @@ impl Union {
         } else {
             None
         }
-    }
-
-    /// Returns an iterator over the fields of the Union.
-    pub fn iter(&self) -> impl Iterator<Item = (&Name, &LogicalType)> {
-        self.0.iter()
     }
 }
 
