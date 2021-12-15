@@ -73,7 +73,7 @@ pub struct Stream {
 
 impl Stream {
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(
+    pub fn new(
         data: Id<LogicalType>,
         throughput: PositiveReal,
         dimensionality: NonNegative,
@@ -95,38 +95,38 @@ impl Stream {
         }
     }
 
-    pub(crate) fn data(&self, db: &dyn Ir) -> LogicalType {
+    pub fn data(&self, db: &dyn Ir) -> LogicalType {
         db.lookup_intern_type(self.data)
     }
 
-    pub(crate) fn user(&self, db: &dyn Ir) -> LogicalType {
+    pub fn user(&self, db: &dyn Ir) -> LogicalType {
         db.lookup_intern_type(self.user)
     }
 
     /// Returns the direction of this stream.
-    pub(crate) fn direction(&self) -> Direction {
+    pub fn direction(&self) -> Direction {
         self.direction
     }
 
     /// Returns the synchronicity of this stream.
-    pub(crate) fn synchronicity(&self) -> Synchronicity {
+    pub fn synchronicity(&self) -> Synchronicity {
         self.synchronicity
     }
 
     /// Returns the dimensionality of this stream.
-    pub(crate) fn dimensionality(&self) -> NonNegative {
+    pub fn dimensionality(&self) -> NonNegative {
         self.dimensionality
     }
 
     /// Returns the throughput ratio of this stream.
-    pub(crate) fn throughput(&self) -> PositiveReal {
+    pub fn throughput(&self) -> PositiveReal {
         self.throughput
     }
 
     /// Returns true if this stream is null i.e. it results in no signals.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub(crate) fn is_null(&self, db: &dyn Ir) -> bool {
+    pub fn is_null(&self, db: &dyn Ir) -> bool {
         self.data(db).is_null(db) && self.user(db).is_null(db) && !self.keep
     }
 }

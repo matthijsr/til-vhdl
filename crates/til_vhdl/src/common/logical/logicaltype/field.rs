@@ -5,14 +5,14 @@ use crate::ir::{Identifier, Ir, Name};
 use super::LogicalType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct Field {
+pub struct Field {
     /// The relative name of the field
     name: Id<Identifier>,
     typ: Id<LogicalType>,
 }
 
 impl Field {
-    pub(crate) fn new(db: &dyn Ir, base_id: &Vec<Name>, name: Name, typ: Id<LogicalType>) -> Field {
+    pub fn new(db: &dyn Ir, base_id: &Vec<Name>, name: Name, typ: Id<LogicalType>) -> Field {
         if base_id.is_empty() {
             Field {
                 name: db.intern_identifier(vec![name]),
@@ -28,11 +28,11 @@ impl Field {
         }
     }
 
-    pub(crate) fn name(&self, db: &dyn Ir) -> Identifier {
+    pub fn name(&self, db: &dyn Ir) -> Identifier {
         db.lookup_intern_identifier(self.name)
     }
 
-    pub(crate) fn typ(&self, db: &dyn Ir) -> LogicalType {
+    pub fn typ(&self, db: &dyn Ir) -> LogicalType {
         db.lookup_intern_type(self.typ)
     }
 }

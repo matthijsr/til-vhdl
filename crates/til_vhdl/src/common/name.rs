@@ -125,7 +125,7 @@ impl fmt::Display for Name {
 pub struct PathName(Vec<Name>);
 
 impl PathName {
-    pub(crate) fn new_empty() -> Self {
+    pub fn new_empty() -> Self {
         PathName(Vec::new())
     }
 
@@ -152,7 +152,7 @@ impl PathName {
         self.0.push(name.into())
     }
 
-    pub(crate) fn with_parents(&self, path: impl Into<PathName>) -> PathName {
+    pub fn with_parents(&self, path: impl Into<PathName>) -> PathName {
         let parent = path.into();
         let mut result: Vec<Name> = Vec::with_capacity(self.len() + parent.len());
         result.extend(parent.0.into_iter());
@@ -160,7 +160,7 @@ impl PathName {
         PathName::new(result.into_iter())
     }
 
-    pub(crate) fn with_parent(&self, name: impl Into<Name>) -> PathName {
+    pub fn with_parent(&self, name: impl Into<Name>) -> PathName {
         let mut result: Vec<Name> = Vec::with_capacity(self.len() + 1);
         result.push(name.into());
         result.extend(self.0.clone().into_iter());

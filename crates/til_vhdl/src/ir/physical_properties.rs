@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum PortDirection {
+pub enum PortDirection {
     Source,
     Sink,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct PhysicalProperties {
+pub struct PhysicalProperties {
     direction: PortDirection,
 }

@@ -25,7 +25,7 @@ impl Union {
     /// Returns a new Union logical stream type. Returns an error when either
     /// the name or logical stream type conversion fails, or when there are
     /// duplicate names.
-    pub(crate) fn try_new(
+    pub fn try_new(
         db: &dyn Ir,
         parent_id: Id<Identifier>,
         union: impl IntoIterator<
@@ -58,7 +58,7 @@ impl Union {
 
     /// Returns the tag name and width of this union.
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html)
-    pub(crate) fn tag(&self) -> Option<(String, BitCount)> {
+    pub fn tag(&self) -> Option<(String, BitCount)> {
         if self.0.len() > 1 {
             Some((
                 "tag".to_string(),

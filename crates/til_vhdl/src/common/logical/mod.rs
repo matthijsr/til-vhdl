@@ -1,1 +1,1 @@
-pub(crate) mod logicaltype;
+pub mod logicaltype;

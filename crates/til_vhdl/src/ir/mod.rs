@@ -1,28 +1,28 @@
 use crate::common::{logical, name};
 use tydi_intern::Id;
 
-pub(crate) use connection::Connection;
+pub use connection::Connection;
 pub mod connection;
-pub(crate) use implementation::Implementation;
+pub use implementation::Implementation;
 pub mod implementation;
-pub(crate) use physical_properties::PhysicalProperties;
+pub use physical_properties::PhysicalProperties;
 pub mod physical_properties;
-pub(crate) use port::Port;
+pub use port::Port;
 pub mod port;
-pub(crate) use streamlet::Streamlet;
+pub use streamlet::Streamlet;
 pub mod streamlet;
-pub(crate) use db::Database;
+pub use db::Database;
 pub mod db;
 
 /// List of all the nodes
-pub(crate) type LogicalType = logical::logicaltype::LogicalType;
-pub(crate) type Stream = logical::logicaltype::Stream;
-pub(crate) type Name = name::Name;
-pub(crate) type Field = logical::logicaltype::Field;
-pub(crate) type Identifier = Vec<Name>;
+pub type LogicalType = logical::logicaltype::LogicalType;
+pub type Stream = logical::logicaltype::Stream;
+pub type Name = name::Name;
+pub type Field = logical::logicaltype::Field;
+pub type Identifier = Vec<Name>;
 
 #[salsa::query_group(IrStorage)]
-pub(crate) trait Ir {
+pub trait Ir {
     #[salsa::interned]
     fn intern_connection(&self, connection: Connection) -> Id<Connection>;
     #[salsa::interned]

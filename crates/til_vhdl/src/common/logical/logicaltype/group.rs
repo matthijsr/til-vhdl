@@ -23,7 +23,7 @@ impl Group {
     /// Returns a new Group logical stream type. Returns an error when either
     /// the name or logical stream type conversion fails, or when there are
     /// duplicate names.
-    pub(crate) fn try_new(
+    pub fn try_new(
         db: &dyn Ir,
         parent_id: Id<Identifier>,
         group: impl IntoIterator<

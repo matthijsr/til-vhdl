@@ -9,18 +9,18 @@ use crate::{
     ir::{Identifier, Ir},
 };
 
-pub(crate) use field::*;
-pub(crate) mod field;
+pub use field::*;
+pub mod field;
 
-pub(crate) use group::*;
-pub(crate) mod group;
+pub use group::*;
+pub mod group;
 
-pub(crate) use stream::*;
-pub(crate) mod stream;
+pub use stream::*;
+pub mod stream;
 
 use tydi_intern::Id;
-pub(crate) use union::*;
-pub(crate) mod union;
+pub use union::*;
+pub mod union;
 
 /// Types of logical streams.
 ///
@@ -82,7 +82,7 @@ impl LogicalType {
     /// assert_eq!(zero, Err(Error::InvalidArgument("bit count cannot be zero".to_string())));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub(crate) fn try_new_bits(bit_count: NonNegative) -> Result<Self> {
+    pub fn try_new_bits(bit_count: NonNegative) -> Result<Self> {
         Ok(LogicalType::Bits(Positive::new(bit_count).ok_or_else(
             || Error::InvalidArgument("bit count cannot be zero".to_string()),
         )?))
@@ -122,7 +122,7 @@ impl LogicalType {
     /// ```
     ///
     /// [`Group`]: ./struct.Group.html
-    pub(crate) fn try_new_group(
+    pub fn try_new_group(
         db: &dyn Ir,
         parent_id: Id<Identifier>,
         group: impl IntoIterator<
@@ -135,7 +135,7 @@ impl LogicalType {
         Group::try_new(db, parent_id, group).map(Into::into)
     }
 
-    pub(crate) fn try_new_union(
+    pub fn try_new_union(
         db: &dyn Ir,
         parent_id: Id<Identifier>,
         union: impl IntoIterator<
@@ -162,7 +162,7 @@ impl LogicalType {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub(crate) fn is_element_only(&self, db: &dyn Ir) -> bool {
+    pub fn is_element_only(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null | LogicalType::Bits(_) => true,
             LogicalType::Group(Group(fields)) | LogicalType::Union(Union(fields)) => {
@@ -180,7 +180,7 @@ impl LogicalType {
     /// signals.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub(crate) fn is_null(&self, db: &dyn Ir) -> bool {
+    pub fn is_null(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null => true,
             LogicalType::Group(Group(fields)) => fields
