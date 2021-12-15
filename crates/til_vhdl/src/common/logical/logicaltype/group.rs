@@ -1,4 +1,4 @@
-use std::{convert::TryInto, error};
+use std::{convert::TryInto, error, sync::Arc};
 
 use indexmap::IndexMap;
 use tydi_intern::Id;
@@ -25,7 +25,7 @@ impl Group {
     /// duplicate names.
     pub fn try_new(
         db: &dyn Ir,
-        parent_id: Id<Identifier>,
+        parent_id: Option<Id<Identifier>>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -46,12 +46,25 @@ impl Group {
                 .map(|_| -> Result<()> { Err(Error::UnexpectedDuplicate) })
                 .transpose()?;
         }
-        let base_id = db.lookup_intern_identifier(parent_id);
+        let base_id = match parent_id {
+            Some(id) => db.lookup_intern_identifier(id),
+            None => vec![],
+        };
         let fields = map
             .into_iter()
             .map(|(name, typ)| db.intern_field(Field::new(db, &base_id, name, typ)))
             .collect();
         Ok(Group(fields))
+    }
+
+    /// Returns an iterator over the fields of the Group.
+    pub fn iter(&self, db: &dyn Ir) -> Arc<Vec<Field>> {
+        Arc::new(
+            self.0
+                .iter()
+                .map(|x| db.lookup_intern_field(x.clone()))
+                .collect(),
+        )
     }
 }
 
@@ -61,5 +74,22 @@ impl From<Group> for LogicalType {
     /// [`LogicalType`]: ./enum.LogicalType.html
     fn from(group: Group) -> Self {
         LogicalType::Group(group)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::Database;
+
+    #[test]
+    fn test_new() {
+        let mut db = Database::default();
+        let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
+        let group = Group::try_new(&db, None, vec![("a", bits)]).unwrap();
+        let fields = group.iter(&db);
+        let field = fields.last().unwrap();
+        assert_eq!(field.name().last().unwrap(), "a");
+        assert_eq!(field.typ(&db), db.lookup_intern_type(bits));
     }
 }
