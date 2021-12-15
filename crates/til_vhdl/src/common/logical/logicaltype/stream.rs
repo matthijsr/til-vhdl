@@ -1,3 +1,4 @@
+use std::convert::{TryFrom, TryInto};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
@@ -13,12 +14,54 @@ use crate::ir::Ir;
 
 use super::LogicalType;
 
+/// Floats cannot be hashed or consistently reproduced on all hardware
+///
+/// Throughput is stored as a string to ensure consistency between IR and back-end
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Throughput(String);
+
+impl Throughput {
+    pub fn try_new(throughput: String) -> Result<Self> {
+        match throughput.parse::<f64>() {
+            Ok(val) if PositiveReal::new(val).is_ok() => Ok(Throughput(throughput)),
+            _ => Err(Error::InvalidArgument(format!(
+                "{} is not a positive real number",
+                throughput
+            ))),
+        }
+    }
+
+    pub fn as_real(&self) -> PositiveReal {
+        PositiveReal::new(self.0.parse().unwrap()).unwrap()
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for Throughput {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        Throughput::try_new(value.to_string())
+    }
+}
+
+impl TryFrom<String> for Throughput {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self> {
+        Throughput::try_new(value)
+    }
+}
+
 /// The stream-manipulating logical stream type.
 ///
 /// Defines a new physical stream.
 ///
 /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#stream)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Stream {
     /// Logical stream type of data elements carried by this stream.
     ///
@@ -31,7 +74,7 @@ pub struct Stream {
     /// should be transferrable on the child stream per element in the parent
     /// stream, or if there is no parent stream, the minimum number of elements
     /// that should be transferrable per clock cycle.
-    throughput: PositiveReal,
+    throughput: Throughput,
     /// Dimensionality of the stream.
     ///
     /// Nonnegative integer specifying the dimensionality of the child
@@ -73,26 +116,26 @@ pub struct Stream {
 
 impl Stream {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn try_new(
         data: Id<LogicalType>,
-        throughput: PositiveReal,
+        throughput: impl TryInto<Throughput, Error = Error>,
         dimensionality: NonNegative,
         synchronicity: Synchronicity,
         complexity: impl Into<Complexity>,
         direction: Direction,
         user: Id<LogicalType>,
         keep: bool,
-    ) -> Self {
-        Stream {
+    ) -> Result<Self> {
+        Ok(Stream {
             data: data,
-            throughput,
+            throughput: throughput.try_into()?,
             dimensionality,
             synchronicity,
             complexity: complexity.into(),
             direction,
             user: user,
             keep,
-        }
+        })
     }
 
     pub fn data(&self, db: &dyn Ir) -> LogicalType {
@@ -119,8 +162,8 @@ impl Stream {
     }
 
     /// Returns the throughput ratio of this stream.
-    pub fn throughput(&self) -> PositiveReal {
-        self.throughput
+    pub fn throughput(&self) -> Throughput {
+        self.throughput.clone()
     }
 
     /// Returns true if this stream is null i.e. it results in no signals.
@@ -139,26 +182,6 @@ impl From<Stream> for LogicalType {
         LogicalType::Stream(stream)
     }
 }
-
-impl Hash for Stream {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        (
-            &self.complexity,
-            &self.data,
-            &self.dimensionality,
-            &self.direction,
-            &self.keep,
-            &self.synchronicity,
-            &self.user,
-        )
-            .hash(state);
-    }
-}
-
-impl Eq for Stream {}
 
 /// The synchronicity of the elements in the child stream with respect to the
 /// elements in the parent stream.
