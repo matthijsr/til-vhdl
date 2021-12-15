@@ -25,7 +25,7 @@ impl Group {
     /// duplicate names.
     pub fn try_new(
         db: &dyn Ir,
-        parent_id: Option<Id<Identifier>>,
+        parent_id: Option<Identifier>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -47,7 +47,7 @@ impl Group {
                 .transpose()?;
         }
         let base_id = match parent_id {
-            Some(id) => db.lookup_intern_identifier(id),
+            Some(id) => id,
             None => vec![],
         };
         let fields = map

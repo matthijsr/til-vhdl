@@ -28,8 +28,6 @@ pub trait Ir {
     #[salsa::interned]
     fn intern_field(&self, field: Field) -> Id<Field>;
     #[salsa::interned]
-    fn intern_identifier(&self, identifier: Identifier) -> Id<Identifier>;
-    #[salsa::interned]
     fn intern_implementation(&self, implementation: Implementation) -> Id<Implementation>;
     #[salsa::interned]
     fn intern_type(&self, logical_type: LogicalType) -> Id<LogicalType>;

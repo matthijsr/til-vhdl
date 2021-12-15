@@ -1,4 +1,4 @@
-use std::{convert::TryInto, error};
+use std::{convert::TryInto, error, sync::Arc};
 
 use indexmap::IndexMap;
 use tydi_intern::Id;
@@ -27,7 +27,7 @@ impl Union {
     /// duplicate names.
     pub fn try_new(
         db: &dyn Ir,
-        parent_id: Id<Identifier>,
+        parent_id: Option<Identifier>,
         union: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -48,7 +48,10 @@ impl Union {
                 .map(|_| -> Result<()> { Err(Error::UnexpectedDuplicate) })
                 .transpose()?;
         }
-        let base_id = db.lookup_intern_identifier(parent_id);
+        let base_id = match parent_id {
+            Some(id) => id,
+            None => vec![],
+        };
         let fields = map
             .into_iter()
             .map(|(name, typ)| db.intern_field(Field::new(db, &base_id, name, typ)))
@@ -56,20 +59,28 @@ impl Union {
         Ok(Union(fields))
     }
 
-    /// Returns the tag name and width of this union.
-    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html)
-    pub fn tag(&self) -> Option<(String, BitCount)> {
+    /// Returns the tag width of this union.
+    pub fn tag(&self) -> Option<BitCount> {
         if self.0.len() > 1 {
-            Some((
-                "tag".to_string(),
+            Some(
                 BitCount::new(log2_ceil(
                     BitCount::new(self.0.len() as NonNegative).unwrap(),
                 ))
                 .unwrap(),
-            ))
+            )
         } else {
             None
         }
+    }
+
+    /// Returns an iterator over the fields of the Union.
+    pub fn iter(&self, db: &dyn Ir) -> Arc<Vec<Field>> {
+        Arc::new(
+            self.0
+                .iter()
+                .map(|x| db.lookup_intern_field(x.clone()))
+                .collect(),
+        )
     }
 }
 
@@ -79,5 +90,23 @@ impl From<Union> for LogicalType {
     /// [`LogicalType`]: ./enum.LogicalType.html
     fn from(union: Union) -> Self {
         LogicalType::Union(union)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::Database;
+
+    #[test]
+    fn test_new() {
+        let mut db = Database::default();
+        let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
+        let union = Union::try_new(&db, None, vec![("a", bits)]).unwrap();
+        let fields = union.iter(&db);
+        let field = fields.last().unwrap();
+        assert_eq!(field.name().last().unwrap(), "a");
+        assert_eq!(field.typ(&db), db.lookup_intern_type(bits));
+        assert_eq!(union.tag(), None);
     }
 }

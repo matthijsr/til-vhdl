@@ -124,7 +124,7 @@ impl LogicalType {
     /// [`Group`]: ./struct.Group.html
     pub fn try_new_group(
         db: &dyn Ir,
-        parent_id: Option<Id<Identifier>>,
+        parent_id: Option<Identifier>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -137,7 +137,7 @@ impl LogicalType {
 
     pub fn try_new_union(
         db: &dyn Ir,
-        parent_id: Id<Identifier>,
+        parent_id: Option<Identifier>,
         union: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
