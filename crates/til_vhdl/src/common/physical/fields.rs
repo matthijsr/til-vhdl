@@ -1,9 +1,9 @@
 use indexmap::IndexMap;
 
-use crate::common::{
+use tydi_common::{
     error::{Error, Result},
-    integers::BitCount,
     name::PathName,
+    numbers::BitCount,
 };
 
 #[derive(Debug, Clone, PartialEq)]

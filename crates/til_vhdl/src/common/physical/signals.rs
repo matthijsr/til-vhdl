@@ -1,8 +1,7 @@
 use std::convert::TryFrom;
 
-use crate::common::{
-    error::{Error, Result},
-    integers::{NonNegative, Positive},
+use tydi_common::{
+    numbers::{NonNegative, Positive},
     util::log2_ceil,
 };
 

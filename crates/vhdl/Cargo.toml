@@ -1,0 +1,11 @@
+# Copied from https://github.com/tydi-lang/tydi for now
+[project]
+name = "tydi-vhdl"
+version = "0.0.0"
+edition = "2018"
+publish = false
+description = "VHDL library for Tydi back-ends"
+
+[dependencies]
+indexmap = "1.7.0"
+tydi-common = { path = "../common" }

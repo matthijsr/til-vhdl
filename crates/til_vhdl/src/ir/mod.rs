@@ -1,4 +1,4 @@
-use crate::common::{logical, name};
+use crate::common::logical;
 use tydi_intern::Id;
 
 pub use connection::Connection;
@@ -17,7 +17,7 @@ pub mod db;
 /// List of all the nodes
 pub type LogicalType = logical::logicaltype::LogicalType;
 pub type Stream = logical::logicaltype::Stream;
-pub type Name = name::Name;
+pub type Name = tydi_common::name::Name;
 pub type Field = logical::logicaltype::Field;
 pub type Identifier = Vec<Name>;
 

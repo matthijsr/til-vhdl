@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use super::error::{Error, Result};
+use crate::error::{Error, Result};
 
 /// Type-safe wrapper for valid names.
 ///

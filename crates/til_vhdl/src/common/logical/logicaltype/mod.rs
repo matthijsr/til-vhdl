@@ -1,12 +1,10 @@
 use std::{convert::TryInto, error};
 
-use crate::{
-    common::{
-        error::{Error, Result},
-        integers::{NonNegative, Positive},
-        name::Name,
-    },
-    ir::{Identifier, Ir},
+use crate::ir::{Identifier, Ir};
+use tydi_common::{
+    error::{Error, Result},
+    name::Name,
+    numbers::{NonNegative, Positive},
 };
 
 pub use field::*;

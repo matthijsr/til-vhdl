@@ -1,9 +1,9 @@
 use std::convert::TryInto;
 
-use crate::common::{
+use tydi_common::{
     error::{Error, Result},
-    integers::{NonNegative, Positive},
     name::PathName,
+    numbers::{NonNegative, Positive},
     util::log2_ceil,
 };
 

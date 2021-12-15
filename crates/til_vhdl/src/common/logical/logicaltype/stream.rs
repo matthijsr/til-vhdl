@@ -5,12 +5,12 @@ use std::str::FromStr;
 use salsa::Database;
 use tydi_intern::Id;
 
-use crate::common::{
-    error::{Error, Result},
-    integers::{NonNegative, PositiveReal},
-    physical::complexity::Complexity,
-};
+use crate::common::physical::complexity::Complexity;
 use crate::ir::Ir;
+use tydi_common::{
+    error::{Error, Result},
+    numbers::{NonNegative, PositiveReal},
+};
 
 use super::LogicalType;
 

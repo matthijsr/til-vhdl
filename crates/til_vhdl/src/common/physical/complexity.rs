@@ -1,8 +1,8 @@
 use std::{cmp::Ordering, convert::TryFrom, fmt, str::FromStr};
 
-use crate::common::{
+use tydi_common::{
     error::{Error, Result},
-    integers::NonNegative,
+    numbers::NonNegative,
 };
 
 /// Interface complexity level.

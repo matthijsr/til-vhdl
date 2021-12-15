@@ -3,12 +3,10 @@ use std::{convert::TryInto, error, sync::Arc};
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::{
-    common::{
-        error::{Error, Result},
-        name::Name,
-    },
-    ir::{Identifier, Ir},
+use crate::ir::{Identifier, Ir};
+use tydi_common::{
+    error::{Error, Result},
+    name::Name,
 };
 
 use super::{Field, LogicalType};

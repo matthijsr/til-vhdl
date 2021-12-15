@@ -1,4 +1,4 @@
-use super::integers::{NonNegative, Positive};
+use super::numbers::{NonNegative, Positive};
 
 /// Returns ⌈log2(x)⌉.
 pub const fn log2_ceil(x: Positive) -> NonNegative {
