@@ -1,6 +1,17 @@
-use tydi_common::traits::{Identify, Document};
+use itertools::Itertools;
+use textwrap::indent;
+use tydi_common::{
+    error::Result,
+    traits::{Document, Identify},
+};
 
-use crate::port::{Parameter, Port};
+use crate::{
+    declaration::Declare,
+    object::ObjectType,
+    port::{Parameter, Port},
+    properties::Analyze,
+    traits::VhdlDocument,
+};
 
 /// A component.
 #[derive(Debug, Clone)]
@@ -13,18 +24,6 @@ pub struct Component {
     ports: Vec<Port>,
     /// Documentation.
     doc: Option<String>,
-}
-
-impl Identify for Component {
-    fn identifier(&self) -> &str {
-        self.identifier.as_str()
-    }
-}
-
-impl Document for Component {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
-    }
 }
 
 impl Component {
@@ -62,5 +61,96 @@ impl Component {
     /// Set the documentation of this component.
     pub fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into())
+    }
+}
+
+impl Identify for Component {
+    fn identifier(&self) -> &str {
+        self.identifier.as_str()
+    }
+}
+
+impl Document for Component {
+    fn doc(&self) -> Option<String> {
+        self.doc.clone()
+    }
+}
+
+impl Analyze for Component {
+    fn list_nested_types(&self) -> Vec<ObjectType> {
+        let mut result: Vec<ObjectType> = vec![];
+        for p in self.ports().iter() {
+            result.append(&mut p.typ().list_nested_types())
+        }
+        result.into_iter().unique_by(|x| x.type_name()).collect()
+    }
+}
+
+impl Declare for Component {
+    fn declare(&self) -> Result<String> {
+        let mut result = String::new();
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(doc.as_str());
+        }
+        result.push_str(format!("component {}\n", self.identifier()).as_str());
+        let mut port_body = "port (\n".to_string();
+        let ports = self
+            .ports()
+            .iter()
+            .map(|x| x.declare())
+            .collect::<Result<Vec<String>>>()?
+            .join(";\n");
+        port_body.push_str(&indent(&ports, "  "));
+        port_body.push_str("\n);\n");
+        result.push_str(&indent(&port_body, "  "));
+        result.push_str("end component;");
+        Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::port::Mode;
+
+    use super::*;
+
+    #[test]
+    fn test_declare() {
+        let empty_comp = Component::new("test", vec![], vec![], Some("test\ntest".to_string()));
+        assert_eq!(
+            r#"-- test
+-- test
+component test
+  port (
+
+  );
+end component;"#,
+            empty_comp.declare().unwrap()
+        );
+        let port1 = Port::new_documented(
+            "some_port",
+            Mode::In,
+            ObjectType::Bit,
+            "This is port documentation\nNext line.",
+        );
+        let port2 = Port::new(
+            "some_other_port",
+            Mode::Out,
+            ObjectType::bit_vector(43, 0).unwrap(),
+        );
+        let clk = Port::new("clk", Mode::In, ObjectType::Bit);
+        let comp = Component::new("test", vec![], vec![port1, port2, clk], None);
+        assert_eq!(
+            r#"component test
+  port (
+    -- This is port documentation
+    -- Next line.
+    some_port : in std_logic;
+    some_other_port : out std_logic_vector(43 downto 0);
+    clk : in std_logic
+  );
+end component;"#,
+            comp.declare().unwrap()
+        );
     }
 }

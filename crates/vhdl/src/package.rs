@@ -1,22 +1,45 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
+use textwrap::indent;
 use tydi_common::{
     error::{Error, Result},
+    name::Name,
     traits::Identify,
 };
 
-use crate::{component::Component, declaration::Declare};
+use crate::{
+    component::Component,
+    declaration::Declare,
+    object::ObjectType,
+    properties::Analyze,
+    usings::{DeclareUsings, ListUsings, Usings},
+};
 
 /// A library of components and types.
 #[derive(Debug)]
 pub struct Package {
     /// The identifier.
-    pub identifier: String,
-    /// The components declared within the library.66
-    pub components: Vec<Component>,
+    identifier: Name,
+    /// The components declared within the library.
+    components: Vec<Component>,
+    /// The types declared within the library.
+    types: Vec<ObjectType>,
 }
 
 impl Package {
+    pub fn new(identifier: Name, components: &Vec<Component>, types: &Vec<ObjectType>) -> Self {
+        let mut all_types: Vec<ObjectType> = types.clone();
+        for component in components {
+            all_types.append(&mut component.list_nested_types());
+        }
+        Package {
+            identifier,
+            components: components.clone(),
+            types: all_types.into_iter().unique_by(|x| x.type_name()).collect(),
+        }
+    }
+
     pub fn get_component(&self, identifier: impl Into<String>) -> Result<Component> {
         let identifier = identifier.into();
         match self
@@ -31,71 +54,63 @@ impl Package {
             ))),
         }
     }
+
+    pub fn components(&self) -> &Vec<Component> {
+        &self.components
+    }
+
+    pub fn types(&self) -> &Vec<ObjectType> {
+        &self.types
+    }
 }
 
 // TODO
 
-// impl Declare for Package {
-//     fn declare(&self) -> Result<String> {
-//         let mut result = String::new();
-//         result.push_str(self.declare_usings()?.as_str());
-//         result.push_str(format!("package {} is\n\n", self.identifier).as_str());
+impl Declare for Package {
+    fn declare(&self) -> Result<String> {
+        let mut result = String::new();
+        result.push_str(self.declare_usings()?.as_str());
+        result.push_str(format!("package {} is\n\n", self.identifier).as_str());
 
-//         // Whatever generated the common representation is responsible to not to use the same
-//         // identifiers for different types.
-//         // Use a set to remember which type identifiers we've already used, so we don't declare
-//         // them twice, and produce an error otherwise.
-//         let mut type_ids = HashMap::<String, Type>::new();
-//         for c in &self.components {
-//             let comp_nested = c.list_nested_types();
-//             for t in comp_nested.iter() {
-//                 match type_ids.get(&t.vhdl_identifier()?) {
-//                     None => {
-//                         type_ids.insert(t.vhdl_identifier()?, t.clone());
-//                         result.push_str(format!("{}\n\n", t.declare(true)?).as_str());
-//                     }
-//                     Some(already_defined_type) => {
-//                         if t != already_defined_type {
-//                             return Err(BackEndError(format!(
-//                                 "Type name conflict: {}",
-//                                 already_defined_type
-//                                     .vhdl_identifier()
-//                                     .unwrap_or_else(|_| "".to_string())
-//                             )));
-//                         }
-//                     }
-//                 }
-//             }
-//             result.push_str(format!("{}\n\n", c.declare()?).as_str());
-//         }
-//         result.push_str(format!("end {};", self.identifier).as_str());
+        let mut body = String::new();
+        for t in self.types() {
+            body.push_str(format!("{}\n\n", t.declare()?).as_str());
+        }
+        for c in &self.components {
+            body.push_str(format!("{}\n\n", c.declare()?).as_str());
+        }
+        result.push_str(&indent(&body, "  "));
+        result.push_str(format!("end {};", self.identifier).as_str());
 
-//         Ok(result)
-//     }
-// }
+        Ok(result)
+    }
+}
 
-// // NOTE: ListUsings is overkill for Packages as-is (could be simple constants, as they always use ieee.std_logic and nothing else), but serves as a decent example.
-// impl ListUsings for Package {
-//     fn list_usings(&self) -> Result<Usings> {
-//         let mut usings = Usings::new_empty();
-//         let mut types = self
-//             .components
-//             .iter()
-//             .flat_map(|x| x.ports().iter().map(|p| p.typ()));
-//         fn uses_std_logic(t: &Type) -> bool {
-//             match t {
-//                 Type::Bit => true,
-//                 Type::BitVec { width: _ } => true,
-//                 Type::Record(rec) => rec.fields().any(|field| uses_std_logic(field.typ())),
-//                 Type::Union(rec) => rec.fields().any(|field| uses_std_logic(field.typ())),
-//                 Type::Array(arr) => uses_std_logic(arr.typ()),
-//             }
-//         }
+// NOTE: ListUsings is overkill for Packages as-is (could be simple constants, as they always use ieee.std_logic and nothing else), but serves as a decent example.
+impl ListUsings for Package {
+    fn list_usings(&self) -> Result<Usings> {
+        let mut usings = Usings::new_empty();
+        let mut types = self
+            .components
+            .iter()
+            .flat_map(|x| x.ports().iter().map(|p| p.typ()));
+        fn uses_std_logic(t: &ObjectType) -> bool {
+            match t {
+                ObjectType::Bit => true,
+                ObjectType::Array(array_object) => {
+                    array_object.is_bitvector() || uses_std_logic(array_object.typ())
+                }
+                ObjectType::Record(record_object) => record_object
+                    .fields()
+                    .into_iter()
+                    .any(|(_, typ)| uses_std_logic(typ)),
+            }
+        }
 
-//         if types.any(|x| uses_std_logic(&x)) {
-//             usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
-//         }
+        if types.any(|x| uses_std_logic(&x)) {
+            usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
+        }
 
-//         Ok(usings)
-//     }
-// }
+        Ok(usings)
+    }
+}

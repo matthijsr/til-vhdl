@@ -5,7 +5,7 @@
 /// # Implementing `Reverse`
 ///
 /// ```rust
-/// use tydi::{Reverse, Reversed};
+/// use tydi_common::traits::{Reverse, Reversed};
 ///
 /// #[derive(Clone, Copy, Debug, PartialEq)]
 /// struct A {

@@ -1,6 +1,11 @@
-use tydi_common::traits::{Document, Identify};
+use std::fmt::Display;
 
-use crate::object::ObjectType;
+use tydi_common::{
+    error::Result,
+    traits::{Document, Identify},
+};
+
+use crate::{declaration::Declare, object::ObjectType, traits::VhdlDocument};
 
 /// A port.
 #[derive(Debug, Clone, PartialEq)]
@@ -31,13 +36,13 @@ impl Port {
         name: impl Into<String>,
         mode: Mode,
         typ: ObjectType,
-        doc: Option<String>,
+        doc: impl Into<String>,
     ) -> Port {
         Port {
             identifier: name.into(),
             mode,
             typ,
-            doc,
+            doc: Some(doc.into()),
         }
     }
 
@@ -47,8 +52,8 @@ impl Port {
     }
 
     /// Return the type of the port.
-    pub fn typ(&self) -> ObjectType {
-        self.typ.clone()
+    pub fn typ(&self) -> &ObjectType {
+        &self.typ
     }
 
     // /// Returns true if the port type contains reversed fields.
@@ -80,10 +85,38 @@ impl Document for Port {
     }
 }
 
+impl Declare for Port {
+    fn declare(&self) -> Result<String> {
+        let mut result = String::new();
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(doc.as_str());
+        }
+        result.push_str(
+            format!(
+                "{} : {} {}",
+                self.identifier(),
+                self.mode(),
+                self.typ().type_name()
+            )
+            .as_str(),
+        );
+        Ok(result)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
     In,
     Out,
+}
+
+impl Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Mode::In => write!(f, "in"),
+            Mode::Out => write!(f, "out"),
+        }
+    }
 }
 
 /// A parameter for functions and components (generics).

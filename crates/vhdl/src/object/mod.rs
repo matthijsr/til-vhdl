@@ -1,14 +1,24 @@
 use std::{convert::TryInto, fmt};
 
-use indexmap::IndexMap;
-use tydi_common::error::{Error, Result};
-
-use crate::assignment::{
-    array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
-    FieldSelection, RangeConstraint, ValueAssignment,
+use array::ArrayObject;
+use record::RecordObject;
+use tydi_common::{
+    error::{Error, Result},
+    name::Name,
 };
 
+use crate::{
+    assignment::{
+        array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
+        FieldSelection, RangeConstraint, ValueAssignment,
+    },
+    declaration::Declare,
+    properties::Analyze,
+};
+
+pub mod array;
 pub mod object_from;
+pub mod record;
 
 /// Types of VHDL objects, possibly referring to fields
 #[derive(Debug, Clone, PartialEq)]
@@ -39,8 +49,7 @@ impl fmt::Display for ObjectType {
                 }
                 write!(
                     f,
-                    "{} (type name: {}) with fields: ( {})",
-                    if record.is_union() { "Union" } else { "Record" },
+                    "Record (type name: {}) with fields: ( {})",
                     record.type_name(),
                     fields
                 )
@@ -70,12 +79,16 @@ impl ObjectType {
                         }
                     } else {
                         if range.is_between(array.high(), array.low())? {
-                            Ok(ObjectType::array(
-                                range.high(),
-                                range.low(),
-                                array.typ().clone(),
-                                array.type_name(), // NOTE: This is technically incorrect, as array types also declare the range
-                            )?)
+                            if array.is_std_logic_vector() {
+                                ObjectType::bit_vector(range.high(), range.low())
+                            } else {
+                                ObjectType::array(
+                                    range.high(),
+                                    range.low(),
+                                    array.typ().clone(),
+                                    Name::try_new(array.type_name())?,
+                                )
+                            }
                         } else {
                             Err(Error::InvalidArgument(format!(
                                 "Cannot select {} on array with high: {}, low: {}",
@@ -119,7 +132,7 @@ impl ObjectType {
         high: i32,
         low: i32,
         object: ObjectType,
-        type_name: impl Into<String>,
+        type_name: impl Into<Name>,
     ) -> Result<ObjectType> {
         Ok(ObjectType::Array(ArrayObject::array(
             high, low, object, type_name,
@@ -292,9 +305,9 @@ impl ObjectType {
         }
     }
 
-    pub fn type_name(&self) -> &str {
+    pub fn type_name(&self) -> String {
         match self {
-            ObjectType::Bit => "std_logic",
+            ObjectType::Bit => "std_logic".to_string(),
             ObjectType::Array(array) => array.type_name(),
             ObjectType::Record(record) => record.type_name(),
         }
@@ -310,127 +323,39 @@ impl ObjectType {
     }
 }
 
-/// An record object
-#[derive(Debug, Clone, PartialEq)]
-pub struct RecordObject {
-    type_name: String,
-    fields: IndexMap<String, ObjectType>,
-    /// While Unions are record objects, care needs to be taken to ensure their (non-tag) fields are always assigned from the same signal
-    is_union: bool,
-}
-
-impl RecordObject {
-    pub fn new(type_name: impl Into<String>, fields: IndexMap<String, ObjectType>) -> RecordObject {
-        RecordObject {
-            type_name: type_name.into(),
-            fields,
-            is_union: false,
+impl Analyze for ObjectType {
+    fn list_nested_types(&self) -> Vec<ObjectType> {
+        match self {
+            ObjectType::Bit => vec![],
+            ObjectType::Array(array_object) => {
+                if array_object.is_std_logic_vector() {
+                    vec![]
+                } else {
+                    let mut result = array_object.typ().list_nested_types();
+                    result.push(self.clone());
+                    result
+                }
+            }
+            ObjectType::Record(record_object) => {
+                let mut result = vec![];
+                for (_, typ) in record_object.fields() {
+                    result.append(&mut typ.list_nested_types())
+                }
+                result.push(self.clone());
+                result
+            }
         }
-    }
-
-    /// While Unions are record objects, care needs to be taken to ensure their (non-tag) fields are always assigned from the same signal
-    pub fn new_union(
-        type_name: impl Into<String>,
-        fields: IndexMap<String, ObjectType>,
-    ) -> RecordObject {
-        RecordObject {
-            type_name: type_name.into(),
-            fields,
-            is_union: true,
-        }
-    }
-
-    pub fn type_name(&self) -> &str {
-        self.type_name.as_str()
-    }
-
-    pub fn fields(&self) -> &IndexMap<String, ObjectType> {
-        &self.fields
-    }
-
-    /// While Unions are record objects, care needs to be taken to ensure their (non-tag) fields are always assigned from the same signal
-    pub fn is_union(&self) -> bool {
-        self.is_union
-    }
-
-    pub fn get_field(&self, field_name: impl Into<String>) -> Result<&ObjectType> {
-        let field_name = &field_name.into();
-        self.fields()
-            .get(field_name)
-            .ok_or(Error::InvalidArgument(format!(
-                "Field {} does not exist on record with type {}",
-                field_name,
-                self.type_name()
-            )))
     }
 }
 
-/// An array object, arrays contain a single type of object, but can contain nested objects
-#[derive(Debug, Clone, PartialEq)]
-pub struct ArrayObject {
-    high: i32,
-    low: i32,
-    typ: Box<ObjectType>,
-    type_name: String,
-}
-
-impl ArrayObject {
-    /// Create a bit vector object
-    pub fn bit_vector(high: i32, low: i32) -> Result<ArrayObject> {
-        ArrayObject::array(
-            high,
-            low,
-            ObjectType::Bit,
-            format!("std_logic_vector({} downto {})", high, low),
-        )
-    }
-
-    /// Create an array of a specific field type
-    pub fn array(
-        high: i32,
-        low: i32,
-        object: ObjectType,
-        type_name: impl Into<String>,
-    ) -> Result<ArrayObject> {
-        if low > high {
-            Err(Error::InvalidArgument(format!(
-                "{} > {}! Low must be lower than high",
-                low, high
-            )))
-        } else {
-            Ok(ArrayObject {
-                high,
-                low,
-                typ: Box::new(object),
-                type_name: type_name.into(),
-            })
+impl Declare for ObjectType {
+    fn declare(&self) -> Result<String> {
+        match self {
+            ObjectType::Bit => Err(Error::BackEndError(
+                "Invalid type, Bit (std_logic) cannot be declared.".to_string(),
+            )),
+            ObjectType::Array(array_object) => array_object.declare(),
+            ObjectType::Record(_) => todo!(),
         }
-    }
-
-    pub fn typ(&self) -> &ObjectType {
-        &self.typ
-    }
-
-    pub fn high(&self) -> i32 {
-        self.high
-    }
-
-    pub fn low(&self) -> i32 {
-        self.low
-    }
-
-    pub fn width(&self) -> u32 {
-        (1 + self.high - self.low).try_into().unwrap()
-    }
-
-    pub fn is_bitvector(&self) -> bool {
-        match self.typ() {
-            ObjectType::Bit => true,
-            _ => false,
-        }
-    }
-
-    pub fn type_name(&self) -> &str {
-        self.type_name.as_str()
     }
 }

@@ -244,14 +244,14 @@ impl ObjectDeclaration {
         let ent_obj = |p: &Port| -> Result<ObjectDeclaration> {
             Ok(ObjectDeclaration::entity_port(
                 p.identifier(),
-                p.typ(),
+                p.typ().clone(),
                 p.mode(),
             ))
         };
         let comp_obj = |p: &Port| -> Result<ObjectDeclaration> {
             Ok(ObjectDeclaration::component_port(
                 p.identifier(),
-                p.typ(),
+                p.typ().clone(),
                 p.mode(),
             ))
         };
@@ -369,7 +369,7 @@ pub mod tests {
     use indexmap::IndexMap;
     use tydi_common::name::Name;
 
-    use crate::object::RecordObject;
+    use crate::object::record::RecordObject;
 
     use super::*;
 
@@ -386,7 +386,10 @@ pub mod tests {
         fields.insert("a".to_string(), ObjectType::bit_vector(10, -4)?);
         Ok(ObjectDeclaration::signal(
             "test_signal",
-            ObjectType::Record(RecordObject::new("record_typ".to_string(), fields)),
+            ObjectType::Record(RecordObject::new(
+                Name::try_new("record_typ".to_string())?,
+                fields,
+            )),
             None,
         ))
     }

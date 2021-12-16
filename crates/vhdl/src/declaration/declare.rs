@@ -1,5 +1,4 @@
-
-use tydi_common::error::{Result, Error};
+use tydi_common::error::{Error, Result};
 
 use crate::architecture::ArchitectureDeclare;
 
@@ -48,7 +47,7 @@ impl ArchitectureDeclare for ObjectDeclaration {
                 ObjectMode::Out => result.push_str("in "),
             };
         }
-        result.push_str(self.typ().type_name());
+        result.push_str(self.typ().type_name().as_str());
         if let Some(default) = self.default() {
             result.push_str(" := ");
             result.push_str(&default.declare_for(self.identifier(), pre, post)?);

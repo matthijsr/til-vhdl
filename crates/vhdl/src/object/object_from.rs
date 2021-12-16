@@ -1,4 +1,7 @@
-use super::{ArrayObject, ObjectType, RecordObject};
+use crate::object::array::ArrayObject;
+use crate::object::record::RecordObject;
+
+use super::ObjectType;
 
 impl From<ArrayObject> for ObjectType {
     fn from(array: ArrayObject) -> Self {

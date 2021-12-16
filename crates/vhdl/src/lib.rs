@@ -12,6 +12,7 @@ pub mod package;
 pub mod port;
 pub mod properties;
 pub mod statement;
+pub mod traits;
 pub mod usings;
 
 #[cfg(test)]

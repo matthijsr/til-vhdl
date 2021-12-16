@@ -42,19 +42,8 @@ impl FlatLength for ObjectType {
             ObjectType::Array(arr) => arr.width() * arr.typ().flat_length()?,
             ObjectType::Record(rec) => {
                 let mut total: u32 = 0;
-                if rec.is_union() {
-                    let mut max: u32 = 0;
-                    for (name, typ) in rec.fields() {
-                        if name != "tag" && typ.flat_length()? > max {
-                            max = typ.flat_length()?;
-                        }
-                    }
-                    total += max;
-                    total += rec.get_field("tag")?.flat_length()?;
-                } else {
-                    for (_, typ) in rec.fields() {
-                        total += typ.flat_length()?;
-                    }
+                for (_, typ) in rec.fields() {
+                    total += typ.flat_length()?;
                 }
                 total
             }
@@ -92,42 +81,11 @@ impl FlatAssignment for ObjectDeclaration {
                 self_typ
             )))
         } else {
-            let complex_typ = complex_object.typ().get_nested(to_field)?;
-            match &complex_typ {
-                ObjectType::Record(rec) if rec.is_union() => {
-                    let self_typ = self.typ().get_nested(from_field)?;
-                    let tag_length = rec.get_field("tag")?.flat_length()?;
-                    let remainder = complex_typ.flat_length()? - tag_length;
-                    let mut result = vec![];
-                    for (name, field) in rec.fields() {
-                        let mut new_to = to_field.clone();
-                        let mut new_from = from_field.clone();
-                        new_to.push(FieldSelection::name(name));
-                        if name == "tag" {
-                            select_specific_flat_range(
-                                &mut new_from,
-                                remainder,
-                                tag_length,
-                                &self_typ,
-                            )?;
-                        } else {
-                            select_specific_flat_range(
-                                &mut new_from,
-                                0,
-                                field.flat_length()?,
-                                &self_typ,
-                            )?;
-                        }
-                        result.extend(self.to_complex(complex_object, &new_to, &new_from)?);
-                    }
-                    Ok(result)
-                }
-                _ => complex_object
-                    .to_flat(self, from_field, to_field)?
-                    .iter()
-                    .map(|x| x.reverse())
-                    .collect(),
-            }
+            complex_object
+                .to_flat(self, from_field, to_field)?
+                .iter()
+                .map(|x| x.reverse())
+                .collect()
         }
     }
 
@@ -206,48 +164,20 @@ impl FlatAssignment for ObjectDeclaration {
                     }
                 }
                 ObjectType::Record(rec) => {
-                    if rec.is_union() {
-                        // TODO: This is incorrect. Driving the signal from multiple sources doesn't work.
-                        // Ideally, figure out some way to generate an "or" on multiple signals
-                        let tag_length = rec.get_field("tag")?.flat_length()?;
-                        let remainder = self_typ.flat_length()? - tag_length;
-                        for (name, field) in rec.fields() {
-                            let mut new_to = to_field.clone();
-                            let mut new_from = from_field.clone();
-                            new_from.push(FieldSelection::name(name));
-                            if name == "tag" {
-                                select_specific_flat_range(
-                                    &mut new_to,
-                                    remainder,
-                                    tag_length,
-                                    &flat_typ,
-                                )?;
-                            } else {
-                                select_specific_flat_range(
-                                    &mut new_to,
-                                    0,
-                                    field.flat_length()?,
-                                    &flat_typ,
-                                )?;
-                            }
-                            result.extend(self.to_flat(flat_object, &new_to, &new_from)?);
-                        }
-                    } else {
-                        let mut preceding_length = 0;
-                        for (name, field) in rec.fields() {
-                            let mut new_to = to_field.clone();
-                            let mut new_from = from_field.clone();
-                            new_from.push(FieldSelection::name(name));
-                            let field_length = field.flat_length()?;
-                            select_specific_flat_range(
-                                &mut new_to,
-                                preceding_length,
-                                field_length,
-                                &flat_typ,
-                            )?;
-                            result.extend(self.to_flat(flat_object, &new_to, &new_from)?);
-                            preceding_length += field_length;
-                        }
+                    let mut preceding_length = 0;
+                    for (name, field) in rec.fields() {
+                        let mut new_to = to_field.clone();
+                        let mut new_from = from_field.clone();
+                        new_from.push(FieldSelection::name(name));
+                        let field_length = field.flat_length()?;
+                        select_specific_flat_range(
+                            &mut new_to,
+                            preceding_length,
+                            field_length,
+                            &flat_typ,
+                        )?;
+                        result.extend(self.to_flat(flat_object, &new_to, &new_from)?);
+                        preceding_length += field_length;
                     }
                 }
             }
