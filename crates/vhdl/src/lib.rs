@@ -15,13 +15,7 @@ pub mod statement;
 pub mod traits;
 pub mod usings;
 
+pub(crate) mod test_tools;
+
 #[cfg(test)]
-mod tests {
-    // use crate::generator::common::test::{records, test_comp};
-
-    // use super::*;
-
-    // pub fn test_entity() -> Entity {
-    //     Entity::from(test_comp())
-    // }
-}
+mod tests {}

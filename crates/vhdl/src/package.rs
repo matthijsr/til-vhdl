@@ -10,7 +10,7 @@ use tydi_common::{
 
 use crate::{
     component::Component,
-    declaration::Declare,
+    declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
     properties::Analyze,
     usings::{DeclareUsings, ListUsings, Usings},
@@ -64,10 +64,8 @@ impl Package {
     }
 }
 
-// TODO
-
-impl Declare for Package {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for Package {
+    fn declare_with_indent(&self, pre: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
         result.push_str(format!("package {} is\n\n", self.identifier).as_str());
@@ -79,7 +77,7 @@ impl Declare for Package {
         for c in &self.components {
             body.push_str(format!("{}\n\n", c.declare()?).as_str());
         }
-        result.push_str(&indent(&body, "  "));
+        result.push_str(&indent(&body, pre));
         result.push_str(format!("end {};", self.identifier).as_str());
 
         Ok(result)
@@ -112,5 +110,11 @@ impl ListUsings for Package {
         }
 
         Ok(usings)
+    }
+}
+
+impl Identify for Package {
+    fn identifier(&self) -> &str {
+        self.identifier.as_ref()
     }
 }

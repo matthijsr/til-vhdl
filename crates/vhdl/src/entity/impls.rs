@@ -1,6 +1,9 @@
+use textwrap::indent;
 use tydi_common::error::Result;
 use tydi_common::traits::{Document, Identify};
 
+use crate::declaration::DeclareWithIndent;
+use crate::traits::VhdlDocument;
 use crate::{
     component::Component,
     declaration::Declare,
@@ -9,17 +12,23 @@ use crate::{
 
 use super::Entity;
 
-impl Declare for Entity {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for Entity {
+    fn declare_with_indent(&self, pre: &str) -> Result<String> {
         let mut result = String::new();
-        if let Some(doc) = self.doc() {
-            result.push_str("--");
-            result.push_str(doc.replace("\n", "\n--").as_str());
-            result.push('\n');
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(&doc);
         }
         result.push_str(format!("entity {} is\n", self.identifier()).as_str());
-        // TODO: Port declare
-        // result.push_str(self.ports().declare()?.as_str());
+        let mut port_body = "port (\n".to_string();
+        let ports = self
+            .ports()
+            .iter()
+            .map(|x| x.declare())
+            .collect::<Result<Vec<String>>>()?
+            .join(";\n");
+        port_body.push_str(&indent(&ports, pre));
+        port_body.push_str("\n);\n");
+        result.push_str(&indent(&port_body, pre));
         result.push_str(format!("end {};\n", self.identifier()).as_str());
         Ok(result)
     }

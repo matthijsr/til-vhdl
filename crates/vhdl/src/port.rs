@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use tydi_common::{
     error::Result,
+    name::Name,
     traits::{Document, Identify},
 };
 
@@ -11,7 +12,7 @@ use crate::{declaration::Declare, object::ObjectType, traits::VhdlDocument};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Port {
     /// Port identifier.
-    identifier: String,
+    identifier: Name,
     /// Port mode.
     mode: Mode,
     /// Port type.
@@ -22,7 +23,7 @@ pub struct Port {
 
 impl Port {
     /// Create a new port.
-    pub fn new(name: impl Into<String>, mode: Mode, typ: ObjectType) -> Port {
+    pub fn new(name: impl Into<Name>, mode: Mode, typ: ObjectType) -> Port {
         Port {
             identifier: name.into(),
             mode,
@@ -33,7 +34,7 @@ impl Port {
 
     /// Create a new port with documentation.
     pub fn new_documented(
-        name: impl Into<String>,
+        name: impl Into<Name>,
         mode: Mode,
         typ: ObjectType,
         doc: impl Into<String>,
@@ -44,6 +45,31 @@ impl Port {
             typ,
             doc: Some(doc.into()),
         }
+    }
+
+    /// Create a new port with `Mode::In`
+    pub fn new_in(name: impl Into<Name>, typ: ObjectType) -> Port {
+        Port::new(name, Mode::In, typ)
+    }
+
+    /// Create a new port with `Mode::Out`
+    pub fn new_out(name: impl Into<Name>, typ: ObjectType) -> Port {
+        Port::new(name, Mode::Out, typ)
+    }
+
+    /// Create an in port with type `std_logic`
+    pub fn bit_in(name: impl Into<Name>) -> Port {
+        Port::new(name, Mode::In, ObjectType::Bit)
+    }
+
+    /// Create an out port with type `std_logic`
+    pub fn bit_out(name: impl Into<Name>) -> Port {
+        Port::new(name, Mode::Out, ObjectType::Bit)
+    }
+
+    /// Create a `clk` port, `clk : in std_logic`.
+    pub fn clk() -> Port {
+        Port::new(Name::try_new("clk").unwrap(), Mode::In, ObjectType::Bit)
     }
 
     /// Return the port mode.
@@ -75,7 +101,7 @@ impl Port {
 
 impl Identify for Port {
     fn identifier(&self) -> &str {
-        self.identifier.as_str()
+        self.identifier.as_ref()
     }
 }
 

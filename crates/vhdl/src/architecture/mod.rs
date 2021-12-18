@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
-use tydi_common::error::Result;
 use tydi_common::name::Name;
+use tydi_common::{error::Result, traits::Identify};
 
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
@@ -34,7 +34,7 @@ pub struct Architecture<'a> {
 }
 
 pub trait ArchitectureDeclare {
-    /// Returns a string for the declaration, pre is useful for tabs/spaces, post is useful for closing characters (','/';')
+    /// Returns a string for the declaration, pre can be used for indentation, post is used for closing characters (','/';')
     fn declare(&self, pre: &str, post: &str) -> Result<String>;
 }
 
@@ -56,10 +56,10 @@ impl<'a> Architecture<'a> {
         package: &Package,
         component_id: impl Into<String>,
     ) -> Result<Architecture> {
-        let mut usings = Usings::new_empty();
-        usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
-        // let mut usings = package.list_usings()?;
-        // usings.add_using(library_id, format!("{}.all", package.identifier));
+        // let mut usings = Usings::new_empty();
+        // usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
+        let mut usings = package.list_usings()?;
+        usings.add_using(library_id, format!("{}.all", package.identifier()));
         Ok(Architecture {
             identifier,
             entity: Entity::from(package.get_component(component_id)?),
@@ -149,51 +149,42 @@ mod tests {
 
     //     use crate::generator::{common::convert::Packify, vhdl::Declare};
 
-    //     use super::*;
+    use crate::{declaration::Declare, test_tools::*};
 
-    //     pub fn test_package() -> Package {
-    //         let (_, streamlet) = crate::parser::nom::streamlet(
-    //             "Streamlet test (a : in Stream<Bits<1>>, b : out Stream<Bits<2>, d=2>)",
-    //         )
-    //         .unwrap();
-    //         let lib = crate::design::library::Library::try_new(
-    //             Name::try_new("test").unwrap(),
-    //             vec![],
-    //             vec![streamlet],
-    //         );
-    //         let lib: crate::generator::common::Package = lib.unwrap().fancy();
-    //         lib
-    //     }
+    use super::*;
 
-    //     #[test]
-    //     fn test_architecture() {
-    //         let package = test_package();
-    //         let architecture =
-    //             Architecture::new_default(&package, Name::try_new("test").unwrap()).unwrap();
+    pub(crate) fn test_package() -> Result<Package> {
+        Ok(Package::new(
+            Name::try_new("pak")?,
+            &vec![empty_component(), component_with_nested_types()?],
+            &vec![],
+        ))
+    }
 
-    //         assert_eq!(
-    //             r#"library ieee;
-    // use ieee.std_logic_1164.all;
+    #[test]
+    fn test_architecture() -> Result<()> {
+        let package = test_package()?;
+        let architecture =
+            Architecture::new_default(&package, Name::try_new("component_with_nested_types")?)?;
+        assert_eq!(
+            r#"library ieee;
+use ieee.std_logic_1164.all;
 
-    // library work;
-    // use work.test.all;
+library work;
+use work.pak.all;
 
-    // entity test is
-    //   port(
-    //     clk : in std_logic;
-    //     rst : in std_logic;
-    //     a_dn : in test_a_dn_type;
-    //     a_up : out test_a_up_type;
-    //     b_dn : out test_b_dn_type;
-    //     b_up : in test_b_up_type
-    //   );
-    // end test;
+entity component_with_nested_types is
+  port (
+    some_other_port : out record_type;
+    clk : in std_logic
+  );
+end component_with_nested_types;
 
-    // architecture Behavioral of test is
-    // begin
-    // end Behavioral;
-    // "#,
-    //             architecture.declare().unwrap()
-    //         );
-    //     }
+architecture Behavioral of component_with_nested_types is
+begin
+end Behavioral;"#,
+            architecture.declare()?
+        );
+        Ok(())
+    }
 }

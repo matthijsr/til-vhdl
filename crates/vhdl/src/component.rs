@@ -6,7 +6,7 @@ use tydi_common::{
 };
 
 use crate::{
-    declaration::Declare,
+    declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
     port::{Parameter, Port},
     properties::Analyze,
@@ -86,8 +86,8 @@ impl Analyze for Component {
     }
 }
 
-impl Declare for Component {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for Component {
+    fn declare_with_indent(&self, pre: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());
@@ -100,9 +100,9 @@ impl Declare for Component {
             .map(|x| x.declare())
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
-        port_body.push_str(&indent(&ports, "  "));
+        port_body.push_str(&indent(&ports, pre));
         port_body.push_str("\n);\n");
-        result.push_str(&indent(&port_body, "  "));
+        result.push_str(&indent(&port_body, pre));
         result.push_str("end component;");
         Ok(result)
     }
@@ -110,17 +110,19 @@ impl Declare for Component {
 
 #[cfg(test)]
 mod tests {
-    use crate::port::Mode;
+    use tydi_common::name::Name;
+
+    use crate::{port::Mode, test_tools::*};
 
     use super::*;
 
     #[test]
     fn test_declare() {
-        let empty_comp = Component::new("test", vec![], vec![], Some("test\ntest".to_string()));
+        let empty_comp = empty_component().with_doc("test\ntest");
         assert_eq!(
             r#"-- test
 -- test
-component test
+component empty_component
   port (
 
   );
@@ -128,17 +130,17 @@ end component;"#,
             empty_comp.declare().unwrap()
         );
         let port1 = Port::new_documented(
-            "some_port",
+            Name::try_new("some_port").unwrap(),
             Mode::In,
             ObjectType::Bit,
             "This is port documentation\nNext line.",
         );
         let port2 = Port::new(
-            "some_other_port",
+            Name::try_new("some_other_port").unwrap(),
             Mode::Out,
             ObjectType::bit_vector(43, 0).unwrap(),
         );
-        let clk = Port::new("clk", Mode::In, ObjectType::Bit);
+        let clk = Port::new(Name::try_new("clk").unwrap(), Mode::In, ObjectType::Bit);
         let comp = Component::new("test", vec![], vec![port1, port2, clk], None);
         assert_eq!(
             r#"component test

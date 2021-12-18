@@ -1,16 +1,14 @@
-use crate::{architecture::ArchitectureDeclare, declaration::ObjectKind};
-use tydi_common::{error::Result, traits::Document};
+use crate::{architecture::ArchitectureDeclare, declaration::ObjectKind, traits::VhdlDocument};
+use textwrap::indent;
+use tydi_common::error::Result;
 
 use super::AssignDeclaration;
 
 impl ArchitectureDeclare for AssignDeclaration {
     fn declare(&self, pre: &str, post: &str) -> Result<String> {
-        let mut result = pre.to_string();
-        if let Some(doc) = self.doc() {
-            result.push_str("--");
-            result.push_str(doc.replace("\n", &format!("\n{}--", pre)).as_str());
-            result.push_str("\n");
-            result.push_str(pre);
+        let mut result = String::new();
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(&indent(&doc, pre));
         }
         result.push_str(&self.object_string());
         result.push_str(match self.object.kind() {

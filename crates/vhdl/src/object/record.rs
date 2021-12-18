@@ -3,7 +3,7 @@ use textwrap::indent;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
 
-use crate::declaration::Declare;
+use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::ObjectType;
 
 /// A record object
@@ -41,14 +41,14 @@ impl RecordObject {
     }
 }
 
-impl Declare for RecordObject {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for RecordObject {
+    fn declare_with_indent(&self, pre: &str) -> Result<String> {
         let mut this = format!("type {} is record\n", self.type_name());
         let mut fields = String::new();
         for (name, typ) in self.fields() {
             fields.push_str(format!("{} : {};\n", name, typ.type_name()).as_str());
         }
-        this.push_str(&indent(&fields, "  "));
+        this.push_str(&indent(&fields, pre));
         this.push_str("end record;");
         Ok(this)
     }

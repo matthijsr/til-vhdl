@@ -19,6 +19,27 @@ pub trait Declare {
     fn declare(&self) -> Result<String>;
 }
 
+/// Allows users to specify the indent of scopes when declaring VHDL
+///
+/// E.g., when `pre` is set to two spaces
+/// ```vhdl
+/// entity component_with_nested_types is
+///   port (
+///     some_other_port : out record_type;
+///     clk : in std_logic
+///   );
+/// end component_with_nested_types;
+/// ```
+pub trait DeclareWithIndent {
+    fn declare_with_indent(&self, pre: &str) -> Result<String>;
+}
+
+impl<T: DeclareWithIndent> Declare for T {
+    fn declare(&self) -> Result<String> {
+        self.declare_with_indent("  ")
+    }
+}
+
 // Declarations may typically be any of the following: type, subtype, signal, constant, file, alias, component, attribute, function, procedure, configuration specification. (per: https://www.ics.uci.edu/~jmoorkan/vhdlref/architec.html)
 // Per: https://insights.sigasi.com/tech/vhdl2008.ebnf/#block_declarative_item
 //     subprogram_declaration

@@ -1,6 +1,8 @@
+use textwrap::indent;
 use tydi_common::error::Result;
 use tydi_common::traits::{Document, Identify};
 
+use crate::traits::VhdlDocument;
 use crate::usings::DeclareUsings;
 use crate::{declaration::Declare, usings::ListUsings};
 
@@ -51,10 +53,8 @@ impl<'a> Declare for Architecture<'a> {
         result.push_str(self.entity.declare()?.as_str());
         result.push_str("\n");
 
-        if let Some(doc) = self.doc() {
-            result.push_str("--");
-            result.push_str(doc.replace("\n", "\n--").as_str());
-            result.push('\n');
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(&doc);
         }
 
         result.push_str(
@@ -66,13 +66,13 @@ impl<'a> Declare for Architecture<'a> {
             .as_str(),
         );
         for declaration in self.declarations() {
-            result.push_str(&declaration.declare("   ", ";\n")?);
+            result.push_str(&declaration.declare("  ", ";\n")?);
         }
         result.push_str("begin\n");
         for statement in self.statements() {
-            result.push_str(&statement.declare("   ", ";\n")?);
+            result.push_str(&statement.declare("  ", ";\n")?);
         }
-        result.push_str(format!("end {};\n", self.identifier()).as_str());
+        result.push_str(format!("end {};", self.identifier()).as_str());
         Ok(result)
     }
 }
