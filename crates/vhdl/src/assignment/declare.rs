@@ -1,27 +1,33 @@
-use crate::{architecture::ArchitectureDeclare, declaration::ObjectKind, traits::VhdlDocument};
+use crate::{
+    architecture::{arch_storage::Arch, ArchitectureDeclare},
+    declaration::ObjectKind,
+    traits::VhdlDocument,
+};
 use textwrap::indent;
 use tydi_common::error::Result;
 
 use super::AssignDeclaration;
 
 impl ArchitectureDeclare for AssignDeclaration {
-    fn declare(&self, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(&indent(&doc, pre));
         }
-        result.push_str(&self.object_string());
-        result.push_str(match self.object.kind() {
-            ObjectKind::Signal => " <= ",
-            ObjectKind::Variable => " := ",
-            ObjectKind::Constant => " := ",
-            ObjectKind::EntityPort => " <= ",
-            ObjectKind::ComponentPort => " => ",
-        });
+        result.push_str(&self.object_string(db));
+        result.push_str(
+            match db.lookup_intern_object_declaration(self.object).kind() {
+                ObjectKind::Signal => " <= ",
+                ObjectKind::Variable => " := ",
+                ObjectKind::Constant => " := ",
+                ObjectKind::EntityPort => " <= ",
+                ObjectKind::ComponentPort => " => ",
+            },
+        );
         result.push_str(
             &self
                 .assignment()
-                .declare_for(self.object_string(), pre, post)?,
+                .declare_for(db, self.object_string(db), pre, post)?,
         );
         result.push_str(post);
         Ok(result)

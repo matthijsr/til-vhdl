@@ -1,11 +1,11 @@
 use tydi_common::error::{Error, Result};
 
-use crate::architecture::ArchitectureDeclare;
+use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 
 use super::{PortMapping, Statement};
 
 impl ArchitectureDeclare for PortMapping {
-    fn declare(&self, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
         let mut result = pre.to_string();
         result.push_str(&format!(
             "{}: {} port map(\n",
@@ -15,7 +15,7 @@ impl ArchitectureDeclare for PortMapping {
         let mut port_maps = vec![];
         for (port, _) in self.ports() {
             if let Some(port_assign) = self.mappings().get(port) {
-                port_maps.push(port_assign.declare(&format!("{}  ", pre), "")?);
+                port_maps.push(port_assign.declare(db, &format!("{}  ", pre), "")?);
             } else {
                 return Err(Error::BackEndError(format!(
                     "Error while declaring port mapping, port {} is not assigned",
@@ -30,10 +30,10 @@ impl ArchitectureDeclare for PortMapping {
 }
 
 impl ArchitectureDeclare for Statement {
-    fn declare(&self, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
         match self {
-            Statement::Assignment(assignment) => assignment.declare(pre, post),
-            Statement::PortMapping(portmapping) => portmapping.declare(pre, post),
+            Statement::Assignment(assignment) => assignment.declare(db, pre, post),
+            Statement::PortMapping(portmapping) => portmapping.declare(db, pre, post),
         }
     }
 }

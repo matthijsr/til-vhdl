@@ -8,11 +8,12 @@ use tydi_common::{
 };
 
 use crate::{
+    architecture::arch_storage::Arch,
     assignment::{
         array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
         FieldSelection, RangeConstraint, ValueAssignment,
     },
-    declaration::Declare,
+    declaration::{Declare, DeclareWithIndent},
     properties::Analyze,
 };
 
@@ -21,7 +22,7 @@ pub mod object_from;
 pub mod record;
 
 /// Types of VHDL objects, possibly referring to fields
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectType {
     /// A bit object, can not contain further fields
     Bit,
@@ -107,14 +108,7 @@ impl ObjectType {
                 FieldSelection::Range(_) => Err(Error::InvalidTarget(
                     "Cannot select a range on a record".to_string(),
                 )),
-                FieldSelection::Name(name) => Ok(record
-                    .fields()
-                    .get(name)
-                    .ok_or(Error::InvalidArgument(format!(
-                        "Field with name {} does not exist on record",
-                        name
-                    )))?
-                    .clone()),
+                FieldSelection::Name(name) => Ok(record.get_field(name)?.clone()),
             },
         }
     }
@@ -195,13 +189,13 @@ impl ObjectType {
         }
     }
 
-    pub fn can_assign(&self, assignment: &Assignment) -> Result<()> {
+    pub fn can_assign(&self, db: &impl Arch, assignment: &Assignment) -> Result<()> {
         let mut to_object = self.clone();
         for field in assignment.to_field() {
             to_object = to_object.get_field(field)?;
         }
         match assignment.kind() {
-            AssignmentKind::Object(object) => to_object.can_assign_type(&object.typ()?),
+            AssignmentKind::Object(object) => to_object.can_assign_type(&object.typ(db)?),
             AssignmentKind::Direct(direct) => match direct {
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(_) => match to_object {
@@ -223,9 +217,11 @@ impl ObjectType {
                 DirectAssignment::FullRecord(record) => {
                     if let ObjectType::Record(to_record) = &to_object {
                         if to_record.fields().len() == record.len() {
-                            for (field, value) in record {
-                                let to_field = to_object.get_field(&FieldSelection::name(field))?;
-                                to_field.can_assign(&Assignment::from(value.clone()))?;
+                            for ra in record {
+                                let to_field = to_object
+                                    .get_field(&FieldSelection::name(ra.field().clone()))?;
+                                to_field
+                                    .can_assign(db, &Assignment::from(ra.assignment().clone()))?;
                             }
                             Ok(())
                         } else {
@@ -246,7 +242,7 @@ impl ObjectType {
                                     for value in direct {
                                         to_array
                                             .typ()
-                                            .can_assign(&Assignment::from(value.clone()))?;
+                                            .can_assign(db, &Assignment::from(value.clone()))?;
                                     }
                                     Ok(())
                                 } else {
@@ -255,7 +251,8 @@ impl ObjectType {
                             }
                             ArrayAssignment::Sliced { direct, others } => {
                                 let mut ranges_assigned: Vec<&RangeConstraint> = vec![];
-                                for (range, value) in direct {
+                                for ra in direct {
+                                    let range = ra.constraint();
                                     if !range.is_between(to_array.high(), to_array.low())? {
                                         return Err(Error::InvalidArgument(format!(
                                             "{} is not between {} and {}",
@@ -267,9 +264,10 @@ impl ObjectType {
                                     if ranges_assigned.iter().any(|x| x.overlaps(range)) {
                                         return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range)));
                                     }
-                                    to_array
-                                        .typ()
-                                        .can_assign(&Assignment::from(value.clone()))?;
+                                    to_array.typ().can_assign(
+                                        db,
+                                        &Assignment::from(ra.assignment().clone()),
+                                    )?;
                                     ranges_assigned.push(range);
                                 }
                                 let total_assigned: u32 =
@@ -282,9 +280,10 @@ impl ObjectType {
                                     }
                                 } else {
                                     if let Some(value) = others {
-                                        to_array
-                                            .typ()
-                                            .can_assign(&Assignment::from(value.as_ref().clone()))
+                                        to_array.typ().can_assign(
+                                            db,
+                                            &Assignment::from(value.as_ref().clone()),
+                                        )
                                     } else {
                                         Err(Error::InvalidArgument("Sliced array assignment does not assign all values directly, but does not contain an 'others' field.".to_string()))
                                     }
@@ -292,7 +291,7 @@ impl ObjectType {
                             }
                             ArrayAssignment::Others(others) => to_array
                                 .typ()
-                                .can_assign(&Assignment::from(others.as_ref().clone())),
+                                .can_assign(db, &Assignment::from(others.as_ref().clone())),
                         }
                     } else {
                         Err(Error::InvalidTarget(format!(
@@ -348,13 +347,13 @@ impl Analyze for ObjectType {
     }
 }
 
-impl Declare for ObjectType {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for ObjectType {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         match self {
             ObjectType::Bit => Err(Error::BackEndError(
                 "Invalid type, Bit (std_logic) cannot be declared.".to_string(),
             )),
-            ObjectType::Array(array_object) => array_object.declare(),
+            ObjectType::Array(array_object) => array_object.declare(db),
             ObjectType::Record(_) => todo!(),
         }
     }

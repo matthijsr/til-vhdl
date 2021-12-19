@@ -5,10 +5,10 @@ use tydi_common::{
     name::Name,
 };
 
-use crate::{declaration::Declare, object::ObjectType};
+use crate::{architecture::arch_storage::Arch, declaration::Declare, object::ObjectType};
 
 /// An array object, arrays contain a single type of object, but can contain nested objects
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrayObject {
     high: i32,
     low: i32,
@@ -92,7 +92,7 @@ impl ArrayObject {
 }
 
 impl Declare for ArrayObject {
-    fn declare(&self) -> Result<String> {
+    fn declare(&self, db: &impl Arch) -> Result<String> {
         if self.is_std_logic_vector() {
             Err(Error::BackEndError(
                 "Invalid type, std_logic_vector cannot be declared.".to_string(),

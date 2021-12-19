@@ -25,8 +25,8 @@ impl ListUsings for AssignmentKind {
                     },
                 },
                 DirectAssignment::FullRecord(rec) => {
-                    for (_, ak) in rec {
-                        usings.combine(&ak.list_usings()?);
+                    for fa in rec {
+                        usings.combine(&fa.assignment().list_usings()?);
                     }
                 }
                 DirectAssignment::FullArray(arr) => match arr {
@@ -36,8 +36,8 @@ impl ListUsings for AssignmentKind {
                         }
                     }
                     ArrayAssignment::Sliced { direct, others } => {
-                        for (_, ak) in direct {
-                            usings.combine(&ak.list_usings()?);
+                        for ra in direct {
+                            usings.combine(&ra.assignment().list_usings()?);
                         }
                         if let Some(value) = others {
                             usings.combine(&value.list_usings()?);

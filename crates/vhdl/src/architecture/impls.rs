@@ -2,13 +2,14 @@ use textwrap::indent;
 use tydi_common::error::Result;
 use tydi_common::traits::{Document, Identify};
 
+use crate::declaration::DeclareWithIndent;
 use crate::traits::VhdlDocument;
 use crate::usings::DeclareUsings;
 use crate::{declaration::Declare, usings::ListUsings};
 
 use super::*;
 
-impl ListUsings for Architecture<'_> {
+impl ListUsings for Architecture {
     fn list_usings(&self) -> Result<Usings> {
         Ok(self.usings.clone())
     }
@@ -45,12 +46,12 @@ impl ListUsings for Architecture<'_> {
 // Sequential statements
 //
 // Any complex logic should probably just be string templates.
-impl<'a> Declare for Architecture<'a> {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for Architecture {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
 
-        result.push_str(self.entity.declare()?.as_str());
+        result.push_str(self.entity.declare(db)?.as_str());
         result.push_str("\n");
 
         if let Some(doc) = self.vhdl_doc() {
@@ -66,24 +67,28 @@ impl<'a> Declare for Architecture<'a> {
             .as_str(),
         );
         for declaration in self.declarations() {
-            result.push_str(&declaration.declare("  ", ";\n")?);
+            result.push_str(
+                db.lookup_intern_architecture_declaration(*declaration)
+                    .declare(db, pre, ";\n")?
+                    .as_str(),
+            );
         }
         result.push_str("begin\n");
         for statement in self.statements() {
-            result.push_str(&statement.declare("  ", ";\n")?);
+            result.push_str(statement.declare(db, pre, ";\n")?.as_str());
         }
         result.push_str(format!("end {};", self.identifier()).as_str());
         Ok(result)
     }
 }
 
-impl Identify for Architecture<'_> {
+impl Identify for Architecture {
     fn identifier(&self) -> &str {
         self.identifier.as_ref()
     }
 }
 
-impl Document for Architecture<'_> {
+impl Document for Architecture {
     fn doc(&self) -> Option<String> {
         self.doc.clone()
     }
