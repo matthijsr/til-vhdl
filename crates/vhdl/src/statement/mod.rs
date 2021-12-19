@@ -115,4 +115,17 @@ impl PortMapping {
     pub fn component_name(&self) -> &str {
         self.component_name.as_str()
     }
+
+    /// Find the assignment to an object based on a port name and its ID, assuming one exists.
+    pub(crate) fn assignment_for(
+        &self,
+        port: &str,
+        id: Id<ObjectDeclaration>,
+    ) -> Option<&AssignDeclaration> {
+        if let Some(_) = self.ports().get(port).filter(|x| **x == id) {
+            self.mappings().get(port)
+        } else {
+            None
+        }
+    }
 }

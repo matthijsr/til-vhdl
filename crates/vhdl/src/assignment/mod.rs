@@ -10,7 +10,7 @@ use tydi_common::traits::Document;
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
-use crate::declaration::Declare;
+use crate::declaration::{Declare, ObjectMode};
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
@@ -82,6 +82,34 @@ impl AssignDeclaration {
     /// Set the documentation of this assignment declaration.
     pub fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into())
+    }
+
+    /// If this is an object to object assignment, return the object being assigned from
+    pub fn from(&self) -> Option<Id<ObjectDeclaration>> {
+        if let AssignmentKind::Object(o) = self.assignment().kind() {
+            Some(o.object())
+        } else {
+            None
+        }
+    }
+
+    /// Based on assignment, return the expected resulting object mode.
+    ///
+    /// This method assumes the object being assigned to is in a suitable mode,
+    /// further validation occurs as part of the database query.
+    /// 
+    /// Will return an error if the assignment itself is somehow incorrect.
+    pub fn resulting_mode(&self, db: &dyn Arch) -> Result<ObjectMode> {
+        match self.assignment().kind() {
+            AssignmentKind::Object(_) => todo!(),
+            AssignmentKind::Direct(d) => match d {
+                DirectAssignment::Value(_) => ObjectMode::Assigned,
+                DirectAssignment::FullRecord(fas) => {
+                    let 
+                },
+                DirectAssignment::FullArray(_) => todo!(),
+            },
+        }
     }
 
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments

@@ -9,7 +9,7 @@ use log::SetLoggerError;
 pub type Result<T> = result::Result<T, Error>;
 
 /// Error variants used in this crate.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Error {
     /// Unknown error.
     UnknownError,
@@ -40,7 +40,7 @@ pub enum Error {
 }
 
 ///Error variants for implementation parser
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct LineErr {
     pub line: usize,
     pub err: String,

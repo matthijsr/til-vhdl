@@ -131,6 +131,16 @@ pub enum ObjectMode {
     Out,
 }
 
+impl fmt::Display for ObjectMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ObjectMode::Undefined => write!(f, "Undefined"),
+            ObjectMode::Assigned => write!(f, "Assigned"),
+            ObjectMode::Out => write!(f, "Out"),
+        }
+    }
+}
+
 /// Struct describing the identifier of the object, its type, its kind, and a potential default value
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectDeclaration {
@@ -261,6 +271,20 @@ impl ObjectDeclaration {
 
     pub fn mode(&self) -> &ObjectMode {
         &self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: ObjectMode) -> Result<()> {
+        if *self.mode() != ObjectMode::Undefined && *self.mode() != mode {
+            Err(Error::InvalidTarget(format!(
+                "Cannot set object {} to mode {}, it is already in mode {}",
+                self.identifier(),
+                mode,
+                self.mode()
+            )))
+        } else {
+            self.mode = mode;
+            Ok(())
+        }
     }
 
     pub fn from_port(port: &Port, is_entity: bool) -> Result<Vec<ObjectDeclaration>> {
