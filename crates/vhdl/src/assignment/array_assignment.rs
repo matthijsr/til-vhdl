@@ -42,6 +42,23 @@ impl ArrayAssignment {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RangeAssignment {
-    pub constraint: RangeConstraint,
-    pub assignment: AssignmentKind,
+    constraint: RangeConstraint,
+    assignment: AssignmentKind,
+}
+
+impl RangeAssignment {
+    pub fn new(constraint: RangeConstraint, assignment: AssignmentKind) -> Self {
+        RangeAssignment {
+            constraint,
+            assignment,
+        }
+    }
+
+    pub fn constraint(&self) -> &RangeConstraint {
+        &self.constraint
+    }
+
+    pub fn assignment(&self) -> &AssignmentKind {
+        &self.assignment
+    }
 }

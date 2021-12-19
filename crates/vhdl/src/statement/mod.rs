@@ -5,8 +5,9 @@ use tydi_common::{
     error::{Error, Result},
     traits::Identify,
 };
+use tydi_intern::Id;
 
-use crate::{assignment::Assign, component::Component};
+use crate::{architecture::arch_storage::Arch, assignment::Assign, component::Component};
 
 use super::{
     assignment::{AssignDeclaration, Assignment},
@@ -15,7 +16,7 @@ use super::{
 
 pub mod declare;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Assignment(AssignDeclaration),
     PortMapping(PortMapping),
@@ -33,24 +34,31 @@ impl From<PortMapping> for Statement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PortMapping {
     label: String,
     component_name: String,
     /// The ports, in the order they were declared on the component
-    ports: IndexMap<String, ObjectDeclaration>,
+    ports: IndexMap<String, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
     /// irrespective of the order they're mapped during generation.
     mappings: HashMap<String, AssignDeclaration>,
 }
 
 impl PortMapping {
-    pub fn from_component(component: &Component, label: impl Into<String>) -> Result<PortMapping> {
+    pub fn from_component(
+        db: &impl Arch,
+        component: &Component,
+        label: impl Into<String>,
+    ) -> Result<PortMapping> {
         let mut ports = IndexMap::new();
         for port in component.ports() {
             let objs = ObjectDeclaration::from_port(port, false)?;
             for obj in objs {
-                ports.insert(obj.identifier().to_string(), obj);
+                ports.insert(
+                    obj.identifier().to_string(),
+                    db.intern_object_declaration(obj),
+                );
             }
         }
         Ok(PortMapping {
@@ -61,7 +69,7 @@ impl PortMapping {
         })
     }
 
-    pub fn ports(&self) -> &IndexMap<String, ObjectDeclaration> {
+    pub fn ports(&self) -> &IndexMap<String, Id<ObjectDeclaration>> {
         &self.ports
     }
 
@@ -71,6 +79,7 @@ impl PortMapping {
 
     pub fn map_port(
         &mut self,
+        db: &impl Arch,
         identifier: impl Into<String>,
         assignment: &(impl Into<Assignment> + Clone),
     ) -> Result<&mut Self> {
@@ -82,7 +91,7 @@ impl PortMapping {
                 "Port {} does not exist on this component",
                 identifier
             )))?;
-        let assigned = port.assign(assignment)?;
+        let assigned = port.assign(db, assignment)?;
         self.mappings.insert(identifier.to_string(), assigned);
         Ok(self)
     }

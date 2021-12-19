@@ -14,8 +14,9 @@ impl Assign for Id<ObjectDeclaration> {
         assignment: &(impl Into<Assignment> + Clone),
     ) -> Result<AssignDeclaration> {
         let true_assignment = assignment.clone().into();
-        self.typ().can_assign(&true_assignment)?;
-        Ok(AssignDeclaration::new(self.clone(), true_assignment))
+        let self_obj = db.get_object_declaration(*self);
+        self_obj.typ().can_assign(db, &true_assignment)?;
+        Ok(AssignDeclaration::new(*self, true_assignment))
     }
 }
 

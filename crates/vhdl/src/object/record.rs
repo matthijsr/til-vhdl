@@ -51,23 +51,19 @@ impl RecordObject {
         self.type_name.to_string()
     }
 
-    pub fn fields(&self) -> IndexMap<Name, ObjectType> {
-        IndexMap::from_iter(
-            (&self.fields)
-                .into_iter()
-                .map(|x| (x.field().clone(), x.typ().clone())),
-        )
+    pub fn fields(&self) -> IndexMap<Name, &ObjectType> {
+        IndexMap::from_iter(self.fields.iter().map(|x| (x.field().clone(), x.typ())))
     }
 
-    pub fn get_field(&self, field_name: impl Into<Name>) -> Result<&ObjectType> {
-        let field_name = &field_name.into();
-        self.fields()
-            .get(field_name)
-            .ok_or(Error::InvalidArgument(format!(
+    pub fn get_field(&self, field_name: &Name) -> Result<&ObjectType> {
+        match self.fields().get(field_name) {
+            Some(field) => Ok(field),
+            None => Err(Error::InvalidArgument(format!(
                 "Field {} does not exist on record with type {}",
-                field_name,
+                field_name.to_string(),
                 self.type_name()
-            )))
+            ))),
+        }
     }
 }
 

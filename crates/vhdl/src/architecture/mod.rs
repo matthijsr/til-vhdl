@@ -34,12 +34,12 @@ pub struct Architecture {
     /// The declaration part of the architecture
     declaration: Vec<Id<ArchitectureDeclaration>>,
     /// The statement part of the architecture
-    statement: Vec<Id<Statement>>,
+    statement: Vec<Statement>,
 }
 
 pub trait ArchitectureDeclare {
     /// Returns a string for the declaration, pre can be used for indentation, post is used for closing characters (','/';')
-    fn declare(&self, pre: &str, post: &str) -> Result<String>;
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String>;
 }
 
 impl Architecture {
@@ -101,7 +101,8 @@ impl Architecture {
                 self.usings.combine(&object.list_usings()?);
             }
             ArchitectureDeclaration::Alias(alias) => {
-                self.usings.combine(&alias.object().list_usings()?);
+                self.usings
+                    .combine(&db.get_object_declaration(alias.object()).list_usings()?);
             }
             ArchitectureDeclaration::Type(_)
             | ArchitectureDeclaration::SubType(_)
@@ -115,26 +116,22 @@ impl Architecture {
         Ok(id)
     }
 
-    pub fn add_statement(
-        &mut self,
-        db: &impl Arch,
-        statement: impl Into<Statement>,
-    ) -> Result<Id<Statement>> {
+    pub fn add_statement(&mut self, db: &impl Arch, statement: impl Into<Statement>) -> Result<()> {
         let statement = statement.into();
         match &statement {
             Statement::Assignment(assignment) => self.usings.combine(&assignment.list_usings()?),
             Statement::PortMapping(pm) => {
                 for (_, object) in pm.ports() {
-                    self.usings.combine(&object.list_usings()?);
+                    self.usings
+                        .combine(&db.get_object_declaration(*object).list_usings()?);
                 }
             }
         }
-        let id = db.intern_statement(statement);
-        self.statement.push(id);
-        Ok(id)
+        self.statement.push(statement);
+        Ok(())
     }
 
-    pub fn statements(&self) -> &Vec<Id<Statement>> {
+    pub fn statements(&self) -> &Vec<Statement> {
         &self.statement
     }
 

@@ -69,17 +69,13 @@ impl DeclareWithIndent for Architecture {
         for declaration in self.declarations() {
             result.push_str(
                 db.lookup_intern_architecture_declaration(*declaration)
-                    .declare(pre, ";\n")?
+                    .declare(db, pre, ";\n")?
                     .as_str(),
             );
         }
         result.push_str("begin\n");
         for statement in self.statements() {
-            result.push_str(
-                db.lookup_intern_statement(*statement)
-                    .declare(pre, ";\n")?
-                    .as_str(),
-            );
+            result.push_str(statement.declare(db, pre, ";\n")?.as_str());
         }
         result.push_str(format!("end {};", self.identifier()).as_str());
         Ok(result)

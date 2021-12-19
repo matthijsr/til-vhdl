@@ -314,11 +314,12 @@ pub struct AliasDeclaration {
 
 impl AliasDeclaration {
     pub fn new(
+        db: &impl Arch,
         object: Id<ObjectDeclaration>,
         identifier: impl Into<String>,
         fields: Vec<FieldSelection>,
     ) -> Result<AliasDeclaration> {
-        AliasDeclaration::from_object(object, identifier).with_selection(fields)
+        AliasDeclaration::from_object(object, identifier).with_selection(db, fields)
     }
 
     pub fn from_object(
@@ -333,8 +334,8 @@ impl AliasDeclaration {
     }
 
     /// Apply one or more field selections to the alias
-    pub fn with_selection(mut self, fields: Vec<FieldSelection>) -> Result<Self> {
-        let mut object = self.object().typ().clone();
+    pub fn with_selection(mut self, db: &impl Arch, fields: Vec<FieldSelection>) -> Result<Self> {
+        let mut object = db.get_object_declaration(self.object()).typ().clone();
         for field in self.field_selection() {
             object = object.get_field(field)?;
         }
@@ -347,7 +348,7 @@ impl AliasDeclaration {
     }
 
     /// Returns the actual object this is aliasing
-    pub fn object(&self) -> ObjectDeclaration {
+    pub fn object(&self) -> Id<ObjectDeclaration> {
         self.object
     }
 
@@ -362,8 +363,8 @@ impl AliasDeclaration {
     }
 
     /// Returns the object type of the alias (after fields have been selected)
-    pub fn typ(&self) -> Result<ObjectType> {
-        let mut object = self.object().typ().clone();
+    pub fn typ(&self, db: &impl Arch) -> Result<ObjectType> {
+        let mut object = db.get_object_declaration(self.object()).typ().clone();
         for field in self.field_selection() {
             object = object.get_field(field)?;
         }
@@ -371,19 +372,19 @@ impl AliasDeclaration {
     }
 }
 
-impl TryInto<ObjectDeclaration> for AliasDeclaration {
-    type Error = Error;
+// impl TryInto<ObjectDeclaration> for AliasDeclaration {
+//     type Error = Error;
 
-    fn try_into(self) -> Result<ObjectDeclaration> {
-        Ok(ObjectDeclaration {
-            identifier: self.identifier().to_string(),
-            typ: self.typ()?,
-            mode: self.object().mode().clone(),
-            default: None,
-            kind: self.object().kind().clone(),
-        })
-    }
-}
+//     fn try_into(self) -> Result<ObjectDeclaration> {
+//         Ok(ObjectDeclaration {
+//             identifier: self.identifier().to_string(),
+//             typ: self.typ()?,
+//             mode: self.object().mode().clone(),
+//             default: None,
+//             kind: self.object().kind().clone(),
+//         })
+//     }
+// }
 
 #[cfg(test)]
 pub mod tests {
@@ -392,7 +393,7 @@ pub mod tests {
     use indexmap::IndexMap;
     use tydi_common::name::Name;
 
-    use crate::object::record::RecordObject;
+    use crate::{architecture::arch_storage::db::Database, object::record::RecordObject};
 
     use super::*;
 
@@ -405,8 +406,8 @@ pub mod tests {
     }
 
     pub(crate) fn test_complex_signal() -> Result<ObjectDeclaration> {
-        let mut fields: IndexMap<String, ObjectType> = IndexMap::new();
-        fields.insert("a".to_string(), ObjectType::bit_vector(10, -4)?);
+        let mut fields = IndexMap::new();
+        fields.insert(Name::try_new("a")?, ObjectType::bit_vector(10, -4)?);
         Ok(ObjectDeclaration::signal(
             "test_signal",
             ObjectType::Record(RecordObject::new(
@@ -419,59 +420,82 @@ pub mod tests {
 
     #[test]
     fn alias_verification_success() -> Result<()> {
-        AliasDeclaration::from_object(&test_bit_signal()?, Name::try_from("test_signal_alias")?);
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![FieldSelection::name("a")])?;
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![
-                FieldSelection::name("a"),
+        let db = Database::default();
+        let test_bit_signal = db.intern_object_declaration(test_bit_signal()?);
+        let test_complex_signal = db.intern_object_declaration(test_complex_signal()?);
+        AliasDeclaration::from_object(test_bit_signal, Name::try_from("test_signal_alias")?);
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
+            .with_selection(&db, vec![FieldSelection::try_name("a")?])?;
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+            &db,
+            vec![
+                FieldSelection::try_name("a")?,
                 FieldSelection::downto(10, -4)?,
-            ])?;
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![FieldSelection::name("a")])?
-            .with_selection(vec![FieldSelection::downto(10, -4)?])?;
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![
-                FieldSelection::name("a"),
+            ],
+        )?;
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
+            .with_selection(&db, vec![FieldSelection::try_name("a")?])?
+            .with_selection(&db, vec![FieldSelection::downto(10, -4)?])?;
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+            &db,
+            vec![
+                FieldSelection::try_name("a")?,
                 FieldSelection::downto(4, -1)?,
-            ])?;
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![FieldSelection::name("a"), FieldSelection::to(-4, 10)?])?;
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![FieldSelection::name("a"), FieldSelection::index(10)])?;
-        AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-            .with_selection(vec![FieldSelection::name("a"), FieldSelection::index(-4)])?;
+            ],
+        )?;
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+            &db,
+            vec![FieldSelection::try_name("a")?, FieldSelection::to(-4, 10)?],
+        )?;
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+            &db,
+            vec![FieldSelection::try_name("a")?, FieldSelection::index(10)],
+        )?;
+        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+            &db,
+            vec![FieldSelection::try_name("a")?, FieldSelection::index(-4)],
+        )?;
         Ok(())
     }
 
     #[test]
     fn alias_verification_error() -> Result<()> {
+        let db = Database::default();
+        let test_bit_signal = db.intern_object_declaration(test_bit_signal()?);
+        let test_complex_signal = db.intern_object_declaration(test_complex_signal()?);
         is_invalid_target(
-            AliasDeclaration::from_object(&test_bit_signal()?, "test_signal_alias")
-                .with_selection(vec![FieldSelection::name("a")]),
+            AliasDeclaration::from_object(test_bit_signal, "test_signal_alias")
+                .with_selection(&db, vec![FieldSelection::try_name("a")?]),
         )?;
         is_invalid_target(
-            AliasDeclaration::from_object(&test_bit_signal()?, "test_signal_alias")
-                .with_selection(vec![FieldSelection::index(1)]),
+            AliasDeclaration::from_object(test_bit_signal, "test_signal_alias")
+                .with_selection(&db, vec![FieldSelection::index(1)]),
         )?;
         is_invalid_target(
-            AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-                .with_selection(vec![FieldSelection::index(1)]),
+            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
+                .with_selection(&db, vec![FieldSelection::index(1)]),
         )?;
         is_invalid_argument(
-            AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-                .with_selection(vec![FieldSelection::name("b")]),
+            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
+                .with_selection(&db, vec![FieldSelection::try_name("b")?]),
         )?;
         is_invalid_target(
-            AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-                .with_selection(vec![FieldSelection::name("a"), FieldSelection::name("a")]),
+            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+                &db,
+                vec![
+                    FieldSelection::try_name("a")?,
+                    FieldSelection::try_name("a")?,
+                ],
+            ),
         )?;
         is_invalid_argument(
-            AliasDeclaration::from_object(&test_complex_signal()?, "test_signal_alias")
-                .with_selection(vec![
-                    FieldSelection::name("a"),
+            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
+                &db,
+                vec![
+                    FieldSelection::try_name("a")?,
                     FieldSelection::downto(11, -4)?,
-                ]),
+                ],
+            ),
         )?;
         Ok(())
     }

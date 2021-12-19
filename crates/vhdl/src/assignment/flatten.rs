@@ -82,7 +82,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                 "Cannot assign object to itself".to_string(),
             ))
         } else {
-            let self_obj = db.lookup_intern_object_declaration(*self);
+            let self_obj = db.get_object_declaration(*self);
             let self_typ = self_obj.typ().get_nested(from_field)?;
             if !self_typ.is_flat() {
                 Err(Error::InvalidArgument(format!(
@@ -95,7 +95,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                 complex_id
                     .to_flat(db, *self, from_field, to_field)?
                     .iter()
-                    .map(|x| x.reverse())
+                    .map(|x| x.reverse(db))
                     .collect()
             }
         }
@@ -113,9 +113,9 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                 "Cannot assign object to itself".to_string(),
             ))
         } else {
-            let self_obj = db.lookup_intern_object_declaration(*self);
+            let self_obj = db.get_object_declaration(*self);
             let self_typ = self_obj.typ().get_nested(from_field)?;
-            let flat_obj = db.lookup_intern_object_declaration(flat_id);
+            let flat_obj = db.get_object_declaration(flat_id);
             let flat_typ = flat_obj.typ().get_nested(to_field)?;
             if self_typ.flat_length() != flat_typ.flat_length() {
                 Err(Error::InvalidArgument(format!("Can't assign objects to one another, mismatched length (self ({}{}): {}, flat object ({}{}): {})",
@@ -140,8 +140,9 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                     }
                     result.push(
                         flat_id.assign(
+                            db,
                             &Assignment::from(
-                                ObjectAssignment::from(self.clone()).assign_from(&new_from)?,
+                                ObjectAssignment::from(self.clone()).assign_from(db, &new_from)?,
                             )
                             .to_nested(&new_to),
                         )?,
@@ -188,7 +189,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                         for (name, field) in rec.fields() {
                             let mut new_to = to_field.clone();
                             let mut new_from = from_field.clone();
-                            new_from.push(FieldSelection::name(name));
+                            new_from.push(FieldSelection::try_name(name.to_string())?);
                             let field_length = field.flat_length()?;
                             select_specific_flat_range(
                                 &mut new_to,

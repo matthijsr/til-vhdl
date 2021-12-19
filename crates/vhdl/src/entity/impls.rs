@@ -2,6 +2,7 @@ use textwrap::indent;
 use tydi_common::error::Result;
 use tydi_common::traits::{Document, Identify};
 
+use crate::architecture::arch_storage::Arch;
 use crate::declaration::DeclareWithIndent;
 use crate::traits::VhdlDocument;
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
 use super::Entity;
 
 impl DeclareWithIndent for Entity {
-    fn declare_with_indent(&self, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(&doc);
@@ -23,7 +24,7 @@ impl DeclareWithIndent for Entity {
         let ports = self
             .ports()
             .iter()
-            .map(|x| x.declare())
+            .map(|x| x.declare(db))
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
         port_body.push_str(&indent(&ports, pre));

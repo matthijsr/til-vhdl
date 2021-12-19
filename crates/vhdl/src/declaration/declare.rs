@@ -1,17 +1,17 @@
 use tydi_common::error::{Error, Result};
 
-use crate::architecture::ArchitectureDeclare;
+use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 
 use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectMode};
 
 impl ArchitectureDeclare for ArchitectureDeclaration {
-    fn declare(&self, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
         match self {
             ArchitectureDeclaration::Type(_) => todo!(),
             ArchitectureDeclaration::SubType(_) => todo!(),
             ArchitectureDeclaration::Procedure(_) => todo!(),
             ArchitectureDeclaration::Function(_) => todo!(),
-            ArchitectureDeclaration::Object(object) => object.declare(pre, post),
+            ArchitectureDeclaration::Object(object) => object.declare(db, pre, post),
             ArchitectureDeclaration::Alias(_) => todo!(),
             ArchitectureDeclaration::Component(_) => todo!(),
             ArchitectureDeclaration::Custom(_) => todo!(),
@@ -20,7 +20,7 @@ impl ArchitectureDeclare for ArchitectureDeclaration {
 }
 
 impl ArchitectureDeclare for ObjectDeclaration {
-    fn declare(&self, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
         if self.kind() == ObjectKind::EntityPort {
             // Entity ports are part of the architecture, but aren't declared in the declaration part
             return Ok("".to_string());
@@ -50,7 +50,7 @@ impl ArchitectureDeclare for ObjectDeclaration {
         result.push_str(self.typ().type_name().as_str());
         if let Some(default) = self.default() {
             result.push_str(" := ");
-            result.push_str(&default.declare_for(self.identifier(), pre, post)?);
+            result.push_str(&default.declare_for(db, self.identifier(), pre, post)?);
         }
         result.push_str(post);
         Ok(result)
@@ -59,20 +59,21 @@ impl ArchitectureDeclare for ObjectDeclaration {
 
 #[cfg(test)]
 mod tests {
-    use crate::{assignment::StdLogicValue, object::ObjectType};
+    use crate::{assignment::StdLogicValue, object::ObjectType, architecture::arch_storage::db::Database};
 
     use super::*;
 
     #[test]
     fn test_declarations() -> Result<()> {
+        let db = Database::default();
         assert_eq!(
             "signal TestSignal : std_logic;\n",
-            ObjectDeclaration::signal("TestSignal", ObjectType::Bit, None).declare("", ";\n")?
+            ObjectDeclaration::signal("TestSignal", ObjectType::Bit, None).declare(&db, "", ";\n")?
         );
         assert_eq!(
             "variable TestVariable : std_logic;\n",
             ObjectDeclaration::variable("TestVariable", ObjectType::Bit, None)
-                .declare("", ";\n")?
+                .declare(&db, "", ";\n")?
         );
         assert_eq!(
             "signal SignalWithDefault : std_logic := 'U';\n",
@@ -81,12 +82,12 @@ mod tests {
                 ObjectType::Bit,
                 Some(StdLogicValue::U.into())
             )
-            .declare("", ";\n")?
+            .declare(&db, "", ";\n")?
         );
         assert_eq!(
             "  constant TestConstant : std_logic := 'U';\n",
             ObjectDeclaration::constant("TestConstant", ObjectType::Bit, StdLogicValue::U)
-                .declare("  ", ";\n")?
+                .declare(&db, "  ", ";\n")?
         );
         Ok(())
     }

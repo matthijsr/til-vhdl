@@ -5,10 +5,12 @@ use indexmap::map::IndexMap;
 
 use array_assignment::ArrayAssignment;
 use tydi_common::error::{Error, Result};
+use tydi_common::name::Name;
 use tydi_common::traits::Document;
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
+use crate::declaration::Declare;
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
@@ -62,7 +64,7 @@ impl AssignDeclaration {
     /// The object declaration with any field selections on it
     pub fn object_string(&self, db: &impl Arch) -> String {
         let mut result = db
-            .lookup_intern_object_declaration(self.object())
+            .get_object_declaration(self.object())
             .identifier()
             .to_string();
         for field in self.assignment().to_field() {
@@ -83,12 +85,13 @@ impl AssignDeclaration {
     }
 
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
-    pub fn reverse(&self) -> Result<AssignDeclaration> {
+    pub fn reverse(&self, db: &impl Arch) -> Result<AssignDeclaration> {
         match self.assignment().kind() {
             AssignmentKind::Object(object) => Ok(object.object().assign(
+                db,
                 &Assignment::from(
                     ObjectAssignment::from(self.object().clone())
-                        .assign_from(self.assignment().to_field())?,
+                        .assign_from(db, self.assignment().to_field())?,
                 )
                 .to_nested(object.from_field()),
             )?),
@@ -126,8 +129,8 @@ impl Assignment {
     }
 
     /// Append a named field selection
-    pub fn to_named(self, to: &str) -> Self {
-        self.to(FieldSelection::Name(to.to_string()))
+    pub fn to_named(self, to: Name) -> Self {
+        self.to(FieldSelection::Name(to))
     }
 
     /// Append a range field selection
@@ -160,7 +163,13 @@ impl Assignment {
         &self.kind
     }
 
-    pub fn declare_for(&self, object_identifier: String, pre: &str, post: &str) -> Result<String> {
+    pub fn declare_for(
+        &self,
+        db: &impl Arch,
+        object_identifier: String,
+        pre: &str,
+        post: &str,
+    ) -> Result<String> {
         if let AssignmentKind::Direct(DirectAssignment::Value(ValueAssignment::BitVec(bitvec))) =
             self.kind()
         {
@@ -168,7 +177,7 @@ impl Assignment {
                 return bitvec.declare_for_range(range);
             }
         }
-        self.kind().declare_for(object_identifier, pre, post)
+        self.kind().declare_for(db, object_identifier, pre, post)
     }
 }
 
@@ -182,113 +191,119 @@ pub enum AssignmentKind {
 }
 
 impl AssignmentKind {
-    pub fn full_record(fields: IndexMap<String, AssignmentKind>) -> AssignmentKind {
-        AssignmentKind::Direct(DirectAssignment::FullRecord(fields))
+    pub fn full_record(fields: IndexMap<Name, AssignmentKind>) -> AssignmentKind {
+        AssignmentKind::Direct(DirectAssignment::FullRecord(
+            fields
+                .into_iter()
+                .map(|(k, v)| FieldAssignment::new(k, v))
+                .collect(),
+        ))
     }
 
-    /// Converts an object assignment into a direct assignment. Useful when array or record types have identical fields but different type names.
-    ///
-    /// `convert_all` will also unwrap further nested objects
-    pub fn to_direct(
-        object: &(impl Into<ObjectAssignment> + Clone),
-        convert_all: bool,
-    ) -> Result<AssignmentKind> {
-        let object = object.clone().into();
-        match object.typ()? {
-            ObjectType::Bit => Ok(object.into()),
-            ObjectType::Record(rec) => {
-                let mut fields = IndexMap::new();
-                for (field, typ) in rec.fields() {
-                    match typ {
-                        ObjectType::Array(_) if convert_all => {
-                            fields.insert(
-                                field.clone(),
-                                AssignmentKind::to_direct(
-                                    &object
-                                        .clone()
-                                        .assign_from(&vec![FieldSelection::name(field)])?,
-                                    true,
-                                )?,
-                            );
-                        }
-                        ObjectType::Record(_) if convert_all => {
-                            fields.insert(
-                                field.clone(),
-                                AssignmentKind::to_direct(
-                                    &object
-                                        .clone()
-                                        .assign_from(&vec![FieldSelection::name(field)])?,
-                                    true,
-                                )?,
-                            );
-                        }
-                        _ => {
-                            fields.insert(
-                                field.clone(),
-                                object
-                                    .clone()
-                                    .assign_from(&vec![FieldSelection::name(field)])?
-                                    .into(),
-                            );
-                        }
-                    }
-                }
-                Ok(AssignmentKind::Direct(DirectAssignment::FullRecord(fields)))
-            }
-            ObjectType::Array(arr) => {
-                if arr.is_bitvector() {
-                    Ok(object.into())
-                } else {
-                    let mut fields = vec![];
-                    match arr.typ() {
-                        ObjectType::Array(_) if convert_all => {
-                            for i in arr.low()..arr.high() + 1 {
-                                fields.push(AssignmentKind::to_direct(
-                                    &object
-                                        .clone()
-                                        .assign_from(&vec![FieldSelection::index(i)])?,
-                                    true,
-                                )?);
-                            }
-                        }
-                        ObjectType::Record(_) if convert_all => {
-                            for i in arr.low()..arr.high() + 1 {
-                                fields.push(AssignmentKind::to_direct(
-                                    &object
-                                        .clone()
-                                        .assign_from(&vec![FieldSelection::index(i)])?,
-                                    true,
-                                )?);
-                            }
-                        }
-                        _ => {
-                            for i in arr.low()..arr.high() + 1 {
-                                fields.push(
-                                    object
-                                        .clone()
-                                        .assign_from(&vec![FieldSelection::index(i)])?
-                                        .into(),
-                                );
-                            }
-                        }
-                    }
-                    Ok(AssignmentKind::Direct(DirectAssignment::FullArray(
-                        ArrayAssignment::Direct(fields),
-                    )))
-                }
-            }
-        }
-    }
+    // /// Converts an object assignment into a direct assignment. Useful when array or record types have identical fields but different type names.
+    // ///
+    // /// `convert_all` will also unwrap further nested objects
+    // pub fn to_direct(
+    //     object: &(impl Into<ObjectAssignment> + Clone),
+    //     convert_all: bool,
+    // ) -> Result<AssignmentKind> {
+    //     let object = object.clone().into();
+    //     match object.typ()? {
+    //         ObjectType::Bit => Ok(object.into()),
+    //         ObjectType::Record(rec) => {
+    //             let mut fields = IndexMap::new();
+    //             for (field, typ) in rec.fields() {
+    //                 match typ {
+    //                     ObjectType::Array(_) if convert_all => {
+    //                         fields.insert(
+    //                             field.clone(),
+    //                             AssignmentKind::to_direct(
+    //                                 &object
+    //                                     .clone()
+    //                                     .assign_from(&vec![FieldSelection::name(field)])?,
+    //                                 true,
+    //                             )?,
+    //                         );
+    //                     }
+    //                     ObjectType::Record(_) if convert_all => {
+    //                         fields.insert(
+    //                             field.clone(),
+    //                             AssignmentKind::to_direct(
+    //                                 &object
+    //                                     .clone()
+    //                                     .assign_from(&vec![FieldSelection::name(field)])?,
+    //                                 true,
+    //                             )?,
+    //                         );
+    //                     }
+    //                     _ => {
+    //                         fields.insert(
+    //                             field.clone(),
+    //                             object
+    //                                 .clone()
+    //                                 .assign_from(&vec![FieldSelection::name(field)])?
+    //                                 .into(),
+    //                         );
+    //                     }
+    //                 }
+    //             }
+    //             Ok(AssignmentKind::Direct(DirectAssignment::FullRecord(fields)))
+    //         }
+    //         ObjectType::Array(arr) => {
+    //             if arr.is_bitvector() {
+    //                 Ok(object.into())
+    //             } else {
+    //                 let mut fields = vec![];
+    //                 match arr.typ() {
+    //                     ObjectType::Array(_) if convert_all => {
+    //                         for i in arr.low()..arr.high() + 1 {
+    //                             fields.push(AssignmentKind::to_direct(
+    //                                 &object
+    //                                     .clone()
+    //                                     .assign_from(&vec![FieldSelection::index(i)])?,
+    //                                 true,
+    //                             )?);
+    //                         }
+    //                     }
+    //                     ObjectType::Record(_) if convert_all => {
+    //                         for i in arr.low()..arr.high() + 1 {
+    //                             fields.push(AssignmentKind::to_direct(
+    //                                 &object
+    //                                     .clone()
+    //                                     .assign_from(&vec![FieldSelection::index(i)])?,
+    //                                 true,
+    //                             )?);
+    //                         }
+    //                     }
+    //                     _ => {
+    //                         for i in arr.low()..arr.high() + 1 {
+    //                             fields.push(
+    //                                 object
+    //                                     .clone()
+    //                                     .assign_from(&vec![FieldSelection::index(i)])?
+    //                                     .into(),
+    //                             );
+    //                         }
+    //                     }
+    //                 }
+    //                 Ok(AssignmentKind::Direct(DirectAssignment::FullArray(
+    //                     ArrayAssignment::Direct(fields),
+    //                 )))
+    //             }
+    //         }
+    //     }
+    // }
 
     pub fn declare_for(
         &self,
+        db: &impl Arch,
         object_identifier: impl Into<String>,
         pre: &str,
         post: &str,
     ) -> Result<String> {
         let object_identifier: &str = &object_identifier.into();
         match self {
-            AssignmentKind::Object(object) => Ok(object.to_string()),
+            AssignmentKind::Object(object) => object.declare(db),
             AssignmentKind::Direct(direct) => match direct {
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
@@ -297,13 +312,14 @@ impl AssignmentKind {
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
                     let nested_pre = &format!("{}  ", pre);
-                    for (field, value) in record {
+                    for rf in record {
                         field_assignments.push(format!(
                             "\n{}{} => {}",
                             nested_pre,
-                            field,
-                            value.declare_for(
-                                format!("{}.{}", object_identifier, field),
+                            rf.field(),
+                            rf.assignment().declare_for(
+                                db,
+                                format!("{}.{}", object_identifier, rf.field()),
                                 nested_pre,
                                 post
                             )?
@@ -316,6 +332,7 @@ impl AssignmentKind {
                         let mut positionals = Vec::new();
                         for value in direct {
                             positionals.push(value.declare_for(
+                                db,
                                 format!("{}'element", object_identifier),
                                 pre,
                                 post,
@@ -326,12 +343,16 @@ impl AssignmentKind {
                     ArrayAssignment::Sliced { direct, others } => {
                         let mut field_assignments = Vec::new();
                         let nested_pre = &format!("{}  ", pre);
-                        for (range, value) in direct {
+                        for ra in direct {
                             field_assignments.push(format!(
                                 "\n{}{} => {}",
                                 nested_pre,
-                                range.to_string().replace("(", "").replace(")", ""),
-                                value.declare_for(
+                                ra.constraint()
+                                    .to_string()
+                                    .replace("(", "")
+                                    .replace(")", ""),
+                                ra.assignment().declare_for(
+                                    db,
                                     format!("{}'element", object_identifier),
                                     nested_pre,
                                     post
@@ -343,6 +364,7 @@ impl AssignmentKind {
                                 "\n{}others => {}",
                                 nested_pre,
                                 value.declare_for(
+                                    db,
                                     format!("{}'element", object_identifier),
                                     nested_pre,
                                     post
@@ -353,7 +375,12 @@ impl AssignmentKind {
                     }
                     ArrayAssignment::Others(value) => Ok(format!(
                         "( others => {} )",
-                        value.declare_for(format!("{}'element", object_identifier), pre, post)?
+                        value.declare_for(
+                            db,
+                            format!("{}'element", object_identifier),
+                            pre,
+                            post
+                        )?
                     )),
                 },
             },
@@ -370,25 +397,15 @@ pub struct ObjectAssignment {
     from_field: Vec<FieldSelection>,
 }
 
-impl fmt::Display for ObjectAssignment {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut result = self.object().identifier().to_string();
-        for field in self.from_field() {
-            result.push_str(&field.to_string());
-        }
-        write!(f, "{}", result)
-    }
-}
-
 impl ObjectAssignment {
     /// Returns a reference to the object being assigned from
-    pub fn object(&self) -> &ObjectDeclaration {
-        &self.object
+    pub fn object(&self) -> Id<ObjectDeclaration> {
+        self.object
     }
 
     /// Select fields from the object being assigned
-    pub fn assign_from(mut self, fields: &Vec<FieldSelection>) -> Result<Self> {
-        let mut object = self.object().typ().clone();
+    pub fn assign_from(mut self, db: &impl Arch, fields: &Vec<FieldSelection>) -> Result<Self> {
+        let mut object = db.get_object_declaration(self.object()).typ().clone();
         // Verify the fields exist
         for field in self.from_field() {
             object = object.get_field(field)?;
@@ -406,12 +423,25 @@ impl ObjectAssignment {
     }
 
     /// Returns the object type of the selected field
-    pub fn typ(&self) -> Result<ObjectType> {
-        let mut object = self.object().typ().clone();
+    pub fn typ(&self, db: &impl Arch) -> Result<ObjectType> {
+        let mut object = db.get_object_declaration(self.object()).typ().clone();
         for field in self.from_field() {
             object = object.get_field(field)?;
         }
         Ok(object)
+    }
+}
+
+impl Declare for ObjectAssignment {
+    fn declare(&self, db: &impl Arch) -> Result<String> {
+        let mut result = db
+            .get_object_declaration(self.object())
+            .identifier()
+            .to_string();
+        for field in self.from_field() {
+            result.push_str(&field.to_string());
+        }
+        Ok(result)
     }
 }
 
@@ -491,8 +521,22 @@ pub enum DirectAssignment {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FieldAssignment {
-    pub field: String,
-    pub assignment: AssignmentKind,
+    field: Name,
+    assignment: AssignmentKind,
+}
+
+impl FieldAssignment {
+    pub fn new(field: Name, assignment: AssignmentKind) -> Self {
+        FieldAssignment { field, assignment }
+    }
+
+    pub fn field(&self) -> &Name {
+        &self.field
+    }
+
+    pub fn assignment(&self) -> &AssignmentKind {
+        &self.assignment
+    }
 }
 
 /// Directly assigning a value or an entire Record, corresponds to the Types defined in `tydi::generator::common::Type`
@@ -510,7 +554,7 @@ pub enum FieldSelection {
     /// The most common kind of constraint, a specific range or index
     Range(RangeConstraint),
     /// The field of a record
-    Name(String),
+    Name(Name),
 }
 
 impl fmt::Display for FieldSelection {
@@ -541,7 +585,11 @@ impl FieldSelection {
         FieldSelection::Range(RangeConstraint::Index(index.into()))
     }
 
-    pub fn name(name: impl Into<String>) -> FieldSelection {
+    pub fn try_name(name: impl Into<String>) -> Result<FieldSelection> {
+        Ok(FieldSelection::Name(Name::try_new(name)?))
+    }
+
+    pub fn name(name: impl Into<Name>) -> FieldSelection {
         FieldSelection::Name(name.into())
     }
 }
