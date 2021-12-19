@@ -15,13 +15,15 @@ impl ArchitectureDeclare for AssignDeclaration {
             result.push_str(&indent(&doc, pre));
         }
         result.push_str(&self.object_string(db));
-        result.push_str(match db.get_object_declaration(self.object).kind() {
-            ObjectKind::Signal => " <= ",
-            ObjectKind::Variable => " := ",
-            ObjectKind::Constant => " := ",
-            ObjectKind::EntityPort => " <= ",
-            ObjectKind::ComponentPort => " => ",
-        });
+        result.push_str(
+            match db.lookup_intern_object_declaration(self.object).kind() {
+                ObjectKind::Signal => " <= ",
+                ObjectKind::Variable => " := ",
+                ObjectKind::Constant => " := ",
+                ObjectKind::EntityPort => " <= ",
+                ObjectKind::ComponentPort => " => ",
+            },
+        );
         result.push_str(
             &self
                 .assignment()

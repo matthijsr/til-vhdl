@@ -64,7 +64,7 @@ impl AssignDeclaration {
     /// The object declaration with any field selections on it
     pub fn object_string(&self, db: &impl Arch) -> String {
         let mut result = db
-            .get_object_declaration(self.object())
+            .lookup_intern_object_declaration(self.object())
             .identifier()
             .to_string();
         for field in self.assignment().to_field() {
@@ -405,7 +405,10 @@ impl ObjectAssignment {
 
     /// Select fields from the object being assigned
     pub fn assign_from(mut self, db: &impl Arch, fields: &Vec<FieldSelection>) -> Result<Self> {
-        let mut object = db.get_object_declaration(self.object()).typ().clone();
+        let mut object = db
+            .lookup_intern_object_declaration(self.object())
+            .typ()
+            .clone();
         // Verify the fields exist
         for field in self.from_field() {
             object = object.get_field(field)?;
@@ -424,7 +427,10 @@ impl ObjectAssignment {
 
     /// Returns the object type of the selected field
     pub fn typ(&self, db: &impl Arch) -> Result<ObjectType> {
-        let mut object = db.get_object_declaration(self.object()).typ().clone();
+        let mut object = db
+            .lookup_intern_object_declaration(self.object())
+            .typ()
+            .clone();
         for field in self.from_field() {
             object = object.get_field(field)?;
         }
@@ -435,7 +441,7 @@ impl ObjectAssignment {
 impl Declare for ObjectAssignment {
     fn declare(&self, db: &impl Arch) -> Result<String> {
         let mut result = db
-            .get_object_declaration(self.object())
+            .lookup_intern_object_declaration(self.object())
             .identifier()
             .to_string();
         for field in self.from_field() {

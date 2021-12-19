@@ -82,7 +82,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                 "Cannot assign object to itself".to_string(),
             ))
         } else {
-            let self_obj = db.get_object_declaration(*self);
+            let self_obj = db.lookup_intern_object_declaration(*self);
             let self_typ = self_obj.typ().get_nested(from_field)?;
             if !self_typ.is_flat() {
                 Err(Error::InvalidArgument(format!(
@@ -113,9 +113,9 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                 "Cannot assign object to itself".to_string(),
             ))
         } else {
-            let self_obj = db.get_object_declaration(*self);
+            let self_obj = db.lookup_intern_object_declaration(*self);
             let self_typ = self_obj.typ().get_nested(from_field)?;
-            let flat_obj = db.get_object_declaration(flat_id);
+            let flat_obj = db.lookup_intern_object_declaration(flat_id);
             let flat_typ = flat_obj.typ().get_nested(to_field)?;
             if self_typ.flat_length() != flat_typ.flat_length() {
                 Err(Error::InvalidArgument(format!("Can't assign objects to one another, mismatched length (self ({}{}): {}, flat object ({}{}): {})",

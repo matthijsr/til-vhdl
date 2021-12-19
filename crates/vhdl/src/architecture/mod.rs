@@ -101,8 +101,10 @@ impl Architecture {
                 self.usings.combine(&object.list_usings()?);
             }
             ArchitectureDeclaration::Alias(alias) => {
-                self.usings
-                    .combine(&db.get_object_declaration(alias.object()).list_usings()?);
+                self.usings.combine(
+                    &db.lookup_intern_object_declaration(alias.object())
+                        .list_usings()?,
+                );
             }
             ArchitectureDeclaration::Type(_)
             | ArchitectureDeclaration::SubType(_)
@@ -123,7 +125,7 @@ impl Architecture {
             Statement::PortMapping(pm) => {
                 for (_, object) in pm.ports() {
                     self.usings
-                        .combine(&db.get_object_declaration(*object).list_usings()?);
+                        .combine(&db.lookup_intern_object_declaration(*object).list_usings()?);
                 }
             }
         }

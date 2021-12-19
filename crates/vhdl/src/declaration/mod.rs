@@ -335,7 +335,10 @@ impl AliasDeclaration {
 
     /// Apply one or more field selections to the alias
     pub fn with_selection(mut self, db: &impl Arch, fields: Vec<FieldSelection>) -> Result<Self> {
-        let mut object = db.get_object_declaration(self.object()).typ().clone();
+        let mut object = db
+            .lookup_intern_object_declaration(self.object())
+            .typ()
+            .clone();
         for field in self.field_selection() {
             object = object.get_field(field)?;
         }
@@ -364,7 +367,10 @@ impl AliasDeclaration {
 
     /// Returns the object type of the alias (after fields have been selected)
     pub fn typ(&self, db: &impl Arch) -> Result<ObjectType> {
-        let mut object = db.get_object_declaration(self.object()).typ().clone();
+        let mut object = db
+            .lookup_intern_object_declaration(self.object())
+            .typ()
+            .clone();
         for field in self.field_selection() {
             object = object.get_field(field)?;
         }
