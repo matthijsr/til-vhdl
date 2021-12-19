@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use tydi_common::{error::{Error, Result}, traits::Identify};
+use tydi_common::{
+    error::{Error, Result},
+    traits::Identify,
+};
 
 use crate::{assignment::Assign, component::Component};
 
@@ -12,7 +15,7 @@ use super::{
 
 pub mod declare;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
     Assignment(AssignDeclaration),
     PortMapping(PortMapping),
@@ -30,7 +33,7 @@ impl From<PortMapping> for Statement {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortMapping {
     label: String,
     component_name: String,

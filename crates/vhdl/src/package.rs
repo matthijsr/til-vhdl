@@ -9,6 +9,7 @@ use tydi_common::{
 };
 
 use crate::{
+    architecture::arch_storage::Arch,
     component::Component,
     declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
@@ -65,17 +66,17 @@ impl Package {
 }
 
 impl DeclareWithIndent for Package {
-    fn declare_with_indent(&self, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
         result.push_str(format!("package {} is\n\n", self.identifier).as_str());
 
         let mut body = String::new();
         for t in self.types() {
-            body.push_str(format!("{}\n\n", t.declare()?).as_str());
+            body.push_str(format!("{}\n\n", t.declare_with_indent(db, pre)?).as_str());
         }
         for c in &self.components {
-            body.push_str(format!("{}\n\n", c.declare()?).as_str());
+            body.push_str(format!("{}\n\n", c.declare(db)?).as_str());
         }
         result.push_str(&indent(&body, pre));
         result.push_str(format!("end {};", self.identifier).as_str());
@@ -101,7 +102,7 @@ impl ListUsings for Package {
                 ObjectType::Record(record_object) => record_object
                     .fields()
                     .into_iter()
-                    .any(|(_, typ)| uses_std_logic(typ)),
+                    .any(|(_, typ)| uses_std_logic(&typ)),
             }
         }
 

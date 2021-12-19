@@ -6,7 +6,10 @@ use tydi_common::{
     traits::{Document, Identify},
 };
 
-use crate::{declaration::Declare, object::ObjectType, traits::VhdlDocument};
+use crate::{
+    architecture::arch_storage::Arch, declaration::Declare, object::ObjectType,
+    traits::VhdlDocument,
+};
 
 /// A port.
 #[derive(Debug, Clone, PartialEq)]
@@ -112,7 +115,7 @@ impl Document for Port {
 }
 
 impl Declare for Port {
-    fn declare(&self) -> Result<String> {
+    fn declare(&self, db: &impl Arch) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());

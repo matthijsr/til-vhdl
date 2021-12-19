@@ -15,7 +15,7 @@ pub(crate) fn empty_component() -> Component {
 pub(crate) fn record_with_nested_type() -> Result<ObjectType> {
     let nested = ObjectType::array(3, 0, ObjectType::Bit, Name::try_new("nested_type")?)?;
     let mut fields = IndexMap::new();
-    fields.insert("nested".to_string(), nested);
+    fields.insert(Name::try_new("nested")?, nested);
     Ok(RecordObject::new(Name::try_new("record_type")?, fields).into())
 }
 

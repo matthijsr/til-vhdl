@@ -10,7 +10,7 @@ use crate::{
     object::ObjectType,
     port::{Parameter, Port},
     properties::Analyze,
-    traits::VhdlDocument,
+    traits::VhdlDocument, architecture::arch_storage::Arch,
 };
 
 /// A component.
@@ -87,7 +87,7 @@ impl Analyze for Component {
 }
 
 impl DeclareWithIndent for Component {
-    fn declare_with_indent(&self, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());
@@ -97,7 +97,7 @@ impl DeclareWithIndent for Component {
         let ports = self
             .ports()
             .iter()
-            .map(|x| x.declare())
+            .map(|x| x.declare(db))
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
         port_body.push_str(&indent(&ports, pre));
@@ -112,12 +112,13 @@ impl DeclareWithIndent for Component {
 mod tests {
     use tydi_common::name::Name;
 
-    use crate::{port::Mode, test_tools::*};
+    use crate::{architecture::arch_storage::db::Database, port::Mode, test_tools::*};
 
     use super::*;
 
     #[test]
     fn test_declare() {
+        let db = Database::default();
         let empty_comp = empty_component().with_doc("test\ntest");
         assert_eq!(
             r#"-- test
@@ -127,7 +128,7 @@ component empty_component
 
   );
 end component;"#,
-            empty_comp.declare().unwrap()
+            empty_comp.declare(&db).unwrap()
         );
         let port1 = Port::new_documented(
             Name::try_new("some_port").unwrap(),
@@ -152,7 +153,7 @@ end component;"#,
     clk : in std_logic
   );
 end component;"#,
-            comp.declare().unwrap()
+            comp.declare(&db).unwrap()
         );
     }
 }

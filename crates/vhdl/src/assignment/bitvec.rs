@@ -22,7 +22,7 @@ fn min_length_signed(value: i32) -> u32 {
 }
 
 /// A struct for describing value assigned to a bit vector
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BitVecValue {
     /// Value assigned as (others => value)
     Others(StdLogicValue),

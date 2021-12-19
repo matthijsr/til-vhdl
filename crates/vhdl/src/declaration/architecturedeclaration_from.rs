@@ -1,13 +1,13 @@
 use super::{AliasDeclaration, ArchitectureDeclaration, ObjectDeclaration};
 
-impl From<ObjectDeclaration> for ArchitectureDeclaration<'_> {
+impl From<ObjectDeclaration> for ArchitectureDeclaration {
     fn from(object: ObjectDeclaration) -> Self {
         ArchitectureDeclaration::Object(object)
     }
 }
 
-impl<'a> From<AliasDeclaration<'a>> for ArchitectureDeclaration<'a> {
-    fn from(alias: AliasDeclaration<'a>) -> Self {
+impl From<AliasDeclaration> for ArchitectureDeclaration {
+    fn from(alias: AliasDeclaration) -> Self {
         ArchitectureDeclaration::Alias(alias)
     }
 }

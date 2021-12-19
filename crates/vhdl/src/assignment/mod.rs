@@ -6,7 +6,9 @@ use indexmap::map::IndexMap;
 use array_assignment::ArrayAssignment;
 use tydi_common::error::{Error, Result};
 use tydi_common::traits::Document;
+use tydi_intern::Id;
 
+use crate::architecture::arch_storage::Arch;
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
@@ -23,21 +25,25 @@ pub mod flatten;
 pub mod impls;
 
 pub trait Assign {
-    fn assign(&self, assignment: &(impl Into<Assignment> + Clone)) -> Result<AssignDeclaration>;
+    fn assign(
+        &self,
+        db: &impl Arch,
+        assignment: &(impl Into<Assignment> + Clone),
+    ) -> Result<AssignDeclaration>;
 }
 
 /// Describing the declaration of an assignment
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssignDeclaration {
     /// The declared object being assigned
-    object: ObjectDeclaration,
+    object: Id<ObjectDeclaration>,
     /// The assignment to the declared object
     assignment: Assignment,
     doc: Option<String>,
 }
 
 impl AssignDeclaration {
-    pub fn new(object: ObjectDeclaration, assignment: Assignment) -> AssignDeclaration {
+    pub fn new(object: Id<ObjectDeclaration>, assignment: Assignment) -> AssignDeclaration {
         AssignDeclaration {
             object,
             assignment,
@@ -45,8 +51,8 @@ impl AssignDeclaration {
         }
     }
 
-    pub fn object(&self) -> &ObjectDeclaration {
-        &self.object
+    pub fn object(&self) -> Id<ObjectDeclaration> {
+        self.object
     }
 
     pub fn assignment(&self) -> &Assignment {
@@ -54,8 +60,11 @@ impl AssignDeclaration {
     }
 
     /// The object declaration with any field selections on it
-    pub fn object_string(&self) -> String {
-        let mut result = self.object().identifier().to_string();
+    pub fn object_string(&self, db: &impl Arch) -> String {
+        let mut result = db
+            .lookup_intern_object_declaration(self.object())
+            .identifier()
+            .to_string();
         for field in self.assignment().to_field() {
             result.push_str(&field.to_string());
         }
@@ -97,7 +106,7 @@ impl Document for AssignDeclaration {
 }
 
 /// An object can be assigned from another object or directly
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignment {
     /// Indicates assignment to (nested) fields. (Named or range)
     to_field: Vec<FieldSelection>,
@@ -164,7 +173,7 @@ impl Assignment {
 }
 
 /// An object can be assigned a value or from another object
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssignmentKind {
     /// An object is assigned from or driven by another object
     Object(ObjectAssignment),
@@ -353,10 +362,10 @@ impl AssignmentKind {
 }
 
 /// An object can be assigned a value or another object
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectAssignment {
     /// The object being assigned from
-    object: Box<ObjectDeclaration>,
+    object: Id<ObjectDeclaration>,
     /// Optional selections on the object being assigned from, representing nested selections
     from_field: Vec<FieldSelection>,
 }
@@ -407,7 +416,7 @@ impl ObjectAssignment {
 }
 
 /// Possible values which can be assigned to std_logic
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StdLogicValue {
     /// Uninitialized, 'U'
     U,
@@ -470,18 +479,24 @@ impl fmt::Display for StdLogicValue {
 }
 
 /// Directly assigning a value or an entire Record/Array
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DirectAssignment {
     /// Assigning a specific value to a bit vector or single bit
     Value(ValueAssignment),
     /// Assigning all fields of a Record
-    FullRecord(IndexMap<String, AssignmentKind>),
+    FullRecord(Vec<FieldAssignment>),
     /// Assigning all fields of an Array
     FullArray(ArrayAssignment),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FieldAssignment {
+    pub field: String,
+    pub assignment: AssignmentKind,
+}
+
 /// Directly assigning a value or an entire Record, corresponds to the Types defined in `tydi::generator::common::Type`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValueAssignment {
     /// Assigning a value to a single bit
     Bit(StdLogicValue),
@@ -490,7 +505,7 @@ pub enum ValueAssignment {
 }
 
 /// A VHDL assignment constraint
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FieldSelection {
     /// The most common kind of constraint, a specific range or index
     Range(RangeConstraint),
@@ -532,7 +547,7 @@ impl FieldSelection {
 }
 
 /// A VHDL range constraint
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RangeConstraint {
     /// A range [start] to [end]
     To { start: i32, end: i32 },

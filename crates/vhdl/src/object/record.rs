@@ -1,23 +1,49 @@
+use std::iter::FromIterator;
+
 use indexmap::IndexMap;
 use textwrap::indent;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
 
+use crate::architecture::arch_storage::Arch;
 use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::ObjectType;
 
 /// A record object
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RecordObject {
     type_name: Name,
-    fields: IndexMap<String, ObjectType>,
+    fields: Vec<RecordField>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RecordField {
+    field: Name,
+    typ: ObjectType,
+}
+
+impl RecordField {
+    pub fn new(field: Name, typ: ObjectType) -> Self {
+        RecordField { field, typ }
+    }
+
+    pub fn field(&self) -> &Name {
+        &self.field
+    }
+
+    pub fn typ(&self) -> &ObjectType {
+        &self.typ
+    }
 }
 
 impl RecordObject {
-    pub fn new(type_name: impl Into<Name>, fields: IndexMap<String, ObjectType>) -> RecordObject {
+    pub fn new(type_name: impl Into<Name>, fields: IndexMap<Name, ObjectType>) -> RecordObject {
         RecordObject {
             type_name: type_name.into(),
-            fields,
+            fields: fields
+                .into_iter()
+                .map(|(field, typ)| RecordField::new(field, typ))
+                .collect(),
         }
     }
 
@@ -25,11 +51,15 @@ impl RecordObject {
         self.type_name.to_string()
     }
 
-    pub fn fields(&self) -> &IndexMap<String, ObjectType> {
-        &self.fields
+    pub fn fields(&self) -> IndexMap<Name, ObjectType> {
+        IndexMap::from_iter(
+            (&self.fields)
+                .into_iter()
+                .map(|x| (x.field().clone(), x.typ().clone())),
+        )
     }
 
-    pub fn get_field(&self, field_name: impl Into<String>) -> Result<&ObjectType> {
+    pub fn get_field(&self, field_name: impl Into<Name>) -> Result<&ObjectType> {
         let field_name = &field_name.into();
         self.fields()
             .get(field_name)
@@ -42,7 +72,7 @@ impl RecordObject {
 }
 
 impl DeclareWithIndent for RecordObject {
-    fn declare_with_indent(&self, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         let mut this = format!("type {} is record\n", self.type_name());
         let mut fields = String::new();
         for (name, typ) in self.fields() {

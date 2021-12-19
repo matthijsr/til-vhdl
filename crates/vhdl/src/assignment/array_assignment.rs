@@ -1,15 +1,16 @@
 use indexmap::IndexMap;
+use tydi_intern::Id;
 
 use super::{AssignmentKind, RangeConstraint};
 
 /// An enum for describing complete assignment to an array
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ArrayAssignment {
     /// Assigning all of an array directly (may concatenate objects)
     Direct(Vec<AssignmentKind>),
     /// Assign some fields directly, and may assign all other fields a single value (e.g. ( 1 => '1', others => '0' ), or ( 1 downto 0 => '1', others => '0' ))
     Sliced {
-        direct: IndexMap<RangeConstraint, AssignmentKind>,
+        direct: Vec<RangeAssignment>,
         others: Option<Box<AssignmentKind>>,
     },
     /// Assigning a single value to all of an array
@@ -22,7 +23,7 @@ impl ArrayAssignment {
     }
 
     pub fn partial(
-        direct: IndexMap<RangeConstraint, AssignmentKind>,
+        direct: Vec<RangeAssignment>,
         others: Option<AssignmentKind>,
     ) -> ArrayAssignment {
         ArrayAssignment::Sliced {
@@ -37,4 +38,10 @@ impl ArrayAssignment {
     pub fn others(value: AssignmentKind) -> ArrayAssignment {
         ArrayAssignment::Others(Box::new(value))
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RangeAssignment {
+    pub constraint: RangeConstraint,
+    pub assignment: AssignmentKind,
 }

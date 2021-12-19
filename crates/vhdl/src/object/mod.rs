@@ -8,11 +8,12 @@ use tydi_common::{
 };
 
 use crate::{
+    architecture::arch_storage::Arch,
     assignment::{
         array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
         FieldSelection, RangeConstraint, ValueAssignment,
     },
-    declaration::Declare,
+    declaration::{Declare, DeclareWithIndent},
     properties::Analyze,
 };
 
@@ -21,7 +22,7 @@ pub mod object_from;
 pub mod record;
 
 /// Types of VHDL objects, possibly referring to fields
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectType {
     /// A bit object, can not contain further fields
     Bit,
@@ -348,13 +349,13 @@ impl Analyze for ObjectType {
     }
 }
 
-impl Declare for ObjectType {
-    fn declare(&self) -> Result<String> {
+impl DeclareWithIndent for ObjectType {
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
         match self {
             ObjectType::Bit => Err(Error::BackEndError(
                 "Invalid type, Bit (std_logic) cannot be declared.".to_string(),
             )),
-            ObjectType::Array(array_object) => array_object.declare(),
+            ObjectType::Array(array_object) => array_object.declare(db),
             ObjectType::Record(_) => todo!(),
         }
     }

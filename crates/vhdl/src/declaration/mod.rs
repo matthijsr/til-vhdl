@@ -3,7 +3,9 @@ use std::fmt;
 
 use tydi_common::error::{Error, Result};
 use tydi_common::traits::Identify;
+use tydi_intern::Id;
 
+use crate::architecture::arch_storage::Arch;
 use crate::port::{Mode, Port};
 
 use super::assignment::{AssignmentKind, FieldSelection};
@@ -16,7 +18,7 @@ pub mod impls;
 /// Generate trait for generic VHDL declarations.
 pub trait Declare {
     /// Generate a VHDL declaration from self.
-    fn declare(&self) -> Result<String>;
+    fn declare(&self, db: &impl Arch) -> Result<String>;
 }
 
 /// Allows users to specify the indent of scopes when declaring VHDL
@@ -31,12 +33,12 @@ pub trait Declare {
 /// end component_with_nested_types;
 /// ```
 pub trait DeclareWithIndent {
-    fn declare_with_indent(&self, pre: &str) -> Result<String>;
+    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String>;
 }
 
 impl<T: DeclareWithIndent> Declare for T {
-    fn declare(&self) -> Result<String> {
-        self.declare_with_indent("  ")
+    fn declare(&self, db: &impl Arch) -> Result<String> {
+        self.declare_with_indent(db, "  ")
     }
 }
 
@@ -67,8 +69,8 @@ impl<T: DeclareWithIndent> Declare for T {
 // | PSL_Sequence_Declaration
 // | PSL_Clock_Declaration
 /// Architecture declaration.
-#[derive(Debug, Clone)]
-pub enum ArchitectureDeclaration<'a> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ArchitectureDeclaration {
     Type(String),      // TODO: Type declarations within the architecture
     SubType(String),   // TODO: Do we want subtypes, or should these just be (part of) types?
     Procedure(String), // TODO: Procedure
@@ -79,13 +81,13 @@ pub enum ArchitectureDeclaration<'a> {
     /// as such, the ports of the entity implemented are treated as inferred declarations.
     Object(ObjectDeclaration),
     /// Alias for an object declaration, with optional range constraint
-    Alias(AliasDeclaration<'a>),
+    Alias(AliasDeclaration),
     Component(String), // TODO: Component declarations within the architecture
     Custom(String),    // TODO: Custom (templates?)
 }
 
 /// The kind of object declared (signal, variable, constant, ports)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectKind {
     Signal,
     Variable,
@@ -119,7 +121,7 @@ impl fmt::Display for ObjectKind {
 /// (E.g., an "in" port on the entity is "Assigned", but so is an "out" port of a component inside the architecture)
 ///
 /// "Out" objects can be assigned "Assigned" objects or "Undefined" objects (which then become "Out" objects themselves)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectMode {
     /// The object does not have a defined mode yet
     Undefined,
@@ -130,7 +132,7 @@ pub enum ObjectMode {
 }
 
 /// Struct describing the identifier of the object, its type, its kind, and a potential default value
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectDeclaration {
     /// Name of the signal
     identifier: String,
@@ -301,28 +303,28 @@ impl ObjectDeclaration {
 }
 
 /// Aliases an existing object, with optional field constraint
-#[derive(Debug, Clone)]
-pub struct AliasDeclaration<'a> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AliasDeclaration {
     identifier: String,
     /// Reference to an existing object declaration
-    object: &'a ObjectDeclaration,
+    object: Id<ObjectDeclaration>,
     /// Optional field selection(s) - when assigning to or from the alias, this is used to determine the fields it represents
     field_selection: Vec<FieldSelection>,
 }
 
-impl<'a> AliasDeclaration<'a> {
+impl AliasDeclaration {
     pub fn new(
-        object: &'a ObjectDeclaration,
+        object: Id<ObjectDeclaration>,
         identifier: impl Into<String>,
         fields: Vec<FieldSelection>,
-    ) -> Result<AliasDeclaration<'a>> {
+    ) -> Result<AliasDeclaration> {
         AliasDeclaration::from_object(object, identifier).with_selection(fields)
     }
 
     pub fn from_object(
-        object: &'a ObjectDeclaration,
+        object: Id<ObjectDeclaration>,
         identifier: impl Into<String>,
-    ) -> AliasDeclaration<'a> {
+    ) -> AliasDeclaration {
         AliasDeclaration {
             identifier: identifier.into(),
             object,
@@ -345,7 +347,7 @@ impl<'a> AliasDeclaration<'a> {
     }
 
     /// Returns the actual object this is aliasing
-    pub fn object(&self) -> &'a ObjectDeclaration {
+    pub fn object(&self) -> ObjectDeclaration {
         self.object
     }
 
@@ -369,7 +371,7 @@ impl<'a> AliasDeclaration<'a> {
     }
 }
 
-impl<'a> TryInto<ObjectDeclaration> for AliasDeclaration<'a> {
+impl TryInto<ObjectDeclaration> for AliasDeclaration {
     type Error = Error;
 
     fn try_into(self) -> Result<ObjectDeclaration> {

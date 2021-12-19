@@ -8,7 +8,7 @@ use tydi_common::{
 use crate::{declaration::Declare, object::ObjectType};
 
 /// An array object, arrays contain a single type of object, but can contain nested objects
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrayObject {
     high: i32,
     low: i32,

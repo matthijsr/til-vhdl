@@ -4,7 +4,7 @@ use crate::architecture::ArchitectureDeclare;
 
 use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectMode};
 
-impl ArchitectureDeclare for ArchitectureDeclaration<'_> {
+impl ArchitectureDeclare for ArchitectureDeclaration {
     fn declare(&self, pre: &str, post: &str) -> Result<String> {
         match self {
             ArchitectureDeclaration::Type(_) => todo!(),

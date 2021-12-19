@@ -1,3 +1,5 @@
+use tydi_intern::Id;
+
 use crate::declaration::ObjectDeclaration;
 
 use super::{
@@ -26,8 +28,8 @@ impl From<ObjectAssignment> for AssignmentKind {
     }
 }
 
-impl From<ObjectDeclaration> for AssignmentKind {
-    fn from(assignment: ObjectDeclaration) -> Self {
+impl From<Id<ObjectDeclaration>> for AssignmentKind {
+    fn from(assignment: Id<ObjectDeclaration>) -> Self {
         AssignmentKind::Object(assignment.into())
     }
 }
@@ -44,11 +46,11 @@ where
 
 impl<T> From<T> for ObjectAssignment
 where
-    T: Into<ObjectDeclaration>,
+    T: Into<Id<ObjectDeclaration>>,
 {
     fn from(object: T) -> Self {
         ObjectAssignment {
-            object: Box::new(object.into()),
+            object: object.into(),
             from_field: vec![],
         }
     }

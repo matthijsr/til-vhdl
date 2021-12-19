@@ -1,6 +1,7 @@
 use indexmap::IndexMap;
 use tydi_common::name::Name;
 use tydi_common::{error::Result, traits::Identify};
+use tydi_intern::Id;
 
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
@@ -10,6 +11,9 @@ use crate::{
     usings::{ListUsings, Usings},
 };
 
+use self::arch_storage::Arch;
+
+pub mod arch_storage;
 pub mod impls;
 
 // NOTE: One of the main things to consider is probably how to handle multiple element lanes. Probably as a check on the number of lanes,
@@ -18,7 +22,7 @@ pub mod impls;
 
 /// An architecture
 #[derive(Debug, Clone)]
-pub struct Architecture<'a> {
+pub struct Architecture {
     /// Name of the architecture
     identifier: Name,
     /// Entity which this architecture is for
@@ -28,9 +32,9 @@ pub struct Architecture<'a> {
     /// Documentation.
     doc: Option<String>,
     /// The declaration part of the architecture
-    declaration: Vec<ArchitectureDeclaration<'a>>,
+    declaration: Vec<Id<ArchitectureDeclaration>>,
     /// The statement part of the architecture
-    statement: Vec<Statement>,
+    statement: Vec<Id<Statement>>,
 }
 
 pub trait ArchitectureDeclare {
@@ -38,7 +42,7 @@ pub trait ArchitectureDeclare {
     fn declare(&self, pre: &str, post: &str) -> Result<String>;
 }
 
-impl<'a> Architecture<'a> {
+impl Architecture {
     /// Create the architecture based on a component contained within a package, assuming the library (project) is "work" and the architecture's identifier is "Behavioral"
     pub fn new_default(package: &Package, component_id: impl Into<String>) -> Result<Architecture> {
         Architecture::new(
@@ -88,8 +92,9 @@ impl<'a> Architecture<'a> {
 
     pub fn add_declaration(
         &mut self,
-        declaration: impl Into<ArchitectureDeclaration<'a>>,
-    ) -> Result<()> {
+        db: &impl Arch,
+        declaration: impl Into<ArchitectureDeclaration>,
+    ) -> Result<Id<ArchitectureDeclaration>> {
         let declaration = declaration.into();
         match &declaration {
             ArchitectureDeclaration::Object(object) => {
@@ -105,11 +110,16 @@ impl<'a> Architecture<'a> {
             | ArchitectureDeclaration::Component(_)
             | ArchitectureDeclaration::Custom(_) => (),
         }
-        self.declaration.push(declaration);
-        Ok(())
+        let id = db.intern_architecture_declaration(declaration);
+        self.declaration.push(id);
+        Ok(id)
     }
 
-    pub fn add_statement(&mut self, statement: impl Into<Statement>) -> Result<()> {
+    pub fn add_statement(
+        &mut self,
+        db: &impl Arch,
+        statement: impl Into<Statement>,
+    ) -> Result<Id<Statement>> {
         let statement = statement.into();
         match &statement {
             Statement::Assignment(assignment) => self.usings.combine(&assignment.list_usings()?),
@@ -119,15 +129,16 @@ impl<'a> Architecture<'a> {
                 }
             }
         }
-        self.statement.push(statement);
-        Ok(())
+        let id = db.intern_statement(statement);
+        self.statement.push(id);
+        Ok(id)
     }
 
-    pub fn statements(&self) -> &Vec<Statement> {
+    pub fn statements(&self) -> &Vec<Id<Statement>> {
         &self.statement
     }
 
-    pub fn declarations(&self) -> &Vec<ArchitectureDeclaration> {
+    pub fn declarations(&self) -> &Vec<Id<ArchitectureDeclaration>> {
         &self.declaration
     }
 
@@ -149,7 +160,7 @@ mod tests {
 
     //     use crate::generator::{common::convert::Packify, vhdl::Declare};
 
-    use crate::{declaration::Declare, test_tools::*};
+    use crate::{architecture::arch_storage::db::Database, declaration::Declare, test_tools::*};
 
     use super::*;
 
@@ -163,6 +174,7 @@ mod tests {
 
     #[test]
     fn test_architecture() -> Result<()> {
+        let db = Database::default();
         let package = test_package()?;
         let architecture =
             Architecture::new_default(&package, Name::try_new("component_with_nested_types")?)?;
@@ -183,7 +195,7 @@ end component_with_nested_types;
 architecture Behavioral of component_with_nested_types is
 begin
 end Behavioral;"#,
-            architecture.declare()?
+            architecture.declare(&db)?
         );
         Ok(())
     }
