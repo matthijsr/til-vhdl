@@ -6,7 +6,7 @@ use indexmap::map::IndexMap;
 use array_assignment::ArrayAssignment;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
-use tydi_common::traits::Document;
+use tydi_common::traits::{Document, Identify};
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
@@ -97,19 +97,10 @@ impl AssignDeclaration {
     ///
     /// This method assumes the object being assigned to is in a suitable mode,
     /// further validation occurs as part of the database query.
-    /// 
+    ///
     /// Will return an error if the assignment itself is somehow incorrect.
     pub fn resulting_mode(&self, db: &dyn Arch) -> Result<ObjectMode> {
-        match self.assignment().kind() {
-            AssignmentKind::Object(_) => todo!(),
-            AssignmentKind::Direct(d) => match d {
-                DirectAssignment::Value(_) => ObjectMode::Assigned,
-                DirectAssignment::FullRecord(fas) => {
-                    let 
-                },
-                DirectAssignment::FullArray(_) => todo!(),
-            },
-        }
+        self.assignment().kind().resulting_mode(db)
     }
 
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
@@ -414,6 +405,39 @@ impl AssignmentKind {
             },
         }
     }
+
+    /// Return the expected resulting object mode.
+    ///
+    /// Will return an error if the assignment itself is incorrect.
+    pub fn resulting_mode(&self, db: &dyn Arch) -> Result<ObjectMode> {
+        match self {
+            AssignmentKind::Object(_) => todo!(),
+            AssignmentKind::Direct(d) => match d {
+                DirectAssignment::Value(_) => Ok(ObjectMode::Assigned),
+                DirectAssignment::FullRecord(fas) => {
+                    let mut mode = None;
+                    let mut prev_field = "";
+                    for fa in fas {
+                        let mode2 = fa.assignment().resulting_mode(db)?;
+                        match mode {
+                            Some(m) => {
+                                if m == mode2 {
+                                    return Err(Error::BackEndError(format!("Attempted to find mode of FullRecord assignment, but assignment has conflicting modes: {}: {} and {}: {}", prev_field, m, fa.identifier(), mode2)));
+                                }
+                            }
+                            None => mode = Some(mode2),
+                        }
+                    }
+                    if let Some(m) = mode {
+                        Ok(m)
+                    } else {
+                        Err(Error::BackEndError("Attempted to find mode of FullRecord assignment, but assignment was empty.".to_string()))
+                    }
+                }
+                DirectAssignment::FullArray(_) => todo!(),
+            },
+        }
+    }
 }
 
 /// An object can be assigned a value or another object
@@ -570,6 +594,12 @@ impl FieldAssignment {
 
     pub fn assignment(&self) -> &AssignmentKind {
         &self.assignment
+    }
+}
+
+impl Identify for FieldAssignment {
+    fn identifier(&self) -> &str {
+        self.field().as_ref()
     }
 }
 

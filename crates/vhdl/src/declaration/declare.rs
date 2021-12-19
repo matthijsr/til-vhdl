@@ -1,4 +1,5 @@
 use tydi_common::error::{Error, Result};
+use tydi_intern::Id;
 
 use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 
@@ -57,36 +58,47 @@ impl ArchitectureDeclare for ObjectDeclaration {
     }
 }
 
+impl ArchitectureDeclare for Id<ObjectDeclaration> {
+    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+        db.lookup_intern_object_declaration(*self)
+            .declare(db, pre, post)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{assignment::StdLogicValue, object::ObjectType, architecture::arch_storage::db::Database};
+    use crate::{
+        architecture::arch_storage::db::Database, assignment::StdLogicValue, object::ObjectType,
+    };
 
     use super::*;
 
     #[test]
     fn test_declarations() -> Result<()> {
-        let db = Database::default();
+        let mut db = Database::default();
         assert_eq!(
             "signal TestSignal : std_logic;\n",
-            ObjectDeclaration::signal("TestSignal", ObjectType::Bit, None).declare(&db, "", ";\n")?
+            ObjectDeclaration::signal(&mut db, "TestSignal", ObjectType::Bit, None)
+                .declare(&db, "", ";\n")?
         );
         assert_eq!(
             "variable TestVariable : std_logic;\n",
-            ObjectDeclaration::variable("TestVariable", ObjectType::Bit, None)
+            ObjectDeclaration::variable(&mut db, "TestVariable", ObjectType::Bit, None)
                 .declare(&db, "", ";\n")?
         );
         assert_eq!(
             "signal SignalWithDefault : std_logic := 'U';\n",
             ObjectDeclaration::signal(
+                &mut db,
                 "SignalWithDefault",
                 ObjectType::Bit,
                 Some(StdLogicValue::U.into())
             )
-            .declare(&db, "", ";\n")?
+            .declare(&mut db, "", ";\n")?
         );
         assert_eq!(
             "  constant TestConstant : std_logic := 'U';\n",
-            ObjectDeclaration::constant("TestConstant", ObjectType::Bit, StdLogicValue::U)
+            ObjectDeclaration::constant(&mut db, "TestConstant", ObjectType::Bit, StdLogicValue::U)
                 .declare(&db, "  ", ";\n")?
         );
         Ok(())

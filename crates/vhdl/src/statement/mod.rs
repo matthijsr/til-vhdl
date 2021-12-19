@@ -47,19 +47,14 @@ pub struct PortMapping {
 
 impl PortMapping {
     pub fn from_component(
-        db: &impl Arch,
+        db: &mut impl Arch,
         component: &Component,
         label: impl Into<String>,
     ) -> Result<PortMapping> {
         let mut ports = IndexMap::new();
         for port in component.ports() {
-            let objs = ObjectDeclaration::from_port(port, false)?;
-            for obj in objs {
-                ports.insert(
-                    obj.identifier().to_string(),
-                    db.intern_object_declaration(obj),
-                );
-            }
+            let obj = ObjectDeclaration::from_port(db, port, false);
+            ports.insert(port.identifier().to_string(), obj);
         }
         Ok(PortMapping {
             label: label.into(),
