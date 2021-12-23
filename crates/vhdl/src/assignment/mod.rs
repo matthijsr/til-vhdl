@@ -29,7 +29,7 @@ pub mod impls;
 pub trait Assign {
     fn assign(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         assignment: &(impl Into<Assignment> + Clone),
     ) -> Result<AssignDeclaration>;
 }
@@ -62,7 +62,7 @@ impl AssignDeclaration {
     }
 
     /// The object declaration with any field selections on it
-    pub fn object_string(&self, db: &impl Arch) -> String {
+    pub fn object_string(&self, db: &dyn Arch) -> String {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
             .identifier()
@@ -99,17 +99,44 @@ impl AssignDeclaration {
     /// further validation occurs as part of the database query.
     ///
     /// Will return an error if the assignment itself is somehow incorrect.
-    pub fn resulting_mode(&self, db: &dyn Arch) -> Result<ObjectMode> {
-        self.assignment().kind().resulting_mode(db)
-    }
+    // pub fn resulting_mode(&self, db: &dyn Arch) -> Result<ObjectMode> {
+
+    //     match self.assignment().kind() {
+    //         AssignmentKind::Object(_) => todo!(),
+    //         AssignmentKind::Direct(d) => match d {
+    //             DirectAssignment::Value(_) => Ok(ObjectMode::new()),
+    //             DirectAssignment::FullRecord(fas) => {
+    //                 let mut mode = None;
+    //                 let mut prev_field = "";
+    //                 for fa in fas {
+    //                     let mode2 = fa.assignment().resulting_mode(db)?;
+    //                     match mode {
+    //                         Some(m) => {
+    //                             if m == mode2 {
+    //                                 return Err(Error::BackEndError(format!("Attempted to find mode of FullRecord assignment, but assignment has conflicting modes: {}: {} and {}: {}", prev_field, m, fa.identifier(), mode2)));
+    //                             }
+    //                         }
+    //                         None => mode = Some(mode2),
+    //                     }
+    //                 }
+    //                 if let Some(m) = mode {
+    //                     Ok(m)
+    //                 } else {
+    //                     Err(Error::BackEndError("Attempted to find mode of FullRecord assignment, but assignment was empty.".to_string()))
+    //                 }
+    //             }
+    //             DirectAssignment::FullArray(_) => todo!(),
+    //         },
+    //     }
+    // }
 
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
-    pub fn reverse(&self, db: &impl Arch) -> Result<AssignDeclaration> {
+    pub fn reverse(&self, db: &dyn Arch) -> Result<AssignDeclaration> {
         match self.assignment().kind() {
             AssignmentKind::Object(object) => Ok(object.object().assign(
                 db,
                 &Assignment::from(
-                    ObjectAssignment::from(self.object().clone())
+                    ObjectAssignment::from(self.object())
                         .assign_from(db, self.assignment().to_field())?,
                 )
                 .to_nested(object.from_field()),
@@ -184,7 +211,7 @@ impl Assignment {
 
     pub fn declare_for(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         object_identifier: String,
         pre: &str,
         post: &str,
@@ -315,7 +342,7 @@ impl AssignmentKind {
 
     pub fn declare_for(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         object_identifier: impl Into<String>,
         pre: &str,
         post: &str,
@@ -405,39 +432,6 @@ impl AssignmentKind {
             },
         }
     }
-
-    /// Return the expected resulting object mode.
-    ///
-    /// Will return an error if the assignment itself is incorrect.
-    pub fn resulting_mode(&self, db: &dyn Arch) -> Result<ObjectMode> {
-        match self {
-            AssignmentKind::Object(_) => todo!(),
-            AssignmentKind::Direct(d) => match d {
-                DirectAssignment::Value(_) => Ok(ObjectMode::Assigned),
-                DirectAssignment::FullRecord(fas) => {
-                    let mut mode = None;
-                    let mut prev_field = "";
-                    for fa in fas {
-                        let mode2 = fa.assignment().resulting_mode(db)?;
-                        match mode {
-                            Some(m) => {
-                                if m == mode2 {
-                                    return Err(Error::BackEndError(format!("Attempted to find mode of FullRecord assignment, but assignment has conflicting modes: {}: {} and {}: {}", prev_field, m, fa.identifier(), mode2)));
-                                }
-                            }
-                            None => mode = Some(mode2),
-                        }
-                    }
-                    if let Some(m) = mode {
-                        Ok(m)
-                    } else {
-                        Err(Error::BackEndError("Attempted to find mode of FullRecord assignment, but assignment was empty.".to_string()))
-                    }
-                }
-                DirectAssignment::FullArray(_) => todo!(),
-            },
-        }
-    }
 }
 
 /// An object can be assigned a value or another object
@@ -455,8 +449,16 @@ impl ObjectAssignment {
         self.object
     }
 
+    pub fn selected_object(&self, db: &dyn Arch) -> Result<ObjectDeclaration> {
+        if self.from_field().is_empty() {
+            db.get_object(self.object())
+        } else {
+            todo!() // Need to be able to keep track of individual fields, or collections of fields... which is very hard (consider that an array consists of multiple fields, but can also be assigned in slices)
+        }
+    }
+
     /// Select fields from the object being assigned
-    pub fn assign_from(mut self, db: &impl Arch, fields: &Vec<FieldSelection>) -> Result<Self> {
+    pub fn assign_from(mut self, db: &dyn Arch, fields: &Vec<FieldSelection>) -> Result<Self> {
         let mut object = db
             .lookup_intern_object_declaration(self.object())
             .typ()
@@ -478,7 +480,7 @@ impl ObjectAssignment {
     }
 
     /// Returns the object type of the selected field
-    pub fn typ(&self, db: &impl Arch) -> Result<ObjectType> {
+    pub fn typ(&self, db: &dyn Arch) -> Result<ObjectType> {
         let mut object = db
             .lookup_intern_object_declaration(self.object())
             .typ()
@@ -491,7 +493,7 @@ impl ObjectAssignment {
 }
 
 impl Declare for ObjectAssignment {
-    fn declare(&self, db: &impl Arch) -> Result<String> {
+    fn declare(&self, db: &dyn Arch) -> Result<String> {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
             .identifier()

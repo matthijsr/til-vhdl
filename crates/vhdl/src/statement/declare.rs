@@ -5,7 +5,7 @@ use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 use super::{PortMapping, Statement};
 
 impl ArchitectureDeclare for PortMapping {
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
         let mut result = pre.to_string();
         result.push_str(&format!(
             "{}: {} port map(\n",
@@ -30,7 +30,7 @@ impl ArchitectureDeclare for PortMapping {
 }
 
 impl ArchitectureDeclare for Statement {
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
         match self {
             Statement::Assignment(assignment) => assignment.declare(db, pre, post),
             Statement::PortMapping(portmapping) => portmapping.declare(db, pre, post),

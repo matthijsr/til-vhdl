@@ -23,7 +23,7 @@ pub trait FlatAssignment {
     /// Assigns a flat object to a complex object over multiple assignments
     fn to_complex(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         complex_id: Id<ObjectDeclaration>,
         to_field: &Vec<FieldSelection>,
         from_field: &Vec<FieldSelection>,
@@ -32,7 +32,7 @@ pub trait FlatAssignment {
     /// Assigns a complex object to a flat object over multiple assignments
     fn to_flat(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         flat_id: Id<ObjectDeclaration>,
         to_field: &Vec<FieldSelection>,
         from_field: &Vec<FieldSelection>,
@@ -72,7 +72,7 @@ impl FlatLength for ObjectDeclaration {
 impl FlatAssignment for Id<ObjectDeclaration> {
     fn to_complex(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         complex_id: Id<ObjectDeclaration>,
         to_field: &Vec<FieldSelection>,
         from_field: &Vec<FieldSelection>,
@@ -103,7 +103,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
 
     fn to_flat(
         &self,
-        db: &impl Arch,
+        db: &dyn Arch,
         flat_id: Id<ObjectDeclaration>,
         to_field: &Vec<FieldSelection>,
         from_field: &Vec<FieldSelection>,

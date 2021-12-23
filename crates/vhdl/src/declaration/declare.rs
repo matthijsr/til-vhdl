@@ -3,10 +3,10 @@ use tydi_intern::Id;
 
 use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 
-use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectMode};
+use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectMode, ObjectState};
 
 impl ArchitectureDeclare for ArchitectureDeclaration {
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
         match self {
             ArchitectureDeclaration::Type(_) => todo!(),
             ArchitectureDeclaration::SubType(_) => todo!(),
@@ -21,7 +21,7 @@ impl ArchitectureDeclare for ArchitectureDeclaration {
 }
 
 impl ArchitectureDeclare for ObjectDeclaration {
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
         if self.kind() == ObjectKind::EntityPort {
             // Entity ports are part of the architecture, but aren't declared in the declaration part
             return Ok("".to_string());
@@ -37,15 +37,9 @@ impl ArchitectureDeclare for ObjectDeclaration {
         result.push_str(&self.identifier());
         result.push_str(" : ");
         if self.kind() == ObjectKind::ComponentPort {
-            match self.mode() {
-                ObjectMode::Undefined => {
-                    return Err(Error::BackEndError(format!(
-                        "Component port {} has no direction",
-                        self.identifier()
-                    )));
-                }
-                ObjectMode::Assigned => result.push_str("out "),
-                ObjectMode::Out => result.push_str("in "),
+            match self.mode().state() {
+                ObjectState::Assigned => result.push_str("out "),
+                ObjectState::Unassigned => result.push_str("in "),
             };
         }
         result.push_str(self.typ().type_name().as_str());
@@ -59,7 +53,7 @@ impl ArchitectureDeclare for ObjectDeclaration {
 }
 
 impl ArchitectureDeclare for Id<ObjectDeclaration> {
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
         db.lookup_intern_object_declaration(*self)
             .declare(db, pre, post)
     }

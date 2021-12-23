@@ -66,7 +66,7 @@ impl Package {
 }
 
 impl DeclareWithIndent for Package {
-    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
         result.push_str(format!("package {} is\n\n", self.identifier).as_str());

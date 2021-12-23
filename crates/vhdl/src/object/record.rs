@@ -68,7 +68,7 @@ impl RecordObject {
 }
 
 impl DeclareWithIndent for RecordObject {
-    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
         let mut this = format!("type {} is record\n", self.type_name());
         let mut fields = String::new();
         for (name, typ) in self.fields() {

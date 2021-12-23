@@ -115,7 +115,7 @@ impl Document for Port {
 }
 
 impl Declare for Port {
-    fn declare(&self, db: &impl Arch) -> Result<String> {
+    fn declare(&self, db: &dyn Arch) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());

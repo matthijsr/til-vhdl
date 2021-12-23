@@ -14,7 +14,7 @@ use crate::{
 use super::Entity;
 
 impl DeclareWithIndent for Entity {
-    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(&doc);

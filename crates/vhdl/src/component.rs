@@ -6,11 +6,12 @@ use tydi_common::{
 };
 
 use crate::{
+    architecture::arch_storage::Arch,
     declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
     port::{Parameter, Port},
     properties::Analyze,
-    traits::VhdlDocument, architecture::arch_storage::Arch,
+    traits::VhdlDocument,
 };
 
 /// A component.
@@ -87,7 +88,7 @@ impl Analyze for Component {
 }
 
 impl DeclareWithIndent for Component {
-    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());

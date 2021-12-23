@@ -47,7 +47,7 @@ impl ListUsings for Architecture {
 //
 // Any complex logic should probably just be string templates.
 impl DeclareWithIndent for Architecture {
-    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
 

@@ -92,7 +92,7 @@ impl ArrayObject {
 }
 
 impl Declare for ArrayObject {
-    fn declare(&self, db: &impl Arch) -> Result<String> {
+    fn declare(&self, db: &dyn Arch) -> Result<String> {
         if self.is_std_logic_vector() {
             Err(Error::BackEndError(
                 "Invalid type, std_logic_vector cannot be declared.".to_string(),
