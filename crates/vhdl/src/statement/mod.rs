@@ -7,7 +7,10 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-use crate::{architecture::arch_storage::Arch, assignment::Assign, component::Component};
+use crate::{
+    architecture::arch_storage::Arch, assignment::Assign, component::Component,
+    declaration::ObjectState,
+};
 
 use super::{
     assignment::{AssignDeclaration, Assignment},
@@ -47,19 +50,14 @@ pub struct PortMapping {
 
 impl PortMapping {
     pub fn from_component(
-        db: &impl Arch,
+        db: &mut impl Arch,
         component: &Component,
         label: impl Into<String>,
     ) -> Result<PortMapping> {
         let mut ports = IndexMap::new();
         for port in component.ports() {
-            let objs = ObjectDeclaration::from_port(port, false)?;
-            for obj in objs {
-                ports.insert(
-                    obj.identifier().to_string(),
-                    db.intern_object_declaration(obj),
-                );
-            }
+            let obj = ObjectDeclaration::from_port(db, port, false);
+            ports.insert(port.identifier().to_string(), obj);
         }
         Ok(PortMapping {
             label: label.into(),
@@ -79,7 +77,7 @@ impl PortMapping {
 
     pub fn map_port(
         &mut self,
-        db: &impl Arch,
+        db: &dyn Arch,
         identifier: impl Into<String>,
         assignment: &(impl Into<Assignment> + Clone),
     ) -> Result<&mut Self> {
@@ -91,12 +89,19 @@ impl PortMapping {
                 "Port {} does not exist on this component",
                 identifier
             )))?;
-        let assigned = port.assign(db, assignment)?;
+        let mut assigned = port.assign(db, assignment)?;
+        // If the port is already assigned, reverse the assignment so that the object being assigned is on the "left"
+        if db.lookup_intern_object_declaration(*port).state() == ObjectState::Assigned {
+            assigned = assigned.reverse(db)?;
+        }
         self.mappings.insert(identifier.to_string(), assigned);
         Ok(self)
     }
 
     pub fn finish(self) -> Result<Self> {
+        // Note that the assign function prevents assignment to a field of a port
+        // TODO: These are both bad ideas, should allow for assignment of individual fields, and should track this in port mappings.
+        //       Or should make port mapping separate from assignment.
         if self.ports().len() == self.mappings().len() {
             Ok(self)
         } else {
@@ -114,5 +119,18 @@ impl PortMapping {
 
     pub fn component_name(&self) -> &str {
         self.component_name.as_str()
+    }
+
+    /// Find the assignment to an object based on a port name and its ID, assuming one exists.
+    pub(crate) fn assignment_for(
+        &self,
+        port: &str,
+        id: Id<ObjectDeclaration>,
+    ) -> Option<&AssignDeclaration> {
+        if let Some(_) = self.ports().get(port).filter(|x| **x == id) {
+            self.mappings().get(port)
+        } else {
+            None
+        }
     }
 }

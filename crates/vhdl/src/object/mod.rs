@@ -189,7 +189,7 @@ impl ObjectType {
         }
     }
 
-    pub fn can_assign(&self, db: &impl Arch, assignment: &Assignment) -> Result<()> {
+    pub fn can_assign(&self, db: &dyn Arch, assignment: &Assignment) -> Result<()> {
         let mut to_object = self.clone();
         for field in assignment.to_field() {
             to_object = to_object.get_field(field)?;
@@ -348,7 +348,7 @@ impl Analyze for ObjectType {
 }
 
 impl DeclareWithIndent for ObjectType {
-    fn declare_with_indent(&self, db: &impl Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
         match self {
             ObjectType::Bit => Err(Error::BackEndError(
                 "Invalid type, Bit (std_logic) cannot be declared.".to_string(),

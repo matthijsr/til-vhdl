@@ -39,7 +39,7 @@ pub struct Architecture {
 
 pub trait ArchitectureDeclare {
     /// Returns a string for the declaration, pre can be used for indentation, post is used for closing characters (','/';')
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String>;
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String>;
 }
 
 impl Architecture {
@@ -92,7 +92,7 @@ impl Architecture {
 
     pub fn add_declaration(
         &mut self,
-        db: &impl Arch,
+        db: &dyn Arch,
         declaration: impl Into<ArchitectureDeclaration>,
     ) -> Result<Id<ArchitectureDeclaration>> {
         let declaration = declaration.into();
@@ -118,7 +118,7 @@ impl Architecture {
         Ok(id)
     }
 
-    pub fn add_statement(&mut self, db: &impl Arch, statement: impl Into<Statement>) -> Result<()> {
+    pub fn add_statement(&mut self, db: &dyn Arch, statement: impl Into<Statement>) -> Result<()> {
         let statement = statement.into();
         match &statement {
             Statement::Assignment(assignment) => self.usings.combine(&assignment.list_usings()?),
@@ -141,13 +141,14 @@ impl Architecture {
         &self.declaration
     }
 
-    pub fn entity_ports(&self) -> Result<IndexMap<String, ObjectDeclaration>> {
+    pub fn entity_ports(
+        &self,
+        db: &mut impl Arch,
+    ) -> Result<IndexMap<String, Id<ObjectDeclaration>>> {
         let mut result = IndexMap::new();
         for port in self.entity.ports() {
-            let objs = ObjectDeclaration::from_port(port, true)?;
-            for obj in objs {
-                result.insert(obj.identifier().to_string(), obj);
-            }
+            let obj = ObjectDeclaration::from_port(db, port, true);
+            result.insert(port.identifier().to_string(), obj);
         }
         Ok(result)
     }

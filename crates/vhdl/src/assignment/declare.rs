@@ -9,7 +9,7 @@ use tydi_common::error::Result;
 use super::AssignDeclaration;
 
 impl ArchitectureDeclare for AssignDeclaration {
-    fn declare(&self, db: &impl Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(&indent(&doc, pre));

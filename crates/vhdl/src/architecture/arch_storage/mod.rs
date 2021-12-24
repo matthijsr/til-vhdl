@@ -1,18 +1,24 @@
 use std::sync::Arc;
 
-use tydi_common::name::Name;
+use tydi_common::error::{Error, Result};
 use tydi_intern::Id;
 
 use crate::{
-    declaration::{ArchitectureDeclaration, ObjectDeclaration},
+    assignment::AssignmentKind,
+    declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectMode, ObjectState},
     object::ObjectType,
     statement::Statement,
 };
+
+use super::Architecture;
 
 pub mod db;
 
 #[salsa::query_group(ArchStorage)]
 pub trait Arch {
+    #[salsa::input]
+    fn architecture(&self) -> Arc<Architecture>;
+
     #[salsa::interned]
     fn intern_architecture_declaration(
         &self,
@@ -22,6 +28,43 @@ pub trait Arch {
     #[salsa::interned]
     fn intern_object_declaration(&self, obj_decl: ObjectDeclaration) -> Id<ObjectDeclaration>;
 
+    fn get_object(&self, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration>;
+
     // #[salsa::interned]
     // fn intern_statement(&self, stat: Statement) -> Id<Statement>;
+}
+
+fn get_object(db: &dyn Arch, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration> {
+    let mut obj = db.lookup_intern_object_declaration(id);
+    for stat in db.architecture().statements() {
+        match stat {
+            Statement::Assignment(ass) => {
+                if ass.object() == id {
+                    if ass.assignment().to_field().is_empty() {
+                        match ass.assignment().kind() {
+                            AssignmentKind::Object(oa) => {
+                                obj.set_state(oa.selected_object(db)?.state())?
+                            }
+                            AssignmentKind::Direct(_) => obj.set_state(ObjectState::Assigned)?,
+                        }
+                    } else {
+                        todo!()
+                        // Need to be able to keep track of individual fields, or collections of fields... which is very hard (consider that an array consists of multiple fields, but can also be assigned in slices)
+                        // Should use a similar function to this one to track such things, rather than give them all individual IDs...
+                    }
+                }
+            }
+            Statement::PortMapping(pm) => {
+                // TODO: Currently port mappings assume that ports are assigned completely, rather than assigning individual fields...
+                if pm
+                    .mappings()
+                    .values()
+                    .any(|x| x.object() == id && x.assignment().to_field().is_empty())
+                {
+                    obj.set_state(ObjectState::Assigned)?
+                }
+            }
+        }
+    }
+    Ok(obj)
 }
