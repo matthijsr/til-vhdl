@@ -12,7 +12,11 @@ pub mod port;
 pub use streamlet::Streamlet;
 pub mod streamlet;
 pub use db::Database;
+use tydi_vhdl::architecture::arch_storage::Arch;
 pub mod db;
+
+pub mod get_self;
+pub mod intern_self;
 
 /// List of all the nodes
 pub type LogicalType = logical::logicaltype::LogicalType;
@@ -37,4 +41,16 @@ pub trait Ir {
     fn intern_stream(&self, stream: Stream) -> Id<Stream>;
     #[salsa::interned]
     fn intern_streamlet(&self, streamlet: Streamlet) -> Id<Streamlet>;
+}
+
+pub trait GetSelf<T> {
+    fn get(&self, db: &dyn Ir) -> T;
+}
+
+pub trait InternSelf<T> {
+    fn intern(self, db: &dyn Ir) -> Id<T>;
+}
+
+pub trait IntoVhdl<T> {
+    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> T;
 }

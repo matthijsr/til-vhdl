@@ -12,7 +12,7 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(db: &dyn Ir, base_id: &Identifier, name: Name, typ: Id<LogicalType>) -> Field {
+    pub fn new(base_id: &Identifier, name: Name, typ: Id<LogicalType>) -> Field {
         if base_id.is_empty() {
             Field {
                 name: vec![name],

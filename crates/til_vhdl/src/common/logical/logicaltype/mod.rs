@@ -1,6 +1,6 @@
 use std::{convert::TryInto, error};
 
-use crate::ir::{Identifier, Ir};
+use crate::ir::{Identifier, Ir, GetSelf, IntoVhdl};
 use tydi_common::{
     error::{Error, Result},
     name::Name,
@@ -19,6 +19,10 @@ pub mod stream;
 use tydi_intern::Id;
 pub use union::*;
 pub mod union;
+
+pub trait IsNull {
+    fn is_null(&self, db: &dyn Ir) -> bool;
+}
 
 /// Types of logical streams.
 ///
@@ -61,7 +65,7 @@ pub enum LogicalType {
     /// The Stream type is used to define a new physical stream.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#stream)
-    Stream(Stream),
+    Stream(Id<Stream>),
 }
 
 impl LogicalType {
@@ -170,7 +174,7 @@ impl LogicalType {
                         .is_element_only(db)
                 })
             }
-            LogicalType::Stream(stream) => stream.data(db).is_element_only(db),
+            LogicalType::Stream(stream) => stream.get(db).data(db).is_element_only(db),
         }
     }
 
@@ -179,6 +183,29 @@ impl LogicalType {
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
     pub fn is_null(&self, db: &dyn Ir) -> bool {
+        match self {
+            LogicalType::Null => true,
+            LogicalType::Group(Group(fields)) => fields
+                .into_iter()
+                .all(|field_id| db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)),
+            LogicalType::Union(Union(fields)) => {
+                fields.len() == 1
+                    && fields.into_iter().all(|field_id| {
+                        db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)
+                    })
+            }
+            LogicalType::Stream(stream) => stream.is_null(db),
+            LogicalType::Bits(_) => false,
+        }
+    }
+}
+
+impl IsNull for LogicalType {
+    /// Returns true if and only if this logical stream does not result in any
+    /// signals.
+    ///
+    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
+    fn is_null(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null => true,
             LogicalType::Group(Group(fields)) => fields

@@ -139,6 +139,15 @@ pub enum Mode {
     Out,
 }
 
+impl Mode {
+    pub fn reverse(&self) -> Self {
+        match self {
+            Mode::In => Mode::Out,
+            Mode::Out => Mode::In,
+        }
+    }
+}
+
 impl Display for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

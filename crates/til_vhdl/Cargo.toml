@@ -13,3 +13,4 @@ log = "0.4.14"
 salsa = "0.16.1"
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
+tydi-vhdl = { path = "../vhdl" }

@@ -12,7 +12,7 @@ use tydi_common::{
     numbers::{NonNegative, PositiveReal},
 };
 
-use super::LogicalType;
+use super::{IsNull, LogicalType};
 
 /// Floats cannot be hashed or consistently reproduced on all hardware
 ///
@@ -117,6 +117,7 @@ pub struct Stream {
 impl Stream {
     #[allow(clippy::too_many_arguments)]
     pub fn try_new(
+        db: &dyn Ir,
         data: Id<LogicalType>,
         throughput: impl TryInto<Throughput, Error = Error>,
         dimensionality: NonNegative,
@@ -125,8 +126,8 @@ impl Stream {
         direction: Direction,
         user: Id<LogicalType>,
         keep: bool,
-    ) -> Result<Self> {
-        Ok(Stream {
+    ) -> Result<Id<Self>> {
+        Ok(db.intern_stream(Stream {
             data: data,
             throughput: throughput.try_into()?,
             dimensionality,
@@ -135,7 +136,7 @@ impl Stream {
             direction,
             user: user,
             keep,
-        })
+        }))
     }
 
     pub fn data(&self, db: &dyn Ir) -> LogicalType {
@@ -165,20 +166,28 @@ impl Stream {
     pub fn throughput(&self) -> Throughput {
         self.throughput.clone()
     }
+}
 
+impl IsNull for Stream {
     /// Returns true if this stream is null i.e. it results in no signals.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub fn is_null(&self, db: &dyn Ir) -> bool {
+    fn is_null(&self, db: &dyn Ir) -> bool {
         self.data(db).is_null(db) && self.user(db).is_null(db) && !self.keep
     }
 }
 
-impl From<Stream> for LogicalType {
+impl IsNull for Id<Stream> {
+    fn is_null(&self, db: &dyn Ir) -> bool {
+        db.lookup_intern_stream(*self).is_null(db)
+    }
+}
+
+impl From<Id<Stream>> for LogicalType {
     /// Wraps this stream in a [`LogicalType`].
     ///
     /// [`LogicalType`]: ./enum.LogicalType.html
-    fn from(stream: Stream) -> Self {
+    fn from(stream: Id<Stream>) -> Self {
         LogicalType::Stream(stream)
     }
 }

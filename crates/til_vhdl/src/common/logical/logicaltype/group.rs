@@ -50,7 +50,7 @@ impl Group {
         };
         let fields = map
             .into_iter()
-            .map(|(name, typ)| db.intern_field(Field::new(db, &base_id, name, typ)))
+            .map(|(name, typ)| db.intern_field(Field::new(&base_id, name, typ)))
             .collect();
         Ok(Group(fields))
     }
