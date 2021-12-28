@@ -1,4 +1,5 @@
 use crate::common::logical;
+use tydi_common::error::{Error, Result};
 use tydi_intern::Id;
 
 pub use connection::Connection;
@@ -7,7 +8,7 @@ pub use implementation::Implementation;
 pub mod implementation;
 pub use physical_properties::PhysicalProperties;
 pub mod physical_properties;
-pub use port::Port;
+pub use port::Interface;
 pub mod port;
 pub use streamlet::Streamlet;
 pub mod streamlet;
@@ -36,7 +37,7 @@ pub trait Ir {
     #[salsa::interned]
     fn intern_type(&self, logical_type: LogicalType) -> Id<LogicalType>;
     #[salsa::interned]
-    fn intern_port(&self, logical_type: Port) -> Id<Port>;
+    fn intern_port(&self, logical_type: Interface) -> Id<Interface>;
     #[salsa::interned]
     fn intern_stream(&self, stream: Stream) -> Id<Stream>;
     #[salsa::interned]
@@ -52,7 +53,7 @@ pub trait InternSelf<T> {
 }
 
 pub trait IntoVhdl<T> {
-    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> T;
+    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<T>;
 }
 
 #[cfg(test)]

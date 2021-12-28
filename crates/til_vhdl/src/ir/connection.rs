@@ -1,9 +1,9 @@
 use tydi_intern::Id;
 
-use super::Port;
+use super::Interface;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Connection {
-    source: Id<Port>,
-    sink: Id<Port>,
+    source: Id<Interface>,
+    sink: Id<Interface>,
 }

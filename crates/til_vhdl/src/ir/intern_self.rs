@@ -1,6 +1,6 @@
 use tydi_intern::Id;
 
-use super::{Connection, Field, InternSelf, Implementation, LogicalType, Port, Stream, Streamlet};
+use super::{Connection, Field, InternSelf, Implementation, LogicalType, Interface, Stream, Streamlet};
 
 impl InternSelf<Connection> for Connection {
     fn intern(self, db: &dyn super::Ir) -> Id<Connection> {
@@ -26,8 +26,8 @@ impl InternSelf<LogicalType> for LogicalType {
     }
 }
 
-impl InternSelf<Port> for Port {
-    fn intern(self, db: &dyn super::Ir) -> Id<Port> {
+impl InternSelf<Interface> for Interface {
+    fn intern(self, db: &dyn super::Ir) -> Id<Interface> {
         db.intern_port(self)
     }
 }

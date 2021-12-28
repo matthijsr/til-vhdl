@@ -7,16 +7,18 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{architecture::arch_storage::Arch, component::Component};
 
-use super::{physical_properties::Origin, GetSelf, Implementation, InternSelf, IntoVhdl, Ir, Port};
+use super::{
+    physical_properties::Origin, GetSelf, Implementation, Interface, InternSelf, IntoVhdl, Ir,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Streamlet {
     implementation: Option<Id<Implementation>>,
-    ports: Vec<Id<Port>>,
+    ports: Vec<Id<Interface>>,
 }
 
 impl Streamlet {
-    pub fn try_new(db: &dyn Ir, ports: Vec<Port>) -> Result<Streamlet> {
+    pub fn try_new(db: &dyn Ir, ports: Vec<Interface>) -> Result<Streamlet> {
         let mut set = HashSet::new();
         for port in &ports {
             if !set.insert(port.identifier()) {
@@ -49,7 +51,7 @@ impl Streamlet {
         }
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<Port> {
+    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
         let mut result = vec![];
         for port in &self.ports {
             result.push(port.get(db))
@@ -57,14 +59,14 @@ impl Streamlet {
         result
     }
 
-    pub fn inputs(&self, db: &dyn Ir) -> Vec<Port> {
+    pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
         self.ports(db)
             .into_iter()
             .filter(|x| x.physical_properties().origin() == Origin::Sink)
             .collect()
     }
 
-    pub fn outputs(&self, db: &dyn Ir) -> Vec<Port> {
+    pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
         self.ports(db)
             .into_iter()
             .filter(|x| x.physical_properties().origin() == Origin::Source)
@@ -73,7 +75,7 @@ impl Streamlet {
 }
 
 impl IntoVhdl<Component> for Streamlet {
-    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Component {
+    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<Component> {
         todo!()
     }
 }

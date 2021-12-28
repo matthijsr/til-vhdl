@@ -1,6 +1,6 @@
 use tydi_intern::Id;
 
-use super::{Connection, Field, GetSelf, Implementation, LogicalType, Port, Stream, Streamlet};
+use super::{Connection, Field, GetSelf, Implementation, LogicalType, Interface, Stream, Streamlet};
 
 impl GetSelf<Connection> for Id<Connection> {
     fn get(&self, db: &dyn super::Ir) -> Connection {
@@ -26,8 +26,8 @@ impl GetSelf<LogicalType> for Id<LogicalType> {
     }
 }
 
-impl GetSelf<Port> for Id<Port> {
-    fn get(&self, db: &dyn super::Ir) -> Port {
+impl GetSelf<Interface> for Id<Interface> {
+    fn get(&self, db: &dyn super::Ir) -> Interface {
         db.lookup_intern_port(*self)
     }
 }

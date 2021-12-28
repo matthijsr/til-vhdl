@@ -7,15 +7,15 @@ use tydi_common::{
 };
 
 use crate::{
-    architecture::arch_storage::Arch, declaration::Declare, object::ObjectType,
-    traits::VhdlDocument,
+    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, declaration::Declare,
+    object::ObjectType, traits::VhdlDocument,
 };
 
 /// A port.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Port {
     /// Port identifier.
-    identifier: Name,
+    identifier: VhdlName,
     /// Port mode.
     mode: Mode,
     /// Port type.
@@ -26,7 +26,7 @@ pub struct Port {
 
 impl Port {
     /// Create a new port.
-    pub fn new(name: impl Into<Name>, mode: Mode, typ: ObjectType) -> Port {
+    pub fn new(name: impl Into<VhdlName>, mode: Mode, typ: ObjectType) -> Port {
         Port {
             identifier: name.into(),
             mode,
@@ -37,7 +37,7 @@ impl Port {
 
     /// Create a new port with documentation.
     pub fn new_documented(
-        name: impl Into<Name>,
+        name: impl Into<VhdlName>,
         mode: Mode,
         typ: ObjectType,
         doc: impl Into<String>,
@@ -51,28 +51,28 @@ impl Port {
     }
 
     /// Create a new port with `Mode::In`
-    pub fn new_in(name: impl Into<Name>, typ: ObjectType) -> Port {
+    pub fn new_in(name: impl Into<VhdlName>, typ: ObjectType) -> Port {
         Port::new(name, Mode::In, typ)
     }
 
     /// Create a new port with `Mode::Out`
-    pub fn new_out(name: impl Into<Name>, typ: ObjectType) -> Port {
+    pub fn new_out(name: impl Into<VhdlName>, typ: ObjectType) -> Port {
         Port::new(name, Mode::Out, typ)
     }
 
     /// Create an in port with type `std_logic`
-    pub fn bit_in(name: impl Into<Name>) -> Port {
+    pub fn bit_in(name: impl Into<VhdlName>) -> Port {
         Port::new(name, Mode::In, ObjectType::Bit)
     }
 
     /// Create an out port with type `std_logic`
-    pub fn bit_out(name: impl Into<Name>) -> Port {
+    pub fn bit_out(name: impl Into<VhdlName>) -> Port {
         Port::new(name, Mode::Out, ObjectType::Bit)
     }
 
     /// Create a `clk` port, `clk : in std_logic`.
     pub fn clk() -> Port {
-        Port::new(Name::try_new("clk").unwrap(), Mode::In, ObjectType::Bit)
+        Port::new(VhdlName::try_new("clk").unwrap(), Mode::In, ObjectType::Bit)
     }
 
     /// Return the port mode.

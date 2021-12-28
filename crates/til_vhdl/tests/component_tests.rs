@@ -1,11 +1,19 @@
+use std::convert::TryInto;
+
 use til_vhdl::{
-    common::logical::logicaltype::{Direction, Synchronicity},
+    common::{
+        logical::logicaltype::{Direction, Synchronicity},
+        physical::{fields::Fields, stream::PhysicalStream},
+    },
     ir::{
-        physical_properties::Origin, Database, Implementation, InternSelf, Ir, LogicalType,
-        PhysicalProperties, Port, Stream, Streamlet, IntoVhdl,
+        physical_properties::Origin, Database, Implementation, Interface, InternSelf, IntoVhdl, Ir,
+        LogicalType, PhysicalProperties, Stream, Streamlet,
     },
 };
-use tydi_common::error::{Error, Result};
+use tydi_common::{
+    error::{Error, Result},
+    numbers::{BitCount, Positive},
+};
 use tydi_vhdl::declaration::Declare;
 
 extern crate til_vhdl;
@@ -44,9 +52,9 @@ fn streamlet_to_vhdl() -> Result<()> {
         null_type,
         false,
     )?;
-    let port = Port::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
+    let port = Interface::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
     let streamlet = Streamlet::try_new(db, vec![port])?;
-    let component = streamlet.into_vhdl(db, vhdl_db);
+    let component = streamlet.into_vhdl(db, vhdl_db)?;
     print!("{}", component.declare(vhdl_db)?);
 
     Ok(())

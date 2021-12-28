@@ -15,19 +15,19 @@ use super::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Port {
+pub struct Interface {
     name: Name,
     stream: Id<Stream>,
     physical_properties: PhysicalProperties,
 }
 
-impl Port {
+impl Interface {
     pub fn try_new(
         name: impl TryInto<Name, Error = Error>,
         stream: Id<Stream>,
         physical_properties: PhysicalProperties,
-    ) -> Result<Port> {
-        Ok(Port {
+    ) -> Result<Interface> {
+        Ok(Interface {
             name: name.try_into()?,
             stream,
             physical_properties,
@@ -43,13 +43,13 @@ impl Port {
     }
 }
 
-impl Identify for Port {
+impl Identify for Interface {
     fn identifier(&self) -> &str {
         self.name.as_ref()
     }
 }
 // // TODO
-// impl IntoVhdl<Vec<tydi_vhdl::port::Port>> for Port {
+// impl IntoVhdl<Vec<tydi_vhdl::port::Port>> for Interface {
 //     fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Vec<tydi_vhdl::port::Port> {
 //         let stream = self.stream(ir_db);
 //         let default_mode = match self.physical_properties().origin() {
