@@ -139,6 +139,28 @@ impl Stream {
         }))
     }
 
+    pub(crate) fn new(
+        data: Id<LogicalType>,
+        throughput: Throughput,
+        dimensionality: NonNegative,
+        synchronicity: Synchronicity,
+        complexity: impl Into<Complexity>,
+        direction: Direction,
+        user: Id<LogicalType>,
+        keep: bool,
+    ) -> Self {
+        Stream {
+            data: data,
+            throughput: throughput,
+            dimensionality,
+            synchronicity,
+            complexity: complexity.into(),
+            direction,
+            user: user,
+            keep,
+        }
+    }
+
     pub fn data(&self, db: &dyn Ir) -> LogicalType {
         db.lookup_intern_type(self.data)
     }
@@ -165,6 +187,10 @@ impl Stream {
     /// Returns the throughput ratio of this stream.
     pub fn throughput(&self) -> Throughput {
         self.throughput.clone()
+    }
+
+    pub fn keep(&self) -> bool {
+        self.keep
     }
 }
 

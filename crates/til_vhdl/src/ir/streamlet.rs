@@ -7,7 +7,7 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{architecture::arch_storage::Arch, component::Component};
 
-use super::{GetSelf, Implementation, InternSelf, IntoVhdl, Ir, Port};
+use super::{physical_properties::Origin, GetSelf, Implementation, InternSelf, IntoVhdl, Ir, Port};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Streamlet {
@@ -55,6 +55,20 @@ impl Streamlet {
             result.push(port.get(db))
         }
         result
+    }
+
+    pub fn inputs(&self, db: &dyn Ir) -> Vec<Port> {
+        self.ports(db)
+            .into_iter()
+            .filter(|x| x.physical_properties().origin() == Origin::Sink)
+            .collect()
+    }
+
+    pub fn outputs(&self, db: &dyn Ir) -> Vec<Port> {
+        self.ports(db)
+            .into_iter()
+            .filter(|x| x.physical_properties().origin() == Origin::Source)
+            .collect()
     }
 }
 

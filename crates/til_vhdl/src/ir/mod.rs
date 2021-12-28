@@ -54,3 +54,20 @@ pub trait InternSelf<T> {
 pub trait IntoVhdl<T> {
     fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> T;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tydi_common::error::Result;
+
+    // Want to make sure interning works as I expect it to (identical objects get same ID)
+    #[test]
+    fn verify_intern_id() -> Result<()> {
+        let _db = Database::default();
+        let db = &_db;
+        let id1 = db.intern_type(LogicalType::try_new_bits(8)?);
+        let id2 = db.intern_type(LogicalType::try_new_bits(8)?);
+        assert_eq!(id1, id2);
+        Ok(())
+    }
+}

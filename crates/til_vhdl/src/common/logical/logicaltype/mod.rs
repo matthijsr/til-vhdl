@@ -1,10 +1,14 @@
 use std::{convert::TryInto, error};
 
-use crate::ir::{Identifier, Ir, GetSelf, IntoVhdl};
+use crate::{
+    common::physical::{fields::Fields, stream::PhysicalStream},
+    ir::{GetSelf, Identifier, IntoVhdl, Ir},
+};
+use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result},
-    name::Name,
-    numbers::{NonNegative, Positive},
+    name::{Name, PathName},
+    numbers::{BitCount, NonNegative, Positive},
 };
 
 pub use field::*;
@@ -22,6 +26,38 @@ pub mod union;
 
 pub trait IsNull {
     fn is_null(&self, db: &dyn Ir) -> bool;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SplitStreams {
+    signals: LogicalType,
+    streams: IndexMap<PathName, LogicalType>,
+}
+
+impl SplitStreams {
+    pub fn streams(&self) -> impl Iterator<Item = (&PathName, &LogicalType)> {
+        self.streams.iter()
+    }
+    pub fn signal(&self) -> &LogicalType {
+        &self.signals
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LogicalStream {
+    signals: Fields,
+    streams: IndexMap<PathName, PhysicalStream>,
+}
+
+impl LogicalStream {
+    #[allow(dead_code)]
+    pub fn signals(&self) -> impl Iterator<Item = (&PathName, &BitCount)> {
+        self.signals.iter()
+    }
+
+    pub fn streams(&self) -> impl Iterator<Item = (&PathName, &PhysicalStream)> {
+        self.streams.iter()
+    }
 }
 
 /// Types of logical streams.
@@ -178,26 +214,95 @@ impl LogicalType {
         }
     }
 
-    /// Returns true if and only if this logical stream does not result in any
-    /// signals.
-    ///
-    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub fn is_null(&self, db: &dyn Ir) -> bool {
-        match self {
-            LogicalType::Null => true,
-            LogicalType::Group(Group(fields)) => fields
-                .into_iter()
-                .all(|field_id| db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)),
-            LogicalType::Union(Union(fields)) => {
-                fields.len() == 1
-                    && fields.into_iter().all(|field_id| {
-                        db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)
-                    })
-            }
-            LogicalType::Stream(stream) => stream.is_null(db),
-            LogicalType::Bits(_) => false,
-        }
-    }
+    // // Splits a logical stream type into simplified stream types.
+    // //
+    // // [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#split-function)
+    // pub(crate) fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
+    //     match self {
+    //         LogicalType::Stream(stream_in) => {
+    //             let stream_in = stream_in.get(db);
+    //             let mut streams = IndexMap::new();
+
+    //             let split = stream_in.data(db).split_streams(db);
+    //             let (element, rest) = (split.signals, split.streams);
+    //             if !element.is_null(db) || !stream_in.user(db).is_null(db) || stream_in.keep() {
+    //                 streams.insert(
+    //                     PathName::new_empty(),
+    //                     // todo: add method
+    //                     Stream::new(
+    //                         element,
+    //                         stream_in.throughput(),
+    //                         stream_in.dimensionality,
+    //                         stream_in.synchronicity,
+    //                         stream_in.complexity.clone(),
+    //                         stream_in.direction,
+    //                         stream_in.user.clone().map(|stream| *stream),
+    //                         stream_in.keep,
+    //                     )
+    //                     .into(),
+    //                 );
+    //             }
+
+    //             streams.extend(rest.into_iter().map(|(name, stream)| match stream {
+    //                 LogicalType::Stream(mut stream) => {
+    //                     if stream_in.direction == Direction::Reverse {
+    //                         stream.reverse();
+    //                     }
+    //                     if stream_in.synchronicity == Synchronicity::Flatten
+    //                         || stream_in.synchronicity == Synchronicity::FlatDesync
+    //                     {
+    //                         stream.set_synchronicity(Synchronicity::FlatDesync);
+    //                     }
+    //                     if stream.synchronicity != Synchronicity::Flatten
+    //                         && stream_in.synchronicity != Synchronicity::FlatDesync
+    //                     {
+    //                         stream.set_dimensionality(
+    //                             stream.dimensionality + stream_in.dimensionality,
+    //                         );
+    //                     };
+    //                     stream.set_throughput(stream.throughput * stream_in.throughput);
+    //                     (name, stream.into())
+    //                 }
+    //                 _ => unreachable!(),
+    //             }));
+
+    //             SplitStreams {
+    //                 signals: LogicalType::Null,
+    //                 streams,
+    //             }
+    //         }
+    //         LogicalType::Null | LogicalType::Bits(_) => SplitStreams {
+    //             signals: self.clone(),
+    //             streams: IndexMap::new(),
+    //         },
+    //         LogicalType::Group(Group(fields)) | LogicalType::Union(Union(fields)) => {
+    //             let signals = fields
+    //                 .into_iter()
+    //                 .map(|(name, stream)| (name.clone(), stream.split_streams().signals))
+    //                 .collect();
+
+    //             SplitStreams {
+    //                 signals: match self {
+    //                     LogicalType::Group(_) => LogicalType::Group(Group(signals)),
+    //                     LogicalType::Union(_) => LogicalType::Union(Union(signals)),
+    //                     _ => unreachable!(),
+    //                 },
+    //                 streams: fields
+    //                     .into_iter()
+    //                     .map(|(name, stream)| {
+    //                         stream.split_streams().streams.into_iter().map(
+    //                             move |(mut path_name, stream_)| {
+    //                                 path_name.push(name.clone());
+    //                                 (path_name, stream_)
+    //                             },
+    //                         )
+    //                     })
+    //                     .flatten()
+    //                     .collect(),
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 impl IsNull for LogicalType {

@@ -10,7 +10,7 @@ use tydi_vhdl::{architecture::arch_storage::Arch, port::Mode};
 use crate::common::logical::logicaltype::Direction;
 
 use super::{
-    physical_properties::{self, PortDirection},
+    physical_properties::{self, Origin},
     IntoVhdl, Ir, LogicalType, Name, PhysicalProperties, Stream,
 };
 
@@ -48,13 +48,13 @@ impl Identify for Port {
         self.name.as_ref()
     }
 }
-// TODO
+// // TODO
 // impl IntoVhdl<Vec<tydi_vhdl::port::Port>> for Port {
 //     fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Vec<tydi_vhdl::port::Port> {
 //         let stream = self.stream(ir_db);
-//         let default_mode = match self.physical_properties().direction() {
-//             PortDirection::Source => Mode::Out,
-//             PortDirection::Sink => Mode::In,
+//         let default_mode = match self.physical_properties().origin() {
+//             Origin::Source => Mode::Out,
+//             Origin::Sink => Mode::In,
 //         };
 //         let result_mode = |x: Mode, d: Direction| match d {
 //             Direction::Forward => x,
@@ -69,6 +69,6 @@ impl Identify for Port {
 //             LogicalType::Stream(_) => todo!(),
 //         }
 
-//         result;
+//         result
 //     }
 // }
