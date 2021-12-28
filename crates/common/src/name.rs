@@ -167,6 +167,21 @@ impl PathName {
         PathName::new(result.into_iter())
     }
 
+    pub fn with_child(&self, name: impl Into<Name>) -> PathName {
+        let mut result: Vec<Name> = Vec::with_capacity(self.len() + 1);
+        result.extend(self.0.clone().into_iter());
+        result.push(name.into());
+        PathName::new(result.into_iter())
+    }
+
+    pub fn with_children(&self, path: impl Into<PathName>) -> PathName {
+        let parent = path.into();
+        let mut result: Vec<Name> = Vec::with_capacity(self.len() + parent.len());
+        result.extend(self.0.clone().into_iter());
+        result.extend(parent.0.into_iter());
+        PathName::new(result.into_iter())
+    }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }

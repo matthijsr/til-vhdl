@@ -23,8 +23,7 @@ pub mod intern_self;
 pub type LogicalType = logical::logicaltype::LogicalType;
 pub type Stream = logical::logicaltype::Stream;
 pub type Name = tydi_common::name::Name;
-pub type Field = logical::logicaltype::Field;
-pub type Identifier = Vec<Name>;
+pub type Field = logical::logicaltype::LogicalField;
 
 #[salsa::query_group(IrStorage)]
 pub trait Ir {

@@ -2,13 +2,14 @@ use std::{convert::TryInto, error};
 
 use crate::{
     common::physical::{fields::Fields, stream::PhysicalStream},
-    ir::{GetSelf, Identifier, IntoVhdl, Ir},
+    ir::{GetSelf, IntoVhdl, Ir},
 };
 use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
+    util::log2_ceil,
 };
 
 pub use field::*;
@@ -162,7 +163,7 @@ impl LogicalType {
     /// [`Group`]: ./struct.Group.html
     pub fn try_new_group(
         db: &dyn Ir,
-        parent_id: Option<Identifier>,
+        parent_id: Option<PathName>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -175,7 +176,7 @@ impl LogicalType {
 
     pub fn try_new_union(
         db: &dyn Ir,
-        parent_id: Option<Identifier>,
+        parent_id: Option<PathName>,
         union: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -214,95 +215,61 @@ impl LogicalType {
         }
     }
 
-    // // Splits a logical stream type into simplified stream types.
-    // //
-    // // [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#split-function)
-    // pub(crate) fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
-    //     match self {
-    //         LogicalType::Stream(stream_in) => {
-    //             let stream_in = stream_in.get(db);
-    //             let mut streams = IndexMap::new();
-
-    //             let split = stream_in.data(db).split_streams(db);
-    //             let (element, rest) = (split.signals, split.streams);
-    //             if !element.is_null(db) || !stream_in.user(db).is_null(db) || stream_in.keep() {
-    //                 streams.insert(
-    //                     PathName::new_empty(),
-    //                     // todo: add method
-    //                     Stream::new(
-    //                         element,
-    //                         stream_in.throughput(),
-    //                         stream_in.dimensionality,
-    //                         stream_in.synchronicity,
-    //                         stream_in.complexity.clone(),
-    //                         stream_in.direction,
-    //                         stream_in.user.clone().map(|stream| *stream),
-    //                         stream_in.keep,
-    //                     )
-    //                     .into(),
-    //                 );
-    //             }
-
-    //             streams.extend(rest.into_iter().map(|(name, stream)| match stream {
-    //                 LogicalType::Stream(mut stream) => {
-    //                     if stream_in.direction == Direction::Reverse {
-    //                         stream.reverse();
-    //                     }
-    //                     if stream_in.synchronicity == Synchronicity::Flatten
-    //                         || stream_in.synchronicity == Synchronicity::FlatDesync
-    //                     {
-    //                         stream.set_synchronicity(Synchronicity::FlatDesync);
-    //                     }
-    //                     if stream.synchronicity != Synchronicity::Flatten
-    //                         && stream_in.synchronicity != Synchronicity::FlatDesync
-    //                     {
-    //                         stream.set_dimensionality(
-    //                             stream.dimensionality + stream_in.dimensionality,
-    //                         );
-    //                     };
-    //                     stream.set_throughput(stream.throughput * stream_in.throughput);
-    //                     (name, stream.into())
-    //                 }
-    //                 _ => unreachable!(),
-    //             }));
-
-    //             SplitStreams {
-    //                 signals: LogicalType::Null,
-    //                 streams,
-    //             }
-    //         }
-    //         LogicalType::Null | LogicalType::Bits(_) => SplitStreams {
-    //             signals: self.clone(),
-    //             streams: IndexMap::new(),
-    //         },
-    //         LogicalType::Group(Group(fields)) | LogicalType::Union(Union(fields)) => {
-    //             let signals = fields
-    //                 .into_iter()
-    //                 .map(|(name, stream)| (name.clone(), stream.split_streams().signals))
-    //                 .collect();
-
-    //             SplitStreams {
-    //                 signals: match self {
-    //                     LogicalType::Group(_) => LogicalType::Group(Group(signals)),
-    //                     LogicalType::Union(_) => LogicalType::Union(Union(signals)),
-    //                     _ => unreachable!(),
-    //                 },
-    //                 streams: fields
-    //                     .into_iter()
-    //                     .map(|(name, stream)| {
-    //                         stream.split_streams().streams.into_iter().map(
-    //                             move |(mut path_name, stream_)| {
-    //                                 path_name.push(name.clone());
-    //                                 (path_name, stream_)
-    //                             },
-    //                         )
-    //                     })
-    //                     .flatten()
-    //                     .collect(),
-    //             }
-    //         }
-    //     }
-    // }
+    /// Flattens a logical stream type consisting of Null, Bits, Group and
+    /// Union stream types into a [`Fields`].
+    ///
+    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#field-conversion-function)
+    ///
+    /// [`Fields`]: ./struct.Fields.html
+    pub(crate) fn fields(&self, db: &dyn Ir) -> Fields {
+        let mut fields = Fields::new_empty();
+        match self {
+            LogicalType::Null | LogicalType::Stream(_) => fields,
+            LogicalType::Bits(b) => {
+                fields.insert(PathName::new_empty(), *b).unwrap();
+                fields
+            }
+            LogicalType::Group(group) => {
+                for field in group.fields(db).iter() {
+                    field
+                        .typ(db)
+                        .fields(db)
+                        .iter()
+                        .for_each(|(path_name, bit_count)| {
+                            fields
+                                .insert(path_name.with_parents(field.name().clone()), *bit_count)
+                                .unwrap();
+                        })
+                }
+                fields
+            }
+            LogicalType::Union(union) => {
+                if let Some(tag) = union.tag() {
+                    fields
+                        .insert(PathName::try_new(vec!["tag"]).unwrap(), tag)
+                        .unwrap();
+                }
+                let b = union.fields(db).iter().fold(0, |acc, field| {
+                    acc.max(
+                        field
+                            .typ(db)
+                            .fields(db)
+                            .values()
+                            .fold(0, |acc, count| acc.max(count.get())),
+                    )
+                });
+                if b > 0 {
+                    fields
+                        .insert(
+                            PathName::try_new(vec!["union"]).unwrap(),
+                            BitCount::new(b).unwrap(),
+                        )
+                        .unwrap();
+                }
+                fields
+            }
+        }
+    }
 }
 
 impl IsNull for LogicalType {

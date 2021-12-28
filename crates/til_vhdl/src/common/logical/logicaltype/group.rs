@@ -3,19 +3,19 @@ use std::{convert::TryInto, error, sync::Arc};
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::ir::{Identifier, Ir};
+use crate::ir::Ir;
 use tydi_common::{
     error::{Error, Result},
-    name::Name,
+    name::{Name, PathName},
 };
 
-use super::{Field, LogicalType};
+use super::{LogicalField, LogicalType};
 
 /// The Group stream type acts as a product type (composition).
 ///
 /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#group)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Group(pub(super) Vec<Id<Field>>);
+pub struct Group(pub(super) Vec<Id<LogicalField>>);
 
 impl Group {
     /// Returns a new Group logical stream type. Returns an error when either
@@ -23,7 +23,7 @@ impl Group {
     /// duplicate names.
     pub fn try_new(
         db: &dyn Ir,
-        parent_id: Option<Identifier>,
+        parent_id: Option<PathName>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -46,17 +46,17 @@ impl Group {
         }
         let base_id = match parent_id {
             Some(id) => id,
-            None => vec![],
+            None => PathName::new_empty(),
         };
         let fields = map
             .into_iter()
-            .map(|(name, typ)| db.intern_field(Field::new(&base_id, name, typ)))
+            .map(|(name, typ)| db.intern_field(LogicalField::new(base_id.with_child(name), typ)))
             .collect();
         Ok(Group(fields))
     }
 
-    /// Returns an iterator over the fields of the Group.
-    pub fn iter(&self, db: &dyn Ir) -> Arc<Vec<Field>> {
+    /// Returns the fields of the Group.
+    pub fn fields(&self, db: &dyn Ir) -> Arc<Vec<LogicalField>> {
         Arc::new(
             self.0
                 .iter()
@@ -85,7 +85,7 @@ mod tests {
         let mut db = Database::default();
         let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
         let group = Group::try_new(&db, None, vec![("a", bits)]).unwrap();
-        let fields = group.iter(&db);
+        let fields = group.fields(&db);
         let field = fields.last().unwrap();
         assert_eq!(field.name().last().unwrap(), "a");
         assert_eq!(field.typ(&db), db.lookup_intern_type(bits));

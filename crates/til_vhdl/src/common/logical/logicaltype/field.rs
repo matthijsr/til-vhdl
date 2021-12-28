@@ -1,31 +1,26 @@
+use tydi_common::name::PathName;
 use tydi_intern::Id;
 
-use crate::ir::{Identifier, Ir, Name};
+use crate::ir::{Ir, Name};
 
 use super::LogicalType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Field {
+pub struct LogicalField {
     /// The relative name of the field
-    name: Identifier,
+    name: PathName,
     typ: Id<LogicalType>,
 }
 
-impl Field {
-    pub fn new(base_id: &Identifier, name: Name, typ: Id<LogicalType>) -> Field {
-        if base_id.is_empty() {
-            Field {
-                name: vec![name],
-                typ: typ,
-            }
-        } else {
-            let mut id = base_id.clone();
-            id.push(name);
-            Field { name: id, typ: typ }
+impl LogicalField {
+    pub fn new(name: PathName, typ: Id<LogicalType>) -> LogicalField {
+        LogicalField {
+            name: name,
+            typ: typ,
         }
     }
 
-    pub fn name(&self) -> &Identifier {
+    pub fn name(&self) -> &PathName {
         &self.name
     }
 
