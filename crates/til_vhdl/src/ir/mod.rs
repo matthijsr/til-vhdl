@@ -8,8 +8,8 @@ pub use implementation::Implementation;
 pub mod implementation;
 pub use physical_properties::PhysicalProperties;
 pub mod physical_properties;
-pub use port::Interface;
-pub mod port;
+pub use interface::Interface;
+pub mod interface;
 pub use streamlet::Streamlet;
 pub mod streamlet;
 pub use db::Database;
@@ -52,7 +52,10 @@ pub trait InternSelf<T> {
 }
 
 pub trait IntoVhdl<T> {
-    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<T>;
+    fn canonical(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch, prefix: impl Into<String>) -> Result<T>;
+    fn fancy(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<T> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

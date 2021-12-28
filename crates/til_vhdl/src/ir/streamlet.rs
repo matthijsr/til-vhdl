@@ -75,7 +75,12 @@ impl Streamlet {
 }
 
 impl IntoVhdl<Component> for Streamlet {
-    fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<Component> {
+    fn canonical(
+        &self,
+        ir_db: &dyn Ir,
+        vhdl_db: &dyn Arch,
+        prefix: impl Into<String>,
+    ) -> Result<Component> {
         todo!()
     }
 }

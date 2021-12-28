@@ -1,11 +1,16 @@
 use std::convert::TryInto;
 
 use tydi_common::{
+    cat,
     error::{Error, Result},
-    traits::Identify,
+    traits::{Identify, Reversed},
 };
 use tydi_intern::Id;
-use tydi_vhdl::{architecture::arch_storage::Arch, port::Mode};
+use tydi_vhdl::{
+    architecture::arch_storage::Arch,
+    common::vhdl_name::VhdlName,
+    port::{Mode, Port},
+};
 
 use crate::common::logical::logicaltype::Direction;
 
@@ -48,27 +53,34 @@ impl Identify for Interface {
         self.name.as_ref()
     }
 }
-// // TODO
-// impl IntoVhdl<Vec<tydi_vhdl::port::Port>> for Interface {
-//     fn into_vhdl(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Vec<tydi_vhdl::port::Port> {
-//         let stream = self.stream(ir_db);
-//         let default_mode = match self.physical_properties().origin() {
-//             Origin::Source => Mode::Out,
-//             Origin::Sink => Mode::In,
-//         };
-//         let result_mode = |x: Mode, d: Direction| match d {
-//             Direction::Forward => x,
-//             Direction::Reverse => x.reverse(),
-//         };
-//         let mut result = vec![];
-//         match stream.data(ir_db) {
-//             LogicalType::Null => (),
-//             LogicalType::Bits(n) => tydi_vhdl::port::Port::new(),
-//             LogicalType::Group(_) => todo!(),
-//             LogicalType::Union(_) => todo!(),
-//             LogicalType::Stream(_) => todo!(),
-//         }
 
-//         result
-//     }
-// }
+impl IntoVhdl<Vec<Port>> for Interface {
+    fn canonical(
+        &self,
+        ir_db: &dyn Ir,
+        vhdl_db: &dyn Arch,
+        prefix: impl Into<String>,
+    ) -> Result<Vec<Port>> {
+        let n: String = prefix.into();
+        let mut ports = Vec::new();
+
+        let synth = self.stream(ir_db).synthesize(ir_db);
+
+        for (path, width) in synth.signals() {
+            ports.push(Port::new(
+                VhdlName::try_new(cat!(n.clone(), path.to_string()))?,
+                match self.physical_properties().origin() {
+                    Origin::Source => Mode::Out,
+                    Origin::Sink => Mode::In,
+                },
+                width.clone().into(),
+            ));
+        }
+
+        for (path, phys) in synth.streams() {
+            ports.extend(phys.into_vhdl(&n, path, self.physical_properties().origin())?);
+        }
+
+        Ok(ports)
+    }
+}

@@ -2,7 +2,7 @@ use std::{convert::TryFrom, fmt, ops::Deref, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result},
-    name::Name,
+    name::{Name, PathName},
 };
 /// Type-safe wrapper for valid names.
 ///
@@ -67,6 +67,12 @@ impl From<&VhdlName> for String {
 impl From<Name> for VhdlName {
     fn from(name: Name) -> Self {
         VhdlName::try_new(name).unwrap()
+    }
+}
+
+impl From<PathName> for VhdlName {
+    fn from(path: PathName) -> Self {
+        VhdlName::try_new(path.to_string()).unwrap()
     }
 }
 

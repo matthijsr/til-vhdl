@@ -3,20 +3,22 @@ use std::hash::{Hash, Hasher};
 use std::ops::Mul;
 use std::str::FromStr;
 
+use indexmap::IndexMap;
 use salsa::Database;
+use tydi_common::name::PathName;
 use tydi_common::numbers::Positive;
 use tydi_common::traits::Reverse;
 use tydi_intern::Id;
 
 use crate::common::physical::complexity::Complexity;
 use crate::common::physical::stream::PhysicalStream;
-use crate::ir::Ir;
+use crate::ir::{InternSelf, Ir};
 use tydi_common::{
     error::{Error, Result},
     numbers::{NonNegative, PositiveReal},
 };
 
-use super::{IsNull, LogicalType};
+use super::{IsNull, LogicalStream, LogicalType, SplitStreams};
 
 /// Floats cannot be hashed or consistently reproduced on all hardware
 ///
@@ -257,6 +259,59 @@ impl Stream {
     /// Set the dimensionality of this stream.
     pub(crate) fn set_dimensionality(&mut self, dimensionality: NonNegative) {
         self.dimensionality = dimensionality;
+    }
+
+    pub(crate) fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
+        let split = self.data(db).split_streams(db);
+        let mut streams = IndexMap::new();
+        let (element, rest) = (split.signals, split.streams);
+        if !element.is_null(db) || !self.user(db).is_null(db) || self.keep() {
+            streams.insert(
+                PathName::new_empty(),
+                Stream::new(
+                    element.intern(db),
+                    self.throughput(),
+                    self.dimensionality(),
+                    self.synchronicity(),
+                    self.complexity().clone(),
+                    self.direction(),
+                    self.user_id(),
+                    self.keep(),
+                )
+                .into(),
+            );
+        }
+
+        streams.extend(rest.into_iter().map(|(name, mut stream)| {
+            if self.direction() == Direction::Reverse {
+                stream.reverse();
+            }
+            if self.flattens() {
+                stream.set_synchronicity(Synchronicity::FlatDesync);
+            } else {
+                stream.set_dimensionality(stream.dimensionality() + self.dimensionality());
+            }
+            stream.set_throughput(stream.throughput() * self.throughput());
+
+            (name, stream)
+        }));
+
+        SplitStreams {
+            signals: LogicalType::Null,
+            streams,
+        }
+    }
+
+    pub(crate) fn synthesize(&self, db: &dyn Ir) -> LogicalStream {
+        let split = self.split_streams(db);
+        let (signals, rest) = (split.signals.fields(db), split.streams);
+        LogicalStream {
+            signals,
+            streams: rest
+                .into_iter()
+                .map(|(path_name, stream)| (path_name, stream.physical(db)))
+                .collect(),
+        }
     }
 }
 
