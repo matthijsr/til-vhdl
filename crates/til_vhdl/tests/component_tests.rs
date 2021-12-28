@@ -15,7 +15,11 @@ use tydi_common::{
     name::Name,
     numbers::{BitCount, Positive},
 };
-use tydi_vhdl::{architecture::arch_storage::Arch, declaration::Declare, package::Package};
+use tydi_vhdl::{
+    architecture::{arch_storage::Arch, Architecture},
+    declaration::Declare,
+    package::Package,
+};
 
 extern crate til_vhdl;
 
@@ -80,6 +84,32 @@ package work is
 
 end work;"#,
         package.declare(vhdl_db)?
+    );
+
+    let architecture = Architecture::new_default(&package, Name::try_new("test_com")?)?;
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.work.all;
+
+entity test_com is
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(3 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic
+  );
+end test_com;
+
+architecture Behavioral of test_com is
+begin
+end Behavioral;"#,
+        architecture.declare(vhdl_db)?
     );
 
     Ok(())

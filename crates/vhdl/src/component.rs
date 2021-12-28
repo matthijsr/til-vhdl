@@ -64,6 +64,10 @@ impl Component {
     pub fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into())
     }
+
+    pub fn name(&self) -> &VhdlName {
+        &self.identifier
+    }
 }
 
 impl Identify for Component {
@@ -144,7 +148,12 @@ end component;"#,
             ObjectType::bit_vector(43, 0).unwrap(),
         );
         let clk = Port::new(Name::try_new("clk").unwrap(), Mode::In, ObjectType::Bit);
-        let comp = Component::new(VhdlName::try_new("test").unwrap(), vec![], vec![port1, port2, clk], None);
+        let comp = Component::new(
+            VhdlName::try_new("test").unwrap(),
+            vec![],
+            vec![port1, port2, clk],
+            None,
+        );
         assert_eq!(
             r#"component test
   port (
