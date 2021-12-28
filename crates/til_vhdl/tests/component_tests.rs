@@ -54,7 +54,7 @@ fn streamlet_to_vhdl() -> Result<()> {
     )?;
     let port = Interface::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
     let streamlet = Streamlet::try_new(db, vec![port])?;
-    let component = streamlet.canonical(db, vhdl_db)?;
+    let component = streamlet.canonical(db, vhdl_db, "")?;
     print!("{}", component.declare(vhdl_db)?);
 
     Ok(())
