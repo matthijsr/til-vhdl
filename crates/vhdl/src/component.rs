@@ -7,6 +7,7 @@ use tydi_common::{
 
 use crate::{
     architecture::arch_storage::Arch,
+    common::vhdl_name::VhdlName,
     declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
     port::{Parameter, Port},
@@ -18,7 +19,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Component {
     /// Component identifier.
-    identifier: String,
+    identifier: VhdlName,
     /// The parameters of the component..
     parameters: Vec<Parameter>,
     /// The ports of the component.
@@ -30,7 +31,7 @@ pub struct Component {
 impl Component {
     /// Create a new component.
     pub fn new(
-        identifier: impl Into<String>,
+        identifier: impl Into<VhdlName>,
         parameters: Vec<Parameter>,
         ports: Vec<Port>,
         doc: Option<String>,
@@ -67,7 +68,7 @@ impl Component {
 
 impl Identify for Component {
     fn identifier(&self) -> &str {
-        self.identifier.as_str()
+        self.identifier.as_ref()
     }
 }
 
@@ -143,7 +144,7 @@ end component;"#,
             ObjectType::bit_vector(43, 0).unwrap(),
         );
         let clk = Port::new(Name::try_new("clk").unwrap(), Mode::In, ObjectType::Bit);
-        let comp = Component::new("test", vec![], vec![port1, port2, clk], None);
+        let comp = Component::new(VhdlName::try_new("test").unwrap(), vec![], vec![port1, port2, clk], None);
         assert_eq!(
             r#"component test
   port (

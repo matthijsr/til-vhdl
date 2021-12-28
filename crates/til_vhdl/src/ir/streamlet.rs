@@ -1,24 +1,28 @@
 use std::collections::HashSet;
 
 use tydi_common::{
+    cat,
     error::{Error, Result},
     traits::Identify,
 };
 use tydi_intern::Id;
-use tydi_vhdl::{architecture::arch_storage::Arch, component::Component};
+use tydi_vhdl::{
+    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, component::Component, port::Port,
+};
 
 use super::{
-    physical_properties::Origin, GetSelf, Implementation, Interface, InternSelf, IntoVhdl, Ir,
+    physical_properties::Origin, GetSelf, Implementation, Interface, InternSelf, IntoVhdl, Ir, Name,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Streamlet {
+    name: Name,
     implementation: Option<Id<Implementation>>,
     ports: Vec<Id<Interface>>,
 }
 
 impl Streamlet {
-    pub fn try_new(db: &dyn Ir, ports: Vec<Interface>) -> Result<Streamlet> {
+    pub fn try_new(db: &dyn Ir, name: impl Into<Name>, ports: Vec<Interface>) -> Result<Streamlet> {
         let mut set = HashSet::new();
         for port in &ports {
             if !set.insert(port.identifier()) {
@@ -27,6 +31,7 @@ impl Streamlet {
         }
         let ports = ports.into_iter().map(|x| x.intern(db)).collect();
         Ok(Streamlet {
+            name: name.into(),
             implementation: None,
             ports,
         })
@@ -38,9 +43,14 @@ impl Streamlet {
         implementation: Option<Id<Implementation>>,
     ) -> Id<Streamlet> {
         db.intern_streamlet(Streamlet {
+            name: self.name,
             implementation,
             ports: self.ports,
         })
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.name
     }
 
     pub fn implementation(&self, db: &dyn Ir) -> Option<Implementation> {
@@ -74,6 +84,12 @@ impl Streamlet {
     }
 }
 
+impl Identify for Streamlet {
+    fn identifier(&self) -> &str {
+        self.name.as_ref()
+    }
+}
+
 impl IntoVhdl<Component> for Streamlet {
     fn canonical(
         &self,
@@ -81,7 +97,23 @@ impl IntoVhdl<Component> for Streamlet {
         vhdl_db: &dyn Arch,
         prefix: impl Into<String>,
     ) -> Result<Component> {
-        todo!()
+        let mut ports = vec![];
+        ports.push(Port::clk());
+        ports.push(Port::rst());
+        for input in self.inputs(ir_db) {
+            ports.extend(input.canonical(ir_db, vhdl_db, "")?);
+        }
+        for output in self.outputs(ir_db) {
+            ports.extend(output.canonical(ir_db, vhdl_db, "")?);
+        }
+        // TODO: Streamlet should also have documentation?
+
+        Ok(Component::new(
+            VhdlName::try_new(cat!(self.identifier(), "com"))?,
+            vec![],
+            ports,
+            None,
+        ))
     }
 }
 
@@ -97,7 +129,8 @@ mod tests {
         let db = Database::default();
         let imple = Implementation::Link;
         let implid = db.intern_implementation(imple.clone());
-        let streamlet = Streamlet::try_new(&db, vec![])?.with_implementation(&db, Some(implid));
+        let streamlet = Streamlet::try_new(&db, Name::try_new("test")?, vec![])?
+            .with_implementation(&db, Some(implid));
         assert_eq!(
             db.lookup_intern_streamlet(streamlet)
                 .implementation(&db)

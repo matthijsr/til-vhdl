@@ -12,9 +12,10 @@ use til_vhdl::{
 };
 use tydi_common::{
     error::{Error, Result},
+    name::Name,
     numbers::{BitCount, Positive},
 };
-use tydi_vhdl::declaration::Declare;
+use tydi_vhdl::{architecture::arch_storage::Arch, declaration::Declare, package::Package};
 
 extern crate til_vhdl;
 
@@ -23,7 +24,8 @@ fn streamlet_new() -> Result<()> {
     let db = Database::default();
     let imple = Implementation::Link;
     let implid = db.intern_implementation(imple.clone());
-    let streamlet = Streamlet::try_new(&db, vec![])?.with_implementation(&db, Some(implid));
+    let streamlet = Streamlet::try_new(&db, Name::try_new("test")?, vec![])?
+        .with_implementation(&db, Some(implid));
     assert_eq!(
         db.lookup_intern_streamlet(streamlet)
             .implementation(&db)
@@ -37,7 +39,7 @@ fn streamlet_new() -> Result<()> {
 fn streamlet_to_vhdl() -> Result<()> {
     let _db = Database::default();
     let db = &_db;
-    let _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let vhdl_db = &_vhdl_db;
     let data_type = LogicalType::try_new_bits(4)?.intern(db);
     let null_type = LogicalType::Null.intern(db);
@@ -53,9 +55,32 @@ fn streamlet_to_vhdl() -> Result<()> {
         false,
     )?;
     let port = Interface::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
-    let streamlet = Streamlet::try_new(db, vec![port])?;
+    let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
-    print!("{}", component.declare(vhdl_db)?);
+    let mut package = Package::new_default_empty();
+    package.add_component(component);
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+package work is
+
+  component test_com
+    port (
+      clk : in std_logic;
+      rst : in std_logic;
+      a_valid : in std_logic;
+      a_ready : out std_logic;
+      a_data : in std_logic_vector(3 downto 0);
+      a_last : in std_logic;
+      a_strb : in std_logic
+    );
+  end component;
+
+end work;"#,
+        package.declare(vhdl_db)?
+    );
 
     Ok(())
 }

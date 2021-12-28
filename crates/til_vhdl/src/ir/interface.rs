@@ -61,7 +61,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
         vhdl_db: &dyn Arch,
         prefix: impl Into<String>,
     ) -> Result<Vec<Port>> {
-        let n: String = prefix.into();
+        let n: String = cat!(prefix.into(), self.identifier());
         let mut ports = Vec::new();
 
         let synth = self.stream(ir_db).synthesize(ir_db);

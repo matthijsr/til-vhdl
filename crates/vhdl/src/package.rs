@@ -17,6 +17,7 @@ use crate::{
     usings::{DeclareUsings, ListUsings, Usings},
 };
 
+// TODO: Eventually functions as well.
 /// A library of components and types.
 #[derive(Debug)]
 pub struct Package {
@@ -41,6 +42,11 @@ impl Package {
         }
     }
 
+    /// Creates an empty "work" library
+    pub fn new_default_empty() -> Self {
+        Package::new(Name::try_new("work").unwrap(), &vec![], &vec![])
+    }
+
     pub fn get_component(&self, identifier: impl Into<String>) -> Result<Component> {
         let identifier = identifier.into();
         match self
@@ -54,6 +60,14 @@ impl Package {
                 identifier
             ))),
         }
+    }
+
+    pub fn add_component(&mut self, component: Component) {
+        self.components.push(component);
+    }
+
+    pub fn add_type(&mut self, typ: ObjectType) {
+        self.types.push(typ);
     }
 
     pub fn components(&self) -> &Vec<Component> {

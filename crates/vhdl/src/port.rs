@@ -75,6 +75,11 @@ impl Port {
         Port::new(VhdlName::try_new("clk").unwrap(), Mode::In, ObjectType::Bit)
     }
 
+    /// Create a `rst` port, `rst : in std_logic`.
+    pub fn rst() -> Port {
+        Port::new(VhdlName::try_new("rst").unwrap(), Mode::In, ObjectType::Bit)
+    }
+
     /// Return the port mode.
     pub fn mode(&self) -> Mode {
         self.mode
