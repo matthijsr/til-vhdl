@@ -1,15 +1,15 @@
-use std::{convert::TryInto, error};
+use std::{convert::TryInto, error, sync::Arc};
 
 use crate::{
     common::physical::{fields::Fields, stream::PhysicalStream},
-    ir::{GetSelf, IntoVhdl, Ir},
+    ir::{GetSelf, InternSelf, IntoVhdl, Ir},
 };
 use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
-    util::log2_ceil,
+    util::log2_ceil, traits::Reverse,
 };
 
 pub use field::*;
@@ -32,14 +32,14 @@ pub trait IsNull {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SplitStreams {
     signals: LogicalType,
-    streams: IndexMap<PathName, LogicalType>,
+    streams: IndexMap<PathName, Stream>,
 }
 
 impl SplitStreams {
-    pub fn streams(&self) -> impl Iterator<Item = (&PathName, &LogicalType)> {
+    pub fn streams(&self) -> impl Iterator<Item = (&PathName, &Stream)> {
         self.streams.iter()
     }
-    pub fn signal(&self) -> &LogicalType {
+    pub fn signals(&self) -> &LogicalType {
         &self.signals
     }
 }
@@ -268,6 +268,106 @@ impl LogicalType {
                 }
                 fields
             }
+        }
+    }
+
+    /// Splits a logical stream type into simplified stream types.
+    ///
+    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#split-function)
+    pub(crate) fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
+        fn split_fields(
+            db: &dyn Ir,
+            fields: Arc<Vec<LogicalField>>,
+        ) -> (Vec<LogicalField>, IndexMap<PathName, Stream>) {
+            let signals = fields
+                .iter()
+                .map(|field| {
+                    LogicalField::new(
+                        field.name().clone(),
+                        field.typ(db).split_streams(db).signals().intern(db),
+                    )
+                })
+                .collect();
+            let streams = fields
+                .iter()
+                .map(|field| {
+                    field
+                        .typ(db)
+                        .split_streams(db)
+                        .streams()
+                        .map(|(path_name, stream)| {
+                            (path_name.with_parents(field.name().clone()), stream.clone())
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .flatten()
+                .collect();
+            (signals, streams)
+        }
+
+        match self {
+            LogicalType::Null | LogicalType::Bits(_) => SplitStreams {
+                signals: self.clone(),
+                streams: IndexMap::new(),
+            },
+            LogicalType::Group(group) => {
+                let (fields, streams) = split_fields(db, group.fields(db));
+                SplitStreams {
+                    signals: Group::new(db, fields).into(),
+                    streams,
+                }
+            }
+            LogicalType::Union(union) => {
+                let (fields, streams) = split_fields(db, union.fields(db));
+                SplitStreams {
+                    signals: Union::new(db, fields).into(),
+                    streams,
+                }
+            }
+            LogicalType::Stream(stream_id) => {
+                let stream_in = stream_id.get(db);
+                let split = stream_in.data(db).split_streams(db);
+                let mut streams = IndexMap::new();
+                let (element, rest) = (split.signals, split.streams);
+                if !element.is_null(db)
+                    || !stream_in.user(db).is_null(db)
+                    || stream_in.keep()
+                {
+                    streams.insert(
+                        PathName::new_empty(),
+                        Stream::new(
+                            element.intern(db),
+                            stream_in.throughput(),
+                            stream_in.dimensionality(),
+                            stream_in.synchronicity(),
+                            stream_in.complexity().clone(),
+                            stream_in.direction(),
+                            stream_in.user_id(),
+                            stream_in.keep(),
+                        )
+                        .into(),
+                    );
+                }
+
+                streams.extend(rest.into_iter().map(|(name, mut stream)| {
+                    if stream_in.direction() == Direction::Reverse {
+                        stream.reverse();
+                    }
+                    if stream_in.flattens() {
+                        stream.set_synchronicity(Synchronicity::FlatDesync);
+                    } else {
+                        stream.set_dimensionality(stream.dimensionality() + stream_in.dimensionality());
+                    }
+                    stream.set_throughput(stream.throughput() * stream_in.throughput());
+
+                    (name, stream)
+                }));
+
+                SplitStreams {
+                    signals: LogicalType::Null,
+                    streams
+                }
+            },
         }
     }
 }

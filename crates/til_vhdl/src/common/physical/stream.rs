@@ -5,7 +5,7 @@ use tydi_common::{
     error::{Error, Result},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
-    util::log2_ceil,
+    util::log2_ceil, traits::Reversed,
 };
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
@@ -212,7 +212,7 @@ impl PhysicalStream {
         ));
         ports.push(Port::new(
             VhdlName::try_new(cat!(base_name, path_name, "ready"))?,
-            mode.reverse(),
+            mode.reversed(),
             ObjectType::Bit,
         ));
 

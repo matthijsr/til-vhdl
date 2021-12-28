@@ -2,6 +2,12 @@ use tydi_intern::Id;
 
 use super::{Connection, Field, InternSelf, Implementation, LogicalType, Interface, Stream, Streamlet};
 
+impl<T> InternSelf<T> for &T where T : InternSelf<T> {
+    fn intern(self, db: &dyn super::Ir) -> Id<T> {
+        self.clone().intern(db)
+    }
+}
+
 impl InternSelf<Connection> for Connection {
     fn intern(self, db: &dyn super::Ir) -> Id<Connection> {
         db.intern_connection(self)

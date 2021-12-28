@@ -1,11 +1,15 @@
 use std::convert::{TryFrom, TryInto};
 use std::hash::{Hash, Hasher};
+use std::ops::Mul;
 use std::str::FromStr;
 
 use salsa::Database;
+use tydi_common::numbers::Positive;
+use tydi_common::traits::Reverse;
 use tydi_intern::Id;
 
 use crate::common::physical::complexity::Complexity;
+use crate::common::physical::stream::PhysicalStream;
 use crate::ir::Ir;
 use tydi_common::{
     error::{Error, Result},
@@ -38,6 +42,14 @@ impl Throughput {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn non_negative(&self) -> NonNegative {
+        self.as_real().get().ceil() as NonNegative
+    }
+
+    pub fn positive(&self) -> Positive {
+        Positive::new(self.non_negative()).unwrap()
+    }
 }
 
 impl TryFrom<&str> for Throughput {
@@ -53,6 +65,14 @@ impl TryFrom<String> for Throughput {
 
     fn try_from(value: String) -> Result<Self> {
         Throughput::try_new(value)
+    }
+}
+
+impl Mul for Throughput {
+    type Output = Throughput;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Throughput::try_new((self.as_real() * rhs.as_real()).get().to_string()).unwrap()
     }
 }
 
@@ -165,8 +185,16 @@ impl Stream {
         db.lookup_intern_type(self.data)
     }
 
+    pub fn data_id(&self) -> Id<LogicalType> {
+        self.data
+    }
+
     pub fn user(&self, db: &dyn Ir) -> LogicalType {
         db.lookup_intern_type(self.user)
+    }
+
+    pub fn user_id(&self) -> Id<LogicalType> {
+        self.user
     }
 
     /// Returns the direction of this stream.
@@ -179,6 +207,12 @@ impl Stream {
         self.synchronicity
     }
 
+    /// Returns whether the stream synchronicity should be flattened
+    pub fn flattens(&self) -> bool {
+        self.synchronicity == Synchronicity::Flatten
+            || self.synchronicity == Synchronicity::FlatDesync
+    }
+
     /// Returns the dimensionality of this stream.
     pub fn dimensionality(&self) -> NonNegative {
         self.dimensionality
@@ -189,8 +223,40 @@ impl Stream {
         self.throughput.clone()
     }
 
+    // Returns the complexity of this stream.
+    pub fn complexity(&self) -> Complexity {
+        self.complexity.clone()
+    }
+
+    // Returns the keep flag of this stream.
     pub fn keep(&self) -> bool {
         self.keep
+    }
+
+    // Converts this Stream type into a Physical Stream.
+    pub fn physical(&self, db: &dyn Ir) -> PhysicalStream {
+        PhysicalStream::new(
+            self.data(db).fields(db),
+            self.throughput().positive(),
+            self.dimensionality(),
+            self.complexity(),
+            self.user(db).fields(db),
+        )
+    }
+
+    /// Set the throughput ratio of this stream.
+    pub(crate) fn set_throughput(&mut self, throughput: Throughput) {
+        self.throughput = throughput;
+    }
+
+    /// Set the synchronicity of this stream.
+    pub(crate) fn set_synchronicity(&mut self, synchronicity: Synchronicity) {
+        self.synchronicity = synchronicity;
+    }
+
+    /// Set the dimensionality of this stream.
+    pub(crate) fn set_dimensionality(&mut self, dimensionality: NonNegative) {
+        self.dimensionality = dimensionality;
     }
 }
 
@@ -215,6 +281,15 @@ impl From<Id<Stream>> for LogicalType {
     /// [`LogicalType`]: ./enum.LogicalType.html
     fn from(stream: Id<Stream>) -> Self {
         LogicalType::Stream(stream)
+    }
+}
+
+impl Reverse for Stream {
+    fn reverse(&mut self) {
+        match self.direction() {
+            Direction::Forward => self.direction = Direction::Reverse,
+            Direction::Reverse => self.direction = Direction::Forward,
+        }
     }
 }
 

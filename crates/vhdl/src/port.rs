@@ -3,7 +3,7 @@ use std::fmt::Display;
 use tydi_common::{
     error::Result,
     name::Name,
-    traits::{Document, Identify},
+    traits::{Document, Identify, Reverse, Reversed},
 };
 
 use crate::{
@@ -139,8 +139,8 @@ pub enum Mode {
     Out,
 }
 
-impl Mode {
-    pub fn reverse(&self) -> Self {
+impl Reversed for Mode {
+    fn reversed(&self) -> Self {
         match self {
             Mode::In => Mode::Out,
             Mode::Out => Mode::In,

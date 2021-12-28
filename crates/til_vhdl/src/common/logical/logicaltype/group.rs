@@ -3,7 +3,7 @@ use std::{convert::TryInto, error, sync::Arc};
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::ir::Ir;
+use crate::ir::{InternSelf, Ir};
 use tydi_common::{
     error::{Error, Result},
     name::{Name, PathName},
@@ -50,9 +50,14 @@ impl Group {
         };
         let fields = map
             .into_iter()
-            .map(|(name, typ)| db.intern_field(LogicalField::new(base_id.with_child(name), typ)))
+            .map(|(name, typ)| LogicalField::new(base_id.with_child(name), typ).intern(db))
             .collect();
         Ok(Group(fields))
+    }
+
+    pub(crate) fn new(db: &dyn Ir, fields: Vec<LogicalField>) -> Self {
+        let fields = fields.iter().map(|x| x.intern(db)).collect();
+        Group(fields)
     }
 
     /// Returns the fields of the Group.
