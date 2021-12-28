@@ -9,7 +9,8 @@ use tydi_common::{
     error::{Error, Result},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
-    util::log2_ceil, traits::Reverse,
+    traits::Reverse,
+    util::log2_ceil,
 };
 
 pub use field::*;
@@ -329,10 +330,7 @@ impl LogicalType {
                 let split = stream_in.data(db).split_streams(db);
                 let mut streams = IndexMap::new();
                 let (element, rest) = (split.signals, split.streams);
-                if !element.is_null(db)
-                    || !stream_in.user(db).is_null(db)
-                    || stream_in.keep()
-                {
+                if !element.is_null(db) || !stream_in.user(db).is_null(db) || stream_in.keep() {
                     streams.insert(
                         PathName::new_empty(),
                         Stream::new(
@@ -356,7 +354,9 @@ impl LogicalType {
                     if stream_in.flattens() {
                         stream.set_synchronicity(Synchronicity::FlatDesync);
                     } else {
-                        stream.set_dimensionality(stream.dimensionality() + stream_in.dimensionality());
+                        stream.set_dimensionality(
+                            stream.dimensionality() + stream_in.dimensionality(),
+                        );
                     }
                     stream.set_throughput(stream.throughput() * stream_in.throughput());
 
@@ -365,9 +365,21 @@ impl LogicalType {
 
                 SplitStreams {
                     signals: LogicalType::Null,
-                    streams
+                    streams,
                 }
-            },
+            }
+        }
+    }
+
+    pub(crate) fn synthesize(&self, db: &dyn Ir) -> LogicalStream {
+        let split = self.split_streams(db);
+        let (signals, rest) = (split.signals.fields(db), split.streams);
+        LogicalStream {
+            signals,
+            streams: rest
+                .into_iter()
+                .map(|(path_name, stream)| (path_name, stream.physical(db)))
+                .collect(),
         }
     }
 }
