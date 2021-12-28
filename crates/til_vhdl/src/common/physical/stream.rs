@@ -206,12 +206,12 @@ impl PhysicalStream {
         };
 
         ports.push(Port::new(
-            VhdlName::try_new("valid")?,
+            VhdlName::try_new(cat!(base_name, path_name, "valid"))?,
             mode,
             ObjectType::Bit,
         ));
         ports.push(Port::new(
-            VhdlName::try_new("ready")?,
+            VhdlName::try_new(cat!(base_name, path_name, "ready"))?,
             mode.reverse(),
             ObjectType::Bit,
         ));
@@ -273,8 +273,8 @@ mod tests {
             .collect::<Result<Vec<String>>>()?
             .join("\n");
         assert_eq!(
-            r#"valid : out std_logic
-ready : in std_logic
+            r#"a_test__sub_valid : out std_logic
+a_test__sub_ready : in std_logic
 a_test__sub_data : out std_logic_vector(9 downto 0)
 a_test__sub_last : out std_logic_vector(2 downto 0)
 a_test__sub_stai : out std_logic
@@ -289,8 +289,8 @@ a_test__sub_strb : out std_logic_vector(1 downto 0)"#,
             .collect::<Result<Vec<String>>>()?
             .join("\n");
         assert_eq!(
-            r#"valid : out std_logic
-ready : in std_logic
+            r#"a_valid : out std_logic
+a_ready : in std_logic
 a_data : out std_logic_vector(9 downto 0)
 a_last : out std_logic_vector(2 downto 0)
 a_stai : out std_logic
