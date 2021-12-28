@@ -4,7 +4,7 @@ use tydi_common::{
     cat,
     error::{Error, Result},
     name::{Name, PathName},
-    numbers::{NonNegative, Positive},
+    numbers::{BitCount, NonNegative, Positive},
     util::log2_ceil,
 };
 use tydi_vhdl::{
@@ -217,15 +217,11 @@ impl PhysicalStream {
         ));
 
         let mut opt = |x: NonNegative, name: &str| -> Result<()> {
-            if x > 0 {
-                let obj_type = match x {
-                    1 => ObjectType::Bit,
-                    _ => ObjectType::bit_vector((x - 1).try_into().unwrap(), 0)?,
-                };
+            if let Some(bits) = BitCount::new(x) {
                 ports.push(Port::new(
                     VhdlName::try_new(cat!(base_name, path_name, name))?,
                     mode,
-                    obj_type,
+                    bits.into(),
                 ));
             }
             Ok(())

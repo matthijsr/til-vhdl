@@ -5,6 +5,7 @@ use record::RecordObject;
 use tydi_common::{
     error::{Error, Result},
     name::Name,
+    numbers::BitCount,
 };
 
 use crate::{
@@ -355,6 +356,16 @@ impl DeclareWithIndent for ObjectType {
             )),
             ObjectType::Array(array_object) => array_object.declare(db),
             ObjectType::Record(_) => todo!(),
+        }
+    }
+}
+
+impl From<BitCount> for ObjectType {
+    fn from(bits: BitCount) -> Self {
+        if bits == BitCount::new(1).unwrap() {
+            ObjectType::Bit
+        } else {
+            ObjectType::bit_vector((bits.get() - 1).try_into().unwrap(), 0).unwrap()
         }
     }
 }
