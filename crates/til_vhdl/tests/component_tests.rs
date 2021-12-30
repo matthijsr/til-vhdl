@@ -114,3 +114,38 @@ end Behavioral;"#,
 
     Ok(())
 }
+
+#[test]
+fn playground() -> Result<()> {
+    let _db = Database::default();
+    let db = &_db;
+    let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let vhdl_db = &_vhdl_db;
+    let bits = LogicalType::try_new_bits(4)?.intern(db);
+    let data_type = LogicalType::try_new_union(db, None, vec![("a", bits)])?.intern(db);
+    //let data_type = LogicalType::try_new_bits(4)?.intern(db);let null_type = LogicalType::Null.intern(db);
+    let null_type = LogicalType::Null.intern(db);
+    let stream = Stream::try_new(
+        db,
+        data_type,
+        "2.0",
+        1,
+        Synchronicity::Sync,
+        4,
+        Direction::Forward,
+        null_type,
+        false,
+    )?;
+    let port = Interface::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
+    let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
+    let component = streamlet.canonical(db, vhdl_db, "")?;
+    let mut package = Package::new_default_empty();
+    package.add_component(component);
+
+    println!("{}", package.declare(vhdl_db)?);
+
+    let architecture = Architecture::new_default(&package, Name::try_new("test_com")?)?;
+    println!("{}", architecture.declare(vhdl_db)?);
+
+    Ok(())
+}
