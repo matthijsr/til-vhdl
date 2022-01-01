@@ -12,7 +12,7 @@ use tydi_vhdl::{
     port::{Mode, Port},
 };
 
-use crate::common::logical::logicaltype::Direction;
+use crate::common::logical::{logical_stream::SynthesizeLogicalStream, logicaltype::Direction};
 
 use super::{
     physical_properties::{self, Origin},
@@ -64,7 +64,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
         let n: String = cat!(prefix.into(), self.identifier());
         let mut ports = Vec::new();
 
-        let synth = self.stream(ir_db).synthesize(ir_db);
+        let synth = self.stream.synthesize(ir_db);
 
         for (path, width) in synth.signals() {
             ports.push(Port::new(

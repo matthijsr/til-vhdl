@@ -10,15 +10,17 @@ use tydi_common::numbers::Positive;
 use tydi_common::traits::Reverse;
 use tydi_intern::Id;
 
+use crate::common::logical::logical_stream::{LogicalStream, SynthesizeLogicalStream};
+use crate::common::logical::split_streams::SplitsStreams;
 use crate::common::physical::complexity::Complexity;
 use crate::common::physical::stream::PhysicalStream;
-use crate::ir::{InternSelf, Ir};
+use crate::ir::{GetSelf, InternSelf, Ir};
 use tydi_common::{
     error::{Error, Result},
     numbers::{NonNegative, PositiveReal},
 };
 
-use super::{IsNull, LogicalStream, LogicalType, SplitStreams};
+use super::{IsNull, LogicalType, SplitStreams};
 
 /// Floats cannot be hashed or consistently reproduced on all hardware
 ///
@@ -260,58 +262,60 @@ impl Stream {
     pub(crate) fn set_dimensionality(&mut self, dimensionality: NonNegative) {
         self.dimensionality = dimensionality;
     }
+}
 
-    pub(crate) fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
-        let split = self.data(db).split_streams(db);
+impl SynthesizeLogicalStream for Id<Stream> {
+    fn synthesize(&self, db: &dyn Ir) -> LogicalStream {
+        let split = self.split_streams(db);
+        let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
+        LogicalStream::new(
+            signals,
+            rest.into_iter()
+                .map(|(path_name, stream)| (path_name.clone(), stream.get(db).physical(db)))
+                .collect(),
+        )
+    }
+}
+
+impl SplitsStreams for Id<Stream> {
+    fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
+        let this_stream = self.get(db);
+        let split = this_stream.data.split_streams(db);
         let mut streams = IndexMap::new();
-        let (element, rest) = (split.signals, split.streams);
-        if !element.is_null(db) || !self.user(db).is_null(db) || self.keep() {
+        let (element, rest) = (split.signals(), split.streams());
+        if this_stream.keep() || !element.is_null(db) || !this_stream.user_id().is_null(db) {
             streams.insert(
                 PathName::new_empty(),
                 Stream::new(
-                    element.intern(db),
-                    self.throughput(),
-                    self.dimensionality(),
-                    self.synchronicity(),
-                    self.complexity().clone(),
-                    self.direction(),
-                    self.user_id(),
-                    self.keep(),
+                    element,
+                    this_stream.throughput(),
+                    this_stream.dimensionality(),
+                    this_stream.synchronicity(),
+                    this_stream.complexity().clone(),
+                    this_stream.direction(),
+                    this_stream.user_id(),
+                    this_stream.keep(),
                 )
-                .into(),
+                .intern(db),
             );
         }
 
-        streams.extend(rest.into_iter().map(|(name, mut stream)| {
-            if self.direction() == Direction::Reverse {
+        streams.extend(rest.into_iter().map(|(name, stream_id)| {
+            let mut stream = stream_id.get(db);
+            if this_stream.direction() == Direction::Reverse {
                 stream.reverse();
             }
-            if self.flattens() {
+            if this_stream.flattens() {
                 stream.set_synchronicity(Synchronicity::FlatDesync);
             } else {
-                stream.set_dimensionality(stream.dimensionality() + self.dimensionality());
+                stream.set_dimensionality(stream.dimensionality() + this_stream.dimensionality());
             }
-            stream.set_throughput(stream.throughput() * self.throughput());
+            stream.set_throughput(stream.throughput() * this_stream.throughput());
 
-            (name, stream)
+            (name.clone(), stream.intern(db))
         }));
 
-        SplitStreams {
-            signals: LogicalType::Null,
-            streams,
-        }
-    }
-
-    pub(crate) fn synthesize(&self, db: &dyn Ir) -> LogicalStream {
-        let split = self.split_streams(db);
-        let (signals, rest) = (split.signals.fields(db), split.streams);
-        LogicalStream {
-            signals,
-            streams: rest
-                .into_iter()
-                .map(|(path_name, stream)| (path_name, stream.physical(db)))
-                .collect(),
-        }
+        SplitStreams::new(db.intern_type(LogicalType::Null), streams)
     }
 }
 

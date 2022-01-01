@@ -1,5 +1,8 @@
 use crate::common::logical;
-use tydi_common::error::{Error, Result};
+use tydi_common::{
+    error::{Error, Result},
+    name::PathName,
+};
 use tydi_intern::Id;
 
 pub use connection::Connection;
@@ -23,14 +26,11 @@ pub mod intern_self;
 pub type LogicalType = logical::logicaltype::LogicalType;
 pub type Stream = logical::logicaltype::Stream;
 pub type Name = tydi_common::name::Name;
-pub type Field = logical::logicaltype::LogicalField;
 
 #[salsa::query_group(IrStorage)]
 pub trait Ir {
     #[salsa::interned]
     fn intern_connection(&self, connection: Connection) -> Id<Connection>;
-    #[salsa::interned]
-    fn intern_field(&self, field: Field) -> Id<Field>;
     #[salsa::interned]
     fn intern_implementation(&self, implementation: Implementation) -> Id<Implementation>;
     #[salsa::interned]
@@ -52,7 +52,8 @@ pub trait InternSelf<T> {
 }
 
 pub trait IntoVhdl<T> {
-    fn canonical(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch, prefix: impl Into<String>) -> Result<T>;
+    fn canonical(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch, prefix: impl Into<String>)
+        -> Result<T>;
     fn fancy(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<T> {
         todo!()
     }

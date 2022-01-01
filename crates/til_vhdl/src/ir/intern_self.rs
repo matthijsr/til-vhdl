@@ -1,22 +1,20 @@
 use tydi_intern::Id;
 
-use super::{Connection, Field, InternSelf, Implementation, LogicalType, Interface, Stream, Streamlet};
+use super::{
+    Connection, Implementation, Interface, InternSelf, LogicalType, Stream, Streamlet,
+};
 
-impl<T> InternSelf<T> for &T where T : InternSelf<T> {
-    fn intern(self, db: &dyn super::Ir) -> Id<T> {
-        self.clone().intern(db)
-    }
-}
+// This will almost certainly lead to bad design, so comment it out for now unless I can think of a valid use.
+//
+// impl<T> InternSelf<T> for &T where T : InternSelf<T> {
+//     fn intern(self, db: &dyn super::Ir) -> Id<T> {
+//         self.clone().intern(db)
+//     }
+// }
 
 impl InternSelf<Connection> for Connection {
     fn intern(self, db: &dyn super::Ir) -> Id<Connection> {
         db.intern_connection(self)
-    }
-}
-
-impl InternSelf<Field> for Field {
-    fn intern(self, db: &dyn super::Ir) -> Id<Field> {
-        db.intern_field(self)
     }
 }
 

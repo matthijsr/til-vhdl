@@ -122,13 +122,14 @@ fn playground() -> Result<()> {
     let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let vhdl_db = &_vhdl_db;
     let bits = LogicalType::try_new_bits(4)?.intern(db);
-    let data_type = LogicalType::try_new_union(db, None, vec![("a", bits)])?.intern(db);
+    let data_type =
+        LogicalType::try_new_union(db, None, vec![("a", bits), ("b", bits)])?.intern(db);
     //let data_type = LogicalType::try_new_bits(4)?.intern(db);let null_type = LogicalType::Null.intern(db);
     let null_type = LogicalType::Null.intern(db);
     let stream = Stream::try_new(
         db,
         data_type,
-        "2.0",
+        "1.0",
         1,
         Synchronicity::Sync,
         4,
