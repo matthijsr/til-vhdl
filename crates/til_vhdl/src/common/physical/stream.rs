@@ -1,11 +1,19 @@
 use std::convert::TryInto;
 
 use tydi_common::{
+    cat,
     error::{Error, Result},
-    name::PathName,
-    numbers::{NonNegative, Positive},
-    util::log2_ceil,
+    name::{Name, PathName},
+    numbers::{BitCount, NonNegative, Positive},
+    util::log2_ceil, traits::Reversed,
 };
+use tydi_vhdl::{
+    common::vhdl_name::VhdlName,
+    object::ObjectType,
+    port::{Mode, Port},
+};
+
+use crate::ir::{physical_properties::InterfaceDirection, IntoVhdl};
 
 use super::{complexity::Complexity, fields::Fields};
 
@@ -182,5 +190,110 @@ impl PhysicalStream {
     /// Returns the bit count of the user fields in this physical stream.
     pub fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
+    }
+
+    pub(crate) fn into_vhdl(
+        &self,
+        base_name: &str,
+        path_name: &PathName,
+        interface_origin: InterfaceDirection,
+    ) -> Result<Vec<Port>> {
+        let mut ports = vec![];
+
+        let mode = match interface_origin {
+            InterfaceDirection::Out => Mode::Out,
+            InterfaceDirection::In => Mode::In,
+        };
+
+        ports.push(Port::new(
+            VhdlName::try_new(cat!(base_name, path_name, "valid"))?,
+            mode,
+            ObjectType::Bit,
+        ));
+        ports.push(Port::new(
+            VhdlName::try_new(cat!(base_name, path_name, "ready"))?,
+            mode.reversed(),
+            ObjectType::Bit,
+        ));
+
+        let mut opt = |x: NonNegative, name: &str| -> Result<()> {
+            if let Some(bits) = BitCount::new(x) {
+                ports.push(Port::new(
+                    VhdlName::try_new(cat!(base_name, path_name, name))?,
+                    mode,
+                    bits.into(),
+                ));
+            }
+            Ok(())
+        };
+        opt(self.data_bit_count(), "data")?;
+        opt(self.last_bit_count(), "last")?;
+        opt(self.stai_bit_count(), "stai")?;
+        opt(self.endi_bit_count(), "endi")?;
+        opt(self.strb_bit_count(), "strb")?;
+        opt(self.user_bit_count(), "user")?;
+
+        Ok(ports)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tydi_common::numbers::BitCount;
+    use tydi_vhdl::declaration::Declare;
+
+    use super::*;
+
+    #[test]
+    fn test_into_vhdl() -> Result<()> {
+        let _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+        let vhdl_db = &_vhdl_db;
+        let physical_stream = PhysicalStream::new(
+            Fields::new(vec![
+                ("a".try_into()?, BitCount::new(3).unwrap()),
+                ("b".try_into()?, BitCount::new(2).unwrap()),
+            ])?,
+            Positive::new(2).unwrap(),
+            3,
+            8,
+            Fields::new(vec![])?,
+        );
+        let ports = physical_stream.into_vhdl(
+            "a",
+            &PathName::new(vec![Name::try_new("test")?, Name::try_new("sub")?].into_iter()),
+            InterfaceDirection::Out,
+        )?;
+        let result = ports
+            .into_iter()
+            .map(|x| x.declare(vhdl_db))
+            .collect::<Result<Vec<String>>>()?
+            .join("\n");
+        assert_eq!(
+            r#"a_test__sub_valid : out std_logic
+a_test__sub_ready : in std_logic
+a_test__sub_data : out std_logic_vector(9 downto 0)
+a_test__sub_last : out std_logic_vector(2 downto 0)
+a_test__sub_stai : out std_logic
+a_test__sub_endi : out std_logic
+a_test__sub_strb : out std_logic_vector(1 downto 0)"#,
+            result
+        );
+        let ports = physical_stream.into_vhdl("a", &PathName::new_empty(), InterfaceDirection::Out)?;
+        let result = ports
+            .into_iter()
+            .map(|x| x.declare(vhdl_db))
+            .collect::<Result<Vec<String>>>()?
+            .join("\n");
+        assert_eq!(
+            r#"a_valid : out std_logic
+a_ready : in std_logic
+a_data : out std_logic_vector(9 downto 0)
+a_last : out std_logic_vector(2 downto 0)
+a_stai : out std_logic
+a_endi : out std_logic
+a_strb : out std_logic_vector(1 downto 0)"#,
+            result
+        );
+        Ok(())
     }
 }

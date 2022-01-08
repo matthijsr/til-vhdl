@@ -1,14 +1,17 @@
-use std::{convert::TryInto, error};
+use std::{convert::TryInto, error, sync::Arc};
 
-use crate::ir::{Identifier, Ir};
+use crate::{
+    common::physical::{fields::Fields, stream::PhysicalStream},
+    ir::{GetSelf, InternSelf, IntoVhdl, Ir},
+};
+use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result},
-    name::Name,
-    numbers::{NonNegative, Positive},
+    name::{Name, PathName},
+    numbers::{BitCount, NonNegative, Positive},
+    traits::Reverse,
+    util::log2_ceil,
 };
-
-pub use field::*;
-pub mod field;
 
 pub use group::*;
 pub mod group;
@@ -18,7 +21,13 @@ pub mod stream;
 
 use tydi_intern::Id;
 pub use union::*;
+
+use super::split_streams::{SplitStreams, SplitsStreams};
 pub mod union;
+
+pub trait IsNull {
+    fn is_null(&self, db: &dyn Ir) -> bool;
+}
 
 /// Types of logical streams.
 ///
@@ -61,7 +70,7 @@ pub enum LogicalType {
     /// The Stream type is used to define a new physical stream.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#stream)
-    Stream(Stream),
+    Stream(Id<Stream>),
 }
 
 impl LogicalType {
@@ -71,7 +80,9 @@ impl LogicalType {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::{Error, logical::LogicalType, Positive};
+    /// use tydi_common::error::Error;
+    /// use tydi_common::numbers::Positive;
+    /// use til_vhdl::common::logical::logicaltype::LogicalType;
     ///
     /// let bits = LogicalType::try_new_bits(4);
     /// let zero = LogicalType::try_new_bits(0);
@@ -93,9 +104,15 @@ impl LogicalType {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::{Error, logical::{Group, LogicalType}};
+    /// use tydi_common::error::Error;
+    /// use til_vhdl::common::logical::logicaltype::LogicalType;
+    /// use til_vhdl::ir::Database;
+    ///
+    /// let db = Database::default();
     ///
     /// let group = LogicalType::try_new_group(
+    ///     &db,
+    ///     None,
     ///     vec![
     ///         ("a", 4), // TryFrom<NonNegative> for LogicalType::Bits.
     ///         ("b", 12),
@@ -122,7 +139,7 @@ impl LogicalType {
     /// [`Group`]: ./struct.Group.html
     pub fn try_new_group(
         db: &dyn Ir,
-        parent_id: Option<Identifier>,
+        parent_id: Option<PathName>,
         group: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -135,7 +152,7 @@ impl LogicalType {
 
     pub fn try_new_union(
         db: &dyn Ir,
-        parent_id: Option<Identifier>,
+        parent_id: Option<PathName>,
         union: impl IntoIterator<
             Item = (
                 impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
@@ -146,14 +163,14 @@ impl LogicalType {
         Union::try_new(db, parent_id, union).map(Into::into)
     }
 
-    /// Returns true if this logical stream consists of only element-
-    /// manipulating stream types. This recursively checks all inner stream
+    /// Returns true if this logical type consists of only element-
+    /// manipulating nodes. This recursively checks all inner logical
     /// types.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::logical::LogicalType;
+    /// use til_vhdl::common::logical::logicaltype::LogicalType;
     ///
     /// assert!(LogicalType::Null.is_element_only());
     /// assert!(LogicalType::try_new_bits(3)?.is_element_only());
@@ -163,32 +180,144 @@ impl LogicalType {
     pub fn is_element_only(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null | LogicalType::Bits(_) => true,
-            LogicalType::Group(Group(fields)) | LogicalType::Union(Union(fields)) => {
-                fields.into_iter().all(|field_id| {
-                    db.lookup_intern_field(field_id.clone())
-                        .typ(db)
-                        .is_element_only(db)
-                })
-            }
-            LogicalType::Stream(stream) => stream.data(db).is_element_only(db),
+            LogicalType::Group(group) => group
+                .fields(db)
+                .iter()
+                .all(|(_, typ)| typ.is_element_only(db)),
+            LogicalType::Union(union) => union
+                .fields(db)
+                .iter()
+                .all(|(_, typ)| typ.is_element_only(db)),
+            LogicalType::Stream(_) => false,
         }
     }
 
+    /// Flattens a logical stream type consisting of Null, Bits, Group and
+    /// Union stream types into a [`Fields`].
+    ///
+    /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#field-conversion-function)
+    ///
+    /// [`Fields`]: ./struct.Fields.html
+    pub(crate) fn fields(&self, db: &dyn Ir) -> Fields {
+        let mut fields = Fields::new_empty();
+        match self {
+            LogicalType::Null | LogicalType::Stream(_) => fields,
+            LogicalType::Bits(b) => {
+                fields.insert(PathName::new_empty(), *b).unwrap();
+                fields
+            }
+            LogicalType::Group(group) => {
+                for (name, typ) in group.ordered_fields(db).iter() {
+                    typ.fields(db).iter().for_each(|(path_name, bit_count)| {
+                        fields
+                            .insert(path_name.with_parents(name.clone()), *bit_count)
+                            .unwrap();
+                    })
+                }
+                fields
+            }
+            LogicalType::Union(union) => {
+                if let Some(tag) = union.tag() {
+                    fields
+                        .insert(PathName::try_new(vec!["tag"]).unwrap(), tag)
+                        .unwrap();
+                }
+                let b = union.field_ids().iter().fold(0, |acc, (_, id)| {
+                    acc.max(
+                        id.get(db)
+                            .fields(db)
+                            .values()
+                            .fold(0, |acc, count| acc.max(count.get())),
+                    )
+                });
+                if b > 0 {
+                    fields
+                        .insert(
+                            PathName::try_new(vec!["union"]).unwrap(),
+                            BitCount::new(b).unwrap(),
+                        )
+                        .unwrap();
+                }
+                fields
+            }
+        }
+    }
+}
+
+impl SplitsStreams for Id<LogicalType> {
+    fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
+        fn split_fields(
+            db: &dyn Ir,
+            fields: Arc<IndexMap<PathName, Id<LogicalType>>>,
+        ) -> (
+            IndexMap<PathName, Id<LogicalType>>,
+            IndexMap<PathName, Id<Stream>>,
+        ) {
+            let mut signals = IndexMap::new();
+            for (name, id) in fields.iter() {
+                signals.insert(name.clone(), id.split_streams(db).signals());
+            }
+            let signals = fields
+                .iter()
+                .map(|(name, id)| (name.clone(), id.split_streams(db).signals()))
+                .collect();
+            let streams = fields
+                .iter()
+                .map(|(name, id)| {
+                    id.split_streams(db)
+                        .streams()
+                        .map(|(path_name, stream)| {
+                            (name.with_children(path_name.clone()), stream.clone())
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .flatten()
+                .collect();
+            (signals, streams)
+        }
+
+        match self.get(db) {
+            LogicalType::Null | LogicalType::Bits(_) => {
+                SplitStreams::new(self.clone(), IndexMap::new())
+            }
+            LogicalType::Group(group) => {
+                let (fields, streams) = split_fields(db, group.ordered_field_ids());
+                SplitStreams::new(
+                    LogicalType::from(Group::new(db, fields)).intern(db),
+                    streams,
+                )
+            }
+            LogicalType::Union(union) => {
+                let (fields, streams) = split_fields(db, union.ordered_field_ids());
+                SplitStreams::new(
+                    LogicalType::from(Union::new(db, fields)).intern(db),
+                    streams,
+                )
+            }
+            LogicalType::Stream(stream_id) => stream_id.split_streams(db),
+        }
+    }
+}
+
+impl IsNull for Id<LogicalType> {
+    fn is_null(&self, db: &dyn Ir) -> bool {
+        self.get(db).is_null(db)
+    }
+}
+
+impl IsNull for LogicalType {
     /// Returns true if and only if this logical stream does not result in any
     /// signals.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#null-detection-function)
-    pub fn is_null(&self, db: &dyn Ir) -> bool {
+    fn is_null(&self, db: &dyn Ir) -> bool {
         match self {
             LogicalType::Null => true,
-            LogicalType::Group(Group(fields)) => fields
-                .into_iter()
-                .all(|field_id| db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)),
-            LogicalType::Union(Union(fields)) => {
-                fields.len() == 1
-                    && fields.into_iter().all(|field_id| {
-                        db.lookup_intern_field(field_id.clone()).typ(db).is_null(db)
-                    })
+            LogicalType::Group(group) => {
+                group.field_ids().into_iter().all(|(_, id)| id.is_null(db))
+            }
+            LogicalType::Union(union) => {
+                union.tag() == None && union.field_ids().into_iter().all(|(_, id)| id.is_null(db))
             }
             LogicalType::Stream(stream) => stream.is_null(db),
             LogicalType::Bits(_) => false,

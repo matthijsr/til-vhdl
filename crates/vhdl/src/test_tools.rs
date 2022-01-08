@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
 
+use crate::common::vhdl_name::VhdlName;
 use crate::{
     component::Component,
     object::{record::RecordObject, ObjectType},
@@ -9,7 +10,12 @@ use crate::{
 };
 
 pub(crate) fn empty_component() -> Component {
-    Component::new("empty_component", vec![], vec![], None)
+    Component::new(
+        VhdlName::try_new("empty_component").unwrap(),
+        vec![],
+        vec![],
+        None,
+    )
 }
 
 pub(crate) fn record_with_nested_type() -> Result<ObjectType> {
@@ -21,12 +27,12 @@ pub(crate) fn record_with_nested_type() -> Result<ObjectType> {
 
 pub(crate) fn component_with_nested_types() -> Result<Component> {
     let port = Port::new(
-        Name::try_new("some_other_port")?,
+        VhdlName::try_new("some_other_port")?,
         Mode::Out,
         record_with_nested_type()?,
     );
     Ok(Component::new(
-        "component_with_nested_types",
+        VhdlName::try_new("component_with_nested_types")?,
         vec![],
         vec![port, Port::clk()],
         None,

@@ -7,6 +7,7 @@ use crate::{
     assignment::AssignmentKind,
     declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectMode, ObjectState},
     object::ObjectType,
+    package::Package,
     statement::Statement,
 };
 
@@ -16,6 +17,9 @@ pub mod db;
 
 #[salsa::query_group(ArchStorage)]
 pub trait Arch {
+    #[salsa::input]
+    fn default_package(&self) -> Arc<Package>;
+
     #[salsa::input]
     fn architecture(&self) -> Arc<Architecture>;
 

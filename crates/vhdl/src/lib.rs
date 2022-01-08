@@ -5,6 +5,7 @@
 pub mod architecture;
 pub mod assignment;
 pub mod component;
+pub mod common;
 pub mod declaration;
 pub mod entity;
 pub mod object;

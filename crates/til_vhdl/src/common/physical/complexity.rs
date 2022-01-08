@@ -14,7 +14,7 @@ use tydi_common::{
 /// # Examples
 ///
 /// ```rust
-/// use tydi::physical::Complexity;
+/// use til_vhdl::common::physical::complexity::Complexity;
 ///
 /// let c3 = Complexity::new_major(3);
 /// let c30 = Complexity::new(vec![3, 0])?;
@@ -130,7 +130,7 @@ impl Complexity {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::physical::Complexity;
+    /// use til_vhdl::common::physical::complexity::Complexity;
     ///
     /// let c = Complexity::new(vec![1, 2, 3, 4])?;
     /// assert!(Complexity::new(vec![]).is_err());
@@ -152,7 +152,7 @@ impl Complexity {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::physical::Complexity;
+    /// use til_vhdl::common::physical::complexity::Complexity;
     ///
     /// let c = Complexity::new_major(4);
     ///
@@ -168,7 +168,7 @@ impl Complexity {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::physical::Complexity;
+    /// use til_vhdl::common::physical::complexity::Complexity;
     ///
     /// let c = Complexity::new(vec![3, 14])?;
     /// assert_eq!(c.level(), &[3, 14]);
@@ -183,7 +183,7 @@ impl Complexity {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::physical::Complexity;
+    /// use til_vhdl::common::physical::complexity::Complexity;
     ///
     /// let c = Complexity::new(vec![3, 14])?;
     /// assert_eq!(c.major(), 3);
@@ -200,7 +200,7 @@ impl fmt::Display for Complexity {
     /// # Examples
     ///
     /// ```rust
-    /// use tydi::physical::Complexity;
+    /// use til_vhdl::common::physical::complexity::Complexity;
     ///
     /// let c = Complexity::new(vec![3, 14])?;
     /// assert_eq!(c.to_string(), "3.14");
