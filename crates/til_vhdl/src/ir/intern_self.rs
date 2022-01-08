@@ -12,12 +12,6 @@ use super::{
 //     }
 // }
 
-impl InternSelf<Connection> for Connection {
-    fn intern(self, db: &dyn super::Ir) -> Id<Connection> {
-        db.intern_connection(self)
-    }
-}
-
 impl InternSelf<Implementation> for Implementation {
     fn intern(self, db: &dyn super::Ir) -> Id<Implementation> {
         db.intern_implementation(self)

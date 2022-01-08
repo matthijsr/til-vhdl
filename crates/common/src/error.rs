@@ -1,5 +1,5 @@
 //! Error variants.
-use std::{error, fmt, result};
+use std::{convert::Infallible, error, fmt, result};
 
 use log::SetLoggerError;
 
@@ -11,6 +11,7 @@ pub type Result<T> = result::Result<T, Error>;
 /// Error variants used in this crate.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Error {
+    Infallible,
     /// Unknown error.
     UnknownError,
     /// Generic CLI error.
@@ -83,6 +84,7 @@ impl fmt::Display for Error {
             Error::ProjectError(ref msg) => write!(f, "Project error: {}", msg),
             Error::ComposerError(ref msg) => write!(f, "Composer error: {}", msg),
             Error::LibraryError(ref msg) => write!(f, "Library error: {}", msg),
+            Error::Infallible => unreachable!(),
         }
     }
 }
@@ -108,6 +110,12 @@ impl From<std::io::Error> for Error {
 impl From<SetLoggerError> for Error {
     fn from(e: SetLoggerError) -> Self {
         Error::CLIError(e.to_string())
+    }
+}
+
+impl From<Infallible> for Error {
+    fn from(_: Infallible) -> Self {
+        Error::Infallible
     }
 }
 

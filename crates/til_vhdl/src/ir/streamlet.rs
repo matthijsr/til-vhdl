@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::TryInto};
 
 use tydi_common::{
     cat,
@@ -11,7 +11,8 @@ use tydi_vhdl::{
 };
 
 use super::{
-    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf, IntoVhdl, Ir, Name,
+    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf,
+    IntoVhdl, Ir, Name,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -22,7 +23,11 @@ pub struct Streamlet {
 }
 
 impl Streamlet {
-    pub fn try_new(db: &dyn Ir, name: impl Into<Name>, ports: Vec<Interface>) -> Result<Streamlet> {
+    pub fn try_new(
+        db: &dyn Ir,
+        name: impl TryInto<Name, Error = Error>,
+        ports: Vec<Interface>,
+    ) -> Result<Streamlet> {
         let mut set = HashSet::new();
         for port in &ports {
             if !set.insert(port.identifier()) {
@@ -31,7 +36,7 @@ impl Streamlet {
         }
         let ports = ports.into_iter().map(|x| x.intern(db)).collect();
         Ok(Streamlet {
-            name: name.into(),
+            name: name.try_into()?,
             implementation: None,
             ports,
         })
@@ -61,12 +66,12 @@ impl Streamlet {
         }
     }
 
+    pub fn port_ids(&self) -> &Vec<Id<Interface>> {
+        &self.ports
+    }
+
     pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
-        let mut result = vec![];
-        for port in &self.ports {
-            result.push(port.get(db))
-        }
-        result
+        self.port_ids().iter().map(|x| x.get(db)).collect()
     }
 
     pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
@@ -129,8 +134,8 @@ mod tests {
         let db = Database::default();
         let imple = Implementation::Link;
         let implid = db.intern_implementation(imple.clone());
-        let streamlet = Streamlet::try_new(&db, Name::try_new("test")?, vec![])?
-            .with_implementation(&db, Some(implid));
+        let streamlet =
+            Streamlet::try_new(&db, "test", vec![])?.with_implementation(&db, Some(implid));
         assert_eq!(
             db.lookup_intern_streamlet(streamlet)
                 .implementation(&db)

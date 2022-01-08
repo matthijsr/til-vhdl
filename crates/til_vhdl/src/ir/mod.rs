@@ -7,6 +7,7 @@ use tydi_intern::Id;
 
 pub use connection::Connection;
 pub mod connection;
+pub mod context;
 pub use implementation::Implementation;
 pub mod implementation;
 pub use physical_properties::PhysicalProperties;
@@ -29,8 +30,6 @@ pub type Name = tydi_common::name::Name;
 
 #[salsa::query_group(IrStorage)]
 pub trait Ir {
-    #[salsa::interned]
-    fn intern_connection(&self, connection: Connection) -> Id<Connection>;
     #[salsa::interned]
     fn intern_implementation(&self, implementation: Implementation) -> Id<Implementation>;
     #[salsa::interned]

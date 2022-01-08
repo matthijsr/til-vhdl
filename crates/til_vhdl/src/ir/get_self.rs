@@ -2,12 +2,6 @@ use tydi_intern::Id;
 
 use super::{Connection, GetSelf, Implementation, Interface, LogicalType, Stream, Streamlet};
 
-impl GetSelf<Connection> for Id<Connection> {
-    fn get(&self, db: &dyn super::Ir) -> Connection {
-        db.lookup_intern_connection(*self)
-    }
-}
-
 impl GetSelf<Implementation> for Id<Implementation> {
     fn get(&self, db: &dyn super::Ir) -> Implementation {
         db.lookup_intern_implementation(*self)
