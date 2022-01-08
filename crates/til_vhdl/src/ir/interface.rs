@@ -15,7 +15,7 @@ use tydi_vhdl::{
 use crate::common::logical::{logical_stream::SynthesizeLogicalStream, logicaltype::Direction};
 
 use super::{
-    physical_properties::{self, Origin},
+    physical_properties::{self, InterfaceDirection},
     IntoVhdl, Ir, LogicalType, Name, PhysicalProperties, Stream,
 };
 
@@ -70,8 +70,8 @@ impl IntoVhdl<Vec<Port>> for Interface {
             ports.push(Port::new(
                 VhdlName::try_new(cat!(n.clone(), path.to_string()))?,
                 match self.physical_properties().origin() {
-                    Origin::Source => Mode::Out,
-                    Origin::Sink => Mode::In,
+                    InterfaceDirection::Out => Mode::Out,
+                    InterfaceDirection::In => Mode::In,
                 },
                 width.clone().into(),
             ));

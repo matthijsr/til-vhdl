@@ -13,7 +13,7 @@ use tydi_vhdl::{
     port::{Mode, Port},
 };
 
-use crate::ir::{physical_properties::Origin, IntoVhdl};
+use crate::ir::{physical_properties::InterfaceDirection, IntoVhdl};
 
 use super::{complexity::Complexity, fields::Fields};
 
@@ -196,13 +196,13 @@ impl PhysicalStream {
         &self,
         base_name: &str,
         path_name: &PathName,
-        interface_origin: Origin,
+        interface_origin: InterfaceDirection,
     ) -> Result<Vec<Port>> {
         let mut ports = vec![];
 
         let mode = match interface_origin {
-            Origin::Source => Mode::Out,
-            Origin::Sink => Mode::In,
+            InterfaceDirection::Out => Mode::Out,
+            InterfaceDirection::In => Mode::In,
         };
 
         ports.push(Port::new(
@@ -261,7 +261,7 @@ mod tests {
         let ports = physical_stream.into_vhdl(
             "a",
             &PathName::new(vec![Name::try_new("test")?, Name::try_new("sub")?].into_iter()),
-            Origin::Source,
+            InterfaceDirection::Out,
         )?;
         let result = ports
             .into_iter()
@@ -278,7 +278,7 @@ a_test__sub_endi : out std_logic
 a_test__sub_strb : out std_logic_vector(1 downto 0)"#,
             result
         );
-        let ports = physical_stream.into_vhdl("a", &PathName::new_empty(), Origin::Source)?;
+        let ports = physical_stream.into_vhdl("a", &PathName::new_empty(), InterfaceDirection::Out)?;
         let result = ports
             .into_iter()
             .map(|x| x.declare(vhdl_db))

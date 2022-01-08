@@ -6,7 +6,7 @@ use til_vhdl::{
         physical::{fields::Fields, stream::PhysicalStream},
     },
     ir::{
-        physical_properties::Origin, Database, Implementation, Interface, InternSelf, IntoVhdl, Ir,
+        physical_properties::InterfaceDirection, Database, Implementation, Interface, InternSelf, IntoVhdl, Ir,
         LogicalType, PhysicalProperties, Stream, Streamlet,
     },
 };
@@ -58,7 +58,7 @@ fn streamlet_to_vhdl() -> Result<()> {
         null_type,
         false,
     )?;
-    let port = Interface::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
+    let port = Interface::try_new("a", stream, PhysicalProperties::new(InterfaceDirection::In))?;
     let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
     let mut package = Package::new_default_empty();
@@ -137,7 +137,7 @@ fn playground() -> Result<()> {
         null_type,
         false,
     )?;
-    let port = Interface::try_new("a", stream, PhysicalProperties::new(Origin::Sink))?;
+    let port = Interface::try_new("a", stream, PhysicalProperties::new(InterfaceDirection::In))?;
     let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
     let mut package = Package::new_default_empty();

@@ -11,7 +11,7 @@ use tydi_vhdl::{
 };
 
 use super::{
-    physical_properties::Origin, GetSelf, Implementation, Interface, InternSelf, IntoVhdl, Ir, Name,
+    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf, IntoVhdl, Ir, Name,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -72,14 +72,14 @@ impl Streamlet {
     pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
         self.ports(db)
             .into_iter()
-            .filter(|x| x.physical_properties().origin() == Origin::Sink)
+            .filter(|x| x.physical_properties().origin() == InterfaceDirection::In)
             .collect()
     }
 
     pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
         self.ports(db)
             .into_iter()
-            .filter(|x| x.physical_properties().origin() == Origin::Source)
+            .filter(|x| x.physical_properties().origin() == InterfaceDirection::Out)
             .collect()
     }
 }

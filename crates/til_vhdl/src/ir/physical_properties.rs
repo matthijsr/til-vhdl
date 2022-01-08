@@ -1,22 +1,22 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Origin {
+pub enum InterfaceDirection {
     /// Indicates this port is a Source (generates output)
-    Source,
+    Out,
     /// Indicates this port is a Sink (takes input)
-    Sink,
+    In,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhysicalProperties {
-    origin: Origin,
+    direction: InterfaceDirection,
 }
 
 impl PhysicalProperties {
-    pub fn new(direction: Origin) -> Self {
-        PhysicalProperties { origin: direction }
+    pub fn new(direction: InterfaceDirection) -> Self {
+        PhysicalProperties { direction }
     }
 
-    pub fn origin(&self) -> Origin {
-        self.origin
+    pub fn origin(&self) -> InterfaceDirection {
+        self.direction
     }
 }
