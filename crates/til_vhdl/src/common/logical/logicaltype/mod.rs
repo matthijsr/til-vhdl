@@ -163,8 +163,8 @@ impl LogicalType {
         Union::try_new(db, parent_id, union).map(Into::into)
     }
 
-    /// Returns true if this logical stream consists of only element-
-    /// manipulating stream types. This recursively checks all inner stream
+    /// Returns true if this logical type consists of only element-
+    /// manipulating nodes. This recursively checks all inner logical
     /// types.
     ///
     /// # Examples
@@ -188,7 +188,7 @@ impl LogicalType {
                 .fields(db)
                 .iter()
                 .all(|(_, typ)| typ.is_element_only(db)),
-            LogicalType::Stream(stream) => stream.get(db).data(db).is_element_only(db),
+            LogicalType::Stream(_) => false,
         }
     }
 
