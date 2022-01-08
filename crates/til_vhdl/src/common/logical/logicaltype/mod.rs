@@ -106,16 +106,19 @@ impl LogicalType {
     /// ```rust
     /// use tydi_common::error::Error;
     /// use til_vhdl::common::logical::logicaltype::LogicalType;
-    /// use til_vhdl::ir::Database;
+    /// use til_vhdl::ir::{Database, Ir};
     ///
     /// let db = Database::default();
+    ///
+    /// let a = db.intern_type(LogicalType::try_new_bits(4)?);
+    /// let b = db.intern_type(LogicalType::try_new_bits(12)?);
     ///
     /// let group = LogicalType::try_new_group(
     ///     &db,
     ///     None,
     ///     vec![
-    ///         ("a", 4), // TryFrom<NonNegative> for LogicalType::Bits.
-    ///         ("b", 12),
+    ///         ("a", a), // TryFrom<NonNegative> for LogicalType::Bits.
+    ///         ("b", b),
     ///     ]
     /// )?;
     ///
@@ -125,12 +128,8 @@ impl LogicalType {
     /// });
     ///
     /// assert_eq!(
-    ///     LogicalType::try_new_group(vec![("1badname", 4)]),
+    ///     LogicalType::try_new_group(&db, None, vec![("1badname", a)]),
     ///     Err(Error::InvalidArgument("name cannot start with a digit".to_string()))
-    /// );
-    /// assert_eq!(
-    ///     LogicalType::try_new_group(vec![("good_name", 0)]),
-    ///     Err(Error::InvalidArgument("bit count cannot be zero".to_string()))
     /// );
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -171,9 +170,12 @@ impl LogicalType {
     ///
     /// ```rust
     /// use til_vhdl::common::logical::logicaltype::LogicalType;
+    /// use til_vhdl::ir::Database;
     ///
-    /// assert!(LogicalType::Null.is_element_only());
-    /// assert!(LogicalType::try_new_bits(3)?.is_element_only());
+    /// let db = Database::default();
+    ///
+    /// assert!(LogicalType::Null.is_element_only(&db));
+    /// assert!(LogicalType::try_new_bits(3)?.is_element_only(&db));
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
