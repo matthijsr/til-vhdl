@@ -6,7 +6,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
     traits::Reverse,
@@ -117,7 +117,7 @@ impl LogicalType {
     ///     &db,
     ///     None,
     ///     vec![
-    ///         ("a", a), // TryFrom<NonNegative> for LogicalType::Bits.
+    ///         ("a", a),
     ///         ("b", b),
     ///     ]
     /// )?;
@@ -141,7 +141,7 @@ impl LogicalType {
         parent_id: Option<PathName>,
         group: impl IntoIterator<
             Item = (
-                impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
+                impl TryResult<Name>,
                 Id<LogicalType>,
             ),
         >,
@@ -154,7 +154,7 @@ impl LogicalType {
         parent_id: Option<PathName>,
         union: impl IntoIterator<
             Item = (
-                impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
+                impl TryResult<Name>,
                 Id<LogicalType>,
             ),
         >,

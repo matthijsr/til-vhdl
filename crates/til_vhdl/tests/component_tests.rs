@@ -6,8 +6,8 @@ use til_vhdl::{
         physical::{fields::Fields, stream::PhysicalStream},
     },
     ir::{
-        physical_properties::InterfaceDirection, Database, Implementation, Interface, InternSelf, IntoVhdl, Ir,
-        LogicalType, PhysicalProperties, Stream, Streamlet,
+        physical_properties::InterfaceDirection, Database, Implementation, Interface, InternSelf,
+        IntoVhdl, Ir, LogicalType, PhysicalProperties, Stream, Streamlet,
     },
 };
 use tydi_common::{
@@ -28,8 +28,7 @@ fn streamlet_new() -> Result<()> {
     let db = Database::default();
     let imple = Implementation::Link;
     let implid = db.intern_implementation(imple.clone());
-    let streamlet = Streamlet::try_new(&db, Name::try_new("test")?, vec![])?
-        .with_implementation(&db, Some(implid));
+    let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
     assert_eq!(
         db.lookup_intern_streamlet(streamlet)
             .implementation(&db)
@@ -58,8 +57,11 @@ fn streamlet_to_vhdl() -> Result<()> {
         null_type,
         false,
     )?;
-    let port = Interface::try_new("a", stream, PhysicalProperties::new(InterfaceDirection::In))?;
-    let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
+    let streamlet = Streamlet::try_new(
+        db,
+        Name::try_new("test")?,
+        vec![("a", stream, InterfaceDirection::In)],
+    )?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);
@@ -137,8 +139,14 @@ fn playground() -> Result<()> {
         null_type,
         false,
     )?;
-    let port = Interface::try_new("a", stream, PhysicalProperties::new(InterfaceDirection::In))?;
-    let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
+    let streamlet = Streamlet::try_new(
+        db,
+        Name::try_new("test")?,
+        vec![
+            ("a", stream, InterfaceDirection::In),
+            ("b", stream, InterfaceDirection::Out),
+        ],
+    )?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);

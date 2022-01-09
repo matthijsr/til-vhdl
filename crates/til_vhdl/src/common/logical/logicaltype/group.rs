@@ -4,7 +4,7 @@ use tydi_intern::Id;
 
 use crate::ir::{GetSelf, Ir};
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     name::{Name, PathName},
 };
 
@@ -28,7 +28,7 @@ impl Group {
         parent_id: Option<PathName>,
         group: impl IntoIterator<
             Item = (
-                impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
+                impl TryResult<Name>,
                 Id<LogicalType>,
             ),
         >,
@@ -41,10 +41,7 @@ impl Group {
         let mut field_order = vec![];
         for (name, typ) in group
             .into_iter()
-            .map(|(name, typ)| match (name.try_into(), typ) {
-                (Ok(name), _) => Ok((name, typ)),
-                (Err(name), _) => Err(Error::from(name.into())),
-            })
+            .map(|(name, typ)| Ok((name.try_result()?, typ)))
             .collect::<Result<Vec<_>>>()?
         {
             let path_name = base_id.with_child(name);

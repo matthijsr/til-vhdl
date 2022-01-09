@@ -5,7 +5,7 @@ use tydi_intern::Id;
 
 use crate::ir::{GetSelf, InternSelf, Ir};
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative},
     util::log2_ceil,
@@ -29,12 +29,7 @@ impl Union {
     pub fn try_new(
         db: &dyn Ir,
         parent_id: Option<PathName>,
-        union: impl IntoIterator<
-            Item = (
-                impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
-                Id<LogicalType>,
-            ),
-        >,
+        union: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
     ) -> Result<Self> {
         let base_id = match parent_id {
             Some(id) => id,
@@ -44,10 +39,7 @@ impl Union {
         let mut field_order = vec![];
         for (name, typ) in union
             .into_iter()
-            .map(|(name, typ)| match (name.try_into(), typ) {
-                (Ok(name), _) => Ok((name, typ)),
-                (Err(name), _) => Err(Error::from(name.into())),
-            })
+            .map(|(name, typ)| Ok((name.try_result()?, typ)))
             .collect::<Result<Vec<_>>>()?
         {
             let path_name = base_id.with_child(name);

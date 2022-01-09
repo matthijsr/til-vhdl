@@ -5,14 +5,14 @@ use tydi_common::{error::Error, name::Name};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InterfaceReference {
     streamlet_instance: Name,
-    interface: Name,
+    port: Name,
 }
 
 impl InterfaceReference {
-    pub fn new(streamlet_instance: Name, interface: Name) -> Self {
+    pub fn new(streamlet_instance: Name, port: Name) -> Self {
         InterfaceReference {
             streamlet_instance,
-            interface,
+            port,
         }
     }
 
@@ -20,8 +20,8 @@ impl InterfaceReference {
         &self.streamlet_instance
     }
 
-    pub fn interface(&self) -> &Name {
-        &self.interface
+    pub fn port(&self) -> &Name {
+        &self.port
     }
 }
 
@@ -45,5 +45,13 @@ pub struct Connection {
 impl Connection {
     pub(crate) fn new(source: InterfaceReference, sink: InterfaceReference) -> Self {
         Connection { source, sink }
+    }
+
+    pub fn source(&self) -> &InterfaceReference {
+        &self.source
+    }
+
+    pub fn sink(&self) -> &InterfaceReference {
+        &self.sink
     }
 }

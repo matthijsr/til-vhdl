@@ -16,7 +16,13 @@ impl PhysicalProperties {
         PhysicalProperties { direction }
     }
 
-    pub fn origin(&self) -> InterfaceDirection {
+    pub fn direction(&self) -> InterfaceDirection {
         self.direction
+    }
+}
+
+impl From<InterfaceDirection> for PhysicalProperties {
+    fn from(direction: InterfaceDirection) -> Self {
+        PhysicalProperties { direction }
     }
 }

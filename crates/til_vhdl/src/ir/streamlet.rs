@@ -1,8 +1,11 @@
-use std::{collections::HashSet, convert::TryInto};
+use std::{
+    collections::{BTreeMap, HashSet},
+    convert::TryInto,
+};
 
 use tydi_common::{
     cat,
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     traits::Identify,
 };
 use tydi_intern::Id;
@@ -19,26 +22,40 @@ use super::{
 pub struct Streamlet {
     name: Name,
     implementation: Option<Id<Implementation>>,
-    ports: Vec<Id<Interface>>,
+    ports: BTreeMap<Name, Id<Interface>>,
+    port_order: Vec<Name>,
 }
 
 impl Streamlet {
+    pub fn try_portless(name: impl TryResult<Name>) -> Result<Self> {
+        Ok(Streamlet {
+            name: name.try_result()?,
+            implementation: None,
+            ports: BTreeMap::new(),
+            port_order: vec![],
+        })
+    }
+
     pub fn try_new(
         db: &dyn Ir,
-        name: impl TryInto<Name, Error = Error>,
-        ports: Vec<Interface>,
+        name: impl TryResult<Name>,
+        ports: Vec<impl TryResult<Interface>>,
     ) -> Result<Streamlet> {
-        let mut set = HashSet::new();
-        for port in &ports {
-            if !set.insert(port.identifier()) {
+        let mut port_order = vec![];
+        let mut port_map = BTreeMap::new();
+        for port in ports {
+            let port = port.try_result()?;
+            port_order.push(port.name().clone());
+            if port_map.insert(port.name().clone(), port.intern(db)) != None {
                 return Err(Error::UnexpectedDuplicate);
             }
         }
-        let ports = ports.into_iter().map(|x| x.intern(db)).collect();
+
         Ok(Streamlet {
-            name: name.try_into()?,
+            name: name.try_result()?,
             implementation: None,
-            ports,
+            ports: port_map,
+            port_order,
         })
     }
 
@@ -51,6 +68,7 @@ impl Streamlet {
             name: self.name,
             implementation,
             ports: self.ports,
+            port_order: self.port_order,
         })
     }
 
@@ -66,26 +84,42 @@ impl Streamlet {
         }
     }
 
-    pub fn port_ids(&self) -> &Vec<Id<Interface>> {
+    pub fn port_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
         &self.ports
     }
 
     pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.port_ids().iter().map(|x| x.get(db)).collect()
+        let mut result = vec![];
+        for name in &self.port_order {
+            result.push(self.port_ids().get(name).unwrap().get(db));
+        }
+        result
     }
 
     pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
         self.ports(db)
             .into_iter()
-            .filter(|x| x.physical_properties().origin() == InterfaceDirection::In)
+            .filter(|x| x.physical_properties().direction() == InterfaceDirection::In)
             .collect()
     }
 
     pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
         self.ports(db)
             .into_iter()
-            .filter(|x| x.physical_properties().origin() == InterfaceDirection::Out)
+            .filter(|x| x.physical_properties().direction() == InterfaceDirection::Out)
             .collect()
+    }
+
+    pub fn try_get_port(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Interface> {
+        let name = name.try_result()?;
+        match self.port_ids().get(&name) {
+            Some(port) => Ok(port.get(db)),
+            None => Err(Error::InvalidArgument(format!(
+                "No port with name {} exists on Streamlet {}",
+                name,
+                self.identifier()
+            ))),
+        }
     }
 }
 
@@ -134,8 +168,7 @@ mod tests {
         let db = Database::default();
         let imple = Implementation::Link;
         let implid = db.intern_implementation(imple.clone());
-        let streamlet =
-            Streamlet::try_new(&db, "test", vec![])?.with_implementation(&db, Some(implid));
+        let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
         assert_eq!(
             db.lookup_intern_streamlet(streamlet)
                 .implementation(&db)

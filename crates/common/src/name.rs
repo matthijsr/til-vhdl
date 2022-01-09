@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, TryResult};
 
 /// Type-safe wrapper for valid names.
 ///
@@ -133,13 +133,11 @@ impl PathName {
         PathName(names.collect())
     }
 
-    pub fn try_new(
-        names: impl IntoIterator<Item = impl TryInto<Name, Error = Error>>,
-    ) -> Result<Self> {
+    pub fn try_new(names: impl IntoIterator<Item = impl TryResult<Name>>) -> Result<Self> {
         Ok(PathName(
             names
                 .into_iter()
-                .map(|name| name.try_into())
+                .map(|name| name.try_result())
                 .collect::<Result<_>>()?,
         ))
     }

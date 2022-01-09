@@ -1,8 +1,8 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use tydi_common::{
     cat,
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     traits::{Identify, Reversed},
 };
 use tydi_intern::Id;
@@ -28,15 +28,19 @@ pub struct Interface {
 
 impl Interface {
     pub fn try_new(
-        name: impl TryInto<Name, Error = Error>,
+        name: impl TryResult<Name>,
         stream: Id<Stream>,
         physical_properties: PhysicalProperties,
     ) -> Result<Interface> {
         Ok(Interface {
-            name: name.try_into()?,
+            name: name.try_result()?,
             stream,
             physical_properties,
         })
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.name
     }
 
     pub fn stream(&self, db: &dyn Ir) -> Stream {
@@ -45,6 +49,11 @@ impl Interface {
 
     pub fn physical_properties(&self) -> &PhysicalProperties {
         &self.physical_properties
+    }
+
+    pub fn is_compatible(&self, other: &Self) -> bool {
+        self.stream == other.stream
+            && self.physical_properties().direction() != other.physical_properties().direction()
     }
 }
 
@@ -69,7 +78,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
         for (path, width) in synth.signals() {
             ports.push(Port::new(
                 VhdlName::try_new(cat!(n.clone(), path.to_string()))?,
-                match self.physical_properties().origin() {
+                match self.physical_properties().direction() {
                     InterfaceDirection::Out => Mode::Out,
                     InterfaceDirection::In => Mode::In,
                 },
@@ -78,9 +87,25 @@ impl IntoVhdl<Vec<Port>> for Interface {
         }
 
         for (path, phys) in synth.streams() {
-            ports.extend(phys.into_vhdl(&n, path, self.physical_properties().origin())?);
+            ports.extend(phys.into_vhdl(&n, path, self.physical_properties().direction())?);
         }
 
         Ok(ports)
+    }
+}
+
+impl<N, P> TryFrom<(N, Id<Stream>, P)> for Interface
+where
+    N: TryResult<Name>,
+    P: TryResult<PhysicalProperties>,
+{
+    type Error = Error;
+
+    fn try_from((name, stream, physical_properties): (N, Id<Stream>, P)) -> Result<Self> {
+        Ok(Interface {
+            name: name.try_result()?,
+            stream,
+            physical_properties: physical_properties.try_result()?,
+        })
     }
 }
