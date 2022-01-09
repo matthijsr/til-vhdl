@@ -57,11 +57,7 @@ fn streamlet_to_vhdl() -> Result<()> {
         null_type,
         false,
     )?;
-    let streamlet = Streamlet::try_new(
-        db,
-        Name::try_new("test")?,
-        vec![("a", stream, InterfaceDirection::In)],
-    )?;
+    let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);
@@ -141,7 +137,7 @@ fn playground() -> Result<()> {
     )?;
     let streamlet = Streamlet::try_new(
         db,
-        Name::try_new("test")?,
+        "test",
         vec![
             ("a", stream, InterfaceDirection::In),
             ("b", stream, InterfaceDirection::Out),
