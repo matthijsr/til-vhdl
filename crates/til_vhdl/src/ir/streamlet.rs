@@ -110,9 +110,12 @@ impl Streamlet {
             .collect()
     }
 
-    pub fn try_get_port(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Interface> {
-        let name = name.try_result()?;
-        match self.port_ids().get(&name) {
+    pub fn try_get_port<>(
+        &self,
+        db: &dyn Ir,
+        name: &Name,
+    ) -> Result<Interface> {
+        match self.port_ids().get(name) {
             Some(port) => Ok(port.get(db)),
             None => Err(Error::InvalidArgument(format!(
                 "No port with name {} exists on Streamlet {}",

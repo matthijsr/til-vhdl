@@ -47,13 +47,16 @@ impl Interface {
         db.lookup_intern_stream(self.stream)
     }
 
+    pub fn stream_id(&self) -> Id<Stream> {
+        self.stream
+    }
+
     pub fn physical_properties(&self) -> &PhysicalProperties {
         &self.physical_properties
     }
 
-    pub fn is_compatible(&self, other: &Self) -> bool {
-        self.stream == other.stream
-            && self.physical_properties().direction() != other.physical_properties().direction()
+    pub fn direction(&self) -> InterfaceDirection {
+        self.physical_properties().direction()
     }
 }
 
