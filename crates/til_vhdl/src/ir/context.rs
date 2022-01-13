@@ -5,10 +5,16 @@ use tydi_common::{
     name::Name,
 };
 use tydi_intern::Id;
+use tydi_vhdl::{
+    architecture::{arch_storage::Arch, ArchitectureBody},
+    assignment::Assign,
+    declaration::ObjectDeclaration,
+    port::Port,
+};
 
 use super::{
     connection::InterfaceReference, physical_properties::InterfaceDirection, Connection, GetSelf,
-    Implementation, Interface, InternSelf, Ir, Streamlet,
+    Implementation, Interface, InternSelf, IntoVhdl, Ir, Streamlet,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -34,15 +40,21 @@ impl Context {
     }
 
     pub fn ports(&self, db: &dyn Ir) -> BTreeMap<Name, Interface> {
-        let mut result = BTreeMap::new();
-        for (key, value) in self.port_ids() {
-            result.insert(key.clone(), value.get(db));
-        }
-        result
+        self.port_ids()
+            .iter()
+            .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
     }
 
-    pub fn streamlet_instances(&self) -> &BTreeMap<Name, Id<Streamlet>> {
+    pub fn streamlet_instance_ids(&self) -> &BTreeMap<Name, Id<Streamlet>> {
         &self.streamlet_instances
+    }
+
+    pub fn streamlet_instances(&self, db: &dyn Ir) -> BTreeMap<Name, Streamlet> {
+        self.streamlet_instance_ids()
+            .iter()
+            .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
     }
 
     pub fn try_add_connection(
@@ -116,7 +128,7 @@ impl Context {
         streamlet: Id<Streamlet>,
     ) -> Result<()> {
         let name = name.try_result()?;
-        if self.streamlet_instances().contains_key(&name) {
+        if self.streamlet_instance_ids().contains_key(&name) {
             Err(Error::InvalidArgument(format!(
                 "A streamlet instance with name {} already exists in this context",
                 name
@@ -127,17 +139,70 @@ impl Context {
         }
     }
 
-    pub fn try_get_streamlet_instance(
-        &self,
-        name: &Name,
-    ) -> Result<Id<Streamlet>> {
-        match self.streamlet_instances().get(name) {
+    pub fn try_get_streamlet_instance(&self, name: &Name) -> Result<Id<Streamlet>> {
+        match self.streamlet_instance_ids().get(name) {
             Some(streamlet) => Ok(*streamlet),
             None => Err(Error::InvalidArgument(format!(
                 "A streamlet instance with name {} does not exist in this context",
                 name
             ))),
         }
+    }
+
+    pub fn connections(&self) -> &Vec<Connection> {
+        &self.connections
+    }
+
+    pub fn try_into_arch_body(
+        &self,
+        ir_db: &dyn Ir,
+        vhdl_db: &mut dyn Arch,
+    ) -> Result<ArchitectureBody> {
+        let mut declarations = vec![];
+        let mut statements = vec![];
+        let own_ports = self
+            .ports(ir_db)
+            .iter()
+            .map(|(name, port)| Ok((name.clone(), port.canonical(ir_db, vhdl_db, "")?)))
+            .collect::<Result<BTreeMap<Name, Vec<Port>>>>()?;
+        let mut streamlet_ports = BTreeMap::new();
+        let mut streamlet_components = BTreeMap::new();
+        for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
+            streamlet_components.insert(
+                instance_name.clone(),
+                streamlet.canonical(ir_db, vhdl_db, "")?,
+            );
+            streamlet_ports.insert(
+                instance_name,
+                streamlet
+                    .port_ids()
+                    .iter()
+                    .map(|(name, id)| {
+                        Ok((name.clone(), id.get(ir_db).canonical(ir_db, vhdl_db, "")?))
+                    })
+                    .collect::<Result<BTreeMap<Name, Vec<Port>>>>()?,
+            );
+        }
+        for connection in self.connections() {
+            if connection.is_local_to_local() {
+                let mut sink_objs = vec![];
+                let mut source_objs = vec![];
+                for port in own_ports.get(connection.sink().port()).unwrap() {
+                    sink_objs.push(ObjectDeclaration::from_port(vhdl_db, port, true));
+                }
+                for port in own_ports.get(connection.source().port()).unwrap() {
+                    source_objs.push(ObjectDeclaration::from_port(vhdl_db, port, true));
+                }
+                let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
+                    sink_objs.into_iter().zip(source_objs.into_iter()).collect();
+                for (sink, source) in sink_source {
+                    statements.push(sink.assign(vhdl_db, &source)?.into());
+                }
+            } else {
+            }
+        }
+
+        Ok(ArchitectureBody::new(declarations, statements))
     }
 }
 
@@ -149,6 +214,8 @@ impl From<&Streamlet> for Context {
 
 #[cfg(test)]
 mod tests {
+    use tydi_vhdl::architecture::ArchitectureDeclare;
+
     use crate::{common::logical::logicaltype::Stream, ir::Database, test_utils::test_stream_id};
 
     use super::*;
@@ -189,6 +256,39 @@ mod tests {
         let mut context = Context::from(&streamlet);
         context.try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
         context.try_get_streamlet_instance(&("instance".try_result()?))?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn try_into_arch_body() -> Result<()> {
+        let _ir_db = Database::default();
+        let ir_db = &_ir_db;
+        let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+        let vhdl_db = &mut _vhdl_db;
+        let stream = test_stream_id(ir_db)?;
+        let streamlet = Streamlet::try_new(
+            ir_db,
+            "a",
+            vec![
+                ("a", stream, InterfaceDirection::In),
+                ("b", stream, InterfaceDirection::Out),
+            ],
+        )?;
+        let mut context = Context::from(&streamlet);
+        context
+            .try_add_streamlet_instance("instance", streamlet.with_implementation(ir_db, None))?;
+        context.try_add_connection(ir_db, "a", ("instance", "a"))?;
+        context.try_add_connection(ir_db, "a", "b")?;
+        let result = context.try_into_arch_body(ir_db, vhdl_db)?;
+        println!("declarations:");
+        for declaration in result.declarations(vhdl_db) {
+            println!("{}", declaration.declare(vhdl_db, "", ";")?);
+        }
+        println!("\nstatements:");
+        for statement in result.statements() {
+            println!("{}", statement.declare(vhdl_db, "", ";")?);
+        }
 
         Ok(())
     }

@@ -187,7 +187,7 @@ pub struct ObjectDeclaration {
 
 impl ObjectDeclaration {
     pub fn signal(
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
         identifier: impl Into<String>,
         typ: ObjectType,
         default: Option<AssignmentKind>,
@@ -205,7 +205,7 @@ impl ObjectDeclaration {
     }
 
     pub fn variable(
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
         identifier: impl Into<String>,
         typ: ObjectType,
         default: Option<AssignmentKind>,
@@ -227,7 +227,7 @@ impl ObjectDeclaration {
     }
 
     pub fn constant(
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
         identifier: impl Into<String>,
         typ: ObjectType,
         value: impl Into<AssignmentKind>,
@@ -247,7 +247,7 @@ impl ObjectDeclaration {
     /// Entity Ports serve as a way to represent the ports of an entity the architecture is describing.
     /// They are not declared within the architecture itself, but can drive or be driven by other objects.
     pub fn entity_port(
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
         identifier: impl Into<String>,
         typ: ObjectType,
         mode: Mode,
@@ -268,7 +268,7 @@ impl ObjectDeclaration {
     }
 
     pub fn component_port(
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
         identifier: impl Into<String>,
         typ: ObjectType,
         mode: Mode,
@@ -288,7 +288,7 @@ impl ObjectDeclaration {
         )
     }
 
-    fn intern(db: &mut impl Arch, obj: ObjectDeclaration) -> Id<ObjectDeclaration> {
+    fn intern(db: &mut dyn Arch, obj: ObjectDeclaration) -> Id<ObjectDeclaration> {
         let id = db.intern_object_declaration(obj);
         id
     }
@@ -331,7 +331,7 @@ impl ObjectDeclaration {
         }
     }
 
-    pub fn from_port(db: &mut impl Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
+    pub fn from_port(db: &mut dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
         if is_entity {
             ObjectDeclaration::entity_port(db, port.identifier(), port.typ().clone(), port.mode())
         } else {
@@ -446,7 +446,7 @@ pub mod tests {
 
     use super::*;
 
-    pub(crate) fn test_bit_signal(db: &mut impl Arch) -> Result<Id<ObjectDeclaration>> {
+    pub(crate) fn test_bit_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
         Ok(ObjectDeclaration::signal(
             db,
             "test_signal".to_string(),
@@ -455,7 +455,7 @@ pub mod tests {
         ))
     }
 
-    pub(crate) fn test_complex_signal(db: &mut impl Arch) -> Result<Id<ObjectDeclaration>> {
+    pub(crate) fn test_complex_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
         let mut fields = IndexMap::new();
         fields.insert(Name::try_new("a")?, ObjectType::bit_vector(10, -4)?);
         Ok(ObjectDeclaration::signal(

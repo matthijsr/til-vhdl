@@ -50,7 +50,7 @@ pub struct PortMapping {
 
 impl PortMapping {
     pub fn from_component(
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
         component: &Component,
         label: impl Into<String>,
     ) -> Result<PortMapping> {

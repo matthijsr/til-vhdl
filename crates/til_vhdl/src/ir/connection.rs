@@ -35,6 +35,20 @@ impl InterfaceReference {
     pub fn port(&self) -> &Name {
         &self.port
     }
+
+    pub fn is_local(&self) -> bool {
+        match self.streamlet_instance() {
+            Some(_) => false,
+            _ => true,
+        }
+    }
+
+    pub(crate) fn vhdl_compat_string(&self) -> String {
+        match self.streamlet_instance() {
+            Some(instance) => format!("{}__{}", instance, self.port()),
+            None => self.port().into(),
+        }
+    }
 }
 
 impl TryFrom<&str> for InterfaceReference {
@@ -86,6 +100,10 @@ impl Connection {
 
     pub fn sink(&self) -> &InterfaceReference {
         &self.sink
+    }
+
+    pub fn is_local_to_local(&self) -> bool {
+        self.source().is_local() && self.sink().is_local()
     }
 }
 

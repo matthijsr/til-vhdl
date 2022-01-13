@@ -20,6 +20,38 @@ pub mod impls;
 // then wrapping in a generate statement. Need to consider indexes at that point.
 // This'd be easier if I simply always made it an array, even when the number of lanes is 1, but that gets real ugly, real fast.
 
+#[derive(Debug, Clone)]
+pub struct ArchitectureBody {
+    /// The declaration part of the architecture
+    declarations: Vec<Id<ArchitectureDeclaration>>,
+    /// The statement part of the architecture
+    statements: Vec<Statement>,
+}
+
+impl ArchitectureBody {
+    pub fn new(declarations: Vec<Id<ArchitectureDeclaration>>, statements: Vec<Statement>) -> Self {
+        ArchitectureBody {
+            declarations,
+            statements,
+        }
+    }
+
+    pub fn declaration_ids(&self) -> &Vec<Id<ArchitectureDeclaration>> {
+        &self.declarations
+    }
+
+    pub fn declarations(&self, db: &dyn Arch) -> Vec<ArchitectureDeclaration> {
+        self.declaration_ids()
+            .iter()
+            .map(|x| db.lookup_intern_architecture_declaration(*x))
+            .collect()
+    }
+
+    pub fn statements(&self) -> &Vec<Statement> {
+        &self.statements
+    }
+}
+
 /// An architecture
 #[derive(Debug, Clone)]
 pub struct Architecture {
@@ -143,7 +175,7 @@ impl Architecture {
 
     pub fn entity_ports(
         &self,
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
     ) -> Result<IndexMap<String, Id<ObjectDeclaration>>> {
         let mut result = IndexMap::new();
         for port in self.entity.ports() {
