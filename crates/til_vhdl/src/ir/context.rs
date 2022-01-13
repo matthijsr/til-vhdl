@@ -260,27 +260,51 @@ mod tests {
         Ok(())
     }
 
+    // Demonstrates how a Context can be used to create a structural architecture for an entity
     #[test]
     fn try_into_arch_body() -> Result<()> {
+        // ...
+        // Databases (this is boilerplate)
+        // ...
         let _ir_db = Database::default();
         let ir_db = &_ir_db;
         let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
         let vhdl_db = &mut _vhdl_db;
+
+        // ...
+        // IR
+        // ...
+        // Create a Stream node
         let stream = test_stream_id(ir_db)?;
+        // Create a Streamlet
         let streamlet = Streamlet::try_new(
             ir_db,
+            // The streamlet is called "a"
             "a",
+            // It has ports "in: a" and "out: b", both using the Stream node as their type
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
+        // Create a Context from the Streamlet definition (this creates a Context with ports matching the Streamlet)
         let mut context = Context::from(&streamlet);
+        // Add an instance (called "instance") of the Streamlet to the Context
         context
             .try_add_streamlet_instance("instance", streamlet.with_implementation(ir_db, None))?;
+        // Connect the Context's "a" port with the instance's "a" port
         context.try_add_connection(ir_db, "a", ("instance", "a"))?;
+        // Connect the Context's "a" port with the Context's "b" port
         context.try_add_connection(ir_db, "a", "b")?;
+
+        // ..
+        // Back-end
+        // ..
+        // Convert the Context into a VHDL architecture body
         let result = context.try_into_arch_body(ir_db, vhdl_db)?;
+
+        // ..
+        // Print the declarations and statements within the body to demonstrate the result
         println!("declarations:");
         for declaration in result.declarations(vhdl_db) {
             println!("{}", declaration.declare(vhdl_db, "", ";")?);
