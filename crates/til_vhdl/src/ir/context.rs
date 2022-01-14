@@ -1,4 +1,8 @@
-use std::{borrow::Borrow, collections::BTreeMap, convert::TryInto};
+use std::{
+    borrow::Borrow,
+    collections::{BTreeMap, HashSet},
+    convert::TryInto,
+};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -43,6 +47,32 @@ impl Context {
         self.port_ids()
             .iter()
             .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
+    }
+
+    pub fn interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
+        let mut result = self.local_interface_references();
+        result.extend(self.streamlet_instance_interface_references(db));
+        result
+    }
+
+    pub fn local_interface_references(&self) -> Vec<InterfaceReference> {
+        self.port_ids()
+            .keys()
+            .map(|name| InterfaceReference::new(None, name.clone()))
+            .collect()
+    }
+
+    pub fn streamlet_instance_interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
+        self.streamlet_instances(db)
+            .iter()
+            .flat_map(|(name, streamlet)| {
+                streamlet
+                    .port_ids()
+                    .keys()
+                    .map(|port| InterfaceReference::new(Some(name.clone()), port.clone()))
+                    .collect::<Vec<InterfaceReference>>()
+            })
             .collect()
     }
 
@@ -153,6 +183,40 @@ impl Context {
         &self.connections
     }
 
+    /// Verifies whether all ports (on the context and all instances) have been connected,
+    /// also verifies whether ports have duplicate connections.
+    ///
+    /// Returns a ProjectError if not all ports have been connected, or if some ports are used multiple times.
+    pub fn validate_connections(&self, db: &dyn Ir) -> Result<()> {
+        let mut sources = HashSet::new();
+        let mut sinks = HashSet::new();
+        for connection in self.connections() {
+            if !sources.insert(connection.source().clone()) {
+                return Err(Error::ProjectError(format!(
+                    "Duplicate use of Source {}",
+                    connection.source()
+                )));
+            }
+            if !sinks.insert(connection.sink().clone()) {
+                return Err(Error::ProjectError(format!(
+                    "Duplicate use of Sink {}",
+                    connection.sink()
+                )));
+            }
+        }
+
+        for interface in self.interface_references(db) {
+            if !(sources.contains(&interface) || sinks.contains(&interface)) {
+                return Err(Error::ProjectError(format!(
+                    "Port {} has not been connected",
+                    interface
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn try_into_arch_body(
         &self,
         ir_db: &dyn Ir,
@@ -240,6 +304,46 @@ mod tests {
         let mut context = Context::from(&streamlet);
         context.try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
         context.try_add_connection(db, "a", ("instance", "a"))?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn try_validate_connections() -> Result<()> {
+        let _db = Database::default();
+        let db = &_db;
+        let stream = test_stream_id(db, 4)?;
+        let streamlet = Streamlet::try_new(
+            db,
+            "a",
+            vec![
+                ("a", stream, InterfaceDirection::In),
+                ("b", stream, InterfaceDirection::Out),
+            ],
+        )?;
+
+        let mut context = Context::from(&streamlet);
+        context.try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        context.try_add_connection(db, "a", ("instance", "a"))?;
+
+        // Test: should throw an error if a port is unconnected
+        assert_eq!(
+            context.validate_connections(db),
+            Err(Error::ProjectError(
+                "Port b has not been connected".to_string()
+            )),
+        );
+
+        // Test: Should no longer throw an error if all ports are connected
+        context.try_add_connection(db, "b", ("instance", "b"))?;
+        context.validate_connections(db)?;
+
+        // Test: should throw an error if a port is connected multiple times
+        context.try_add_connection(db, "a", ("instance", "a"))?;
+        assert_eq!(
+            context.validate_connections(db),
+            Err(Error::ProjectError("Duplicate use of Source a".to_string())),
+        );
 
         Ok(())
     }

@@ -117,7 +117,6 @@ impl LogicalType {
     /// let b = db.intern_type(LogicalType::try_new_bits(12)?);
     ///
     /// let group = LogicalType::try_new_group(
-    ///     &db,
     ///     None,
     ///     vec![
     ///         ("a", a),
@@ -131,7 +130,7 @@ impl LogicalType {
     /// });
     ///
     /// assert_eq!(
-    ///     LogicalType::try_new_group(&db, None, vec![("1badname", a)]),
+    ///     LogicalType::try_new_group(None, vec![("1badname", a)]),
     ///     Err(Error::InvalidArgument("name cannot start with a digit".to_string()))
     /// );
     ///
