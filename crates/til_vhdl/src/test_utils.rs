@@ -2,13 +2,16 @@ use tydi_intern::Id;
 
 use crate::{
     common::logical::logicaltype::{Direction, LogicalType, Stream, Synchronicity},
-    ir::{InternSelf, Ir},
+    ir::{InternSelf, Ir, TryIntern},
 };
 
-use tydi_common::error::Result;
+use tydi_common::{
+    error::{Result, TryResult},
+    numbers::NonNegative,
+};
 
-pub fn test_stream_id(db: &dyn Ir) -> Result<Id<Stream>> {
-    let data_type = LogicalType::try_new_bits(4)?.intern(db);
+pub fn test_stream_id(db: &dyn Ir, data_type: impl TryIntern<LogicalType>) -> Result<Id<Stream>> {
+    let data_type = data_type.try_intern(db)?;
     let null_type = LogicalType::Null.intern(db);
     Stream::try_new(
         db,

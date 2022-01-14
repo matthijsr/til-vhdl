@@ -216,7 +216,11 @@ impl From<&Streamlet> for Context {
 mod tests {
     use tydi_vhdl::architecture::ArchitectureDeclare;
 
-    use crate::{common::logical::logicaltype::Stream, ir::Database, test_utils::test_stream_id};
+    use crate::{
+        common::logical::logicaltype::{LogicalType, Stream},
+        ir::{Database, TryIntern},
+        test_utils::test_stream_id,
+    };
 
     use super::*;
 
@@ -224,7 +228,7 @@ mod tests {
     fn try_add_connection() -> Result<()> {
         let _db = Database::default();
         let db = &_db;
-        let stream = test_stream_id(db)?;
+        let stream = test_stream_id(db, 4)?;
         let streamlet = Streamlet::try_new(
             db,
             "a",
@@ -244,7 +248,7 @@ mod tests {
     fn try_get_streamlet_instance() -> Result<()> {
         let _db = Database::default();
         let db = &_db;
-        let stream = test_stream_id(db)?;
+        let stream = test_stream_id(db, 4)?;
         let streamlet = Streamlet::try_new(
             db,
             "a",
@@ -274,17 +278,27 @@ mod tests {
         // ...
         // IR
         // ...
-        // Create a Stream node
-        let stream = test_stream_id(ir_db)?;
+        // Create a Union type with fields a: Bits(16) and b: Bits(7)
+        let union = LogicalType::try_new_union(
+            None,
+            vec![("a", 16.try_intern(ir_db)?), ("b", 7.try_intern(ir_db)?)],
+        )?;
+        // Create a Stream node with data: Bits(4)
+        let stream = test_stream_id(ir_db, 4)?;
+        // Create another Stream node with data: Union(a: Bits(16), b: Bits(7))
+        let stream2 = test_stream_id(ir_db, union)?;
         // Create a Streamlet
         let streamlet = Streamlet::try_new(
             ir_db,
             // The streamlet is called "a"
             "a",
             // It has ports "in: a" and "out: b", both using the Stream node as their type
+            // As well as ports "in: c" and "out: d", using the other (Union) Stream node
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
+                ("c", stream2, InterfaceDirection::In),
+                ("d", stream2, InterfaceDirection::Out),
             ],
         )?;
         // Create a Context from the Streamlet definition (this creates a Context with ports matching the Streamlet)
@@ -294,8 +308,12 @@ mod tests {
             .try_add_streamlet_instance("instance", streamlet.with_implementation(ir_db, None))?;
         // Connect the Context's "a" port with the instance's "a" port
         context.try_add_connection(ir_db, "a", ("instance", "a"))?;
-        // Connect the Context's "a" port with the Context's "b" port
-        context.try_add_connection(ir_db, "a", "b")?;
+        // Connect the Context's "b" port with the instance's "b" port
+        context.try_add_connection(ir_db, "b", ("instance", "b"))?;
+        // Connect the Context's "c" port with the Context's "d" port
+        context.try_add_connection(ir_db, "c", "d")?;
+        // Connect the instance's "c" port with the instance's "d" port
+        context.try_add_connection(ir_db, ("instance", "c"), ("instance", "d"))?;
 
         // ..
         // Back-end

@@ -13,6 +13,9 @@ use tydi_common::{
     util::log2_ceil,
 };
 
+pub use bits::*;
+pub mod bits;
+
 pub use group::*;
 pub mod group;
 
@@ -137,29 +140,17 @@ impl LogicalType {
     ///
     /// [`Group`]: ./struct.Group.html
     pub fn try_new_group(
-        db: &dyn Ir,
         parent_id: Option<PathName>,
-        group: impl IntoIterator<
-            Item = (
-                impl TryResult<Name>,
-                Id<LogicalType>,
-            ),
-        >,
+        group: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
     ) -> Result<Self> {
-        Group::try_new(db, parent_id, group).map(Into::into)
+        Group::try_new(parent_id, group).map(Into::into)
     }
 
     pub fn try_new_union(
-        db: &dyn Ir,
         parent_id: Option<PathName>,
-        union: impl IntoIterator<
-            Item = (
-                impl TryResult<Name>,
-                Id<LogicalType>,
-            ),
-        >,
+        union: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
     ) -> Result<Self> {
-        Union::try_new(db, parent_id, union).map(Into::into)
+        Union::try_new(parent_id, union).map(Into::into)
     }
 
     /// Returns true if this logical type consists of only element-
@@ -244,6 +235,10 @@ impl LogicalType {
             }
         }
     }
+
+    pub fn null_id(db: &dyn Ir) -> Id<Self> {
+        LogicalType::Null.intern(db)
+    }
 }
 
 impl SplitsStreams for Id<LogicalType> {
@@ -284,17 +279,11 @@ impl SplitsStreams for Id<LogicalType> {
             }
             LogicalType::Group(group) => {
                 let (fields, streams) = split_fields(db, group.ordered_field_ids());
-                SplitStreams::new(
-                    LogicalType::from(Group::new(db, fields)).intern(db),
-                    streams,
-                )
+                SplitStreams::new(LogicalType::from(Group::new(fields)).intern(db), streams)
             }
             LogicalType::Union(union) => {
                 let (fields, streams) = split_fields(db, union.ordered_field_ids());
-                SplitStreams::new(
-                    LogicalType::from(Union::new(db, fields)).intern(db),
-                    streams,
-                )
+                SplitStreams::new(LogicalType::from(Union::new(fields)).intern(db), streams)
             }
             LogicalType::Stream(stream_id) => stream_id.split_streams(db),
         }

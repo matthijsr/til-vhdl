@@ -27,7 +27,6 @@ impl Union {
     /// the name or logical stream type conversion fails, or when there are
     /// duplicate names.
     pub fn try_new(
-        db: &dyn Ir,
         parent_id: Option<PathName>,
         union: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
     ) -> Result<Self> {
@@ -56,7 +55,7 @@ impl Union {
     }
 
     /// Create a new Union explicitly from a set of ordered fields with PathNames.
-    pub(crate) fn new(db: &dyn Ir, fields: IndexMap<PathName, Id<LogicalType>>) -> Self {
+    pub(crate) fn new(fields: IndexMap<PathName, Id<LogicalType>>) -> Self {
         let mut map = BTreeMap::new();
         let mut field_order = vec![];
         for (name, id) in fields {
@@ -151,7 +150,7 @@ mod tests {
     fn test_new() {
         let mut db = Database::default();
         let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
-        let union = Union::try_new(&db, None, vec![("a", bits)]).unwrap();
+        let union = Union::try_new(None, vec![("a", bits)]).unwrap();
         assert_eq!(
             union
                 .get_field_id(&PathName::try_new(vec!["a"]).unwrap())

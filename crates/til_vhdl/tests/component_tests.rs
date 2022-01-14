@@ -45,7 +45,7 @@ fn streamlet_to_vhdl() -> Result<()> {
     let db = &_db;
     let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let vhdl_db = &_vhdl_db;
-    let stream = test_stream_id(db)?;
+    let stream = test_stream_id(db, 4)?;
     let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
     let component = streamlet.canonical(db, vhdl_db, "")?;
     let mut package = Package::new_default_empty();
@@ -109,8 +109,7 @@ fn playground() -> Result<()> {
     let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let vhdl_db = &_vhdl_db;
     let bits = LogicalType::try_new_bits(4)?.intern(db);
-    let data_type =
-        LogicalType::try_new_union(db, None, vec![("a", bits), ("b", bits)])?.intern(db);
+    let data_type = LogicalType::try_new_union(None, vec![("a", bits), ("b", bits)])?.intern(db);
     //let data_type = LogicalType::try_new_bits(4)?.intern(db);let null_type = LogicalType::Null.intern(db);
     let null_type = LogicalType::Null.intern(db);
     let stream = Stream::try_new(

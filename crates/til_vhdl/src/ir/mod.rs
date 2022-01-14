@@ -1,6 +1,6 @@
 use crate::common::logical;
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     name::PathName,
 };
 use tydi_intern::Id;
@@ -48,6 +48,20 @@ pub trait GetSelf<T> {
 
 pub trait InternSelf<T> {
     fn intern(self, db: &dyn Ir) -> Id<T>;
+}
+
+pub trait TryIntern<T> {
+    fn try_intern(self, db: &dyn Ir) -> Result<Id<T>>;
+}
+
+impl<T, U> TryIntern<T> for U
+where
+    U: TryResult<T>,
+    T: InternSelf<T>,
+{
+    fn try_intern(self, db: &dyn Ir) -> Result<Id<T>> {
+        Ok(self.try_result()?.intern(db))
+    }
 }
 
 pub trait IntoVhdl<T> {
