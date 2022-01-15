@@ -11,7 +11,7 @@ use crate::{
     usings::{ListUsings, Usings},
 };
 
-use self::arch_storage::Arch;
+use self::arch_storage::{Arch, GetSelf};
 
 pub mod arch_storage;
 pub mod impls;
@@ -130,7 +130,7 @@ impl Architecture {
         let declaration = declaration.into();
         match &declaration {
             ArchitectureDeclaration::Object(object) => {
-                self.usings.combine(&object.list_usings()?);
+                self.usings.combine(&object.get(db).list_usings()?);
             }
             ArchitectureDeclaration::Alias(alias) => {
                 self.usings.combine(

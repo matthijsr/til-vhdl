@@ -1,24 +1,27 @@
-use std::{
-    borrow::Borrow,
-    collections::{BTreeMap, HashSet},
-    convert::TryInto,
-};
+use std::collections::{BTreeMap, HashSet};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::Name,
+    traits::Identify,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::{arch_storage::Arch, ArchitectureBody},
+    architecture::{
+        arch_storage::{Arch, TryIntern},
+        ArchitectureBody,
+    },
     assignment::Assign,
+    common::vhdl_name::VhdlNameSelf,
     declaration::ObjectDeclaration,
-    port::Port, statement::PortMapping,
+    object::ObjectType,
+    port::Mode,
+    statement::PortMapping,
 };
 
 use super::{
     connection::InterfaceReference, physical_properties::InterfaceDirection, Connection, GetSelf,
-    Implementation, Interface, InternSelf, IntoVhdl, Ir, Streamlet,
+    Implementation, Interface, IntoVhdl, Ir, Streamlet,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -229,44 +232,55 @@ impl Context {
         let own_ports = self
             .ports(ir_db)
             .iter()
-            .map(|(name, port)| Ok((name.clone(), port.canonical(ir_db, vhdl_db, "")?)))
-            .collect::<Result<BTreeMap<Name, Vec<Port>>>>()?;
+            .map(|(name, port)| {
+                Ok((
+                    name.clone(),
+                    port.canonical(ir_db, vhdl_db, "")?
+                        .iter()
+                        .map(|vhdl_port| ObjectDeclaration::from_port(vhdl_db, vhdl_port, true))
+                        .collect(),
+                ))
+            })
+            .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
+        let clk = ObjectDeclaration::entity_clk(vhdl_db);
+        let rst = ObjectDeclaration::entity_rst(vhdl_db);
         let mut streamlet_ports = BTreeMap::new();
         let mut streamlet_components = BTreeMap::new();
         for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
             let component = streamlet.canonical(ir_db, vhdl_db, "")?;
-            let mut port_mapping = PortMapping::from_component(vhdl_db, &component, instance_name.clone())?;
-            streamlet_components.insert(
-                instance_name.clone(),
-                component,
-            );
-            streamlet_ports.insert(
-                instance_name,
-                streamlet
-                    .port_ids()
-                    .iter()
-                    .map(|(name, id)| {
-                        let ports = id.get(ir_db).canonical(ir_db, vhdl_db, "")?;
-                        let mut signals = vec![];
-                        // for port in ports {
-                        //     let signal = ObjectDeclaration::signal()
-                        // }
+            let mut port_mapping =
+                PortMapping::from_component(vhdl_db, &component, instance_name.clone())?;
+            streamlet_components.insert(instance_name.clone(), component);
+            let port_map_signals = streamlet
+                .port_ids()
+                .iter()
+                .map(|(name, id)| {
+                    let ports = id.get(ir_db).canonical(ir_db, vhdl_db, "")?;
+                    let mut signals = vec![];
+                    for port in ports {
+                        let signal = ObjectDeclaration::signal(
+                            vhdl_db,
+                            format!("{}__{}", instance_name, port.identifier()),
+                            port.typ().clone(),
+                            None,
+                        )?;
+                        port_mapping.map_port(vhdl_db, port.vhdl_name().clone(), &signal)?;
+                        signals.push(signal);
+                        declarations.push(signal.try_intern(vhdl_db)?);
+                    }
 
-                        Ok((name.clone(), signals))
-                    })
-                    .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?,
-            );
+                    Ok((name.clone(), signals))
+                })
+                .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
+            streamlet_ports.insert(instance_name, port_map_signals);
+            port_mapping.map_port(vhdl_db, "clk", &clk)?;
+            port_mapping.map_port(vhdl_db, "rst", &rst)?;
+            statements.push(port_mapping.finish()?.into());
         }
         for connection in self.connections() {
             if connection.is_local_to_local() {
-                let mut sink_objs = vec![];
-                let mut source_objs = vec![];
-                for port in own_ports.get(connection.sink().port()).unwrap() {
-                    sink_objs.push(ObjectDeclaration::from_port(vhdl_db, port, true));
-                }
-                for port in own_ports.get(connection.source().port()).unwrap() {
-                    source_objs.push(ObjectDeclaration::from_port(vhdl_db, port, true));
-                }
+                let sink_objs = own_ports.get(connection.sink().port()).unwrap().clone();
+                let source_objs = own_ports.get(connection.source().port()).unwrap().clone();
                 let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
                     sink_objs.into_iter().zip(source_objs.into_iter()).collect();
                 for (sink, source) in sink_source {
@@ -291,7 +305,7 @@ mod tests {
     use tydi_vhdl::architecture::ArchitectureDeclare;
 
     use crate::{
-        common::logical::logicaltype::{LogicalType, Stream},
+        common::logical::logicaltype::LogicalType,
         ir::{Database, TryIntern},
         test_utils::test_stream_id,
     };

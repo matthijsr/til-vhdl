@@ -81,7 +81,7 @@ pub enum ArchitectureDeclaration {
     ///
     /// *Ports cannot be declared within the architecture itself, but can be used in the statement part,
     /// as such, the ports of the entity implemented are treated as inferred declarations.
-    Object(ObjectDeclaration),
+    Object(Id<ObjectDeclaration>),
     /// Alias for an object declaration, with optional range constraint
     Alias(AliasDeclaration),
     Component(String), // TODO: Component declarations within the architecture
@@ -279,6 +279,16 @@ impl ObjectDeclaration {
         .intern(db))
     }
 
+    /// Create a default "clk" entity port object
+    pub fn entity_clk(db: &mut dyn Arch) -> Id<ObjectDeclaration> {
+        ObjectDeclaration::entity_port(db, "clk", ObjectType::Bit, Mode::In).unwrap()
+    }
+
+    /// Create a default "rst" entity port object
+    pub fn entity_rst(db: &mut dyn Arch) -> Id<ObjectDeclaration> {
+        ObjectDeclaration::entity_port(db, "rst", ObjectType::Bit, Mode::In).unwrap()
+    }
+
     pub fn kind(&self) -> ObjectKind {
         self.kind
     }
@@ -448,12 +458,7 @@ pub mod tests {
     use super::*;
 
     pub(crate) fn test_bit_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
-        ObjectDeclaration::signal(
-            db,
-            "test_signal",
-            ObjectType::Bit,
-            None,
-        )
+        ObjectDeclaration::signal(db, "test_signal", ObjectType::Bit, None)
     }
 
     pub(crate) fn test_complex_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {

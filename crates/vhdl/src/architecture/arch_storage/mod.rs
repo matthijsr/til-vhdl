@@ -14,6 +14,7 @@ use crate::{
 use super::Architecture;
 
 pub mod db;
+pub mod get_self;
 pub mod intern_self;
 
 #[salsa::query_group(ArchStorage)]
@@ -82,8 +83,26 @@ pub trait InternSelf: Sized {
     fn intern(self, db: &dyn Arch) -> Id<Self>;
 }
 
+pub trait InternAs<T> {
+    fn intern_as(self, db: &dyn Arch) -> Id<T>;
+}
+
 pub trait TryIntern<T> {
     fn try_intern(self, db: &dyn Arch) -> Result<Id<T>>;
+}
+
+pub trait TryInternAs<T> {
+    fn try_intern_as(self, db: &dyn Arch) -> Result<Id<T>>;
+}
+
+impl<T, U> InternAs<T> for U
+where
+    U: Into<T>,
+    T: InternSelf,
+{
+    fn intern_as(self, db: &dyn Arch) -> Id<T> {
+        self.into().intern(db)
+    }
 }
 
 impl<T, U> TryIntern<T> for U

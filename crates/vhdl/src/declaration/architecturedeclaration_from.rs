@@ -1,7 +1,9 @@
+use tydi_intern::Id;
+
 use super::{AliasDeclaration, ArchitectureDeclaration, ObjectDeclaration};
 
-impl From<ObjectDeclaration> for ArchitectureDeclaration {
-    fn from(object: ObjectDeclaration) -> Self {
+impl From<Id<ObjectDeclaration>> for ArchitectureDeclaration {
+    fn from(object: Id<ObjectDeclaration>) -> Self {
         ArchitectureDeclaration::Object(object)
     }
 }

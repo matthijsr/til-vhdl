@@ -92,19 +92,12 @@ impl PortMapping {
                 "Port {} does not exist on this component",
                 identifier
             )))?;
-        let mut assigned = port.assign(db, assignment)?;
-        // If the port is already assigned, reverse the assignment so that the object being assigned is on the "left"
-        if db.lookup_intern_object_declaration(*port).state() == ObjectState::Assigned {
-            assigned = assigned.reverse(db)?;
-        }
+        let assigned = port.assign(db, assignment)?;
         self.mappings.insert(identifier, assigned);
         Ok(self)
     }
 
     pub fn finish(self) -> Result<Self> {
-        // Note that the assign function prevents assignment to a field of a port
-        // TODO: These are both bad ideas, should allow for assignment of individual fields, and should track this in port mappings.
-        //       Or should make port mapping separate from assignment.
         if self.ports().len() == self.mappings().len() {
             Ok(self)
         } else {
