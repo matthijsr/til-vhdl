@@ -1,8 +1,5 @@
 use crate::common::logical;
-use tydi_common::{
-    error::{Error, Result, TryResult},
-    name::PathName,
-};
+use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
 pub use connection::Connection;

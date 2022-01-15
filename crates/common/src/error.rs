@@ -1,6 +1,6 @@
 //! Error variants.
 use std::{
-    convert::{Infallible, TryInto},
+    convert::{Infallible, TryFrom},
     error, fmt, result,
 };
 
@@ -121,17 +121,30 @@ impl From<Infallible> for Error {
     }
 }
 
+pub trait ResultFrom<T>: Sized {
+    fn result_from(value: T) -> Result<Self>;
+}
+
 pub trait TryResult<T> {
     fn try_result(self) -> Result<T>;
 }
 
-impl<T, U, E> TryResult<T> for U
+impl<T, U, E> ResultFrom<U> for T
 where
-    E: Into<Error>,
-    U: TryInto<T, Error = E>,
+    Error: From<E>,
+    T: TryFrom<U, Error = E>,
+{
+    fn result_from(value: U) -> Result<Self> {
+        T::try_from(value).map_err(From::from)
+    }
+}
+
+impl<T, U> TryResult<T> for U
+where
+    T: ResultFrom<U>,
 {
     fn try_result(self) -> Result<T> {
-        self.try_into().map_err(|x| x.into())
+        T::result_from(self)
     }
 }
 
