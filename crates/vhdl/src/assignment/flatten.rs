@@ -7,7 +7,10 @@ use crate::{
     declaration::ObjectDeclaration,
     object::ObjectType,
 };
-use tydi_common::error::{Error, Result};
+use tydi_common::{
+    error::{Error, Result},
+    traits::Identify,
+};
 use tydi_intern::Id;
 
 pub trait FlatLength {

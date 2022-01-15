@@ -1,4 +1,7 @@
-use tydi_common::error::{Error, Result};
+use tydi_common::{
+    error::{Error, Result},
+    traits::Identify,
+};
 use tydi_intern::Id;
 
 use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
@@ -72,12 +75,12 @@ mod tests {
         let mut db = Database::default();
         assert_eq!(
             "signal TestSignal : std_logic;\n",
-            ObjectDeclaration::signal(&mut db, "TestSignal", ObjectType::Bit, None)
+            ObjectDeclaration::signal(&mut db, "TestSignal", ObjectType::Bit, None)?
                 .declare(&db, "", ";\n")?
         );
         assert_eq!(
             "variable TestVariable : std_logic;\n",
-            ObjectDeclaration::variable(&mut db, "TestVariable", ObjectType::Bit, None)
+            ObjectDeclaration::variable(&mut db, "TestVariable", ObjectType::Bit, None)?
                 .declare(&db, "", ";\n")?
         );
         assert_eq!(
@@ -87,13 +90,18 @@ mod tests {
                 "SignalWithDefault",
                 ObjectType::Bit,
                 Some(StdLogicValue::U.into())
-            )
+            )?
             .declare(&mut db, "", ";\n")?
         );
         assert_eq!(
             "  constant TestConstant : std_logic := 'U';\n",
-            ObjectDeclaration::constant(&mut db, "TestConstant", ObjectType::Bit, StdLogicValue::U)
-                .declare(&db, "  ", ";\n")?
+            ObjectDeclaration::constant(
+                &mut db,
+                "TestConstant",
+                ObjectType::Bit,
+                StdLogicValue::U
+            )?
+            .declare(&db, "  ", ";\n")?
         );
         Ok(())
     }

@@ -2,13 +2,16 @@ use std::collections::HashMap;
 
 use indexmap::IndexMap;
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     traits::Identify,
 };
 use tydi_intern::Id;
 
 use crate::{
-    architecture::arch_storage::Arch, assignment::Assign, component::Component,
+    architecture::arch_storage::Arch,
+    assignment::Assign,
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
+    component::Component,
     declaration::ObjectState,
 };
 
@@ -39,52 +42,52 @@ impl From<PortMapping> for Statement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortMapping {
-    label: String,
+    label: VhdlName,
     component_name: String,
     /// The ports, in the order they were declared on the component
-    ports: IndexMap<String, Id<ObjectDeclaration>>,
+    ports: IndexMap<VhdlName, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
     /// irrespective of the order they're mapped during generation.
-    mappings: HashMap<String, AssignDeclaration>,
+    mappings: HashMap<VhdlName, AssignDeclaration>,
 }
 
 impl PortMapping {
     pub fn from_component(
         db: &mut dyn Arch,
         component: &Component,
-        label: impl Into<String>,
+        label: impl TryResult<VhdlName>,
     ) -> Result<PortMapping> {
         let mut ports = IndexMap::new();
         for port in component.ports() {
             let obj = ObjectDeclaration::from_port(db, port, false);
-            ports.insert(port.identifier().to_string(), obj);
+            ports.insert(port.vhdl_name().clone(), obj);
         }
         Ok(PortMapping {
-            label: label.into(),
+            label: label.try_result()?,
             component_name: component.identifier().to_string(),
             ports,
             mappings: HashMap::new(),
         })
     }
 
-    pub fn ports(&self) -> &IndexMap<String, Id<ObjectDeclaration>> {
+    pub fn ports(&self) -> &IndexMap<VhdlName, Id<ObjectDeclaration>> {
         &self.ports
     }
 
-    pub fn mappings(&self) -> &HashMap<String, AssignDeclaration> {
+    pub fn mappings(&self) -> &HashMap<VhdlName, AssignDeclaration> {
         &self.mappings
     }
 
     pub fn map_port(
         &mut self,
         db: &dyn Arch,
-        identifier: impl Into<String>,
+        identifier: impl TryResult<VhdlName>,
         assignment: &(impl Into<Assignment> + Clone),
     ) -> Result<&mut Self> {
-        let identifier: &str = &identifier.into();
+        let identifier = identifier.try_result()?;
         let port = self
             .ports()
-            .get(identifier)
+            .get(&identifier)
             .ok_or(Error::InvalidArgument(format!(
                 "Port {} does not exist on this component",
                 identifier
@@ -94,7 +97,7 @@ impl PortMapping {
         if db.lookup_intern_object_declaration(*port).state() == ObjectState::Assigned {
             assigned = assigned.reverse(db)?;
         }
-        self.mappings.insert(identifier.to_string(), assigned);
+        self.mappings.insert(identifier, assigned);
         Ok(self)
     }
 
@@ -114,7 +117,7 @@ impl PortMapping {
     }
 
     pub fn label(&self) -> &str {
-        self.label.as_str()
+        self.label.as_ref()
     }
 
     pub fn component_name(&self) -> &str {
@@ -124,7 +127,7 @@ impl PortMapping {
     /// Find the assignment to an object based on a port name and its ID, assuming one exists.
     pub(crate) fn assignment_for(
         &self,
-        port: &str,
+        port: &VhdlName,
         id: Id<ObjectDeclaration>,
     ) -> Option<&AssignDeclaration> {
         if let Some(_) = self.ports().get(port).filter(|x| **x == id) {
@@ -132,5 +135,11 @@ impl PortMapping {
         } else {
             None
         }
+    }
+}
+
+impl VhdlNameSelf for PortMapping {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.label
     }
 }

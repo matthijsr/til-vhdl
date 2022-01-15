@@ -7,8 +7,11 @@ use tydi_common::{
 };
 
 use crate::{
-    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, declaration::Declare,
-    object::ObjectType, traits::VhdlDocument,
+    architecture::arch_storage::Arch,
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
+    declaration::Declare,
+    object::ObjectType,
+    traits::VhdlDocument,
 };
 
 /// A port.
@@ -110,6 +113,12 @@ impl Port {
 impl Identify for Port {
     fn identifier(&self) -> &str {
         self.identifier.as_ref()
+    }
+}
+
+impl VhdlNameSelf for Port {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.identifier
     }
 }
 

@@ -13,7 +13,7 @@ use tydi_vhdl::{
     architecture::{arch_storage::Arch, ArchitectureBody},
     assignment::Assign,
     declaration::ObjectDeclaration,
-    port::Port,
+    port::Port, statement::PortMapping,
 };
 
 use super::{
@@ -222,6 +222,8 @@ impl Context {
         ir_db: &dyn Ir,
         vhdl_db: &mut dyn Arch,
     ) -> Result<ArchitectureBody> {
+        self.validate_connections(ir_db)?;
+
         let mut declarations = vec![];
         let mut statements = vec![];
         let own_ports = self
@@ -232,9 +234,11 @@ impl Context {
         let mut streamlet_ports = BTreeMap::new();
         let mut streamlet_components = BTreeMap::new();
         for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
+            let component = streamlet.canonical(ir_db, vhdl_db, "")?;
+            let mut port_mapping = PortMapping::from_component(vhdl_db, &component, instance_name.clone())?;
             streamlet_components.insert(
                 instance_name.clone(),
-                streamlet.canonical(ir_db, vhdl_db, "")?,
+                component,
             );
             streamlet_ports.insert(
                 instance_name,
@@ -242,9 +246,15 @@ impl Context {
                     .port_ids()
                     .iter()
                     .map(|(name, id)| {
-                        Ok((name.clone(), id.get(ir_db).canonical(ir_db, vhdl_db, "")?))
+                        let ports = id.get(ir_db).canonical(ir_db, vhdl_db, "")?;
+                        let mut signals = vec![];
+                        // for port in ports {
+                        //     let signal = ObjectDeclaration::signal()
+                        // }
+
+                        Ok((name.clone(), signals))
                     })
-                    .collect::<Result<BTreeMap<Name, Vec<Port>>>>()?,
+                    .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?,
             );
         }
         for connection in self.connections() {

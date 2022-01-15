@@ -1,6 +1,9 @@
 use std::convert::TryInto;
 
-use tydi_common::error::{Error, Result};
+use tydi_common::{
+    error::{Error, Result},
+    traits::Identify,
+};
 use tydi_intern::Id;
 
 use crate::{

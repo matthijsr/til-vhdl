@@ -43,8 +43,8 @@ pub trait GetSelf<T> {
     fn get(&self, db: &dyn Ir) -> T;
 }
 
-pub trait InternSelf<T> {
-    fn intern(self, db: &dyn Ir) -> Id<T>;
+pub trait InternSelf: Sized {
+    fn intern(self, db: &dyn Ir) -> Id<Self>;
 }
 
 pub trait TryIntern<T> {
@@ -54,7 +54,7 @@ pub trait TryIntern<T> {
 impl<T, U> TryIntern<T> for U
 where
     U: TryResult<T>,
-    T: InternSelf<T>,
+    T: InternSelf,
 {
     fn try_intern(self, db: &dyn Ir) -> Result<Id<T>> {
         Ok(self.try_result()?.intern(db))

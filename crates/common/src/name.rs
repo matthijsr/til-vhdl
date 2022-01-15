@@ -256,3 +256,11 @@ impl TryFrom<&str> for PathName {
         Ok(PathName::from(name))
     }
 }
+
+pub trait NameSelf {
+    fn name(&self) -> &Name;
+}
+
+pub trait PathNameSelf {
+    fn path_name(&self) -> &Name;
+}
