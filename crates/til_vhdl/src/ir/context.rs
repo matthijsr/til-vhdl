@@ -278,15 +278,22 @@ impl Context {
             statements.push(port_mapping.finish()?.into());
         }
         for connection in self.connections() {
-            if connection.is_local_to_local() {
-                let sink_objs = own_ports.get(connection.sink().port()).unwrap().clone();
-                let source_objs = own_ports.get(connection.source().port()).unwrap().clone();
-                let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
-                    sink_objs.into_iter().zip(source_objs.into_iter()).collect();
-                for (sink, source) in sink_source {
-                    statements.push(sink.assign(vhdl_db, &source)?.into());
+            let get_objs = |interface: &InterfaceReference| -> &Vec<Id<ObjectDeclaration>> {
+                match interface.streamlet_instance() {
+                    Some(streamlet_instance) => streamlet_ports
+                        .get(streamlet_instance)
+                        .unwrap()
+                        .get(interface.port())
+                        .unwrap(),
+                    None => own_ports.get(interface.port()).unwrap(),
                 }
-            } else {
+            };
+            let sink_objs = get_objs(connection.sink()).clone();
+            let source_objs = get_objs(connection.source()).clone();
+            let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
+                sink_objs.into_iter().zip(source_objs.into_iter()).collect();
+            for (sink, source) in sink_source {
+                statements.push(sink.assign(vhdl_db, &source)?.into());
             }
         }
 
