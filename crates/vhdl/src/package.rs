@@ -1,15 +1,17 @@
 use std::collections::{HashMap, HashSet};
 
+use indexmap::IndexMap;
 use itertools::Itertools;
 use textwrap::indent;
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     name::Name,
     traits::Identify,
 };
 
 use crate::{
     architecture::arch_storage::Arch,
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
@@ -19,41 +21,49 @@ use crate::{
 
 // TODO: Eventually functions as well.
 /// A library of components and types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Package {
     /// The identifier.
-    identifier: Name,
+    identifier: VhdlName,
     /// The components declared within the library.
-    components: Vec<Component>,
+    components: IndexMap<VhdlName, Component>,
     /// The types declared within the library.
     types: Vec<ObjectType>,
 }
 
 impl Package {
-    pub fn new(identifier: Name, components: &Vec<Component>, types: &Vec<ObjectType>) -> Self {
+    pub fn try_new(
+        identifier: impl TryResult<VhdlName>,
+        components: &Vec<Component>,
+        types: &Vec<ObjectType>,
+    ) -> Result<Self> {
         let mut all_types: Vec<ObjectType> = types.clone();
         for component in components {
             all_types.append(&mut component.list_nested_types());
         }
-        Package {
-            identifier,
-            components: components.clone(),
+        Ok(Package {
+            identifier: identifier.try_result()?,
+            components: components
+                .iter()
+                .map(|c| (c.vhdl_name().clone(), c.clone()))
+                .collect(),
             types: all_types.into_iter().unique_by(|x| x.type_name()).collect(),
-        }
+        })
     }
 
     /// Creates an empty "work" library
     pub fn new_default_empty() -> Self {
-        Package::new(Name::try_new("work").unwrap(), &vec![], &vec![])
+        Package::try_new("work", &vec![], &vec![]).unwrap()
     }
 
-    pub fn get_component(&self, identifier: impl Into<String>) -> Result<Component> {
-        let identifier = identifier.into();
-        match self
-            .components
-            .iter()
-            .find(|x| x.identifier() == &identifier)
-        {
+    pub fn get_subject_component(&self, db: &dyn Arch) -> &Component {
+        let name = db.subject_component_name();
+        self.components.get(&name).unwrap()
+    }
+
+    pub fn get_component(&self, identifier: impl TryResult<VhdlName>) -> Result<Component> {
+        let identifier = identifier.try_result()?;
+        match self.components.get(&identifier) {
             Some(component) => Ok(component.clone()),
             None => Err(Error::LibraryError(format!(
                 "Component with identifier {} does not exist in package.",
@@ -63,14 +73,15 @@ impl Package {
     }
 
     pub fn add_component(&mut self, component: Component) {
-        self.components.push(component);
+        self.components
+            .insert(component.vhdl_name().clone(), component);
     }
 
     pub fn add_type(&mut self, typ: ObjectType) {
         self.types.push(typ);
     }
 
-    pub fn components(&self) -> &Vec<Component> {
+    pub fn components(&self) -> &IndexMap<VhdlName, Component> {
         &self.components
     }
 
@@ -89,7 +100,7 @@ impl DeclareWithIndent for Package {
         for t in self.types() {
             body.push_str(format!("{}\n\n", t.declare_with_indent(db, pre)?).as_str());
         }
-        for c in &self.components {
+        for (_, c) in &self.components {
             body.push_str(format!("{}\n\n", c.declare(db)?).as_str());
         }
         result.push_str(&indent(&body, pre));
@@ -106,7 +117,7 @@ impl ListUsings for Package {
         let mut types = self
             .components
             .iter()
-            .flat_map(|x| x.ports().iter().map(|p| p.typ()));
+            .flat_map(|(_, x)| x.ports().iter().map(|p| p.typ()));
         fn uses_std_logic(t: &ObjectType) -> bool {
             match t {
                 ObjectType::Bit => true,
@@ -121,7 +132,7 @@ impl ListUsings for Package {
         }
 
         if types.any(|x| uses_std_logic(&x)) {
-            usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
+            usings.add_using(VhdlName::try_new("ieee")?, "std_logic_1164.all".to_string());
         }
 
         Ok(usings)
@@ -131,5 +142,11 @@ impl ListUsings for Package {
 impl Identify for Package {
     fn identifier(&self) -> &str {
         self.identifier.as_ref()
+    }
+}
+
+impl VhdlNameSelf for Package {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.identifier
     }
 }

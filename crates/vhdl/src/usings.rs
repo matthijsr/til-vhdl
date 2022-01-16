@@ -4,9 +4,11 @@ use indexmap::IndexMap;
 use tydi_common::error::Result;
 use tydi_common::name::Name;
 
+use crate::common::vhdl_name::VhdlName;
+
 /// A list of VHDL usings, indexed by library
 #[derive(Debug, Clone)]
-pub struct Usings(IndexMap<Name, HashSet<String>>);
+pub struct Usings(IndexMap<VhdlName, HashSet<String>>);
 
 impl Usings {
     pub fn new_empty() -> Usings {
@@ -16,14 +18,14 @@ impl Usings {
     /// If the set did not have this value present, `true` is returned.
     ///
     /// If the set did have this value present, `false` is returned.
-    pub fn add_using(&mut self, library: Name, using: impl Into<String>) -> bool {
+    pub fn add_using(&mut self, library: VhdlName, using: impl Into<String>) -> bool {
         self.0
             .entry(library)
             .or_insert(HashSet::new())
             .insert(using.into())
     }
 
-    pub fn usings(&self) -> &IndexMap<Name, HashSet<String>> {
+    pub fn usings(&self) -> &IndexMap<VhdlName, HashSet<String>> {
         &self.0
     }
 

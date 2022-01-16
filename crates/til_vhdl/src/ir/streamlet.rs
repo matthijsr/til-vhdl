@@ -10,7 +10,10 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, component::Component, port::Port,
+    architecture::{arch_storage::Arch, Architecture},
+    common::vhdl_name::VhdlName,
+    component::Component,
+    port::Port,
 };
 
 use super::{
@@ -132,17 +135,17 @@ impl IntoVhdl<Component> for Streamlet {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
-        vhdl_db: &dyn Arch,
+        arch_db: &mut dyn Arch,
         prefix: impl Into<String>,
     ) -> Result<Component> {
         let mut ports = vec![];
         ports.push(Port::clk());
         ports.push(Port::rst());
         for input in self.inputs(ir_db) {
-            ports.extend(input.canonical(ir_db, vhdl_db, "")?);
+            ports.extend(input.canonical(ir_db, arch_db, "")?);
         }
         for output in self.outputs(ir_db) {
-            ports.extend(output.canonical(ir_db, vhdl_db, "")?);
+            ports.extend(output.canonical(ir_db, arch_db, "")?);
         }
         // TODO: Streamlet should also have documentation?
 

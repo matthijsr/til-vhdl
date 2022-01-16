@@ -2,6 +2,8 @@ use crate::common::logical;
 use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
+pub mod annotation_keys;
+pub use annotation_keys::AnnotationKey;
 pub use connection::Connection;
 pub mod connection;
 pub mod context;
@@ -15,6 +17,8 @@ pub use streamlet::Streamlet;
 pub mod streamlet;
 pub use db::Database;
 use tydi_vhdl::architecture::arch_storage::Arch;
+
+use self::context::Context;
 pub mod db;
 
 pub mod get_self;
@@ -27,6 +31,12 @@ pub type Name = tydi_common::name::Name;
 
 #[salsa::query_group(IrStorage)]
 pub trait Ir {
+    #[salsa::input]
+    fn root(&self) -> Context;
+
+    #[salsa::input]
+    fn annotation(&self, intern_id: salsa::InternId, key: String) -> String;
+
     #[salsa::interned]
     fn intern_implementation(&self, implementation: Implementation) -> Id<Implementation>;
     #[salsa::interned]
@@ -62,12 +72,23 @@ where
 }
 
 pub trait IntoVhdl<T> {
-    fn canonical(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch, prefix: impl Into<String>)
-        -> Result<T>;
-    fn fancy(&self, ir_db: &dyn Ir, vhdl_db: &dyn Arch) -> Result<T> {
+    fn canonical(
+        &self,
+        ir_db: &dyn Ir,
+        arch_db: &mut dyn Arch,
+        prefix: impl Into<String>,
+    ) -> Result<T>;
+    fn fancy(&self, ir_db: &dyn Ir, arch_db: &dyn Arch) -> Result<T> {
         todo!()
     }
 }
+
+// TODO: IntoVhdl for the database, which would actually generate the files.
+// Requires a "project" object to indicate the project name and any other configurations,
+// as well as for keeping track of all the streamlets, tests, etc.
+// Then IntoVhdl would create the package based on the Streamlets, and create architectures based
+// on their implementations.
+// Finally, it would use the root context to create the top level design.
 
 #[cfg(test)]
 mod tests {

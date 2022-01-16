@@ -8,7 +8,7 @@ use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectMode, ObjectState},
     object::ObjectType,
     package::Package,
-    statement::Statement,
+    statement::Statement, common::vhdl_name::VhdlName,
 };
 
 use super::Architecture;
@@ -20,10 +20,13 @@ pub mod intern_self;
 #[salsa::query_group(ArchStorage)]
 pub trait Arch {
     #[salsa::input]
-    fn default_package(&self) -> Arc<Package>;
+    fn default_package(&self) -> Package;
 
     #[salsa::input]
-    fn architecture(&self) -> Arc<Architecture>;
+    fn subject_component_name(&self) -> VhdlName;
+
+    #[salsa::input]
+    fn architecture(&self) -> Architecture;
 
     #[salsa::interned]
     fn intern_architecture_declaration(

@@ -85,14 +85,20 @@ impl Entity {
     }
 }
 
-impl From<Component> for Entity {
-    fn from(comp: Component) -> Self {
+impl From<&Component> for Entity {
+    fn from(comp: &Component) -> Self {
         Entity::new(
             comp.identifier(),
             comp.parameters().to_vec(),
             comp.ports().to_vec(),
             comp.doc(),
         )
+    }
+}
+
+impl From<Component> for Entity {
+    fn from(comp: Component) -> Self {
+        Entity::from(&comp)
     }
 }
 

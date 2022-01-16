@@ -219,13 +219,24 @@ impl Context {
 
         Ok(())
     }
+}
 
-    pub fn try_into_arch_body(
+impl From<&Streamlet> for Context {
+    fn from(streamlet: &Streamlet) -> Self {
+        Context::new(streamlet.port_ids().clone())
+    }
+}
+
+impl IntoVhdl<ArchitectureBody> for Context {
+    fn canonical(
         &self,
         ir_db: &dyn Ir,
-        vhdl_db: &mut dyn Arch,
+        arch_db: &mut dyn Arch,
+        prefix: impl Into<String>,
     ) -> Result<ArchitectureBody> {
         self.validate_connections(ir_db)?;
+
+        let prefix = &prefix.into();
 
         let mut declarations = vec![];
         let mut statements = vec![];
@@ -235,46 +246,46 @@ impl Context {
             .map(|(name, port)| {
                 Ok((
                     name.clone(),
-                    port.canonical(ir_db, vhdl_db, "")?
+                    port.canonical(ir_db, arch_db, prefix)?
                         .iter()
-                        .map(|vhdl_port| ObjectDeclaration::from_port(vhdl_db, vhdl_port, true))
+                        .map(|vhdl_port| ObjectDeclaration::from_port(arch_db, vhdl_port, true))
                         .collect(),
                 ))
             })
             .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
-        let clk = ObjectDeclaration::entity_clk(vhdl_db);
-        let rst = ObjectDeclaration::entity_rst(vhdl_db);
+        let clk = ObjectDeclaration::entity_clk(arch_db);
+        let rst = ObjectDeclaration::entity_rst(arch_db);
         let mut streamlet_ports = BTreeMap::new();
         let mut streamlet_components = BTreeMap::new();
         for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
-            let component = streamlet.canonical(ir_db, vhdl_db, "")?;
+            let component = streamlet.canonical(ir_db, arch_db, "")?;
             let mut port_mapping =
-                PortMapping::from_component(vhdl_db, &component, instance_name.clone())?;
+                PortMapping::from_component(arch_db, &component, instance_name.clone())?;
             streamlet_components.insert(instance_name.clone(), component);
             let port_map_signals = streamlet
                 .port_ids()
                 .iter()
                 .map(|(name, id)| {
-                    let ports = id.get(ir_db).canonical(ir_db, vhdl_db, "")?;
+                    let ports = id.get(ir_db).canonical(ir_db, arch_db, prefix)?;
                     let mut signals = vec![];
                     for port in ports {
                         let signal = ObjectDeclaration::signal(
-                            vhdl_db,
+                            arch_db,
                             format!("{}__{}", instance_name, port.identifier()),
                             port.typ().clone(),
                             None,
                         )?;
-                        port_mapping.map_port(vhdl_db, port.vhdl_name().clone(), &signal)?;
+                        port_mapping.map_port(arch_db, port.vhdl_name().clone(), &signal)?;
                         signals.push(signal);
-                        declarations.push(signal.try_intern(vhdl_db)?);
+                        declarations.push(signal.into());
                     }
 
                     Ok((name.clone(), signals))
                 })
                 .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
             streamlet_ports.insert(instance_name, port_map_signals);
-            port_mapping.map_port(vhdl_db, "clk", &clk)?;
-            port_mapping.map_port(vhdl_db, "rst", &rst)?;
+            port_mapping.map_port(arch_db, "clk", &clk)?;
+            port_mapping.map_port(arch_db, "rst", &rst)?;
             statements.push(port_mapping.finish()?.into());
         }
         for connection in self.connections() {
@@ -293,17 +304,11 @@ impl Context {
             let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
                 sink_objs.into_iter().zip(source_objs.into_iter()).collect();
             for (sink, source) in sink_source {
-                statements.push(sink.assign(vhdl_db, &source)?.into());
+                statements.push(sink.assign(arch_db, &source)?.into());
             }
         }
 
         Ok(ArchitectureBody::new(declarations, statements))
-    }
-}
-
-impl From<&Streamlet> for Context {
-    fn from(streamlet: &Streamlet) -> Self {
-        Context::new(streamlet.port_ids().clone())
     }
 }
 
@@ -405,10 +410,10 @@ mod tests {
         // ...
         // Databases (this is boilerplate)
         // ...
-        let _ir_db = Database::default();
-        let ir_db = &_ir_db;
-        let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-        let vhdl_db = &mut _vhdl_db;
+        let mut _ir_db = Database::default();
+        let ir_db = &mut _ir_db;
+        let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+        let arch_db = &mut _arch_db;
 
         // ...
         // IR
@@ -454,17 +459,17 @@ mod tests {
         // Back-end
         // ..
         // Convert the Context into a VHDL architecture body
-        let result = context.try_into_arch_body(ir_db, vhdl_db)?;
+        let result = context.canonical(ir_db, arch_db, "")?;
 
         // ..
         // Print the declarations and statements within the body to demonstrate the result
         println!("declarations:");
-        for declaration in result.declarations(vhdl_db) {
-            println!("{}", declaration.declare(vhdl_db, "", ";")?);
+        for declaration in result.declarations() {
+            println!("{}", declaration.declare(arch_db, "", ";")?);
         }
         println!("\nstatements:");
         for statement in result.statements() {
-            println!("{}", statement.declare(vhdl_db, "", ";")?);
+            println!("{}", statement.declare(arch_db, "", ";")?);
         }
 
         Ok(())

@@ -6,8 +6,9 @@ use til_vhdl::{
         physical::{fields::Fields, stream::PhysicalStream},
     },
     ir::{
-        physical_properties::InterfaceDirection, Database, Implementation, Interface, InternSelf,
-        IntoVhdl, Ir, LogicalType, PhysicalProperties, Stream, Streamlet,
+        context::Context, physical_properties::InterfaceDirection, Database, GetSelf,
+        Implementation, Interface, InternSelf, IntoVhdl, Ir, LogicalType, PhysicalProperties,
+        Stream, Streamlet,
     },
     test_utils::test_stream_id,
 };
@@ -18,6 +19,7 @@ use tydi_common::{
 };
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
+    common::vhdl_name::VhdlNameSelf,
     declaration::Declare,
     package::Package,
 };
@@ -43,11 +45,11 @@ fn streamlet_new() -> Result<()> {
 fn streamlet_to_vhdl() -> Result<()> {
     let _db = Database::default();
     let db = &_db;
-    let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-    let vhdl_db = &_vhdl_db;
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
     let stream = test_stream_id(db, 4)?;
     let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
-    let component = streamlet.canonical(db, vhdl_db, "")?;
+    let component = streamlet.canonical(db, arch_db, "  ")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);
 
@@ -70,7 +72,7 @@ package work is
   end component;
 
 end work;"#,
-        package.declare(vhdl_db)?
+        package.declare(arch_db)?
     );
 
     let architecture = Architecture::new_default(&package, Name::try_new("test_com")?)?;
@@ -96,7 +98,7 @@ end test_com;
 architecture Behavioral of test_com is
 begin
 end Behavioral;"#,
-        architecture.declare(vhdl_db)?
+        architecture.declare(arch_db)?
     );
 
     Ok(())
@@ -104,14 +106,15 @@ end Behavioral;"#,
 
 #[test]
 fn playground() -> Result<()> {
-    let _db = Database::default();
-    let db = &_db;
-    let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-    let vhdl_db = &_vhdl_db;
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
     let bits = LogicalType::try_new_bits(4)?.intern(db);
     let data_type = LogicalType::try_new_union(None, vec![("a", bits), ("b", bits)])?.intern(db);
-    //let data_type = LogicalType::try_new_bits(4)?.intern(db);let null_type = LogicalType::Null.intern(db);
-    let null_type = LogicalType::Null.intern(db);
+    let null_type = LogicalType::null_id(db);
     let stream = Stream::try_new(
         db,
         data_type,
@@ -123,6 +126,7 @@ fn playground() -> Result<()> {
         null_type,
         false,
     )?;
+
     let streamlet = Streamlet::try_new(
         db,
         "test",
@@ -131,14 +135,27 @@ fn playground() -> Result<()> {
             ("b", stream, InterfaceDirection::Out),
         ],
     )?;
-    let component = streamlet.canonical(db, vhdl_db, "")?;
+
+    let mut context = Context::from(&streamlet);
+    context.try_add_connection(db, "a", "b")?;
+    let implementation = Implementation::Structural(context).intern(db);
+    let streamlet = streamlet
+        .with_implementation(db, Some(implementation))
+        .get(db);
+
+    let component = streamlet.canonical(db, arch_db, "")?;
+    arch_db.set_subject_component_name(component.vhdl_name().clone());
+
     let mut package = Package::new_default_empty();
     package.add_component(component);
+    arch_db.set_default_package(package);
 
-    println!("{}", package.declare(vhdl_db)?);
+    println!("{}", arch_db.default_package().declare(arch_db)?);
 
-    let architecture = Architecture::new_default(&package, Name::try_new("test_com")?)?;
-    println!("{}", architecture.declare(vhdl_db)?);
+    println!(
+        "{}",
+        streamlet.implementation(db).canonical(db, arch_db, "")?
+    );
 
     Ok(())
 }

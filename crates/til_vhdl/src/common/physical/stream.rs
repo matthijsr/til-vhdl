@@ -5,7 +5,8 @@ use tydi_common::{
     error::{Error, Result},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
-    util::log2_ceil, traits::Reversed,
+    traits::Reversed,
+    util::log2_ceil,
 };
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
@@ -246,8 +247,8 @@ mod tests {
 
     #[test]
     fn test_into_vhdl() -> Result<()> {
-        let _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-        let vhdl_db = &_vhdl_db;
+        let _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+        let arch_db = &_arch_db;
         let physical_stream = PhysicalStream::new(
             Fields::new(vec![
                 ("a".try_into()?, BitCount::new(3).unwrap()),
@@ -265,7 +266,7 @@ mod tests {
         )?;
         let result = ports
             .into_iter()
-            .map(|x| x.declare(vhdl_db))
+            .map(|x| x.declare(arch_db))
             .collect::<Result<Vec<String>>>()?
             .join("\n");
         assert_eq!(
@@ -278,10 +279,11 @@ a_test__sub_endi : out std_logic
 a_test__sub_strb : out std_logic_vector(1 downto 0)"#,
             result
         );
-        let ports = physical_stream.into_vhdl("a", &PathName::new_empty(), InterfaceDirection::Out)?;
+        let ports =
+            physical_stream.into_vhdl("a", &PathName::new_empty(), InterfaceDirection::Out)?;
         let result = ports
             .into_iter()
-            .map(|x| x.declare(vhdl_db))
+            .map(|x| x.declare(arch_db))
             .collect::<Result<Vec<String>>>()?
             .join("\n");
         assert_eq!(

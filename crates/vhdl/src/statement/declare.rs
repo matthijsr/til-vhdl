@@ -1,3 +1,4 @@
+use textwrap::indent;
 use tydi_common::error::{Error, Result};
 
 use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
@@ -15,7 +16,7 @@ impl ArchitectureDeclare for PortMapping {
         let mut port_maps = vec![];
         for (port, _) in self.ports() {
             if let Some(port_assign) = self.mappings().get(port) {
-                port_maps.push(port_assign.declare(db, &format!("{}  ", pre), "")?);
+                port_maps.push(port_assign.declare(db, pre, "")?);
             } else {
                 return Err(Error::BackEndError(format!(
                     "Error while declaring port mapping, port {} is not assigned",
@@ -23,7 +24,7 @@ impl ArchitectureDeclare for PortMapping {
                 )));
             }
         }
-        result.push_str(&port_maps.join(",\n"));
+        result.push_str(&indent(&port_maps.join(",\n"), pre));
         result.push_str(&format!("\n{}){}", pre, post));
         Ok(result)
     }

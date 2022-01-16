@@ -70,7 +70,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
-        vhdl_db: &dyn Arch,
+        arch_db: &mut dyn Arch,
         prefix: impl Into<String>,
     ) -> Result<Vec<Port>> {
         let n: String = cat!(prefix.into(), self.identifier());
