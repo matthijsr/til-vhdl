@@ -1,7 +1,7 @@
 use tydi_intern::Id;
 
 use crate::{
-    common::logical::logicaltype::{Direction, LogicalType, Stream, Synchronicity},
+    common::logical::logicaltype::{Direction, LogicalType, Stream, Synchronicity, Throughput},
     ir::{InternSelf, Ir, TryIntern},
 };
 
@@ -29,6 +29,7 @@ pub fn test_stream_id(db: &dyn Ir, data_type: impl TryIntern<LogicalType>) -> Re
 pub fn test_stream_id_custom(
     db: &dyn Ir,
     data_type: impl TryIntern<LogicalType>,
+    throughput: impl TryResult<Throughput>,
     dimensionality: NonNegative,
     complexity: NonNegative,
 ) -> Result<Id<Stream>> {
@@ -37,7 +38,7 @@ pub fn test_stream_id_custom(
     Stream::try_new(
         db,
         data_type,
-        "1.0",
+        throughput,
         dimensionality,
         Synchronicity::Sync,
         complexity,

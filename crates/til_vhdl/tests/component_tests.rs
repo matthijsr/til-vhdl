@@ -10,12 +10,12 @@ use til_vhdl::{
         Implementation, Interface, InternSelf, IntoVhdl, Ir, LogicalType, PhysicalProperties,
         Stream, Streamlet,
     },
-    test_utils::test_stream_id,
+    test_utils::{test_stream_id, test_stream_id_custom},
 };
 use tydi_common::{
     error::{Error, Result},
     name::Name,
-    numbers::{BitCount, Positive},
+    numbers::{BitCount, NonNegative, Positive},
 };
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
@@ -49,7 +49,7 @@ fn streamlet_to_vhdl() -> Result<()> {
     let arch_db = &mut _arch_db;
     let stream = test_stream_id(db, 4)?;
     let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
-    let component = streamlet.canonical(db, arch_db, "  ")?;
+    let component = streamlet.canonical(db, arch_db, "")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);
 
@@ -99,6 +99,124 @@ architecture Behavioral of test_com is
 begin
 end Behavioral;"#,
         architecture.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+// Validate the output signals at each complexity
+#[test]
+fn streamlet_to_vhdl_complexities() -> Result<()> {
+    let _db = Database::default();
+    let db = &_db;
+    let complexity_decls = (1..8)
+        .map(|c: NonNegative| {
+            let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+            let arch_db = &mut _arch_db;
+            let stream = test_stream_id_custom(db, 4, "2.0", 0, c)?;
+            let streamlet =
+                Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
+            let component = streamlet.canonical(db, arch_db, "")?;
+            component.declare(arch_db)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[0],
+        "Complexity 1"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[1],
+        "Complexity 2"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[2],
+        "Complexity 3"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[3],
+        "Complexity 4"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0);
+    a_endi : in std_logic
+  );
+end component;"#,
+        complexity_decls[4],
+        "Complexity 5"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0);
+    a_stai : in std_logic;
+    a_endi : in std_logic
+  );
+end component;"#,
+        complexity_decls[5],
+        "Complexity 6"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0);
+    a_stai : in std_logic;
+    a_endi : in std_logic;
+    a_strb : in std_logic_vector(1 downto 0)
+  );
+end component;"#,
+        complexity_decls[6],
+        "Complexity 7"
     );
 
     Ok(())
