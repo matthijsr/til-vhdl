@@ -6,8 +6,8 @@ use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 use super::{PortMapping, Statement};
 
 impl ArchitectureDeclare for PortMapping {
-    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
-        let mut result = pre.to_string();
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        let mut result = String::new();
         result.push_str(&format!(
             "{}: {} port map(\n",
             self.label(),
@@ -16,7 +16,7 @@ impl ArchitectureDeclare for PortMapping {
         let mut port_maps = vec![];
         for (port, _) in self.ports() {
             if let Some(port_assign) = self.mappings().get(port) {
-                port_maps.push(port_assign.declare(db, pre, "")?);
+                port_maps.push(port_assign.declare_with_indent(db, indent_style)?);
             } else {
                 return Err(Error::BackEndError(format!(
                     "Error while declaring port mapping, port {} is not assigned",
@@ -24,17 +24,19 @@ impl ArchitectureDeclare for PortMapping {
                 )));
             }
         }
-        result.push_str(&indent(&port_maps.join(",\n"), pre));
-        result.push_str(&format!("\n{}){}", pre, post));
+        result.push_str(&indent(&port_maps.join(",\n"), indent_style));
+        result.push_str("\n)");
         Ok(result)
     }
 }
 
 impl ArchitectureDeclare for Statement {
-    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
-            Statement::Assignment(assignment) => assignment.declare(db, pre, post),
-            Statement::PortMapping(portmapping) => portmapping.declare(db, pre, post),
+            Statement::Assignment(assignment) => assignment.declare_with_indent(db, indent_style),
+            Statement::PortMapping(portmapping) => {
+                portmapping.declare_with_indent(db, indent_style)
+            }
         }
     }
 }

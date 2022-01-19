@@ -72,13 +72,18 @@ pub struct Architecture {
 }
 
 pub trait ArchitectureDeclare {
-    /// Returns a string for the declaration, pre can be used for indentation, post is used for closing characters (','/';')
-    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String>;
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String>;
+    fn declare(&self, db: &dyn Arch) -> Result<String> {
+        self.declare_with_indent(db, "  ")
+    }
 }
 
 impl Architecture {
     /// Create the architecture based on a component contained within a package, assuming the library (project) is "work" and the architecture's identifier is "Behavioral"
-    pub fn new_default(package: &Package, component_id: impl TryResult<VhdlName>) -> Result<Architecture> {
+    pub fn new_default(
+        package: &Package,
+        component_id: impl TryResult<VhdlName>,
+    ) -> Result<Architecture> {
         Architecture::new(
             Name::try_new("work")?,
             VhdlName::try_new("Behavioral")?,
@@ -112,7 +117,10 @@ impl Architecture {
     pub fn from_database(db: &dyn Arch, identifier: impl TryResult<VhdlName>) -> Result<Self> {
         let package = db.default_package();
         let mut usings = package.list_usings()?;
-        usings.add_using(package.vhdl_name().clone(), format!("{}.all", package.identifier()));
+        usings.add_using(
+            package.vhdl_name().clone(),
+            format!("{}.all", package.identifier()),
+        );
         let component = package.get_subject_component(db);
         Ok(Architecture {
             identifier: identifier.try_result()?,

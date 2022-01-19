@@ -35,7 +35,7 @@ pub trait Declare {
 /// end component_with_nested_types;
 /// ```
 pub trait DeclareWithIndent {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String>;
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String>;
 }
 
 impl<T: DeclareWithIndent> Declare for T {

@@ -4,6 +4,7 @@ use std::fmt;
 use indexmap::map::IndexMap;
 
 use array_assignment::ArrayAssignment;
+use textwrap::indent;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
 use tydi_common::traits::{Document, Identify};
@@ -213,8 +214,7 @@ impl Assignment {
         &self,
         db: &dyn Arch,
         object_identifier: String,
-        pre: &str,
-        post: &str,
+        indent_style: &str,
     ) -> Result<String> {
         if let AssignmentKind::Direct(DirectAssignment::Value(ValueAssignment::BitVec(bitvec))) =
             self.kind()
@@ -223,7 +223,7 @@ impl Assignment {
                 return bitvec.declare_for_range(range);
             }
         }
-        self.kind().declare_for(db, object_identifier, pre, post)
+        self.kind().declare_for(db, object_identifier, indent_style)
     }
 }
 
@@ -344,8 +344,7 @@ impl AssignmentKind {
         &self,
         db: &dyn Arch,
         object_identifier: impl Into<String>,
-        pre: &str,
-        post: &str,
+        indent_style: &str,
     ) -> Result<String> {
         let object_identifier: &str = &object_identifier.into();
         match self {
@@ -357,21 +356,21 @@ impl AssignmentKind {
                 },
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
-                    let nested_pre = &format!("{}  ", pre);
                     for rf in record {
                         field_assignments.push(format!(
-                            "\n{}{} => {}",
-                            nested_pre,
+                            "\n{} => {}",
                             rf.field(),
                             rf.assignment().declare_for(
                                 db,
                                 format!("{}.{}", object_identifier, rf.field()),
-                                nested_pre,
-                                post
+                                indent_style,
                             )?
                         ));
                     }
-                    Ok(format!("({}\n{})", field_assignments.join(","), pre))
+                    Ok(format!(
+                        "({}\n)",
+                        indent(&field_assignments.join(","), indent_style)
+                    ))
                 }
                 DirectAssignment::FullArray(array) => match array {
                     ArrayAssignment::Direct(direct) => {
@@ -380,52 +379,45 @@ impl AssignmentKind {
                             positionals.push(value.declare_for(
                                 db,
                                 format!("{}'element", object_identifier),
-                                pre,
-                                post,
+                                indent_style,
                             )?);
                         }
                         Ok(format!("( {} )", positionals.join(", ")))
                     }
                     ArrayAssignment::Sliced { direct, others } => {
                         let mut field_assignments = Vec::new();
-                        let nested_pre = &format!("{}  ", pre);
                         for ra in direct {
                             field_assignments.push(format!(
-                                "\n{}{} => {}",
-                                nested_pre,
-                                ra.constraint()
-                                    .to_string()
-                                    .replace("(", "")
-                                    .replace(")", ""),
+                                "\n{} => {}",
+                                ra.constraint().as_slice_index(),
                                 ra.assignment().declare_for(
                                     db,
                                     format!("{}'element", object_identifier),
-                                    nested_pre,
-                                    post
+                                    indent_style,
                                 )?
                             ));
                         }
                         if let Some(value) = others {
                             field_assignments.push(format!(
-                                "\n{}others => {}",
-                                nested_pre,
+                                "\nothers => {}",
                                 value.declare_for(
                                     db,
                                     format!("{}'element", object_identifier),
-                                    nested_pre,
-                                    post
+                                    indent_style,
                                 )?
                             ));
                         }
-                        Ok(format!("({}\n{})", field_assignments.join(","), pre))
+                        Ok(format!(
+                            "({}\n)",
+                            indent(&field_assignments.join(","), indent_style),
+                        ))
                     }
                     ArrayAssignment::Others(value) => Ok(format!(
                         "( others => {} )",
                         value.declare_for(
                             db,
                             format!("{}'element", object_identifier),
-                            pre,
-                            post
+                            indent_style,
                         )?
                     )),
                 },
@@ -764,6 +756,14 @@ impl RangeConstraint {
             )))
         } else {
             Ok(high >= self.high() && low <= self.low())
+        }
+    }
+
+    pub fn as_slice_index(&self) -> String {
+        match self {
+            RangeConstraint::To { start, end } => format!("{} to {}", start, end),
+            RangeConstraint::Downto { start, end } => format!("{} downto {}", start, end),
+            RangeConstraint::Index(index) => format!("{}", index),
         }
     }
 }
