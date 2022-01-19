@@ -319,7 +319,7 @@ mod tests {
     use crate::{
         common::logical::logicaltype::LogicalType,
         ir::{Database, TryIntern},
-        test_utils::test_stream_id,
+        test_utils::{test_stream_id, test_stream_id_custom},
     };
 
     use super::*;
@@ -440,12 +440,13 @@ mod tests {
                 ("c", stream2, InterfaceDirection::In),
                 ("d", stream2, InterfaceDirection::Out),
             ],
-        )?;
+        )?
+        .with_implementation(ir_db, None); // Streamlet does not have an implementation
+
         // Create a Context from the Streamlet definition (this creates a Context with ports matching the Streamlet)
-        let mut context = Context::from(&streamlet);
+        let mut context = Context::from(&streamlet.get(ir_db));
         // Add an instance (called "instance") of the Streamlet to the Context
-        context
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(ir_db, None))?;
+        context.try_add_streamlet_instance("instance", streamlet)?;
         // Connect the Context's "a" port with the instance's "a" port
         context.try_add_connection(ir_db, "a", ("instance", "a"))?;
         // Connect the Context's "b" port with the instance's "b" port
@@ -454,6 +455,10 @@ mod tests {
         context.try_add_connection(ir_db, "c", "d")?;
         // Connect the instance's "c" port with the instance's "d" port
         context.try_add_connection(ir_db, ("instance", "c"), ("instance", "d"))?;
+
+        context.try_add_streamlet_instance("b", streamlet)?;
+        context.try_add_connection(ir_db, ("b", "a"), ("b", "b"))?;
+        context.try_add_connection(ir_db, ("b", "c"), ("b", "d"))?;
 
         // ..
         // Back-end
@@ -465,11 +470,11 @@ mod tests {
         // Print the declarations and statements within the body to demonstrate the result
         println!("declarations:");
         for declaration in result.declarations() {
-            println!("{}", declaration.declare(arch_db, "", ";")?);
+            println!("{}", declaration.declare(arch_db, "  ", ";")?);
         }
         println!("\nstatements:");
         for statement in result.statements() {
-            println!("{}", statement.declare(arch_db, "", ";")?);
+            println!("{}", statement.declare(arch_db, "  ", ";")?);
         }
 
         Ok(())

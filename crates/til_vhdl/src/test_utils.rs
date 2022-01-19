@@ -25,3 +25,24 @@ pub fn test_stream_id(db: &dyn Ir, data_type: impl TryIntern<LogicalType>) -> Re
         false,
     )
 }
+
+pub fn test_stream_id_custom(
+    db: &dyn Ir,
+    data_type: impl TryIntern<LogicalType>,
+    dimensionality: NonNegative,
+    complexity: NonNegative,
+) -> Result<Id<Stream>> {
+    let data_type = data_type.try_intern(db)?;
+    let null_type = LogicalType::Null.intern(db);
+    Stream::try_new(
+        db,
+        data_type,
+        "1.0",
+        dimensionality,
+        Synchronicity::Sync,
+        complexity,
+        Direction::Forward,
+        null_type,
+        false,
+    )
+}
