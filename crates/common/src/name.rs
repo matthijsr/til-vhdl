@@ -94,11 +94,11 @@ impl TryFrom<String> for Name {
 }
 
 impl TryOptionalFrom<&str> for Name {
-    fn optional_result_from(str: &str) -> Result<Option<Self>> {
+    fn optional_result_from(str: &str) -> Option<Result<Self>> {
         if str.trim() == "" {
-            Ok(None)
+            None
         } else {
-            Ok(Some(Name::try_new(str)?))
+            Some(Name::try_new(str))
         }
     }
 }

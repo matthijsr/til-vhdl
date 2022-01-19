@@ -132,10 +132,10 @@ impl IntoVhdl<Component> for Streamlet {
         arch_db: &mut dyn Arch,
         prefix: impl TryOptional<Name>,
     ) -> Result<Component> {
-        let prefix = prefix.try_result()?;
-        let prefix_str = match &prefix {
-            Some(name) => name.as_ref(),
-            None => "",
+        let prefix = prefix.try_optional()?;
+        let n: String = match &prefix {
+            Some(some) => cat!(some, self.identifier(), "com"),
+            None => cat!(self.identifier(), "com"),
         };
 
         let mut ports = vec![];
@@ -150,7 +150,7 @@ impl IntoVhdl<Component> for Streamlet {
         // TODO: Streamlet should also have documentation?
 
         Ok(Component::new(
-            VhdlName::try_new(cat!(prefix_str, self.identifier(), "com"))?,
+            VhdlName::try_new(n)?,
             vec![],
             ports,
             None,

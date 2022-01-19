@@ -72,12 +72,10 @@ impl IntoVhdl<Vec<Port>> for Interface {
         _arch_db: &mut dyn Arch,
         prefix: impl TryOptional<Name>,
     ) -> Result<Vec<Port>> {
-        let prefix = prefix.try_result()?;
-        let prefix = match &prefix {
-            Some(name) => name.as_ref(),
-            None => "",
+        let n: String = match prefix.try_optional()? {
+            Some(some) => cat!(some, self.identifier()),
+            None => self.identifier().to_string(),
         };
-        let n: String = cat!(prefix, self.identifier());
         let mut ports = Vec::new();
 
         let synth = self.stream.synthesize(ir_db);

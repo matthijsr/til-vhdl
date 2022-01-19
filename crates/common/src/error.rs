@@ -130,7 +130,7 @@ pub trait TryResult<T> {
 }
 
 pub trait TryOptionalFrom<T>: Sized {
-    fn optional_result_from(value: T) -> Result<Option<Self>>;
+    fn optional_result_from(value: T) -> Option<Result<Self>>;
 }
 
 pub trait TryOptional<T> {
@@ -156,14 +156,11 @@ where
     }
 }
 
-impl<T, U> TryOptionalFrom<Option<T>> for U
-where
-    U: ResultFrom<T>,
-{
-    fn optional_result_from(value: Option<T>) -> Result<Option<Self>> {
+impl<T> TryOptionalFrom<Option<T>> for T {
+    fn optional_result_from(value: Option<T>) -> Option<Result<Self>> {
         match value {
-            Some(some) => Ok(Some(U::result_from(some)?)),
-            None => Ok(None),
+            Some(some) => Some(Ok(some)),
+            None => None,
         }
     }
 }
@@ -173,7 +170,10 @@ where
     T: TryOptionalFrom<U>,
 {
     fn try_optional(self) -> Result<Option<T>> {
-        T::optional_result_from(self)
+        match T::optional_result_from(self) {
+            Some(some) => Ok(Some(some?)),
+            None => Ok(None),
+        }
     }
 }
 
