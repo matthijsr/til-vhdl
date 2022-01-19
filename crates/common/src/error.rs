@@ -129,6 +129,14 @@ pub trait TryResult<T> {
     fn try_result(self) -> Result<T>;
 }
 
+pub trait TryOptionalFrom<T>: Sized {
+    fn optional_result_from(value: T) -> Result<Option<Self>>;
+}
+
+pub trait TryOptional<T> {
+    fn try_optional(self) -> Result<Option<T>>;
+}
+
 impl<T, U, E> ResultFrom<U> for T
 where
     Error: From<E>,
@@ -145,6 +153,27 @@ where
 {
     fn try_result(self) -> Result<T> {
         T::result_from(self)
+    }
+}
+
+impl<T, U> TryOptionalFrom<Option<T>> for U
+where
+    U: ResultFrom<T>,
+{
+    fn optional_result_from(value: Option<T>) -> Result<Option<Self>> {
+        match value {
+            Some(some) => Ok(Some(U::result_from(some)?)),
+            None => Ok(None),
+        }
+    }
+}
+
+impl<T, U> TryOptional<T> for U
+where
+    T: TryOptionalFrom<U>,
+{
+    fn try_optional(self) -> Result<Option<T>> {
+        T::optional_result_from(self)
     }
 }
 

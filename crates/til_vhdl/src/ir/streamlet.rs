@@ -1,19 +1,13 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    convert::TryInto,
-};
+use std::collections::BTreeMap;
 
 use tydi_common::{
     cat,
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryResult, TryOptional},
     traits::Identify,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::{arch_storage::Arch, Architecture},
-    common::vhdl_name::VhdlName,
-    component::Component,
-    port::Port,
+    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, component::Component, port::Port,
 };
 
 use super::{
@@ -136,21 +130,27 @@ impl IntoVhdl<Component> for Streamlet {
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
-        prefix: impl Into<String>,
+        prefix: impl TryOptional<Name>,
     ) -> Result<Component> {
+        let prefix = prefix.try_result()?;
+        let prefix_str = match &prefix {
+            Some(name) => name.as_ref(),
+            None => "",
+        };
+
         let mut ports = vec![];
         ports.push(Port::clk());
         ports.push(Port::rst());
         for input in self.inputs(ir_db) {
-            ports.extend(input.canonical(ir_db, arch_db, "")?);
+            ports.extend(input.canonical(ir_db, arch_db, prefix.clone())?);
         }
         for output in self.outputs(ir_db) {
-            ports.extend(output.canonical(ir_db, arch_db, "")?);
+            ports.extend(output.canonical(ir_db, arch_db, prefix.clone())?);
         }
         // TODO: Streamlet should also have documentation?
 
         Ok(Component::new(
-            VhdlName::try_new(cat!(self.identifier(), "com"))?,
+            VhdlName::try_new(cat!(prefix_str, self.identifier(), "com"))?,
             vec![],
             ports,
             None,

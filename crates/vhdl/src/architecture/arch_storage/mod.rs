@@ -1,12 +1,11 @@
-use std::sync::Arc;
+
 
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
 use crate::{
     assignment::AssignmentKind,
-    declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectMode, ObjectState},
-    object::ObjectType,
+    declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectState},
     package::Package,
     statement::Statement, common::vhdl_name::VhdlName,
 };

@@ -1,5 +1,5 @@
 use crate::common::logical;
-use tydi_common::error::{Result, TryResult};
+use tydi_common::error::{Result, TryResult, TryOptional};
 use tydi_intern::Id;
 
 pub mod annotation_keys;
@@ -76,9 +76,9 @@ pub trait IntoVhdl<T> {
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
-        prefix: impl Into<String>,
+        prefix: impl TryOptional<Name>,
     ) -> Result<T>;
-    fn fancy(&self, ir_db: &dyn Ir, arch_db: &dyn Arch) -> Result<T> {
+    fn fancy(&self, _ir_db: &dyn Ir, _arch_db: &dyn Arch) -> Result<T> {
         todo!()
     }
 }

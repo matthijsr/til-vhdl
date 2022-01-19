@@ -1,9 +1,9 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use tydi_common::{
     cat,
-    error::{Error, Result, TryResult},
-    traits::{Identify, Reversed},
+    error::{Error, Result, TryResult, TryOptional},
+    traits::Identify,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
@@ -12,11 +12,10 @@ use tydi_vhdl::{
     port::{Mode, Port},
 };
 
-use crate::common::logical::{logical_stream::SynthesizeLogicalStream, logicaltype::Direction};
+use crate::common::logical::logical_stream::SynthesizeLogicalStream;
 
 use super::{
-    physical_properties::{self, InterfaceDirection},
-    IntoVhdl, Ir, LogicalType, Name, PhysicalProperties, Stream,
+    physical_properties::InterfaceDirection, IntoVhdl, Ir, Name, PhysicalProperties, Stream,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -70,10 +69,15 @@ impl IntoVhdl<Vec<Port>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
-        arch_db: &mut dyn Arch,
-        prefix: impl Into<String>,
+        _arch_db: &mut dyn Arch,
+        prefix: impl TryOptional<Name>,
     ) -> Result<Vec<Port>> {
-        let n: String = cat!(prefix.into(), self.identifier());
+        let prefix = prefix.try_result()?;
+        let prefix = match &prefix {
+            Some(name) => name.as_ref(),
+            None => "",
+        };
+        let n: String = cat!(prefix, self.identifier());
         let mut ports = Vec::new();
 
         let synth = self.stream.synthesize(ir_db);

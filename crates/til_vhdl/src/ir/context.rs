@@ -1,21 +1,16 @@
 use std::collections::{BTreeMap, HashSet};
 
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryOptional, TryResult},
     name::Name,
     traits::Identify,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::{
-        arch_storage::{Arch, TryIntern},
-        ArchitectureBody,
-    },
+    architecture::{arch_storage::Arch, ArchitectureBody},
     assignment::Assign,
     common::vhdl_name::VhdlNameSelf,
     declaration::ObjectDeclaration,
-    object::ObjectType,
-    port::Mode,
     statement::PortMapping,
 };
 
@@ -232,11 +227,10 @@ impl IntoVhdl<ArchitectureBody> for Context {
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
-        prefix: impl Into<String>,
+        prefix: impl TryOptional<Name>,
     ) -> Result<ArchitectureBody> {
         self.validate_connections(ir_db)?;
-
-        let prefix = &prefix.into();
+        let prefix = prefix.try_optional()?;
 
         let mut declarations = vec![];
         let mut statements = vec![];
@@ -246,7 +240,7 @@ impl IntoVhdl<ArchitectureBody> for Context {
             .map(|(name, port)| {
                 Ok((
                     name.clone(),
-                    port.canonical(ir_db, arch_db, prefix)?
+                    port.canonical(ir_db, arch_db, prefix.clone())?
                         .iter()
                         .map(|vhdl_port| ObjectDeclaration::from_port(arch_db, vhdl_port, true))
                         .collect(),
@@ -258,7 +252,7 @@ impl IntoVhdl<ArchitectureBody> for Context {
         let mut streamlet_ports = BTreeMap::new();
         let mut streamlet_components = BTreeMap::new();
         for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
-            let component = streamlet.canonical(ir_db, arch_db, "")?;
+            let component = streamlet.canonical(ir_db, arch_db, prefix.clone())?;
             let mut port_mapping =
                 PortMapping::from_component(arch_db, &component, instance_name.clone())?;
             streamlet_components.insert(instance_name.clone(), component);
@@ -266,7 +260,7 @@ impl IntoVhdl<ArchitectureBody> for Context {
                 .port_ids()
                 .iter()
                 .map(|(name, id)| {
-                    let ports = id.get(ir_db).canonical(ir_db, arch_db, prefix)?;
+                    let ports = id.get(ir_db).canonical(ir_db, arch_db, prefix.clone())?;
                     let mut signals = vec![];
                     for port in ports {
                         let signal = ObjectDeclaration::signal(
@@ -464,7 +458,7 @@ mod tests {
         // Back-end
         // ..
         // Convert the Context into a VHDL architecture body
-        let result = context.canonical(ir_db, arch_db, "")?;
+        let result = context.canonical(ir_db, arch_db, None)?;
 
         let mut declarations = String::new();
         for declaration in result.declarations() {

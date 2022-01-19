@@ -1,16 +1,14 @@
-use std::{convert::TryInto, error, sync::Arc};
+use std::{sync::Arc};
 
 use crate::{
-    common::physical::{fields::Fields, stream::PhysicalStream},
-    ir::{GetSelf, InternSelf, IntoVhdl, Ir},
+    common::physical::{fields::Fields},
+    ir::{GetSelf, InternSelf, Ir},
 };
 use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
-    traits::Reverse,
-    util::log2_ceil,
 };
 
 pub use bits::*;

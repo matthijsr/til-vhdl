@@ -1,6 +1,6 @@
 use tydi_intern::Id;
 
-use super::{Connection, GetSelf, Implementation, Interface, LogicalType, Stream, Streamlet};
+use super::{GetSelf, Implementation, Interface, LogicalType, Stream, Streamlet};
 
 impl GetSelf<Implementation> for Id<Implementation> {
     fn get(&self, db: &dyn super::Ir) -> Implementation {

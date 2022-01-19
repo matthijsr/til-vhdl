@@ -1,10 +1,10 @@
-use std::convert::{TryFrom, TryInto};
-use std::hash::{Hash, Hasher};
+use std::convert::TryFrom;
+use std::hash::Hash;
 use std::ops::Mul;
 use std::str::FromStr;
 
 use indexmap::IndexMap;
-use salsa::Database;
+
 use tydi_common::error::TryResult;
 use tydi_common::name::PathName;
 use tydi_common::numbers::Positive;

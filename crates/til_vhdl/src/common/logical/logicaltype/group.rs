@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use std::{collections::BTreeMap, convert::TryInto, error, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 use tydi_intern::Id;
 
 use crate::ir::{GetSelf, Ir};
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let mut db = Database::default();
+        let db = Database::default();
         let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
         let group = Group::try_new(None, vec![("a", bits)]).unwrap();
         assert_eq!(
