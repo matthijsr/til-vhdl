@@ -466,16 +466,154 @@ mod tests {
         // Convert the Context into a VHDL architecture body
         let result = context.canonical(ir_db, arch_db, "")?;
 
-        // ..
-        // Print the declarations and statements within the body to demonstrate the result
-        println!("declarations:");
+        let mut declarations = String::new();
         for declaration in result.declarations() {
-            println!("{}", declaration.declare(arch_db)?);
+            declarations.push_str(&format!("{}\n", declaration.declare(arch_db)?));
         }
-        println!("\nstatements:");
+        assert_eq!(
+            r#"signal b__a_valid : std_logic
+signal b__a_ready : std_logic
+signal b__a_data : std_logic_vector(11 downto 0)
+signal b__a_stai : std_logic_vector(1 downto 0)
+signal b__a_endi : std_logic_vector(1 downto 0)
+signal b__a_strb : std_logic_vector(2 downto 0)
+signal b__b_valid : std_logic
+signal b__b_ready : std_logic
+signal b__b_data : std_logic_vector(11 downto 0)
+signal b__b_stai : std_logic_vector(1 downto 0)
+signal b__b_endi : std_logic_vector(1 downto 0)
+signal b__b_strb : std_logic_vector(2 downto 0)
+signal b__c_valid : std_logic
+signal b__c_ready : std_logic
+signal b__c_data : std_logic_vector(16 downto 0)
+signal b__c_last : std_logic
+signal b__c_strb : std_logic
+signal b__d_valid : std_logic
+signal b__d_ready : std_logic
+signal b__d_data : std_logic_vector(16 downto 0)
+signal b__d_last : std_logic
+signal b__d_strb : std_logic
+signal instance__a_valid : std_logic
+signal instance__a_ready : std_logic
+signal instance__a_data : std_logic_vector(11 downto 0)
+signal instance__a_stai : std_logic_vector(1 downto 0)
+signal instance__a_endi : std_logic_vector(1 downto 0)
+signal instance__a_strb : std_logic_vector(2 downto 0)
+signal instance__b_valid : std_logic
+signal instance__b_ready : std_logic
+signal instance__b_data : std_logic_vector(11 downto 0)
+signal instance__b_stai : std_logic_vector(1 downto 0)
+signal instance__b_endi : std_logic_vector(1 downto 0)
+signal instance__b_strb : std_logic_vector(2 downto 0)
+signal instance__c_valid : std_logic
+signal instance__c_ready : std_logic
+signal instance__c_data : std_logic_vector(16 downto 0)
+signal instance__c_last : std_logic
+signal instance__c_strb : std_logic
+signal instance__d_valid : std_logic
+signal instance__d_ready : std_logic
+signal instance__d_data : std_logic_vector(16 downto 0)
+signal instance__d_last : std_logic
+signal instance__d_strb : std_logic
+"#,
+            declarations,
+            "declarations"
+        );
+
+        let mut statements = String::new();
         for statement in result.statements() {
-            println!("{}", statement.declare(arch_db)?);
+            statements.push_str(&format!("{}\n", statement.declare(arch_db)?));
         }
+        assert_eq!(
+            r#"b: a_com port map(
+  clk => clk,
+  rst => rst,
+  a_valid => b__a_valid,
+  a_ready => b__a_ready,
+  a_data => b__a_data,
+  a_stai => b__a_stai,
+  a_endi => b__a_endi,
+  a_strb => b__a_strb,
+  c_valid => b__c_valid,
+  c_ready => b__c_ready,
+  c_data => b__c_data,
+  c_last => b__c_last,
+  c_strb => b__c_strb,
+  b_valid => b__b_valid,
+  b_ready => b__b_ready,
+  b_data => b__b_data,
+  b_stai => b__b_stai,
+  b_endi => b__b_endi,
+  b_strb => b__b_strb,
+  d_valid => b__d_valid,
+  d_ready => b__d_ready,
+  d_data => b__d_data,
+  d_last => b__d_last,
+  d_strb => b__d_strb
+)
+instance: a_com port map(
+  clk => clk,
+  rst => rst,
+  a_valid => instance__a_valid,
+  a_ready => instance__a_ready,
+  a_data => instance__a_data,
+  a_stai => instance__a_stai,
+  a_endi => instance__a_endi,
+  a_strb => instance__a_strb,
+  c_valid => instance__c_valid,
+  c_ready => instance__c_ready,
+  c_data => instance__c_data,
+  c_last => instance__c_last,
+  c_strb => instance__c_strb,
+  b_valid => instance__b_valid,
+  b_ready => instance__b_ready,
+  b_data => instance__b_data,
+  b_stai => instance__b_stai,
+  b_endi => instance__b_endi,
+  b_strb => instance__b_strb,
+  d_valid => instance__d_valid,
+  d_ready => instance__d_ready,
+  d_data => instance__d_data,
+  d_last => instance__d_last,
+  d_strb => instance__d_strb
+)
+instance__a_valid <= a_valid
+instance__a_ready <= a_ready
+instance__a_data <= a_data
+instance__a_stai <= a_stai
+instance__a_endi <= a_endi
+instance__a_strb <= a_strb
+b_valid <= instance__b_valid
+b_ready <= instance__b_ready
+b_data <= instance__b_data
+b_stai <= instance__b_stai
+b_endi <= instance__b_endi
+b_strb <= instance__b_strb
+d_valid <= c_valid
+d_ready <= c_ready
+d_data <= c_data
+d_last <= c_last
+d_strb <= c_strb
+instance__c_valid <= instance__d_valid
+instance__c_ready <= instance__d_ready
+instance__c_data <= instance__d_data
+instance__c_last <= instance__d_last
+instance__c_strb <= instance__d_strb
+b__a_valid <= b__b_valid
+b__a_ready <= b__b_ready
+b__a_data <= b__b_data
+b__a_stai <= b__b_stai
+b__a_endi <= b__b_endi
+b__a_strb <= b__b_strb
+b__c_valid <= b__d_valid
+b__c_ready <= b__d_ready
+b__c_data <= b__d_data
+b__c_last <= b__d_last
+b__c_strb <= b__d_strb
+"#,
+            statements,
+            "statements"
+        );
 
         Ok(())
     }
