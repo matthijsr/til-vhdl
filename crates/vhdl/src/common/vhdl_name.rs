@@ -2,7 +2,7 @@ use std::{convert::TryFrom, fmt, ops::Deref, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result},
-    name::{Name, PathName},
+    name::{Name, NameSelf, PathName},
 };
 /// Type-safe wrapper for valid names.
 ///
@@ -120,4 +120,8 @@ impl fmt::Display for VhdlName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+pub trait VhdlNameSelf {
+    fn vhdl_name(&self) -> &VhdlName;
 }

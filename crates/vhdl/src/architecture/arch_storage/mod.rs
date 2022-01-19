@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tydi_common::error::{Error, Result};
+use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
 use crate::{
@@ -8,20 +8,25 @@ use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectMode, ObjectState},
     object::ObjectType,
     package::Package,
-    statement::Statement,
+    statement::Statement, common::vhdl_name::VhdlName,
 };
 
 use super::Architecture;
 
 pub mod db;
+pub mod get_self;
+pub mod intern_self;
 
 #[salsa::query_group(ArchStorage)]
 pub trait Arch {
     #[salsa::input]
-    fn default_package(&self) -> Arc<Package>;
+    fn default_package(&self) -> Package;
 
     #[salsa::input]
-    fn architecture(&self) -> Arc<Architecture>;
+    fn subject_component_name(&self) -> VhdlName;
+
+    #[salsa::input]
+    fn architecture(&self) -> Architecture;
 
     #[salsa::interned]
     fn intern_architecture_declaration(
@@ -71,4 +76,44 @@ fn get_object(db: &dyn Arch, id: Id<ObjectDeclaration>) -> Result<ObjectDeclarat
         }
     }
     Ok(obj)
+}
+
+pub trait GetSelf<T> {
+    fn get(&self, db: &dyn Arch) -> T;
+}
+
+pub trait InternSelf: Sized {
+    fn intern(self, db: &dyn Arch) -> Id<Self>;
+}
+
+pub trait InternAs<T> {
+    fn intern_as(self, db: &dyn Arch) -> Id<T>;
+}
+
+pub trait TryIntern<T> {
+    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>>;
+}
+
+pub trait TryInternAs<T> {
+    fn try_intern_as(self, db: &dyn Arch) -> Result<Id<T>>;
+}
+
+impl<T, U> InternAs<T> for U
+where
+    U: Into<T>,
+    T: InternSelf,
+{
+    fn intern_as(self, db: &dyn Arch) -> Id<T> {
+        self.into().intern(db)
+    }
+}
+
+impl<T, U> TryIntern<T> for U
+where
+    U: TryResult<T>,
+    T: InternSelf,
+{
+    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>> {
+        Ok(self.try_result()?.intern(db))
+    }
 }

@@ -9,10 +9,10 @@ use tydi_common::error::Result;
 use super::AssignDeclaration;
 
 impl ArchitectureDeclare for AssignDeclaration {
-    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
-            result.push_str(&indent(&doc, pre));
+            result.push_str(&doc);
         }
         result.push_str(&self.object_string(db));
         result.push_str(
@@ -24,12 +24,11 @@ impl ArchitectureDeclare for AssignDeclaration {
                 ObjectKind::ComponentPort => " => ",
             },
         );
-        result.push_str(
-            &self
-                .assignment()
-                .declare_for(db, self.object_string(db), pre, post)?,
-        );
-        result.push_str(post);
+        result.push_str(&self.assignment().declare_for(
+            db,
+            self.object_string(db),
+            indent_style,
+        )?);
         Ok(result)
     }
 }

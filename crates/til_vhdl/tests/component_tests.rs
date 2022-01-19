@@ -6,17 +6,20 @@ use til_vhdl::{
         physical::{fields::Fields, stream::PhysicalStream},
     },
     ir::{
-        physical_properties::InterfaceDirection, Database, Implementation, Interface, InternSelf, IntoVhdl, Ir,
-        LogicalType, PhysicalProperties, Stream, Streamlet,
+        context::Context, physical_properties::InterfaceDirection, Database, GetSelf,
+        Implementation, Interface, InternSelf, IntoVhdl, Ir, LogicalType, PhysicalProperties,
+        Stream, Streamlet,
     },
+    test_utils::{test_stream_id, test_stream_id_custom},
 };
 use tydi_common::{
     error::{Error, Result},
     name::Name,
-    numbers::{BitCount, Positive},
+    numbers::{BitCount, NonNegative, Positive},
 };
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
+    common::vhdl_name::VhdlNameSelf,
     declaration::Declare,
     package::Package,
 };
@@ -28,8 +31,7 @@ fn streamlet_new() -> Result<()> {
     let db = Database::default();
     let imple = Implementation::Link;
     let implid = db.intern_implementation(imple.clone());
-    let streamlet = Streamlet::try_new(&db, Name::try_new("test")?, vec![])?
-        .with_implementation(&db, Some(implid));
+    let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
     assert_eq!(
         db.lookup_intern_streamlet(streamlet)
             .implementation(&db)
@@ -43,24 +45,11 @@ fn streamlet_new() -> Result<()> {
 fn streamlet_to_vhdl() -> Result<()> {
     let _db = Database::default();
     let db = &_db;
-    let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-    let vhdl_db = &_vhdl_db;
-    let data_type = LogicalType::try_new_bits(4)?.intern(db);
-    let null_type = LogicalType::Null.intern(db);
-    let stream = Stream::try_new(
-        db,
-        data_type,
-        "1.0",
-        1,
-        Synchronicity::Sync,
-        4,
-        Direction::Forward,
-        null_type,
-        false,
-    )?;
-    let port = Interface::try_new("a", stream, PhysicalProperties::new(InterfaceDirection::In))?;
-    let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
-    let component = streamlet.canonical(db, vhdl_db, "")?;
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+    let stream = test_stream_id(db, 4)?;
+    let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
+    let component = streamlet.canonical(db, arch_db, "")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);
 
@@ -83,7 +72,7 @@ package work is
   end component;
 
 end work;"#,
-        package.declare(vhdl_db)?
+        package.declare(arch_db)?
     );
 
     let architecture = Architecture::new_default(&package, Name::try_new("test_com")?)?;
@@ -109,7 +98,125 @@ end test_com;
 architecture Behavioral of test_com is
 begin
 end Behavioral;"#,
-        architecture.declare(vhdl_db)?
+        architecture.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+// Validate the output signals at each complexity
+#[test]
+fn streamlet_to_vhdl_complexities() -> Result<()> {
+    let _db = Database::default();
+    let db = &_db;
+    let complexity_decls = (1..8)
+        .map(|c: NonNegative| {
+            let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+            let arch_db = &mut _arch_db;
+            let stream = test_stream_id_custom(db, 4, "2.0", 0, c)?;
+            let streamlet =
+                Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
+            let component = streamlet.canonical(db, arch_db, "")?;
+            component.declare(arch_db)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[0],
+        "Complexity 1"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[1],
+        "Complexity 2"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[2],
+        "Complexity 3"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        complexity_decls[3],
+        "Complexity 4"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0);
+    a_endi : in std_logic
+  );
+end component;"#,
+        complexity_decls[4],
+        "Complexity 5"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0);
+    a_stai : in std_logic;
+    a_endi : in std_logic
+  );
+end component;"#,
+        complexity_decls[5],
+        "Complexity 6"
+    );
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(7 downto 0);
+    a_stai : in std_logic;
+    a_endi : in std_logic;
+    a_strb : in std_logic_vector(1 downto 0)
+  );
+end component;"#,
+        complexity_decls[6],
+        "Complexity 7"
     );
 
     Ok(())
@@ -117,15 +224,15 @@ end Behavioral;"#,
 
 #[test]
 fn playground() -> Result<()> {
-    let _db = Database::default();
-    let db = &_db;
-    let mut _vhdl_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-    let vhdl_db = &_vhdl_db;
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
     let bits = LogicalType::try_new_bits(4)?.intern(db);
-    let data_type =
-        LogicalType::try_new_union(db, None, vec![("a", bits), ("b", bits)])?.intern(db);
-    //let data_type = LogicalType::try_new_bits(4)?.intern(db);let null_type = LogicalType::Null.intern(db);
-    let null_type = LogicalType::Null.intern(db);
+    let data_type = LogicalType::try_new_union(None, vec![("a", bits), ("b", bits)])?.intern(db);
+    let null_type = LogicalType::null_id(db);
     let stream = Stream::try_new(
         db,
         data_type,
@@ -137,16 +244,36 @@ fn playground() -> Result<()> {
         null_type,
         false,
     )?;
-    let port = Interface::try_new("a", stream, PhysicalProperties::new(InterfaceDirection::In))?;
-    let streamlet = Streamlet::try_new(db, Name::try_new("test")?, vec![port])?;
-    let component = streamlet.canonical(db, vhdl_db, "")?;
+
+    let streamlet = Streamlet::try_new(
+        db,
+        "test",
+        vec![
+            ("a", stream, InterfaceDirection::In),
+            ("b", stream, InterfaceDirection::Out),
+        ],
+    )?;
+
+    let mut context = Context::from(&streamlet);
+    context.try_add_connection(db, "a", "b")?;
+    let implementation = Implementation::Structural(context).intern(db);
+    let streamlet = streamlet
+        .with_implementation(db, Some(implementation))
+        .get(db);
+
+    let component = streamlet.canonical(db, arch_db, "")?;
+    arch_db.set_subject_component_name(component.vhdl_name().clone());
+
     let mut package = Package::new_default_empty();
     package.add_component(component);
+    arch_db.set_default_package(package);
 
-    println!("{}", package.declare(vhdl_db)?);
+    println!("{}", arch_db.default_package().declare(arch_db)?);
 
-    let architecture = Architecture::new_default(&package, Name::try_new("test_com")?)?;
-    println!("{}", architecture.declare(vhdl_db)?);
+    println!(
+        "{}",
+        streamlet.implementation(db).canonical(db, arch_db, "")?
+    );
 
     Ok(())
 }

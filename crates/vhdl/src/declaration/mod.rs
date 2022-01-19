@@ -2,11 +2,12 @@ use std::convert::TryInto;
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tydi_common::error::{Error, Result};
+use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;
 use tydi_intern::Id;
 
-use crate::architecture::arch_storage::Arch;
+use crate::architecture::arch_storage::{Arch, InternSelf};
+use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::port::{Mode, Port};
 
 use super::assignment::{AssignmentKind, FieldSelection};
@@ -34,7 +35,7 @@ pub trait Declare {
 /// end component_with_nested_types;
 /// ```
 pub trait DeclareWithIndent {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String>;
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String>;
 }
 
 impl<T: DeclareWithIndent> Declare for T {
@@ -80,7 +81,7 @@ pub enum ArchitectureDeclaration {
     ///
     /// *Ports cannot be declared within the architecture itself, but can be used in the statement part,
     /// as such, the ports of the entity implemented are treated as inferred declarations.
-    Object(ObjectDeclaration),
+    Object(Id<ObjectDeclaration>),
     /// Alias for an object declaration, with optional range constraint
     Alias(AliasDeclaration),
     Component(String), // TODO: Component declarations within the architecture
@@ -175,7 +176,7 @@ impl fmt::Display for ObjectState {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectDeclaration {
     /// Name of the signal
-    identifier: String,
+    identifier: VhdlName,
     /// (Sub-)Type of the object
     typ: ObjectType,
     mode: ObjectMode,
@@ -187,110 +188,105 @@ pub struct ObjectDeclaration {
 
 impl ObjectDeclaration {
     pub fn signal(
-        db: &mut impl Arch,
-        identifier: impl Into<String>,
+        db: &mut dyn Arch,
+        identifier: impl TryResult<VhdlName>,
         typ: ObjectType,
         default: Option<AssignmentKind>,
-    ) -> Id<ObjectDeclaration> {
-        Self::intern(
-            db,
-            ObjectDeclaration {
-                identifier: identifier.into(),
-                typ,
-                mode: ObjectMode::new(true, ObjectState::Unassigned),
-                default,
-                kind: ObjectKind::Signal,
-            },
-        )
+    ) -> Result<Id<ObjectDeclaration>> {
+        Ok(ObjectDeclaration {
+            identifier: identifier.try_result()?,
+            typ,
+            mode: ObjectMode::new(true, ObjectState::Unassigned),
+            default,
+            kind: ObjectKind::Signal,
+        }
+        .intern(db))
     }
 
     pub fn variable(
-        db: &mut impl Arch,
-        identifier: impl Into<String>,
+        db: &mut dyn Arch,
+        identifier: impl TryResult<VhdlName>,
         typ: ObjectType,
         default: Option<AssignmentKind>,
-    ) -> Id<ObjectDeclaration> {
-        Self::intern(
-            db,
-            ObjectDeclaration {
-                identifier: identifier.into(),
-                typ,
-                mode: if let Some(_) = default {
-                    ObjectMode::new(true, ObjectState::Assigned)
-                } else {
-                    ObjectMode::new(true, ObjectState::Unassigned)
-                },
-                default,
-                kind: ObjectKind::Variable,
+    ) -> Result<Id<ObjectDeclaration>> {
+        Ok(ObjectDeclaration {
+            identifier: identifier.try_result()?,
+            typ,
+            mode: if let Some(_) = default {
+                ObjectMode::new(true, ObjectState::Assigned)
+            } else {
+                ObjectMode::new(true, ObjectState::Unassigned)
             },
-        )
+            default,
+            kind: ObjectKind::Variable,
+        }
+        .intern(db))
     }
 
     pub fn constant(
-        db: &mut impl Arch,
-        identifier: impl Into<String>,
+        db: &mut dyn Arch,
+        identifier: impl TryResult<VhdlName>,
         typ: ObjectType,
         value: impl Into<AssignmentKind>,
-    ) -> Id<ObjectDeclaration> {
-        Self::intern(
-            db,
-            ObjectDeclaration {
-                identifier: identifier.into(),
-                typ,
-                mode: ObjectMode::new(false, ObjectState::Unassigned),
-                default: Some(value.into()),
-                kind: ObjectKind::Constant,
-            },
-        )
+    ) -> Result<Id<ObjectDeclaration>> {
+        Ok(ObjectDeclaration {
+            identifier: identifier.try_result()?,
+            typ,
+            mode: ObjectMode::new(false, ObjectState::Unassigned),
+            default: Some(value.into()),
+            kind: ObjectKind::Constant,
+        }
+        .intern(db))
     }
 
     /// Entity Ports serve as a way to represent the ports of an entity the architecture is describing.
     /// They are not declared within the architecture itself, but can drive or be driven by other objects.
     pub fn entity_port(
-        db: &mut impl Arch,
-        identifier: impl Into<String>,
+        db: &mut dyn Arch,
+        identifier: impl TryResult<VhdlName>,
         typ: ObjectType,
         mode: Mode,
-    ) -> Id<ObjectDeclaration> {
-        Self::intern(
-            db,
-            ObjectDeclaration {
-                identifier: identifier.into(),
-                typ,
-                mode: match mode {
-                    Mode::In => ObjectMode::new(false, ObjectState::Assigned),
-                    Mode::Out => ObjectMode::new(false, ObjectState::Unassigned),
-                },
-                default: None,
-                kind: ObjectKind::EntityPort,
+    ) -> Result<Id<ObjectDeclaration>> {
+        Ok(ObjectDeclaration {
+            identifier: identifier.try_result()?,
+            typ,
+            mode: match mode {
+                Mode::In => ObjectMode::new(false, ObjectState::Assigned),
+                Mode::Out => ObjectMode::new(false, ObjectState::Unassigned),
             },
-        )
+            default: None,
+            kind: ObjectKind::EntityPort,
+        }
+        .intern(db))
     }
 
     pub fn component_port(
-        db: &mut impl Arch,
-        identifier: impl Into<String>,
+        db: &mut dyn Arch,
+        identifier: impl TryResult<VhdlName>,
         typ: ObjectType,
         mode: Mode,
-    ) -> Id<ObjectDeclaration> {
-        Self::intern(
-            db,
-            ObjectDeclaration {
-                identifier: identifier.into(),
-                typ,
-                mode: match mode {
-                    Mode::In => ObjectMode::new(false, ObjectState::Unassigned), // An "in" port requires an object going out of the architecture
-                    Mode::Out => ObjectMode::new(false, ObjectState::Assigned), // An "out" port is already assigned a value
-                },
-                default: None,
-                kind: ObjectKind::ComponentPort,
+    ) -> Result<Id<ObjectDeclaration>> {
+        Ok(ObjectDeclaration {
+            identifier: identifier.try_result()?,
+            typ,
+            mode: match mode {
+                Mode::In => ObjectMode::new(false, ObjectState::Unassigned), // An "in" port requires an object going out of the architecture
+                Mode::Out => ObjectMode::new(false, ObjectState::Assigned), // An "out" port is already assigned a value
             },
-        )
+            default: None,
+            kind: ObjectKind::ComponentPort,
+        }
+        .intern(db))
     }
 
-    fn intern(db: &mut impl Arch, obj: ObjectDeclaration) -> Id<ObjectDeclaration> {
-        let id = db.intern_object_declaration(obj);
-        id
+    /// Create a default "clk" entity port object
+    pub fn entity_clk(db: &mut dyn Arch) -> Id<ObjectDeclaration> {
+        ObjectDeclaration::entity_port(db, "clk", ObjectType::Bit, Mode::In).unwrap()
+    }
+
+    /// Create a default "rst" entity port object
+    pub fn entity_rst(db: &mut dyn Arch) -> Id<ObjectDeclaration> {
+        ObjectDeclaration::entity_port(db, "rst", ObjectType::Bit, Mode::In).unwrap()
     }
 
     pub fn kind(&self) -> ObjectKind {
@@ -299,10 +295,6 @@ impl ObjectDeclaration {
 
     pub fn typ(&self) -> &ObjectType {
         &self.typ
-    }
-
-    pub fn identifier(&self) -> &str {
-        self.identifier.as_str()
     }
 
     pub fn default(&self) -> &Option<AssignmentKind> {
@@ -331,17 +323,36 @@ impl ObjectDeclaration {
         }
     }
 
-    pub fn from_port(db: &mut impl Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
+    pub fn from_port(db: &mut dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
         if is_entity {
-            ObjectDeclaration::entity_port(db, port.identifier(), port.typ().clone(), port.mode())
-        } else {
-            ObjectDeclaration::component_port(
+            ObjectDeclaration::entity_port(
                 db,
-                port.identifier(),
+                port.vhdl_name().clone(),
                 port.typ().clone(),
                 port.mode(),
             )
+            .unwrap()
+        } else {
+            ObjectDeclaration::component_port(
+                db,
+                port.vhdl_name().clone(),
+                port.typ().clone(),
+                port.mode(),
+            )
+            .unwrap()
         }
+    }
+}
+
+impl Identify for ObjectDeclaration {
+    fn identifier(&self) -> &str {
+        self.identifier.as_ref()
+    }
+}
+
+impl VhdlNameSelf for ObjectDeclaration {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.identifier
     }
 }
 
@@ -446,19 +457,14 @@ pub mod tests {
 
     use super::*;
 
-    pub(crate) fn test_bit_signal(db: &mut impl Arch) -> Result<Id<ObjectDeclaration>> {
-        Ok(ObjectDeclaration::signal(
-            db,
-            "test_signal".to_string(),
-            ObjectType::Bit,
-            None,
-        ))
+    pub(crate) fn test_bit_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
+        ObjectDeclaration::signal(db, "test_signal", ObjectType::Bit, None)
     }
 
-    pub(crate) fn test_complex_signal(db: &mut impl Arch) -> Result<Id<ObjectDeclaration>> {
+    pub(crate) fn test_complex_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
         let mut fields = IndexMap::new();
         fields.insert(Name::try_new("a")?, ObjectType::bit_vector(10, -4)?);
-        Ok(ObjectDeclaration::signal(
+        ObjectDeclaration::signal(
             db,
             "test_signal",
             ObjectType::Record(RecordObject::new(
@@ -466,7 +472,7 @@ pub mod tests {
                 fields,
             )),
             None,
-        ))
+        )
     }
 
     #[test]

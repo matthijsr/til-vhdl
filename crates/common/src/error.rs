@@ -1,5 +1,8 @@
 //! Error variants.
-use std::{error, fmt, result};
+use std::{
+    convert::{Infallible, TryFrom},
+    error, fmt, result,
+};
 
 use log::SetLoggerError;
 
@@ -108,6 +111,40 @@ impl From<std::io::Error> for Error {
 impl From<SetLoggerError> for Error {
     fn from(e: SetLoggerError) -> Self {
         Error::CLIError(e.to_string())
+    }
+}
+
+impl From<Infallible> for Error {
+    fn from(_: Infallible) -> Self {
+        // Infallible should never actually exist as an "error"
+        unreachable!()
+    }
+}
+
+pub trait ResultFrom<T>: Sized {
+    fn result_from(value: T) -> Result<Self>;
+}
+
+pub trait TryResult<T> {
+    fn try_result(self) -> Result<T>;
+}
+
+impl<T, U, E> ResultFrom<U> for T
+where
+    Error: From<E>,
+    T: TryFrom<U, Error = E>,
+{
+    fn result_from(value: U) -> Result<Self> {
+        T::try_from(value).map_err(From::from)
+    }
+}
+
+impl<T, U> TryResult<T> for U
+where
+    T: ResultFrom<U>,
+{
+    fn try_result(self) -> Result<T> {
+        T::result_from(self)
     }
 }
 

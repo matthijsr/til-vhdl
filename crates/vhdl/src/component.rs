@@ -7,7 +7,7 @@ use tydi_common::{
 
 use crate::{
     architecture::arch_storage::Arch,
-    common::vhdl_name::VhdlName,
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{Declare, DeclareWithIndent},
     object::ObjectType,
     port::{Parameter, Port},
@@ -73,6 +73,12 @@ impl Component {
 impl Identify for Component {
     fn identifier(&self) -> &str {
         self.identifier.as_ref()
+    }
+}
+
+impl VhdlNameSelf for Component {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.identifier
     }
 }
 

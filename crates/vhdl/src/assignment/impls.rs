@@ -1,7 +1,10 @@
 use tydi_common::error::Result;
 use tydi_common::name::Name;
 
-use crate::usings::{ListUsings, Usings};
+use crate::{
+    common::vhdl_name::VhdlName,
+    usings::{ListUsings, Usings},
+};
 
 use super::{
     array_assignment::ArrayAssignment, bitvec::BitVecValue, AssignDeclaration, Assignment,
@@ -20,7 +23,7 @@ impl ListUsings for AssignmentKind {
                         BitVecValue::Others(_) => (),
                         BitVecValue::Full(_) => (),
                         BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => {
-                            usings.add_using(Name::try_new("ieee")?, "numeric_std.all");
+                            usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all");
                         }
                     },
                 },

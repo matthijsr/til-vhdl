@@ -47,7 +47,7 @@ impl ListUsings for Architecture {
 //
 // Any complex logic should probably just be string templates.
 impl DeclareWithIndent for Architecture {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
 
@@ -66,18 +66,26 @@ impl DeclareWithIndent for Architecture {
             )
             .as_str(),
         );
+
+        let mut declarations = String::new();
         for declaration in self.declarations() {
-            result.push_str(
+            declarations.push_str(&format!(
+                "{};\n",
                 db.lookup_intern_architecture_declaration(*declaration)
-                    .declare(db, pre, ";\n")?
-                    .as_str(),
-            );
+                    .declare_with_indent(db, indent_style)?
+            ));
         }
+        result.push_str(&indent(&declarations, indent_style));
+
         result.push_str("begin\n");
+
+        let mut statements = String::new();
         for statement in self.statements() {
-            result.push_str(statement.declare(db, pre, ";\n")?.as_str());
+            statements.push_str(&format!("{};\n", statement.declare_with_indent(db, indent_style)?));
         }
-        result.push_str(format!("end {};", self.identifier()).as_str());
+        result.push_str(&indent(&statements, indent_style));
+
+        result.push_str(&format!("end {};", self.identifier()));
         Ok(result)
     }
 }

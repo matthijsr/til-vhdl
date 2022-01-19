@@ -4,7 +4,7 @@ use tydi_intern::Id;
 
 use crate::ir::{GetSelf, Ir};
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     name::{Name, PathName},
 };
 
@@ -24,14 +24,8 @@ impl Group {
     /// the name or logical stream type conversion fails, or when there are
     /// duplicate names.
     pub fn try_new(
-        db: &dyn Ir,
         parent_id: Option<PathName>,
-        group: impl IntoIterator<
-            Item = (
-                impl TryInto<Name, Error = impl Into<Box<dyn error::Error>>>,
-                Id<LogicalType>,
-            ),
-        >,
+        group: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
     ) -> Result<Self> {
         let base_id = match parent_id {
             Some(id) => id,
@@ -41,10 +35,7 @@ impl Group {
         let mut field_order = vec![];
         for (name, typ) in group
             .into_iter()
-            .map(|(name, typ)| match (name.try_into(), typ) {
-                (Ok(name), _) => Ok((name, typ)),
-                (Err(name), _) => Err(Error::from(name.into())),
-            })
+            .map(|(name, typ)| Ok((name.try_result()?, typ)))
             .collect::<Result<Vec<_>>>()?
         {
             let path_name = base_id.with_child(name);
@@ -61,7 +52,7 @@ impl Group {
     }
 
     /// Create a new Group explicitly from a set of ordered fields with PathNames.
-    pub(crate) fn new(db: &dyn Ir, fields: IndexMap<PathName, Id<LogicalType>>) -> Self {
+    pub(crate) fn new(fields: IndexMap<PathName, Id<LogicalType>>) -> Self {
         let mut map = BTreeMap::new();
         let mut field_order = vec![];
         for (name, id) in fields {
@@ -142,7 +133,7 @@ mod tests {
     fn test_new() {
         let mut db = Database::default();
         let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
-        let group = Group::try_new(&db, None, vec![("a", bits)]).unwrap();
+        let group = Group::try_new(None, vec![("a", bits)]).unwrap();
         assert_eq!(
             group
                 .get_field_id(&PathName::try_new(vec!["a"]).unwrap())

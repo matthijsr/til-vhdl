@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use indexmap::IndexMap;
 use salsa::Database;
+use tydi_common::error::TryResult;
 use tydi_common::name::PathName;
 use tydi_common::numbers::Positive;
 use tydi_common::traits::Reverse;
@@ -143,20 +144,20 @@ impl Stream {
     pub fn try_new(
         db: &dyn Ir,
         data: Id<LogicalType>,
-        throughput: impl TryInto<Throughput, Error = Error>,
+        throughput: impl TryResult<Throughput>,
         dimensionality: NonNegative,
         synchronicity: Synchronicity,
-        complexity: impl Into<Complexity>,
+        complexity: impl TryResult<Complexity>,
         direction: Direction,
         user: Id<LogicalType>,
         keep: bool,
     ) -> Result<Id<Self>> {
         Ok(db.intern_stream(Stream {
             data: data,
-            throughput: throughput.try_into()?,
+            throughput: throughput.try_result()?,
             dimensionality,
             synchronicity,
-            complexity: complexity.into(),
+            complexity: complexity.try_result()?,
             direction,
             user: user,
             keep,

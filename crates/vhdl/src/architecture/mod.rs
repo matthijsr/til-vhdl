@@ -1,8 +1,10 @@
 use indexmap::IndexMap;
+use tydi_common::error::TryResult;
 use tydi_common::name::Name;
 use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
+use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
     entity::Entity,
@@ -11,7 +13,7 @@ use crate::{
     usings::{ListUsings, Usings},
 };
 
-use self::arch_storage::Arch;
+use self::arch_storage::{Arch, GetSelf};
 
 pub mod arch_storage;
 pub mod impls;
@@ -20,11 +22,43 @@ pub mod impls;
 // then wrapping in a generate statement. Need to consider indexes at that point.
 // This'd be easier if I simply always made it an array, even when the number of lanes is 1, but that gets real ugly, real fast.
 
+#[derive(Debug, Clone)]
+pub struct ArchitectureBody {
+    /// The declaration part of the architecture
+    declarations: Vec<ArchitectureDeclaration>,
+    /// The statement part of the architecture
+    statements: Vec<Statement>,
+}
+
+impl ArchitectureBody {
+    pub fn new(declarations: Vec<ArchitectureDeclaration>, statements: Vec<Statement>) -> Self {
+        ArchitectureBody {
+            declarations,
+            statements,
+        }
+    }
+
+    pub fn declarations(&self) -> &Vec<ArchitectureDeclaration> {
+        &self.declarations
+    }
+
+    // pub fn declarations(&self, db: &dyn Arch) -> Vec<ArchitectureDeclaration> {
+    //     self.declaration_ids()
+    //         .iter()
+    //         .map(|x| db.lookup_intern_architecture_declaration(*x))
+    //         .collect()
+    // }
+
+    pub fn statements(&self) -> &Vec<Statement> {
+        &self.statements
+    }
+}
+
 /// An architecture
 #[derive(Debug, Clone)]
 pub struct Architecture {
     /// Name of the architecture
-    identifier: Name,
+    identifier: VhdlName,
     /// Entity which this architecture is for
     entity: Entity,
     /// Additional usings beyond the Package and those within it
@@ -38,16 +72,21 @@ pub struct Architecture {
 }
 
 pub trait ArchitectureDeclare {
-    /// Returns a string for the declaration, pre can be used for indentation, post is used for closing characters (','/';')
-    fn declare(&self, db: &dyn Arch, pre: &str, post: &str) -> Result<String>;
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String>;
+    fn declare(&self, db: &dyn Arch) -> Result<String> {
+        self.declare_with_indent(db, "  ")
+    }
 }
 
 impl Architecture {
     /// Create the architecture based on a component contained within a package, assuming the library (project) is "work" and the architecture's identifier is "Behavioral"
-    pub fn new_default(package: &Package, component_id: impl Into<String>) -> Result<Architecture> {
+    pub fn new_default(
+        package: &Package,
+        component_id: impl TryResult<VhdlName>,
+    ) -> Result<Architecture> {
         Architecture::new(
             Name::try_new("work")?,
-            Name::try_new("Behavioral")?,
+            VhdlName::try_new("Behavioral")?,
             package,
             component_id,
         )
@@ -55,17 +94,18 @@ impl Architecture {
 
     /// Create the architecture based on a component contained within a package, specify the library (project) in which the package is contained
     pub fn new(
-        library_id: Name,
-        identifier: Name,
+        library_id: impl TryResult<VhdlName>,
+        identifier: impl TryResult<VhdlName>,
         package: &Package,
-        component_id: impl Into<String>,
+        component_id: impl TryResult<VhdlName>,
     ) -> Result<Architecture> {
         // let mut usings = Usings::new_empty();
         // usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
+        let library_id = library_id.try_result()?;
         let mut usings = package.list_usings()?;
         usings.add_using(library_id, format!("{}.all", package.identifier()));
         Ok(Architecture {
-            identifier,
+            identifier: identifier.try_result()?,
             entity: Entity::from(package.get_component(component_id)?),
             usings: usings,
             doc: None,
@@ -74,8 +114,26 @@ impl Architecture {
         })
     }
 
+    pub fn from_database(db: &dyn Arch, identifier: impl TryResult<VhdlName>) -> Result<Self> {
+        let package = db.default_package();
+        let mut usings = package.list_usings()?;
+        usings.add_using(
+            package.vhdl_name().clone(),
+            format!("{}.all", package.identifier()),
+        );
+        let component = package.get_subject_component(db);
+        Ok(Architecture {
+            identifier: identifier.try_result()?,
+            entity: Entity::from(component),
+            usings: usings,
+            doc: None,
+            declaration: vec![],
+            statement: vec![],
+        })
+    }
+
     /// Add additional usings which weren't already part of the package
-    pub fn add_using(&mut self, library: Name, using: String) -> bool {
+    pub fn add_using(&mut self, library: VhdlName, using: String) -> bool {
         self.usings.add_using(library, using)
     }
 
@@ -98,7 +156,7 @@ impl Architecture {
         let declaration = declaration.into();
         match &declaration {
             ArchitectureDeclaration::Object(object) => {
-                self.usings.combine(&object.list_usings()?);
+                self.usings.combine(&object.get(db).list_usings()?);
             }
             ArchitectureDeclaration::Alias(alias) => {
                 self.usings.combine(
@@ -143,7 +201,7 @@ impl Architecture {
 
     pub fn entity_ports(
         &self,
-        db: &mut impl Arch,
+        db: &mut dyn Arch,
     ) -> Result<IndexMap<String, Id<ObjectDeclaration>>> {
         let mut result = IndexMap::new();
         for port in self.entity.ports() {
@@ -151,6 +209,16 @@ impl Architecture {
             result.insert(port.identifier().to_string(), obj);
         }
         Ok(result)
+    }
+
+    pub fn add_body(&mut self, db: &dyn Arch, body: &ArchitectureBody) -> Result<()> {
+        for declaration in body.declarations() {
+            self.add_declaration(db, declaration.clone())?;
+        }
+        for statement in body.statements() {
+            self.add_statement(db, statement.clone())?;
+        }
+        Ok(())
     }
 }
 
@@ -165,11 +233,11 @@ mod tests {
     use super::*;
 
     pub(crate) fn test_package() -> Result<Package> {
-        Ok(Package::new(
-            Name::try_new("pak")?,
+        Package::try_new(
+            "pak",
             &vec![empty_component(), component_with_nested_types()?],
             &vec![],
-        ))
+        )
     }
 
     #[test]
