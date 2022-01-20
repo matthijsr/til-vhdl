@@ -6,7 +6,7 @@ use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
 
 use crate::architecture::arch_storage::Arch;
-use crate::declaration::{Declare, DeclareWithIndent};
+use crate::declaration::DeclareWithIndent;
 use crate::object::ObjectType;
 
 /// A record object
@@ -68,13 +68,13 @@ impl RecordObject {
 }
 
 impl DeclareWithIndent for RecordObject {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, _db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut this = format!("type {} is record\n", self.type_name());
         let mut fields = String::new();
         for (name, typ) in self.fields() {
             fields.push_str(format!("{} : {};\n", name, typ.type_name()).as_str());
         }
-        this.push_str(&indent(&fields, pre));
+        this.push_str(&indent(&fields, indent_style));
         this.push_str("end record;");
         Ok(this)
     }

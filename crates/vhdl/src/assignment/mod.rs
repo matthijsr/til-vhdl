@@ -11,7 +11,7 @@ use tydi_common::traits::{Document, Identify};
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
-use crate::declaration::{Declare, ObjectMode};
+use crate::declaration::{Declare};
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;

@@ -99,7 +99,7 @@ impl Analyze for Component {
 }
 
 impl DeclareWithIndent for Component {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());
@@ -112,9 +112,9 @@ impl DeclareWithIndent for Component {
             .map(|x| x.declare(db))
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
-        port_body.push_str(&indent(&ports, pre));
+        port_body.push_str(&indent(&ports, indent_style));
         port_body.push_str("\n);\n");
-        result.push_str(&indent(&port_body, pre));
+        result.push_str(&indent(&port_body, indent_style));
         result.push_str("end component;");
         Ok(result)
     }
@@ -124,14 +124,14 @@ impl DeclareWithIndent for Component {
 mod tests {
     use tydi_common::name::Name;
 
-    use crate::{architecture::arch_storage::db::Database, port::Mode, test_tools::*};
+    use crate::{architecture::arch_storage::db::Database, port::Mode, test_tools};
 
     use super::*;
 
     #[test]
     fn test_declare() {
         let db = Database::default();
-        let empty_comp = empty_component().with_doc("test\ntest");
+        let empty_comp = test_tools::empty_component().with_doc("test\ntest");
         assert_eq!(
             r#"-- test
 -- test

@@ -1,6 +1,6 @@
 
 
-use tydi_common::error::{Error, Result, TryResult};
+use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
 use crate::{

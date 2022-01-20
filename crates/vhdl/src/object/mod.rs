@@ -349,7 +349,7 @@ impl Analyze for ObjectType {
 }
 
 impl DeclareWithIndent for ObjectType {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
         match self {
             ObjectType::Bit => Err(Error::BackEndError(
                 "Invalid type, Bit (std_logic) cannot be declared.".to_string(),

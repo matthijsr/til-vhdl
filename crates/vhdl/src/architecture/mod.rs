@@ -229,14 +229,17 @@ mod tests {
 
     //     use crate::generator::{common::convert::Packify, vhdl::Declare};
 
-    use crate::{architecture::arch_storage::db::Database, declaration::Declare, test_tools::*};
+    use crate::{architecture::arch_storage::db::Database, declaration::Declare, test_tools};
 
     use super::*;
 
     pub(crate) fn test_package() -> Result<Package> {
         Package::try_new(
             "pak",
-            &vec![empty_component(), component_with_nested_types()?],
+            &vec![
+                test_tools::empty_component(),
+                test_tools::component_with_nested_types()?,
+            ],
             &vec![],
         )
     }

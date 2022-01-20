@@ -42,13 +42,6 @@ impl InterfaceReference {
             _ => true,
         }
     }
-
-    pub(crate) fn vhdl_compat_string(&self) -> String {
-        match self.streamlet_instance() {
-            Some(instance) => format!("{}__{}", instance, self.port()),
-            None => self.port().into(),
-        }
-    }
 }
 
 impl TryFrom<&str> for InterfaceReference {

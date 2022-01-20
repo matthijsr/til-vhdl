@@ -3,7 +3,7 @@ use crate::{
     declaration::ObjectKind,
     traits::VhdlDocument,
 };
-use textwrap::indent;
+
 use tydi_common::error::Result;
 
 use super::AssignDeclaration;

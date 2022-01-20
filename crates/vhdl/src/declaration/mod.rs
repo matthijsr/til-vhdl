@@ -1,6 +1,6 @@
-use std::convert::TryInto;
+
 use std::fmt;
-use std::sync::atomic::{AtomicUsize, Ordering};
+
 
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;

@@ -1,25 +1,23 @@
-use std::convert::TryInto;
+
 
 use til_vhdl::{
     common::{
         logical::logicaltype::{Direction, Synchronicity},
-        physical::{fields::Fields, stream::PhysicalStream},
     },
     ir::{
         context::Context, physical_properties::InterfaceDirection, Database, GetSelf,
-        Implementation, Interface, InternSelf, IntoVhdl, Ir, LogicalType, PhysicalProperties,
+        Implementation, InternSelf, IntoVhdl, Ir, LogicalType,
         Stream, Streamlet,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
 use tydi_common::{
-    error::{Error, Result},
+    error::{Result},
     name::Name,
-    numbers::{BitCount, NonNegative, Positive},
+    numbers::{NonNegative},
 };
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
-    common::vhdl_name::VhdlNameSelf,
     component::Component,
     declaration::Declare,
     package::Package,
