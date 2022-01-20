@@ -20,6 +20,7 @@ use tydi_common::{
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
     common::vhdl_name::VhdlNameSelf,
+    component::Component,
     declaration::Declare,
     package::Package,
 };
@@ -116,7 +117,7 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
             let stream = test_stream_id_custom(db, 4, "2.0", 0, c)?;
             let streamlet =
                 Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
-            let component = streamlet.canonical(db, arch_db, "")?;
+            let component: Component = streamlet.canonical(db, arch_db, "")?;
             component.declare(arch_db)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -261,19 +262,14 @@ fn playground() -> Result<()> {
         .with_implementation(db, Some(implementation))
         .get(db);
 
-    let component = streamlet.canonical(db, arch_db, "")?;
-    arch_db.set_subject_component_name(component.vhdl_name().clone());
-
-    let mut package = Package::new_default_empty();
-    package.add_component(component);
+    let package = Package::new_default_empty();
     arch_db.set_default_package(package);
+
+    let declaration: String = streamlet.canonical(db, arch_db, "")?;
 
     println!("{}", arch_db.default_package().declare(arch_db)?);
 
-    println!(
-        "{}",
-        streamlet.implementation(db).canonical(db, arch_db, "")?
-    );
+    println!("{}", declaration);
 
     Ok(())
 }

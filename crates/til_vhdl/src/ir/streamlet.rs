@@ -8,12 +8,16 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, component::Component, port::Port,
+    architecture::{arch_storage::Arch, Architecture},
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
+    component::Component,
+    declaration::Declare,
+    port::Port,
 };
 
 use super::{
-    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf,
-    IntoVhdl, Ir, Name,
+    implementation::ImplementationKind, physical_properties::InterfaceDirection, GetSelf,
+    Implementation, Interface, InternSelf, IntoVhdl, Ir, Name,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -160,10 +164,55 @@ impl IntoVhdl<Component> for Streamlet {
     }
 }
 
+// TODO: For now, assume architecture output will be a string.
+// The architecture for Structural and None is stored in the arch_db.
+// Might make more sense/be safer if we could either parse Linked architectures to an object,
+// or have some enclosing type which returns either an architecture or a string.
+impl IntoVhdl<String> for Streamlet {
+    fn canonical(
+        &self,
+        ir_db: &dyn Ir,
+        arch_db: &mut dyn Arch,
+        prefix: impl TryOptional<Name>,
+    ) -> Result<String> {
+        let prefix = prefix.try_optional()?;
+        let component: Component = self.canonical(ir_db, arch_db, prefix.clone())?;
+        arch_db.set_subject_component_name(component.vhdl_name().clone());
+
+        let mut package = arch_db.default_package();
+        package.add_component(component);
+        arch_db.set_default_package(package);
+
+        match self.implementation(ir_db) {
+            Some(implementation) => match implementation.kind() {
+                ImplementationKind::Structural(context) => {
+                    let arch_body = context.canonical(ir_db, arch_db, prefix)?;
+                    let mut architecture = Architecture::from_database(arch_db, "Behavioral")?;
+                    architecture.add_body(arch_db, &arch_body)?;
+
+                    let result_string = architecture.declare(arch_db)?;
+                    arch_db.set_architecture(architecture);
+
+                    Ok(result_string)
+                }
+                ImplementationKind::Link => todo!(),
+            },
+            None => {
+                let architecture = Architecture::from_database(arch_db, "Behavioral")?;
+
+                let result_string = architecture.declare(arch_db)?;
+                arch_db.set_architecture(architecture);
+
+                Ok(result_string)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::ir::{Database, Stream};
-    use tydi_common::error::{Error, Result};
+    use crate::ir::{Database};
+    use tydi_common::error::{Result};
 
     use super::*;
 
