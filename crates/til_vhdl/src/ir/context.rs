@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use tydi_common::{
     error::{Error, Result, TryOptional, TryResult},
     name::Name,
-    traits::Identify, cat,
+    traits::Identify,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
@@ -265,7 +265,7 @@ impl IntoVhdl<ArchitectureBody> for Context {
                     for port in ports {
                         let signal = ObjectDeclaration::signal(
                             arch_db,
-                            cat!(instance_name, port.identifier()),
+                            format!("{}__{}", instance_name, port.identifier()),
                             port.typ().clone(),
                             None,
                         )?;
