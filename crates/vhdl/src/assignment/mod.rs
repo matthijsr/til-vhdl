@@ -592,8 +592,8 @@ impl FieldAssignment {
 }
 
 impl Identify for FieldAssignment {
-    fn identifier(&self) -> &str {
-        self.field().as_ref()
+    fn identifier(&self) -> String {
+        self.field().to_string()
     }
 }
 

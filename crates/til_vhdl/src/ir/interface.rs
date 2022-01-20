@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use tydi_common::{
     cat,
-    error::{Error, Result, TryResult, TryOptional},
+    error::{Error, Result, TryOptional, TryResult},
     traits::Identify,
 };
 use tydi_intern::Id;
@@ -60,8 +60,8 @@ impl Interface {
 }
 
 impl Identify for Interface {
-    fn identifier(&self) -> &str {
-        self.name.as_ref()
+    fn identifier(&self) -> String {
+        self.name.to_string()
     }
 }
 

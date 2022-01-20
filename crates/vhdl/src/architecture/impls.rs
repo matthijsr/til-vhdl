@@ -81,7 +81,10 @@ impl DeclareWithIndent for Architecture {
 
         let mut statements = String::new();
         for statement in self.statements() {
-            statements.push_str(&format!("{};\n", statement.declare_with_indent(db, indent_style)?));
+            statements.push_str(&format!(
+                "{};\n",
+                statement.declare_with_indent(db, indent_style)?
+            ));
         }
         result.push_str(&indent(&statements, indent_style));
 
@@ -91,8 +94,8 @@ impl DeclareWithIndent for Architecture {
 }
 
 impl Identify for Architecture {
-    fn identifier(&self) -> &str {
-        self.identifier.as_ref()
+    fn identifier(&self) -> String {
+        self.identifier.to_string()
     }
 }
 

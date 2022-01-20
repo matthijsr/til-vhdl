@@ -71,8 +71,8 @@ impl Component {
 }
 
 impl Identify for Component {
-    fn identifier(&self) -> &str {
-        self.identifier.as_ref()
+    fn identifier(&self) -> String {
+        self.identifier.to_string()
     }
 }
 

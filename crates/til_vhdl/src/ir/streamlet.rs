@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use tydi_common::{
     cat,
-    error::{Error, Result, TryResult, TryOptional},
+    error::{Error, Result, TryOptional, TryResult},
+    name::{NameSelf, PathName, PathNameSelf},
     traits::Identify,
 };
 use tydi_intern::Id;
@@ -17,7 +18,7 @@ use super::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Streamlet {
-    name: Name,
+    name: PathName,
     implementation: Option<Id<Implementation>>,
     ports: BTreeMap<Name, Id<Interface>>,
     port_order: Vec<Name>,
@@ -26,7 +27,7 @@ pub struct Streamlet {
 impl Streamlet {
     pub fn try_portless(name: impl TryResult<Name>) -> Result<Self> {
         Ok(Streamlet {
-            name: name.try_result()?,
+            name: name.try_result()?.into(),
             implementation: None,
             ports: BTreeMap::new(),
             port_order: vec![],
@@ -49,7 +50,7 @@ impl Streamlet {
         }
 
         Ok(Streamlet {
-            name: name.try_result()?,
+            name: name.try_result()?.into(),
             implementation: None,
             ports: port_map,
             port_order,
@@ -61,16 +62,16 @@ impl Streamlet {
         db: &dyn Ir,
         implementation: Option<Id<Implementation>>,
     ) -> Id<Streamlet> {
+        let name = match &implementation {
+            Some(some) => self.name.with_child(some.get(db).name().clone()),
+            None => self.path_name().clone(),
+        };
         db.intern_streamlet(Streamlet {
-            name: self.name,
+            name: name,
             implementation,
             ports: self.ports,
             port_order: self.port_order,
         })
-    }
-
-    pub fn name(&self) -> &Name {
-        &self.name
     }
 
     pub fn implementation(&self, db: &dyn Ir) -> Option<Implementation> {
@@ -119,9 +120,15 @@ impl Streamlet {
     }
 }
 
+impl PathNameSelf for Streamlet {
+    fn path_name(&self) -> &PathName {
+        &self.name
+    }
+}
+
 impl Identify for Streamlet {
-    fn identifier(&self) -> &str {
-        self.name.as_ref()
+    fn identifier(&self) -> String {
+        self.path_name().to_string()
     }
 }
 
@@ -149,12 +156,7 @@ impl IntoVhdl<Component> for Streamlet {
         }
         // TODO: Streamlet should also have documentation?
 
-        Ok(Component::new(
-            VhdlName::try_new(n)?,
-            vec![],
-            ports,
-            None,
-        ))
+        Ok(Component::new(VhdlName::try_new(n)?, vec![], ports, None))
     }
 }
 
@@ -168,7 +170,7 @@ mod tests {
     #[test]
     fn new() -> Result<()> {
         let db = Database::default();
-        let imple = Implementation::Link;
+        let imple = Implementation::link("link")?;
         let implid = db.intern_implementation(imple.clone());
         let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
         assert_eq!(

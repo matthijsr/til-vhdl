@@ -29,7 +29,7 @@ extern crate til_vhdl;
 #[test]
 fn streamlet_new() -> Result<()> {
     let db = Database::default();
-    let imple = Implementation::Link;
+    let imple = Implementation::link("link")?;
     let implid = db.intern_implementation(imple.clone());
     let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
     assert_eq!(
@@ -256,7 +256,7 @@ fn playground() -> Result<()> {
 
     let mut context = Context::from(&streamlet);
     context.try_add_connection(db, "a", "b")?;
-    let implementation = Implementation::Structural(context).intern(db);
+    let implementation = Implementation::structural("structural", context)?.intern(db);
     let streamlet = streamlet
         .with_implementation(db, Some(implementation))
         .get(db);

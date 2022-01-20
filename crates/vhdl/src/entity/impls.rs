@@ -36,8 +36,8 @@ impl DeclareWithIndent for Entity {
 }
 
 impl Identify for Entity {
-    fn identifier(&self) -> &str {
-        self.identifier.as_str()
+    fn identifier(&self) -> String {
+        self.identifier.clone()
     }
 }
 

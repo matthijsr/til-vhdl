@@ -345,8 +345,8 @@ impl ObjectDeclaration {
 }
 
 impl Identify for ObjectDeclaration {
-    fn identifier(&self) -> &str {
-        self.identifier.as_ref()
+    fn identifier(&self) -> String {
+        self.identifier.to_string()
     }
 }
 
@@ -415,8 +415,8 @@ impl AliasDeclaration {
     }
 
     /// Returns the alias's identifier
-    pub fn identifier(&self) -> &str {
-        &self.identifier
+    pub fn identifier(&self) -> String {
+        self.identifier.clone()
     }
 
     /// Returns the object type of the alias (after fields have been selected)

@@ -53,7 +53,7 @@ where
 
 /// Trait for things that have names.
 pub trait Identify {
-    fn identifier(&self) -> &str;
+    fn identifier(&self) -> String;
 }
 
 /// Trait for things that have documentation.

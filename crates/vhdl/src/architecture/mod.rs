@@ -114,6 +114,7 @@ impl Architecture {
         })
     }
 
+    /// Create an architecture based on the default package and component defined in the Arch database
     pub fn from_database(db: &dyn Arch, identifier: impl TryResult<VhdlName>) -> Result<Self> {
         let package = db.default_package();
         let mut usings = package.list_usings()?;

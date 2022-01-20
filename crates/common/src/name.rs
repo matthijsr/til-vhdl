@@ -272,5 +272,5 @@ pub trait NameSelf {
 }
 
 pub trait PathNameSelf {
-    fn path_name(&self) -> &Name;
+    fn path_name(&self) -> &PathName;
 }
