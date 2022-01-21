@@ -1,11 +1,11 @@
+pub mod structural;
+
 use tydi_common::{
     error::{Result, TryResult},
     name::{Name, NameSelf},
 };
 
-
-
-use super::{context::Context};
+use self::structural::Structure;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {
@@ -15,18 +15,18 @@ pub struct Implementation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ImplementationKind {
-    Structural(Context),
+    Structural(Structure),
     Link,
 }
 
 impl Implementation {
     pub fn structural(
         name: impl TryResult<Name>,
-        context: impl TryResult<Context>,
+        structure: impl TryResult<Structure>,
     ) -> Result<Self> {
         Ok(Implementation {
             name: name.try_result()?,
-            kind: ImplementationKind::Structural(context.try_result()?),
+            kind: ImplementationKind::Structural(structure.try_result()?),
         })
     }
 

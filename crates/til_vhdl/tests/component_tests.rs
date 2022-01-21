@@ -1,21 +1,12 @@
-
-
 use til_vhdl::{
-    common::{
-        logical::logicaltype::{Direction, Synchronicity},
-    },
+    common::logical::logicaltype::{Direction, Synchronicity},
     ir::{
-        context::Context, physical_properties::InterfaceDirection, Database, GetSelf,
-        Implementation, InternSelf, IntoVhdl, Ir, LogicalType,
-        Stream, Streamlet,
+        implementation::structural::Structure, physical_properties::InterfaceDirection, Database,
+        GetSelf, Implementation, InternSelf, IntoVhdl, Ir, LogicalType, Stream, Streamlet,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
-use tydi_common::{
-    error::{Result},
-    name::Name,
-    numbers::{NonNegative},
-};
+use tydi_common::{error::Result, name::Name, numbers::NonNegative};
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
     component::Component,
@@ -253,9 +244,9 @@ fn playground() -> Result<()> {
         ],
     )?;
 
-    let mut context = Context::from(&streamlet);
-    context.try_add_connection(db, "a", "b")?;
-    let implementation = Implementation::structural("structural", context)?.intern(db);
+    let mut structure = Structure::from(&streamlet);
+    structure.try_add_connection(db, "a", "b")?;
+    let implementation = Implementation::structural("structural", structure)?.intern(db);
     let streamlet = streamlet
         .with_implementation(db, Some(implementation))
         .get(db);

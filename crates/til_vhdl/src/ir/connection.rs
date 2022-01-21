@@ -9,8 +9,8 @@ use tydi_common::{
     traits::Reverse,
 };
 
-/// References a specific interface (port) within a `Context`,
-/// the streamlet_instance may be left blank to refer to the context's own
+/// References a specific interface (port) within a `Structure`,
+/// the streamlet_instance may be left blank to refer to the structure's own
 /// ports, rather than that of a specific streamlet instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InterfaceReference {
@@ -19,8 +19,8 @@ pub struct InterfaceReference {
 }
 
 impl InterfaceReference {
-    /// Using `None` for `streamlet_instance` indicates you referencing a context's own ports,
-    /// rather than a port of a streamlet instance within said context.
+    /// Using `None` for `streamlet_instance` indicates you referencing a structure's own ports,
+    /// rather than a port of a streamlet instance within said structure.
     pub fn new(streamlet_instance: Option<Name>, port: Name) -> Self {
         InterfaceReference {
             streamlet_instance,

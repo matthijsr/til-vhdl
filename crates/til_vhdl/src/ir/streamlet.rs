@@ -185,8 +185,8 @@ impl IntoVhdl<String> for Streamlet {
 
         match self.implementation(ir_db) {
             Some(implementation) => match implementation.kind() {
-                ImplementationKind::Structural(context) => {
-                    let arch_body = context.canonical(ir_db, arch_db, prefix)?;
+                ImplementationKind::Structural(structure) => {
+                    let arch_body = structure.canonical(ir_db, arch_db, prefix)?;
                     let mut architecture = Architecture::from_database(arch_db, "Behavioral")?;
                     architecture.add_body(arch_db, &arch_body)?;
 
@@ -211,8 +211,8 @@ impl IntoVhdl<String> for Streamlet {
 
 #[cfg(test)]
 mod tests {
-    use crate::ir::{Database};
-    use tydi_common::error::{Result};
+    use crate::ir::Database;
+    use tydi_common::error::Result;
 
     use super::*;
 

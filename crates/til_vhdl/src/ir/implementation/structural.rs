@@ -14,26 +14,25 @@ use tydi_vhdl::{
     statement::PortMapping,
 };
 
-use super::{
+use crate::ir::{
     connection::InterfaceReference, physical_properties::InterfaceDirection, Connection, GetSelf,
-    Implementation, Interface, IntoVhdl, Ir, Streamlet,
+    Interface, IntoVhdl, Ir, Streamlet,
 };
 
+/// This node represents a structural `Implementation`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Context {
+pub struct Structure {
     ports: BTreeMap<Name, Id<Interface>>,
     streamlet_instances: BTreeMap<Name, Id<Streamlet>>,
     connections: Vec<Connection>,
-    implementations: BTreeMap<Name, Id<Implementation>>,
 }
 
-impl Context {
+impl Structure {
     pub fn new(ports: impl Into<BTreeMap<Name, Id<Interface>>>) -> Self {
-        Context {
+        Structure {
             ports: ports.into(),
             streamlet_instances: BTreeMap::new(),
             connections: vec![],
-            implementations: BTreeMap::new(),
         }
     }
 
@@ -94,7 +93,7 @@ impl Context {
         let left = left.try_result()?;
         let right = right.try_result()?;
 
-        struct InterfaceAndContext {
+        struct InterfaceAndStructure {
             on_streamlet: bool,
             interface: Interface,
         }
@@ -103,25 +102,25 @@ impl Context {
             Some(streamlet_instance) => self
                 .try_get_streamlet_instance(streamlet_instance)
                 .and_then(|x| {
-                    Ok(InterfaceAndContext {
+                    Ok(InterfaceAndStructure {
                         on_streamlet: true,
                         interface: x.get(db).try_get_port(db, i.port())?,
                     })
                 }),
             None => match self.port_ids().get(i.port()) {
-                Some(port) => Ok(InterfaceAndContext {
+                Some(port) => Ok(InterfaceAndStructure {
                     on_streamlet: false,
                     interface: port.get(db),
                 }),
                 None => Err(Error::InvalidArgument(format!(
-                    "No port with name {} exists within this context",
+                    "No port with name {} exists within this structure",
                     i.port()
                 ))),
             },
         };
         let left_i = get_port(&left)?;
         let right_i = get_port(&right)?;
-        // Interfaces are on the same layer if they both either belong to the context or to a streamlet instance
+        // Interfaces are on the same layer if they both either belong to the structure or to a streamlet instance
         let same_layer = left_i.on_streamlet == right_i.on_streamlet;
 
         if left_i.interface.stream_id() == right_i.interface.stream_id()
@@ -132,11 +131,11 @@ impl Context {
             let (source, sink) = match left_i.interface.direction() {
                 // If left_interface belongs to a streamlet instance, Out means it's a Source
                 InterfaceDirection::Out if left_i.on_streamlet => (left, right),
-                // Otherwise, it belongs to the context, and is a Sink
+                // Otherwise, it belongs to the structure, and is a Sink
                 InterfaceDirection::Out => (right, left),
                 // Likewise, In means it is a Sink if left_interface is a streamlet instance
                 InterfaceDirection::In if left_i.on_streamlet => (right, left),
-                // But it is a Source if it belongs to the context
+                // But it is a Source if it belongs to the structure
                 InterfaceDirection::In => (left, right),
             };
 
@@ -158,7 +157,7 @@ impl Context {
         let name = name.try_result()?;
         if self.streamlet_instance_ids().contains_key(&name) {
             Err(Error::InvalidArgument(format!(
-                "A streamlet instance with name {} already exists in this context",
+                "A streamlet instance with name {} already exists in this structure",
                 name
             )))
         } else {
@@ -171,7 +170,7 @@ impl Context {
         match self.streamlet_instance_ids().get(name) {
             Some(streamlet) => Ok(*streamlet),
             None => Err(Error::InvalidArgument(format!(
-                "A streamlet instance with name {} does not exist in this context",
+                "A streamlet instance with name {} does not exist in this structure",
                 name
             ))),
         }
@@ -181,7 +180,7 @@ impl Context {
         &self.connections
     }
 
-    /// Verifies whether all ports (on the context and all instances) have been connected,
+    /// Verifies whether all ports (on the structure and all instances) have been connected,
     /// also verifies whether ports have duplicate connections.
     ///
     /// Returns a ProjectError if not all ports have been connected, or if some ports are used multiple times.
@@ -216,13 +215,13 @@ impl Context {
     }
 }
 
-impl From<&Streamlet> for Context {
+impl From<&Streamlet> for Structure {
     fn from(streamlet: &Streamlet) -> Self {
-        Context::new(streamlet.port_ids().clone())
+        Structure::new(streamlet.port_ids().clone())
     }
 }
 
-impl IntoVhdl<ArchitectureBody> for Context {
+impl IntoVhdl<ArchitectureBody> for Structure {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
@@ -331,9 +330,10 @@ mod tests {
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
-        let mut context = Context::from(&streamlet);
-        context.try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
-        context.try_add_connection(db, "a", ("instance", "a"))?;
+        let mut structure = Structure::from(&streamlet);
+        structure
+            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_connection(db, "a", ("instance", "a"))?;
 
         Ok(())
     }
@@ -352,26 +352,27 @@ mod tests {
             ],
         )?;
 
-        let mut context = Context::from(&streamlet);
-        context.try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
-        context.try_add_connection(db, "a", ("instance", "a"))?;
+        let mut structure = Structure::from(&streamlet);
+        structure
+            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_connection(db, "a", ("instance", "a"))?;
 
         // Test: should throw an error if a port is unconnected
         assert_eq!(
-            context.validate_connections(db),
+            structure.validate_connections(db),
             Err(Error::ProjectError(
                 "Port b has not been connected".to_string()
             )),
         );
 
         // Test: Should no longer throw an error if all ports are connected
-        context.try_add_connection(db, "b", ("instance", "b"))?;
-        context.validate_connections(db)?;
+        structure.try_add_connection(db, "b", ("instance", "b"))?;
+        structure.validate_connections(db)?;
 
         // Test: should throw an error if a port is connected multiple times
-        context.try_add_connection(db, "a", ("instance", "a"))?;
+        structure.try_add_connection(db, "a", ("instance", "a"))?;
         assert_eq!(
-            context.validate_connections(db),
+            structure.validate_connections(db),
             Err(Error::ProjectError("Duplicate use of Source a".to_string())),
         );
 
@@ -391,14 +392,15 @@ mod tests {
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
-        let mut context = Context::from(&streamlet);
-        context.try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
-        context.try_get_streamlet_instance(&("instance".try_result()?))?;
+        let mut structure = Structure::from(&streamlet);
+        structure
+            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_get_streamlet_instance(&("instance".try_result()?))?;
 
         Ok(())
     }
 
-    // Demonstrates how a Context can be used to create a structural architecture for an entity
+    // Demonstrates how a Structure can be used to create a structural architecture for an entity
     #[test]
     fn try_into_arch_body() -> Result<()> {
         // ...
@@ -437,28 +439,28 @@ mod tests {
         )?
         .with_implementation(ir_db, None); // Streamlet does not have an implementation
 
-        // Create a Context from the Streamlet definition (this creates a Context with ports matching the Streamlet)
-        let mut context = Context::from(&streamlet.get(ir_db));
-        // Add an instance (called "instance") of the Streamlet to the Context
-        context.try_add_streamlet_instance("instance", streamlet)?;
-        // Connect the Context's "a" port with the instance's "a" port
-        context.try_add_connection(ir_db, "a", ("instance", "a"))?;
-        // Connect the Context's "b" port with the instance's "b" port
-        context.try_add_connection(ir_db, "b", ("instance", "b"))?;
-        // Connect the Context's "c" port with the Context's "d" port
-        context.try_add_connection(ir_db, "c", "d")?;
+        // Create a Structure from the Streamlet definition (this creates a Structure with ports matching the Streamlet)
+        let mut structure = Structure::from(&streamlet.get(ir_db));
+        // Add an instance (called "instance") of the Streamlet to the Structure
+        structure.try_add_streamlet_instance("instance", streamlet)?;
+        // Connect the Structure's "a" port with the instance's "a" port
+        structure.try_add_connection(ir_db, "a", ("instance", "a"))?;
+        // Connect the Structure's "b" port with the instance's "b" port
+        structure.try_add_connection(ir_db, "b", ("instance", "b"))?;
+        // Connect the Structure's "c" port with the Structure's "d" port
+        structure.try_add_connection(ir_db, "c", "d")?;
         // Connect the instance's "c" port with the instance's "d" port
-        context.try_add_connection(ir_db, ("instance", "c"), ("instance", "d"))?;
+        structure.try_add_connection(ir_db, ("instance", "c"), ("instance", "d"))?;
 
-        context.try_add_streamlet_instance("b", streamlet)?;
-        context.try_add_connection(ir_db, ("b", "a"), ("b", "b"))?;
-        context.try_add_connection(ir_db, ("b", "c"), ("b", "d"))?;
+        structure.try_add_streamlet_instance("b", streamlet)?;
+        structure.try_add_connection(ir_db, ("b", "a"), ("b", "b"))?;
+        structure.try_add_connection(ir_db, ("b", "c"), ("b", "d"))?;
 
         // ..
         // Back-end
         // ..
-        // Convert the Context into a VHDL architecture body
-        let result = context.canonical(ir_db, arch_db, None)?;
+        // Convert the Structure into a VHDL architecture body
+        let result = structure.canonical(ir_db, arch_db, None)?;
 
         let mut declarations = String::new();
         for declaration in result.declarations() {
