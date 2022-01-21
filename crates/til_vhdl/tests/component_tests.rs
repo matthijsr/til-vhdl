@@ -1,25 +1,15 @@
-use std::convert::TryInto;
-
 use til_vhdl::{
-    common::{
-        logical::logicaltype::{Direction, Synchronicity},
-        physical::{fields::Fields, stream::PhysicalStream},
-    },
+    common::logical::logicaltype::{Direction, Synchronicity},
     ir::{
-        context::Context, physical_properties::InterfaceDirection, Database, GetSelf,
-        Implementation, Interface, InternSelf, IntoVhdl, Ir, LogicalType, PhysicalProperties,
-        Stream, Streamlet,
+        implementation::structural::Structure, physical_properties::InterfaceDirection, Database,
+        GetSelf, Implementation, InternSelf, IntoVhdl, Ir, LogicalType, Stream, Streamlet,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
-use tydi_common::{
-    error::{Error, Result},
-    name::Name,
-    numbers::{BitCount, NonNegative, Positive},
-};
+use tydi_common::{error::Result, name::Name, numbers::NonNegative};
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
-    common::vhdl_name::VhdlNameSelf,
+    component::Component,
     declaration::Declare,
     package::Package,
 };
@@ -29,7 +19,7 @@ extern crate til_vhdl;
 #[test]
 fn streamlet_new() -> Result<()> {
     let db = Database::default();
-    let imple = Implementation::Link;
+    let imple = Implementation::link("link")?;
     let implid = db.intern_implementation(imple.clone());
     let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
     assert_eq!(
@@ -113,10 +103,10 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
         .map(|c: NonNegative| {
             let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
             let arch_db = &mut _arch_db;
-            let stream = test_stream_id_custom(db, 4, "2.0", 0, c)?;
+            let stream = test_stream_id_custom(db, 4, 2.0, 0, c)?;
             let streamlet =
                 Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
-            let component = streamlet.canonical(db, arch_db, "")?;
+            let component: Component = streamlet.canonical(db, arch_db, "")?;
             component.declare(arch_db)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -236,7 +226,7 @@ fn playground() -> Result<()> {
     let stream = Stream::try_new(
         db,
         data_type,
-        "1.0",
+        1.0,
         1,
         Synchronicity::Sync,
         4,
@@ -254,26 +244,21 @@ fn playground() -> Result<()> {
         ],
     )?;
 
-    let mut context = Context::from(&streamlet);
-    context.try_add_connection(db, "a", "b")?;
-    let implementation = Implementation::Structural(context).intern(db);
+    let mut structure = Structure::from(&streamlet);
+    structure.try_add_connection(db, "a", "b")?;
+    let implementation = Implementation::structural("structural", structure)?.intern(db);
     let streamlet = streamlet
         .with_implementation(db, Some(implementation))
         .get(db);
 
-    let component = streamlet.canonical(db, arch_db, "")?;
-    arch_db.set_subject_component_name(component.vhdl_name().clone());
-
-    let mut package = Package::new_default_empty();
-    package.add_component(component);
+    let package = Package::new_default_empty();
     arch_db.set_default_package(package);
+
+    let declaration: String = streamlet.canonical(db, arch_db, "")?;
 
     println!("{}", arch_db.default_package().declare(arch_db)?);
 
-    println!(
-        "{}",
-        streamlet.implementation(db).canonical(db, arch_db, "")?
-    );
+    println!("{}", declaration);
 
     Ok(())
 }

@@ -4,8 +4,8 @@
 
 pub mod architecture;
 pub mod assignment;
-pub mod component;
 pub mod common;
+pub mod component;
 pub mod declaration;
 pub mod entity;
 pub mod object;
@@ -16,6 +16,7 @@ pub mod statement;
 pub mod traits;
 pub mod usings;
 
+#[cfg(test)]
 pub(crate) mod test_tools;
 
 #[cfg(test)]

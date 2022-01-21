@@ -1,11 +1,8 @@
-use std::collections::{HashMap, HashSet};
-
 use indexmap::IndexMap;
 use itertools::Itertools;
 use textwrap::indent;
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::Name,
     traits::Identify,
 };
 
@@ -91,19 +88,19 @@ impl Package {
 }
 
 impl DeclareWithIndent for Package {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(self.declare_usings()?.as_str());
         result.push_str(format!("package {} is\n\n", self.identifier).as_str());
 
         let mut body = String::new();
         for t in self.types() {
-            body.push_str(format!("{}\n\n", t.declare_with_indent(db, pre)?).as_str());
+            body.push_str(format!("{}\n\n", t.declare_with_indent(db, indent_style)?).as_str());
         }
         for (_, c) in &self.components {
             body.push_str(format!("{}\n\n", c.declare(db)?).as_str());
         }
-        result.push_str(&indent(&body, pre));
+        result.push_str(&indent(&body, indent_style));
         result.push_str(format!("end {};", self.identifier).as_str());
 
         Ok(result)
@@ -140,8 +137,8 @@ impl ListUsings for Package {
 }
 
 impl Identify for Package {
-    fn identifier(&self) -> &str {
-        self.identifier.as_ref()
+    fn identifier(&self) -> String {
+        self.identifier.to_string()
     }
 }
 

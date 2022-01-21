@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use tydi_common::{
     error::Result,
-    name::Name,
-    traits::{Document, Identify, Reverse, Reversed},
+    traits::{Document, Identify, Reversed},
 };
 
 use crate::{
@@ -111,8 +110,8 @@ impl Port {
 }
 
 impl Identify for Port {
-    fn identifier(&self) -> &str {
-        self.identifier.as_ref()
+    fn identifier(&self) -> String {
+        self.identifier.to_string()
     }
 }
 
@@ -129,7 +128,7 @@ impl Document for Port {
 }
 
 impl Declare for Port {
-    fn declare(&self, db: &dyn Arch) -> Result<String> {
+    fn declare(&self, _db: &dyn Arch) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());

@@ -14,7 +14,7 @@ use crate::{
 use super::Entity;
 
 impl DeclareWithIndent for Entity {
-    fn declare_with_indent(&self, db: &dyn Arch, pre: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(&doc);
@@ -27,17 +27,17 @@ impl DeclareWithIndent for Entity {
             .map(|x| x.declare(db))
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
-        port_body.push_str(&indent(&ports, pre));
+        port_body.push_str(&indent(&ports, indent_style));
         port_body.push_str("\n);\n");
-        result.push_str(&indent(&port_body, pre));
+        result.push_str(&indent(&port_body, indent_style));
         result.push_str(format!("end {};\n", self.identifier()).as_str());
         Ok(result)
     }
 }
 
 impl Identify for Entity {
-    fn identifier(&self) -> &str {
-        self.identifier.as_str()
+    fn identifier(&self) -> String {
+        self.identifier.clone()
     }
 }
 

@@ -11,7 +11,7 @@ use tydi_common::traits::{Document, Identify};
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
-use crate::declaration::{Declare, ObjectMode};
+use crate::declaration::{Declare};
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
@@ -592,8 +592,8 @@ impl FieldAssignment {
 }
 
 impl Identify for FieldAssignment {
-    fn identifier(&self) -> &str {
-        self.field().as_ref()
+    fn identifier(&self) -> String {
+        self.field().to_string()
     }
 }
 

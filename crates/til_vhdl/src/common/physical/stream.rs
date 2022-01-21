@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use tydi_common::{
     cat,
     error::{Error, Result},
-    name::{Name, PathName},
+    name::PathName,
     numbers::{BitCount, NonNegative, Positive},
     traits::Reversed,
     util::log2_ceil,
@@ -14,7 +14,7 @@ use tydi_vhdl::{
     port::{Mode, Port},
 };
 
-use crate::ir::{physical_properties::InterfaceDirection, IntoVhdl};
+use crate::ir::{physical_properties::InterfaceDirection};
 
 use super::{complexity::Complexity, fields::Fields};
 
@@ -240,7 +240,7 @@ impl PhysicalStream {
 
 #[cfg(test)]
 mod tests {
-    use tydi_common::numbers::BitCount;
+    use tydi_common::{name::Name, numbers::BitCount};
     use tydi_vhdl::declaration::Declare;
 
     use super::*;

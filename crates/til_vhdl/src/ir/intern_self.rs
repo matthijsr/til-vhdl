@@ -1,7 +1,7 @@
 use tydi_intern::Id;
 
 use super::{
-    Connection, Implementation, Interface, InternSelf, Ir, LogicalType, Stream, Streamlet,
+    Implementation, Interface, InternSelf, Ir, LogicalType, Stream, Streamlet,
 };
 
 // This will almost certainly lead to bad design, so comment it out for now unless I can think of a valid use.

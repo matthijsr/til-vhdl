@@ -114,6 +114,7 @@ impl Architecture {
         })
     }
 
+    /// Create an architecture based on the default package and component defined in the Arch database
     pub fn from_database(db: &dyn Arch, identifier: impl TryResult<VhdlName>) -> Result<Self> {
         let package = db.default_package();
         let mut usings = package.list_usings()?;
@@ -228,14 +229,17 @@ mod tests {
 
     //     use crate::generator::{common::convert::Packify, vhdl::Declare};
 
-    use crate::{architecture::arch_storage::db::Database, declaration::Declare, test_tools::*};
+    use crate::{architecture::arch_storage::db::Database, declaration::Declare, test_tools};
 
     use super::*;
 
     pub(crate) fn test_package() -> Result<Package> {
         Package::try_new(
             "pak",
-            &vec![empty_component(), component_with_nested_types()?],
+            &vec![
+                test_tools::empty_component(),
+                test_tools::component_with_nested_types()?,
+            ],
             &vec![],
         )
     }

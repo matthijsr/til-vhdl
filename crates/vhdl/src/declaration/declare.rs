@@ -1,12 +1,12 @@
 use tydi_common::{
-    error::{Error, Result},
+    error::{Result},
     traits::Identify,
 };
 use tydi_intern::Id;
 
 use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
 
-use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectMode, ObjectState};
+use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectState};
 
 impl ArchitectureDeclare for ArchitectureDeclaration {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {

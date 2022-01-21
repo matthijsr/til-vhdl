@@ -1,4 +1,4 @@
-use std::ops::Mul;
+use std::{convert::TryFrom, ops::Mul};
 
 use super::error::{Error, Result};
 
@@ -46,5 +46,13 @@ where
 {
     pub fn get(&self) -> T {
         self.0
+    }
+}
+
+impl TryFrom<f64> for PositiveReal {
+    type Error = Error;
+
+    fn try_from(value: f64) -> Result<Self> {
+        PositiveReal::new(value)
     }
 }

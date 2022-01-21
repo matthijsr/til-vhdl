@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use indexmap::IndexMap;
 use tydi_common::error::Result;
-use tydi_common::name::Name;
 
 use crate::common::vhdl_name::VhdlName;
 

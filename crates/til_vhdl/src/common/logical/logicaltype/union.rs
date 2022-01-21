@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, convert::TryInto, error, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::ir::{GetSelf, InternSelf, Ir};
+use crate::ir::{GetSelf, Ir};
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let mut db = Database::default();
+        let db = Database::default();
         let bits = db.intern_type(LogicalType::try_new_bits(8).unwrap());
         let union = Union::try_new(None, vec![("a", bits)]).unwrap();
         assert_eq!(

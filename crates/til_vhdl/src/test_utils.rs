@@ -16,7 +16,7 @@ pub fn test_stream_id(db: &dyn Ir, data_type: impl TryIntern<LogicalType>) -> Re
     Stream::try_new(
         db,
         data_type,
-        "1.0",
+        1.0,
         1,
         Synchronicity::Sync,
         4,

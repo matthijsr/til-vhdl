@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::error::{Error, Result, TryResult};
+use crate::error::{Error, Result, TryOptionalFrom, TryResult};
 
 /// Type-safe wrapper for valid names.
 ///
@@ -90,6 +90,16 @@ impl TryFrom<String> for Name {
     type Error = Error;
     fn try_from(string: String) -> Result<Self> {
         Name::try_new(string)
+    }
+}
+
+impl TryOptionalFrom<&str> for Name {
+    fn optional_result_from(str: &str) -> Option<Result<Self>> {
+        if str.trim() == "" {
+            None
+        } else {
+            Some(Name::try_new(str))
+        }
     }
 }
 
@@ -262,5 +272,5 @@ pub trait NameSelf {
 }
 
 pub trait PathNameSelf {
-    fn path_name(&self) -> &Name;
+    fn path_name(&self) -> &PathName;
 }

@@ -2,7 +2,7 @@ use std::{convert::TryFrom, fmt, ops::Deref, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result},
-    name::{Name, NameSelf, PathName},
+    name::{Name, PathName},
 };
 /// Type-safe wrapper for valid names.
 ///
