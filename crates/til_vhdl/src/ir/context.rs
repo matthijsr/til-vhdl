@@ -418,7 +418,7 @@ mod tests {
             vec![("a", 16.try_intern(ir_db)?), ("b", 7.try_intern(ir_db)?)],
         )?;
         // Create a Stream node with data: Bits(4)
-        let stream = test_stream_id_custom(ir_db, 4, "3.0", 0, 7)?;
+        let stream = test_stream_id_custom(ir_db, 4, 3.0, 0, 7)?;
         // Create another Stream node with data: Union(a: Bits(16), b: Bits(7))
         let stream2 = test_stream_id(ir_db, union)?;
         // Create a Streamlet

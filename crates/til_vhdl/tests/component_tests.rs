@@ -112,7 +112,7 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
         .map(|c: NonNegative| {
             let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
             let arch_db = &mut _arch_db;
-            let stream = test_stream_id_custom(db, 4, "2.0", 0, c)?;
+            let stream = test_stream_id_custom(db, 4, 2.0, 0, c)?;
             let streamlet =
                 Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
             let component: Component = streamlet.canonical(db, arch_db, "")?;
@@ -235,7 +235,7 @@ fn playground() -> Result<()> {
     let stream = Stream::try_new(
         db,
         data_type,
-        "1.0",
+        1.0,
         1,
         Synchronicity::Sync,
         4,

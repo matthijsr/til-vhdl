@@ -23,33 +23,29 @@ use tydi_common::{
 
 use super::{IsNull, LogicalType, SplitStreams};
 
-/// Floats cannot be hashed or consistently reproduced on all hardware
-///
-/// Throughput is stored as a string to ensure consistency between IR and back-end
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Throughput(String);
+/// Throughput is a struct containing a `PositiveReal`, which implements `Hash` for use in the `salsa` database.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Throughput(PositiveReal);
 
 impl Throughput {
-    pub fn try_new(throughput: String) -> Result<Self> {
-        match throughput.parse::<f64>() {
-            Ok(val) if PositiveReal::new(val).is_ok() => Ok(Throughput(throughput)),
-            _ => Err(Error::InvalidArgument(format!(
-                "{} is not a positive real number",
-                throughput
-            ))),
-        }
+    pub fn new(throughput: PositiveReal) -> Self {
+        Throughput(throughput)
     }
 
-    pub fn as_real(&self) -> PositiveReal {
-        PositiveReal::new(self.0.parse().unwrap()).unwrap()
+    pub fn try_new(throughput: impl TryResult<PositiveReal>) -> Result<Self> {
+        Ok(Throughput(throughput.try_result()?))
     }
 
-    pub fn as_str(&self) -> &str {
-        &self.0
+    pub fn get(&self) -> f64 {
+        self.0.get()
+    }
+
+    pub fn positive_real(&self) -> PositiveReal {
+        self.0
     }
 
     pub fn non_negative(&self) -> NonNegative {
-        self.as_real().get().ceil() as NonNegative
+        self.0.get().ceil() as NonNegative
     }
 
     pub fn positive(&self) -> Positive {
@@ -57,11 +53,19 @@ impl Throughput {
     }
 }
 
+impl TryFrom<f64> for Throughput {
+    type Error = Error;
+
+    fn try_from(value: f64) -> Result<Self> {
+        Throughput::try_new(value)
+    }
+}
+
 impl TryFrom<&str> for Throughput {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
-        Throughput::try_new(value.to_string())
+        Throughput::try_from(value.to_string())
     }
 }
 
@@ -69,7 +73,21 @@ impl TryFrom<String> for Throughput {
     type Error = Error;
 
     fn try_from(value: String) -> Result<Self> {
-        Throughput::try_new(value)
+        match value.parse::<f64>() {
+            Ok(val) => Ok(Throughput(PositiveReal::new(val)?)),
+            _ => Err(Error::InvalidArgument(format!(
+                "{} is not a floating point number",
+                value
+            ))),
+        }
+    }
+}
+
+impl Eq for Throughput {}
+
+impl Hash for Throughput {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.get().to_ne_bytes().hash(state);
     }
 }
 
@@ -77,7 +95,7 @@ impl Mul for Throughput {
     type Output = Throughput;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Throughput::try_new((self.as_real() * rhs.as_real()).get().to_string()).unwrap()
+        Throughput(self.0 * rhs.0)
     }
 }
 
