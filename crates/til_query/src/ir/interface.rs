@@ -9,9 +9,7 @@ use tydi_intern::Id;
 
 use crate::common::logical::logical_stream::SynthesizeLogicalStream;
 
-use super::{
-    physical_properties::InterfaceDirection, IntoVhdl, Ir, Name, PhysicalProperties, Stream,
-};
+use super::{physical_properties::InterfaceDirection, Ir, Name, PhysicalProperties, Stream};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {
@@ -57,40 +55,6 @@ impl Interface {
 impl Identify for Interface {
     fn identifier(&self) -> String {
         self.name.to_string()
-    }
-}
-
-impl IntoVhdl<Vec<Port>> for Interface {
-    fn canonical(
-        &self,
-        ir_db: &dyn Ir,
-        _arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
-    ) -> Result<Vec<Port>> {
-        let n: String = match prefix.try_optional()? {
-            Some(some) => cat!(some, self.identifier()),
-            None => self.identifier().to_string(),
-        };
-        let mut ports = Vec::new();
-
-        let synth = self.stream.synthesize(ir_db);
-
-        for (path, width) in synth.signals() {
-            ports.push(Port::new(
-                VhdlName::try_new(cat!(n.clone(), path.to_string()))?,
-                match self.physical_properties().direction() {
-                    InterfaceDirection::Out => Mode::Out,
-                    InterfaceDirection::In => Mode::In,
-                },
-                width.clone().into(),
-            ));
-        }
-
-        for (path, phys) in synth.streams() {
-            ports.extend(phys.into_vhdl(&n, path, self.physical_properties().direction())?);
-        }
-
-        Ok(ports)
     }
 }
 

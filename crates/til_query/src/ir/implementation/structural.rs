@@ -9,7 +9,7 @@ use tydi_intern::Id;
 
 use crate::ir::{
     connection::InterfaceReference, physical_properties::InterfaceDirection, Connection, GetSelf,
-    Interface, IntoVhdl, Ir, Streamlet,
+    Interface, Ir, Streamlet,
 };
 
 /// This node represents a structural `Implementation`
@@ -211,90 +211,6 @@ impl Structure {
 impl From<&Streamlet> for Structure {
     fn from(streamlet: &Streamlet) -> Self {
         Structure::new(streamlet.port_ids().clone())
-    }
-}
-
-impl IntoVhdl<ArchitectureBody> for Structure {
-    fn canonical(
-        &self,
-        ir_db: &dyn Ir,
-        arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
-    ) -> Result<ArchitectureBody> {
-        self.validate_connections(ir_db)?;
-        let prefix = prefix.try_optional()?;
-
-        let mut declarations = vec![];
-        let mut statements = vec![];
-        let own_ports = self
-            .ports(ir_db)
-            .iter()
-            .map(|(name, port)| {
-                Ok((
-                    name.clone(),
-                    port.canonical(ir_db, arch_db, prefix.clone())?
-                        .iter()
-                        .map(|vhdl_port| ObjectDeclaration::from_port(arch_db, vhdl_port, true))
-                        .collect(),
-                ))
-            })
-            .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
-        let clk = ObjectDeclaration::entity_clk(arch_db);
-        let rst = ObjectDeclaration::entity_rst(arch_db);
-        let mut streamlet_ports = BTreeMap::new();
-        let mut streamlet_components = BTreeMap::new();
-        for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
-            let component = streamlet.canonical(ir_db, arch_db, prefix.clone())?;
-            let mut port_mapping =
-                PortMapping::from_component(arch_db, &component, instance_name.clone())?;
-            streamlet_components.insert(instance_name.clone(), component);
-            let port_map_signals = streamlet
-                .port_ids()
-                .iter()
-                .map(|(name, id)| {
-                    let ports = id.get(ir_db).canonical(ir_db, arch_db, prefix.clone())?;
-                    let mut signals = vec![];
-                    for port in ports {
-                        let signal = ObjectDeclaration::signal(
-                            arch_db,
-                            format!("{}__{}", instance_name, port.identifier()),
-                            port.typ().clone(),
-                            None,
-                        )?;
-                        port_mapping.map_port(arch_db, port.vhdl_name().clone(), &signal)?;
-                        signals.push(signal);
-                        declarations.push(signal.into());
-                    }
-
-                    Ok((name.clone(), signals))
-                })
-                .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
-            streamlet_ports.insert(instance_name, port_map_signals);
-            port_mapping.map_port(arch_db, "clk", &clk)?;
-            port_mapping.map_port(arch_db, "rst", &rst)?;
-            statements.push(port_mapping.finish()?.into());
-        }
-        for connection in self.connections() {
-            let get_objs = |interface: &InterfaceReference| -> &Vec<Id<ObjectDeclaration>> {
-                match interface.streamlet_instance() {
-                    Some(streamlet_instance) => streamlet_ports
-                        .get(streamlet_instance)
-                        .unwrap()
-                        .get(interface.port())
-                        .unwrap(),
-                    None => own_ports.get(interface.port()).unwrap(),
-                }
-            };
-            let sink_objs = get_objs(connection.sink()).clone();
-            let source_objs = get_objs(connection.source()).clone();
-            let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
-                sink_objs.into_iter().zip(source_objs.into_iter()).collect();
-            for (sink, source) in sink_source {
-                statements.push(sink.assign(arch_db, &source)?.into());
-            }
-        }
-
-        Ok(ArchitectureBody::new(declarations, statements))
     }
 }
 

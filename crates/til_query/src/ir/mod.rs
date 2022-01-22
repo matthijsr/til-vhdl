@@ -65,18 +65,6 @@ where
     }
 }
 
-pub trait IntoVhdl<T> {
-    fn canonical(
-        &self,
-        ir_db: &dyn Ir,
-        arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
-    ) -> Result<T>;
-    fn fancy(&self, _ir_db: &dyn Ir, _arch_db: &dyn Arch) -> Result<T> {
-        todo!()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

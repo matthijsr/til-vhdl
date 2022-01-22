@@ -9,7 +9,7 @@ use tydi_common::{
     util::log2_ceil,
 };
 
-use crate::ir::{physical_properties::InterfaceDirection};
+use crate::ir::physical_properties::InterfaceDirection;
 
 use super::{complexity::Complexity, fields::Fields};
 
@@ -186,49 +186,5 @@ impl PhysicalStream {
     /// Returns the bit count of the user fields in this physical stream.
     pub fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
-    }
-
-    pub(crate) fn into_vhdl(
-        &self,
-        base_name: &str,
-        path_name: &PathName,
-        interface_origin: InterfaceDirection,
-    ) -> Result<Vec<Port>> {
-        let mut ports = vec![];
-
-        let mode = match interface_origin {
-            InterfaceDirection::Out => Mode::Out,
-            InterfaceDirection::In => Mode::In,
-        };
-
-        ports.push(Port::new(
-            VhdlName::try_new(cat!(base_name, path_name, "valid"))?,
-            mode,
-            ObjectType::Bit,
-        ));
-        ports.push(Port::new(
-            VhdlName::try_new(cat!(base_name, path_name, "ready"))?,
-            mode.reversed(),
-            ObjectType::Bit,
-        ));
-
-        let mut opt = |x: NonNegative, name: &str| -> Result<()> {
-            if let Some(bits) = BitCount::new(x) {
-                ports.push(Port::new(
-                    VhdlName::try_new(cat!(base_name, path_name, name))?,
-                    mode,
-                    bits.into(),
-                ));
-            }
-            Ok(())
-        };
-        opt(self.data_bit_count(), "data")?;
-        opt(self.last_bit_count(), "last")?;
-        opt(self.stai_bit_count(), "stai")?;
-        opt(self.endi_bit_count(), "endi")?;
-        opt(self.strb_bit_count(), "strb")?;
-        opt(self.user_bit_count(), "user")?;
-
-        Ok(ports)
     }
 }
