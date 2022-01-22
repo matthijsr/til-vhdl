@@ -1,15 +1,18 @@
 use std::convert::TryFrom;
 
 use tydi_common::{
-    cat,
-    error::{Error, Result, TryOptional, TryResult},
+    error::{Error, Result, TryResult},
+    name::Name,
     traits::Identify,
 };
 use tydi_intern::Id;
 
-use crate::common::logical::logical_stream::SynthesizeLogicalStream;
+use crate::common::logical::logicaltype::stream::Stream;
 
-use super::{physical_properties::InterfaceDirection, Ir, Name, PhysicalProperties, Stream};
+use super::{
+    physical_properties::{InterfaceDirection, PhysicalProperties},
+    Ir,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {

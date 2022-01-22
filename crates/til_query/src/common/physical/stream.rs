@@ -1,15 +1,11 @@
 use std::convert::TryInto;
 
 use tydi_common::{
-    cat,
     error::{Error, Result},
     name::PathName,
-    numbers::{BitCount, NonNegative, Positive},
-    traits::Reversed,
+    numbers::{NonNegative, Positive},
     util::log2_ceil,
 };
-
-use crate::ir::physical_properties::InterfaceDirection;
 
 use super::{complexity::Complexity, fields::Fields};
 

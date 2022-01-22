@@ -1,7 +1,10 @@
 use tydi_intern::Id;
 
 use crate::{
-    common::logical::logicaltype::{Direction, LogicalType, Stream, Synchronicity, Throughput},
+    common::logical::logicaltype::{
+        stream::{Direction, Stream, Synchronicity, Throughput},
+        LogicalType,
+    },
     ir::{InternSelf, Ir, TryIntern},
 };
 

@@ -1,30 +1,18 @@
-use crate::common::logical;
-use tydi_common::error::{Result, TryOptional, TryResult};
+use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
+use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
+use self::{implementation::Implementation, interface::Interface, streamlet::Streamlet};
+
 pub mod annotation_keys;
-pub use annotation_keys::AnnotationKey;
-pub use connection::Connection;
 pub mod connection;
-pub use implementation::Implementation;
-pub mod implementation;
-pub use physical_properties::PhysicalProperties;
-pub mod physical_properties;
-pub use interface::Interface;
-pub mod interface;
-pub use streamlet::Streamlet;
-pub mod streamlet;
-pub use db::Database;
-
 pub mod db;
-
 pub mod get_self;
+pub mod implementation;
+pub mod interface;
 pub mod intern_self;
-
-/// List of all the nodes
-pub type LogicalType = logical::logicaltype::LogicalType;
-pub type Stream = logical::logicaltype::Stream;
-pub type Name = tydi_common::name::Name;
+pub mod physical_properties;
+pub mod streamlet;
 
 #[salsa::query_group(IrStorage)]
 pub trait Ir {
@@ -67,6 +55,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::ir::db::Database;
+
     use super::*;
     use tydi_common::error::Result;
 

@@ -1,15 +1,15 @@
 use std::collections::{BTreeMap, HashSet};
 
 use tydi_common::{
-    error::{Error, Result, TryOptional, TryResult},
+    error::{Error, Result, TryResult},
     name::Name,
-    traits::Identify,
 };
 use tydi_intern::Id;
 
 use crate::ir::{
-    connection::InterfaceReference, physical_properties::InterfaceDirection, Connection, GetSelf,
-    Interface, Ir, Streamlet,
+    connection::{Connection, InterfaceReference},
+    physical_properties::InterfaceDirection,
+    GetSelf, Interface, Ir, Streamlet,
 };
 
 /// This node represents a structural `Implementation`
@@ -216,11 +216,7 @@ impl From<&Streamlet> for Structure {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        common::logical::logicaltype::LogicalType,
-        ir::{Database, TryIntern},
-        test_utils::{test_stream_id, test_stream_id_custom},
-    };
+    use crate::{ir::db::Database, test_utils::test_stream_id};
 
     use super::*;
 

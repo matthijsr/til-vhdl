@@ -1,16 +1,14 @@
 use std::collections::BTreeMap;
 
 use tydi_common::{
-    cat,
-    error::{Error, Result, TryOptional, TryResult},
-    name::{NameSelf, PathName, PathNameSelf},
+    error::{Error, Result, TryResult},
+    name::{Name, NameSelf, PathName, PathNameSelf},
     traits::Identify,
 };
 use tydi_intern::Id;
 
 use super::{
-    implementation::ImplementationKind, physical_properties::InterfaceDirection, GetSelf,
-    Implementation, Interface, InternSelf, Ir, Name,
+    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf, Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -131,8 +129,9 @@ impl Identify for Streamlet {
 
 #[cfg(test)]
 mod tests {
-    use crate::ir::Database;
     use tydi_common::error::Result;
+
+    use crate::ir::db::Database;
 
     use super::*;
 

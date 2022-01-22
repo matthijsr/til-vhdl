@@ -11,17 +11,13 @@ use tydi_common::{
     numbers::{BitCount, NonNegative, Positive},
 };
 
-pub use bits::*;
 pub mod bits;
-
-pub use group::*;
 pub mod group;
-
-pub use stream::*;
 pub mod stream;
 
 use tydi_intern::Id;
-pub use union::*;
+
+use self::{group::Group, stream::Stream, union::Union};
 
 use super::split_streams::{SplitStreams, SplitsStreams};
 pub mod union;

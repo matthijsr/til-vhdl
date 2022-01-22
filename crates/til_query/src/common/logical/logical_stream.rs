@@ -22,6 +22,7 @@ impl LogicalStream {
         self.signals.iter()
     }
 
+    #[allow(dead_code)]
     pub fn streams(&self) -> impl Iterator<Item = (&PathName, &PhysicalStream)> {
         self.streams.iter()
     }
