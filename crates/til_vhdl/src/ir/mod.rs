@@ -1,5 +1,5 @@
 use crate::common::logical;
-use tydi_common::error::{Result, TryOptional, TryResult};
+use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
 pub mod annotation_keys;
@@ -15,7 +15,6 @@ pub mod interface;
 pub use streamlet::Streamlet;
 pub mod streamlet;
 pub use db::Database;
-use tydi_vhdl::architecture::arch_storage::Arch;
 
 pub mod db;
 
@@ -63,18 +62,6 @@ where
 {
     fn try_intern(self, db: &dyn Ir) -> Result<Id<T>> {
         Ok(self.try_result()?.intern(db))
-    }
-}
-
-pub trait IntoVhdl<T> {
-    fn canonical(
-        &self,
-        ir_db: &dyn Ir,
-        arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
-    ) -> Result<T>;
-    fn fancy(&self, _ir_db: &dyn Ir, _arch_db: &dyn Arch) -> Result<T> {
-        todo!()
     }
 }
 

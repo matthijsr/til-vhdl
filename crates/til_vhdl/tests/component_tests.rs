@@ -2,9 +2,10 @@ use til_vhdl::{
     common::logical::logicaltype::{Direction, Synchronicity},
     ir::{
         implementation::structural::Structure, physical_properties::InterfaceDirection, Database,
-        GetSelf, Implementation, InternSelf, IntoVhdl, Ir, LogicalType, Stream, Streamlet,
+        GetSelf, Implementation, InternSelf, Ir, LogicalType, Stream, Streamlet,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
+    IntoVhdl,
 };
 use tydi_common::{error::Result, name::Name, numbers::NonNegative};
 use tydi_vhdl::{

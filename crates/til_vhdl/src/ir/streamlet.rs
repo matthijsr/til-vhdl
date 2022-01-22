@@ -15,9 +15,11 @@ use tydi_vhdl::{
     port::Port,
 };
 
+use crate::IntoVhdl;
+
 use super::{
     implementation::ImplementationKind, physical_properties::InterfaceDirection, GetSelf,
-    Implementation, Interface, InternSelf, IntoVhdl, Ir, Name,
+    Implementation, Interface, InternSelf, Ir, Name,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

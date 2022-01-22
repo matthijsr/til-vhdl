@@ -12,11 +12,9 @@ use tydi_vhdl::{
     port::{Mode, Port},
 };
 
-use crate::common::logical::logical_stream::SynthesizeLogicalStream;
+use crate::{common::logical::logical_stream::SynthesizeLogicalStream, IntoVhdl};
 
-use super::{
-    physical_properties::InterfaceDirection, IntoVhdl, Ir, Name, PhysicalProperties, Stream,
-};
+use super::{physical_properties::InterfaceDirection, Ir, Name, PhysicalProperties, Stream};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {

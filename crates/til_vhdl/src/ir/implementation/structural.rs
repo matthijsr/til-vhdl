@@ -14,9 +14,12 @@ use tydi_vhdl::{
     statement::PortMapping,
 };
 
-use crate::ir::{
-    connection::InterfaceReference, physical_properties::InterfaceDirection, Connection, GetSelf,
-    Interface, IntoVhdl, Ir, Streamlet,
+use crate::{
+    ir::{
+        connection::InterfaceReference, physical_properties::InterfaceDirection, Connection,
+        GetSelf, Interface, Ir, Streamlet,
+    },
+    IntoVhdl,
 };
 
 /// This node represents a structural `Implementation`
