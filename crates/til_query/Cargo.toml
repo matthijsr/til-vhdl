@@ -1,18 +1,15 @@
 [project]
-name = "til-vhdl"
+name = "til-query"
 version = "0.1.0"
 edition = "2018"
 publish = false
-description = "A VHDL compiler for the Tydi Intermediate representation Language"
+description = "A query storage for the Tydi Intermediate representation Language"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# vhdl_lang = "0.17.0"
 indexmap = "1.7.0"
 log = "0.4.14"
 salsa = "0.16.1"
-til-query = {path = "../til_query"}
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
-tydi-vhdl = { path = "../vhdl" }
