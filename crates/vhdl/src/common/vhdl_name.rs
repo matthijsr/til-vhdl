@@ -1,7 +1,7 @@
 use std::{convert::TryFrom, fmt, ops::Deref, str::FromStr};
 
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryOptionalFrom},
     name::{Name, PathName},
 };
 /// Type-safe wrapper for valid names.
@@ -101,6 +101,16 @@ impl FromStr for VhdlName {
     type Err = Error;
     fn from_str(str: &str) -> Result<Self> {
         VhdlName::try_new(str)
+    }
+}
+
+impl TryOptionalFrom<&str> for VhdlName {
+    fn optional_result_from(str: &str) -> Option<Result<Self>> {
+        if str.trim() == "" {
+            None
+        } else {
+            Some(VhdlName::try_new(str))
+        }
     }
 }
 

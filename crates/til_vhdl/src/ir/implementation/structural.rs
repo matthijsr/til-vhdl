@@ -13,6 +13,7 @@ use tydi_vhdl::{
     declaration::ObjectDeclaration,
     statement::PortMapping,
 };
+use tydi_vhdl::common::vhdl_name::VhdlName;
 
 use crate::{
     ir::{
@@ -229,7 +230,7 @@ impl IntoVhdl<ArchitectureBody> for Structure {
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
+        prefix: impl TryOptional<VhdlName>,
     ) -> Result<ArchitectureBody> {
         self.validate_connections(ir_db)?;
         let prefix = prefix.try_optional()?;

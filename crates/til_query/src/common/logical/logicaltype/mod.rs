@@ -103,7 +103,7 @@ impl LogicalType {
     /// ```rust
     /// use tydi_common::error::Error;
     /// use til_query::common::logical::logicaltype::LogicalType;
-    /// use til_query::ir::{Database, Ir};
+    /// use til_query::ir::{db::Database, Ir};
     ///
     /// let db = Database::default();
     ///
@@ -154,7 +154,7 @@ impl LogicalType {
     ///
     /// ```rust
     /// use til_query::common::logical::logicaltype::LogicalType;
-    /// use til_query::ir::Database;
+    /// use til_query::ir::db::Database;
     ///
     /// let db = Database::default();
     ///

@@ -143,7 +143,7 @@ impl IntoVhdl<Component> for Streamlet {
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
+        prefix: impl TryOptional<VhdlName>,
     ) -> Result<Component> {
         let prefix = prefix.try_optional()?;
         let n: String = match &prefix {
@@ -175,7 +175,7 @@ impl IntoVhdl<String> for Streamlet {
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
+        prefix: impl TryOptional<VhdlName>,
     ) -> Result<String> {
         let prefix = prefix.try_optional()?;
         let component: Component = self.canonical(ir_db, arch_db, prefix.clone())?;

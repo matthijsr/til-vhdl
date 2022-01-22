@@ -67,8 +67,8 @@ impl IntoVhdl<Vec<Port>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
-        _arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
+        arch_db: &mut dyn Arch,
+        prefix: impl TryOptional<VhdlName>,
     ) -> Result<Vec<Port>> {
         let n: String = match prefix.try_optional()? {
             Some(some) => cat!(some, self.identifier()),
@@ -90,7 +90,13 @@ impl IntoVhdl<Vec<Port>> for Interface {
         }
 
         for (path, phys) in synth.streams() {
-            ports.extend(phys.into_vhdl(&n, path, self.physical_properties().direction())?);
+            for port in phys
+                .canonical(ir_db, arch_db, cat!(&n, path).as_str())?
+                .with_direction(self.physical_properties().direction())
+                .ports()
+            {
+                ports.push(port.clone());
+            }
         }
 
         Ok(ports)
