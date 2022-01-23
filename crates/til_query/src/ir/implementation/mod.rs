@@ -1,11 +1,11 @@
-pub mod structural;
+pub mod structure;
 
 use tydi_common::{
     error::{Result, TryResult},
     name::{Name, NameSelf},
 };
 
-use self::structural::Structure;
+use self::structure::Structure;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {

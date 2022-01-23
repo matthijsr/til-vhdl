@@ -1,7 +1,7 @@
 use til_vhdl::{
     common::logical::logicaltype::{Direction, Synchronicity},
     ir::{
-        implementation::structural::Structure, physical_properties::InterfaceDirection, Database,
+        implementation::structure::Structure, physical_properties::InterfaceDirection, Database,
         GetSelf, Implementation, InternSelf, Ir, LogicalType, Stream, Streamlet,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
