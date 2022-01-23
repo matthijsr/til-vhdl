@@ -144,7 +144,7 @@ impl From<Union> for LogicalType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::Database;
+    use crate::ir::db::Database;
 
     #[test]
     fn test_new() {

@@ -15,7 +15,7 @@ use crate::common::logical::logical_stream::{LogicalStream, SynthesizeLogicalStr
 use crate::common::logical::split_streams::SplitsStreams;
 use crate::common::physical::complexity::Complexity;
 use crate::common::physical::stream::PhysicalStream;
-use crate::ir::{GetSelf, InternSelf, Ir};
+use crate::ir::{InternSelf, GetSelf, Ir};
 use tydi_common::{
     error::{Error, Result},
     numbers::{NonNegative, PositiveReal},

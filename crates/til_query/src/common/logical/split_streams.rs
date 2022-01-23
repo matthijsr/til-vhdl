@@ -4,7 +4,7 @@ use tydi_intern::Id;
 
 use crate::ir::Ir;
 
-use super::logicaltype::{LogicalType, Stream};
+use super::logicaltype::{stream::Stream, LogicalType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SplitStreams {

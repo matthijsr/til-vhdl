@@ -7,6 +7,9 @@ use tydi_common::{
 
 use super::stream::PhysicalStream;
 
+// TODO: This is currently unused, but still has some useful features (like the default() function)
+// Figure out where to put/use this.
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Signal {
     Valid,

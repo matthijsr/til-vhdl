@@ -1,76 +1,29 @@
-use std::convert::TryFrom;
-
+use til_query::{
+    common::logical::logical_stream::SynthesizeLogicalStream,
+    ir::{physical_properties::InterfaceDirection, Ir},
+};
 use tydi_common::{
     cat,
-    error::{Error, Result, TryOptional, TryResult},
+    error::{Result, TryOptional},
     traits::Identify,
 };
-use tydi_intern::Id;
+
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
     common::vhdl_name::VhdlName,
     port::{Mode, Port},
 };
 
-use crate::common::logical::logical_stream::SynthesizeLogicalStream;
+use crate::IntoVhdl;
 
-use super::{
-    physical_properties::InterfaceDirection, IntoVhdl, Ir, Name, PhysicalProperties, Stream,
-};
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Interface {
-    name: Name,
-    stream: Id<Stream>,
-    physical_properties: PhysicalProperties,
-}
-
-impl Interface {
-    pub fn try_new(
-        name: impl TryResult<Name>,
-        stream: Id<Stream>,
-        physical_properties: PhysicalProperties,
-    ) -> Result<Interface> {
-        Ok(Interface {
-            name: name.try_result()?,
-            stream,
-            physical_properties,
-        })
-    }
-
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-
-    pub fn stream(&self, db: &dyn Ir) -> Stream {
-        db.lookup_intern_stream(self.stream)
-    }
-
-    pub fn stream_id(&self) -> Id<Stream> {
-        self.stream
-    }
-
-    pub fn physical_properties(&self) -> &PhysicalProperties {
-        &self.physical_properties
-    }
-
-    pub fn direction(&self) -> InterfaceDirection {
-        self.physical_properties().direction()
-    }
-}
-
-impl Identify for Interface {
-    fn identifier(&self) -> String {
-        self.name.to_string()
-    }
-}
+pub(crate) type Interface = til_query::ir::interface::Interface;
 
 impl IntoVhdl<Vec<Port>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
-        _arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<Name>,
+        arch_db: &mut dyn Arch,
+        prefix: impl TryOptional<VhdlName>,
     ) -> Result<Vec<Port>> {
         let n: String = match prefix.try_optional()? {
             Some(some) => cat!(some, self.identifier()),
@@ -78,7 +31,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
         };
         let mut ports = Vec::new();
 
-        let synth = self.stream.synthesize(ir_db);
+        let synth = self.stream_id().synthesize(ir_db);
 
         for (path, width) in synth.signals() {
             ports.push(Port::new(
@@ -92,25 +45,15 @@ impl IntoVhdl<Vec<Port>> for Interface {
         }
 
         for (path, phys) in synth.streams() {
-            ports.extend(phys.into_vhdl(&n, path, self.physical_properties().direction())?);
+            for port in phys
+                .canonical(ir_db, arch_db, cat!(&n, path).as_str())?
+                .with_direction(self.physical_properties().direction())
+                .ports()
+            {
+                ports.push(port.clone());
+            }
         }
 
         Ok(ports)
-    }
-}
-
-impl<N, P> TryFrom<(N, Id<Stream>, P)> for Interface
-where
-    N: TryResult<Name>,
-    P: TryResult<PhysicalProperties>,
-{
-    type Error = Error;
-
-    fn try_from((name, stream, physical_properties): (N, Id<Stream>, P)) -> Result<Self> {
-        Ok(Interface {
-            name: name.try_result()?,
-            stream,
-            physical_properties: physical_properties.try_result()?,
-        })
     }
 }

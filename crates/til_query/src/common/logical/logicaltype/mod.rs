@@ -1,7 +1,7 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use crate::{
-    common::physical::{fields::Fields},
+    common::physical::fields::Fields,
     ir::{GetSelf, InternSelf, Ir},
 };
 use indexmap::IndexMap;
@@ -11,17 +11,13 @@ use tydi_common::{
     numbers::{BitCount, NonNegative, Positive},
 };
 
-pub use bits::*;
 pub mod bits;
-
-pub use group::*;
 pub mod group;
-
-pub use stream::*;
 pub mod stream;
 
 use tydi_intern::Id;
-pub use union::*;
+
+use self::{group::Group, stream::Stream, union::Union};
 
 use super::split_streams::{SplitStreams, SplitsStreams};
 pub mod union;
@@ -83,7 +79,7 @@ impl LogicalType {
     /// ```rust
     /// use tydi_common::error::Error;
     /// use tydi_common::numbers::Positive;
-    /// use til_vhdl::common::logical::logicaltype::LogicalType;
+    /// use til_query::common::logical::logicaltype::LogicalType;
     ///
     /// let bits = LogicalType::try_new_bits(4);
     /// let zero = LogicalType::try_new_bits(0);
@@ -106,8 +102,8 @@ impl LogicalType {
     ///
     /// ```rust
     /// use tydi_common::error::Error;
-    /// use til_vhdl::common::logical::logicaltype::LogicalType;
-    /// use til_vhdl::ir::{Database, Ir};
+    /// use til_query::common::logical::logicaltype::LogicalType;
+    /// use til_query::ir::{db::Database, Ir};
     ///
     /// let db = Database::default();
     ///
@@ -157,8 +153,8 @@ impl LogicalType {
     /// # Examples
     ///
     /// ```rust
-    /// use til_vhdl::common::logical::logicaltype::LogicalType;
-    /// use til_vhdl::ir::Database;
+    /// use til_query::common::logical::logicaltype::LogicalType;
+    /// use til_query::ir::db::Database;
     ///
     /// let db = Database::default();
     ///

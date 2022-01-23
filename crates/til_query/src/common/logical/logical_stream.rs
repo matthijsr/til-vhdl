@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LogicalStream {
+pub struct LogicalStream {
     signals: Fields,
     streams: IndexMap<PathName, PhysicalStream>,
 }
@@ -22,11 +22,12 @@ impl LogicalStream {
         self.signals.iter()
     }
 
+    #[allow(dead_code)]
     pub fn streams(&self) -> impl Iterator<Item = (&PathName, &PhysicalStream)> {
         self.streams.iter()
     }
 }
 
-pub(crate) trait SynthesizeLogicalStream {
+pub trait SynthesizeLogicalStream {
     fn synthesize(&self, db: &dyn Ir) -> LogicalStream;
 }

@@ -5,7 +5,7 @@ use tydi_common::{
     numbers::NonNegative,
 };
 
-use crate::ir::LogicalType;
+use super::LogicalType;
 
 impl TryFrom<NonNegative> for LogicalType {
     type Error = Error;

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use tydi_common::{
     error::Result,
-    traits::{Document, Identify, Reversed},
+    traits::{Document, Identify, Reverse, Reversed},
 };
 
 use crate::{
@@ -143,6 +143,15 @@ impl Declare for Port {
             .as_str(),
         );
         Ok(result)
+    }
+}
+
+impl Reverse for Port {
+    fn reverse(&mut self) {
+        match self.mode() {
+            Mode::In => self.mode = Mode::Out,
+            Mode::Out => self.mode = Mode::In,
+        }
     }
 }
 

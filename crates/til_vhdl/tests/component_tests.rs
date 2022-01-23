@@ -1,11 +1,18 @@
-use til_vhdl::{
-    common::logical::logicaltype::{Direction, Synchronicity},
+use til_query::{
+    common::logical::logicaltype::{
+        stream::{Direction, Stream, Synchronicity},
+        LogicalType,
+    },
     ir::{
-        implementation::structural::Structure, physical_properties::InterfaceDirection, Database,
-        GetSelf, Implementation, InternSelf, IntoVhdl, Ir, LogicalType, Stream, Streamlet,
+        db::Database,
+        implementation::{structure::Structure, Implementation},
+        physical_properties::InterfaceDirection,
+        streamlet::Streamlet,
+        GetSelf, InternSelf, Ir,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
+use til_vhdl::IntoVhdl;
 use tydi_common::{error::Result, name::Name, numbers::NonNegative};
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
