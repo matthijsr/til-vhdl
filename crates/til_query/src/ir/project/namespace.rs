@@ -23,11 +23,6 @@ pub struct Namespace {
     streamlets: BTreeMap<Name, Id<Streamlet>>,
     /// The implementations declared within the namespace.
     implementations: BTreeMap<Name, Id<Implementation>>,
-    /// Imported names, structured as:
-    /// Key: Name of the imported type, streamlet or implementation.
-    ///      Allows for PathNames to disambiguate between overlapping names.
-    /// Value: Source of the external dependency.
-    imports: BTreeMap<PathName, PathName>,
 }
 
 impl Namespace {
@@ -37,7 +32,6 @@ impl Namespace {
             types: BTreeMap::new(),
             streamlets: BTreeMap::new(),
             implementations: BTreeMap::new(),
-            imports: BTreeMap::new(),
         })
     }
 
@@ -51,10 +45,6 @@ impl Namespace {
 
     pub fn implementation_ids(&self) -> &BTreeMap<Name, Id<Implementation>> {
         &self.implementations
-    }
-
-    pub fn imports(&self) -> &BTreeMap<PathName, PathName> {
-        &self.imports
     }
 }
 
@@ -92,7 +82,6 @@ impl MoveDb<Id<Namespace>> for Namespace {
             types,
             streamlets,
             implementations,
-            imports: self.imports().clone(),
         }
         .intern(target_db))
     }
