@@ -6,7 +6,10 @@ use std::{
     str::FromStr,
 };
 
-use crate::error::{Error, Result, TryOptionalFrom, TryResult};
+use crate::{
+    error::{Error, Result, TryOptionalFrom, TryResult},
+    traits::Identify,
+};
 
 /// Type-safe wrapper for valid names.
 ///
@@ -194,6 +197,10 @@ impl PathName {
         self.0.len()
     }
 
+    pub fn first(&self) -> Option<&Name> {
+        self.0.first()
+    }
+
     pub fn last(&self) -> Option<&Name> {
         self.0.last()
     }
@@ -267,10 +274,10 @@ impl TryFrom<&str> for PathName {
     }
 }
 
-pub trait NameSelf {
+pub trait NameSelf: Identify {
     fn name(&self) -> &Name;
 }
 
-pub trait PathNameSelf {
+pub trait PathNameSelf: Identify {
     fn path_name(&self) -> &PathName;
 }

@@ -3,6 +3,7 @@ pub mod structure;
 use tydi_common::{
     error::{Result, TryResult},
     name::{Name, NameSelf},
+    traits::Identify,
 };
 
 use self::structure::Structure;
@@ -40,6 +41,12 @@ impl Implementation {
 
     pub fn kind(&self) -> &ImplementationKind {
         &self.kind
+    }
+}
+
+impl Identify for Implementation {
+    fn identifier(&self) -> String {
+        self.name().to_string()
     }
 }
 

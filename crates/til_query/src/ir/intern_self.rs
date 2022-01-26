@@ -1,7 +1,8 @@
 use tydi_intern::Id;
 
 use super::{
-    Implementation, Interface, InternSelf, Ir, LogicalType, Stream, Streamlet,
+    project::namespace::Namespace, Implementation, Interface, InternSelf, Ir, LogicalType, Stream,
+    Streamlet,
 };
 
 // This will almost certainly lead to bad design, so comment it out for now unless I can think of a valid use.
@@ -39,5 +40,11 @@ impl InternSelf for Streamlet {
 impl InternSelf for Stream {
     fn intern(self, db: &dyn Ir) -> Id<Self> {
         db.intern_stream(self)
+    }
+}
+
+impl InternSelf for Namespace {
+    fn intern(self, db: &dyn Ir) -> Id<Self> {
+        db.intern_namespace(self)
     }
 }

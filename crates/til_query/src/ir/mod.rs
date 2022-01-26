@@ -2,7 +2,12 @@ use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
 use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
-use self::{implementation::Implementation, interface::Interface, streamlet::Streamlet};
+use self::{
+    implementation::Implementation,
+    interface::Interface,
+    project::{namespace::Namespace, Project},
+    streamlet::Streamlet,
+};
 
 pub mod annotation_keys;
 pub mod connection;
@@ -12,6 +17,7 @@ pub mod implementation;
 pub mod interface;
 pub mod intern_self;
 pub mod physical_properties;
+pub mod project;
 pub mod streamlet;
 
 #[salsa::query_group(IrStorage)]
@@ -19,6 +25,11 @@ pub trait Ir {
     #[salsa::input]
     fn annotation(&self, intern_id: salsa::InternId, key: String) -> String;
 
+    #[salsa::input]
+    fn project(&self) -> Project;
+
+    #[salsa::interned]
+    fn intern_namespace(&self, namespace: Namespace) -> Id<Namespace>;
     #[salsa::interned]
     fn intern_implementation(&self, implementation: Implementation) -> Id<Implementation>;
     #[salsa::interned]
