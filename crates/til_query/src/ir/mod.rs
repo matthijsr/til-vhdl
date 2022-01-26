@@ -54,6 +54,20 @@ pub trait TryIntern<T> {
     fn try_intern(self, db: &dyn Ir) -> Result<Id<T>>;
 }
 
+pub trait MoveDb<T>: Sized {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<T>;
+}
+
+impl<T> MoveDb<Id<T>> for Id<T>
+where
+    Id<T>: GetSelf<T>,
+    T: MoveDb<Id<T>>,
+{
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<T>> {
+        self.get(original_db).move_db(original_db, target_db)
+    }
+}
+
 impl<T, U> TryIntern<T> for U
 where
     U: TryResult<T>,

@@ -11,7 +11,7 @@ use crate::common::logical::logicaltype::stream::Stream;
 
 use super::{
     physical_properties::{InterfaceDirection, PhysicalProperties},
-    Ir,
+    InternSelf, Ir, MoveDb,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -74,5 +74,16 @@ where
             stream,
             physical_properties: physical_properties.try_result()?,
         })
+    }
+}
+
+impl MoveDb<Id<Interface>> for Interface {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Interface>> {
+        Ok(Interface {
+            name: self.name.clone(),
+            stream: self.stream.move_db(original_db, target_db)?,
+            physical_properties: self.physical_properties.clone(),
+        }
+        .intern(target_db))
     }
 }

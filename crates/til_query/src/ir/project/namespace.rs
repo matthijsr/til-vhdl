@@ -7,7 +7,10 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-use crate::{common::logical::logicaltype::LogicalType, ir::streamlet::Streamlet};
+use crate::{
+    common::logical::logicaltype::LogicalType,
+    ir::{implementation::Implementation, streamlet::Streamlet, InternSelf, Ir, MoveDb},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
@@ -19,7 +22,7 @@ pub struct Namespace {
     /// The streamlets declared within the namespace.
     streamlets: BTreeMap<Name, Id<Streamlet>>,
     /// The implementations declared within the namespace.
-    implementations: BTreeMap<Name, Id<Streamlet>>,
+    implementations: BTreeMap<Name, Id<Implementation>>,
     /// Imported names, structured as:
     /// Key: Name of the imported type, streamlet or implementation.
     ///      Allows for PathNames to disambiguate between overlapping names.
@@ -37,6 +40,10 @@ impl Namespace {
             imports: BTreeMap::new(),
         })
     }
+
+    pub fn type_ids(&self) -> &BTreeMap<Name, Id<LogicalType>> {
+        &self.types
+    }
 }
 
 impl Identify for Namespace {
@@ -48,5 +55,33 @@ impl Identify for Namespace {
 impl PathNameSelf for Namespace {
     fn path_name(&self) -> &PathName {
         &self.name
+    }
+}
+
+impl MoveDb<Id<Namespace>> for Namespace {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Namespace>> {
+        let types = self
+            .types
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        let streamlets = self
+            .streamlets
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        let implementations = self
+            .implementations
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        Ok(Namespace {
+            name: self.name.clone(),
+            types,
+            streamlets,
+            implementations,
+            imports: self.imports.clone(),
+        }
+        .intern(target_db))
     }
 }

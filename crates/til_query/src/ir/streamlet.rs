@@ -9,6 +9,7 @@ use tydi_intern::Id;
 
 use super::{
     physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf, Ir,
+    MoveDb,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -124,6 +125,28 @@ impl PathNameSelf for Streamlet {
 impl Identify for Streamlet {
     fn identifier(&self) -> String {
         self.path_name().to_string()
+    }
+}
+
+impl MoveDb<Id<Streamlet>> for Streamlet {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Streamlet>> {
+        let port_order = self.port_order.clone();
+        let ports = self
+            .ports
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        let implementation = match &self.implementation {
+            Some(id) => Some(id.move_db(original_db, target_db)?),
+            None => None,
+        };
+        Ok(Streamlet {
+            name: self.name.clone(),
+            implementation,
+            ports,
+            port_order,
+        }
+        .intern(target_db))
     }
 }
 

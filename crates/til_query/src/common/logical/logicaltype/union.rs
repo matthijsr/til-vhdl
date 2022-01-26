@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::ir::{GetSelf, Ir};
+use crate::ir::{GetSelf, InternSelf, Ir, MoveDb};
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
@@ -138,6 +138,22 @@ impl From<Union> for LogicalType {
     /// [`LogicalType`]: ./enum.LogicalType.html
     fn from(union: Union) -> Self {
         LogicalType::Union(union)
+    }
+}
+
+impl MoveDb<Id<LogicalType>> for Union {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<LogicalType>> {
+        let field_order = self.field_order.clone();
+        let fields = self
+            .fields
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        Ok(LogicalType::from(Union {
+            fields,
+            field_order,
+        })
+        .intern(target_db))
     }
 }
 

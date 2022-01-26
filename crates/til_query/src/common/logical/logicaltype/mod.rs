@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     common::physical::fields::Fields,
-    ir::{GetSelf, InternSelf, Ir},
+    ir::{GetSelf, InternSelf, Ir, MoveDb},
 };
 use indexmap::IndexMap;
 use tydi_common::{
@@ -306,5 +306,19 @@ impl IsNull for LogicalType {
             LogicalType::Stream(stream) => stream.is_null(db),
             LogicalType::Bits(_) => false,
         }
+    }
+}
+
+impl MoveDb<Id<LogicalType>> for LogicalType {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Self>> {
+        Ok(match self {
+            LogicalType::Null => self.clone().intern(target_db),
+            LogicalType::Bits(_) => self.clone().intern(target_db),
+            LogicalType::Group(group) => group.move_db(original_db, target_db)?,
+            LogicalType::Union(union) => union.move_db(original_db, target_db)?,
+            LogicalType::Stream(stream) => {
+                LogicalType::Stream(stream.move_db(original_db, target_db)?).intern(target_db)
+            }
+        })
     }
 }

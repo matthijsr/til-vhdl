@@ -12,7 +12,7 @@ use tydi_intern::Id;
 
 use self::namespace::Namespace;
 
-use super::{InternSelf, Ir};
+use super::{InternSelf, Ir, MoveDb};
 
 pub mod namespace;
 
@@ -49,6 +49,65 @@ impl Project {
 
     pub fn imports(&self) -> &BTreeMap<Name, Project> {
         &self.imports
+    }
+
+    /// Import another project using an alias
+    pub fn import_project_as(
+        &mut self,
+        db: &dyn Ir,
+        project: &Project,
+        proj_db: &dyn Ir,
+        alias_name: impl TryResult<Name>,
+    ) -> Result<()> {
+        let alias_name = alias_name.try_result()?;
+        if self.imports().contains_key(&alias_name) {
+            Err(Error::InvalidArgument(format!(
+                "Project already has an import with name {}",
+                &alias_name
+            )))
+        } else if self
+            .namespaces()
+            .keys()
+            .filter_map(|path| path.first())
+            .any(|first| first == &alias_name)
+        {
+            Err(Error::InvalidArgument(format!(
+                "Importing project {} would overlap with existing namespace",
+                &alias_name
+            )))
+        } else {
+            for (import_name, import_project) in project.imports() {
+                if let Err(err) = self.import_project_as(db, import_project, proj_db, import_name) {
+                    return Err(Error::ProjectError(format!("Unable to import project {}, due to a problem importing its dependency {}: {}", project.name(), import_name, err)));
+                }
+            }
+            let namespaces = project
+                .namespaces()
+                .iter()
+                .map(|(k, v)| Ok((k.clone(), v.move_db(proj_db, db)?)))
+                .collect::<Result<_>>()?;
+            self.imports.insert(
+                alias_name,
+                Project {
+                    name: project.name.clone(),
+                    location: project.location.clone(),
+                    namespaces,
+                    imports: BTreeMap::new(),
+                },
+            );
+
+            Ok(())
+        }
+    }
+
+    /// Import another project
+    pub fn import_project(
+        &mut self,
+        db: &dyn Ir,
+        project: &Project,
+        proj_db: &dyn Ir,
+    ) -> Result<()> {
+        self.import_project_as(db, project, proj_db, project.name())
     }
 
     /// Validate whether the project's namespaces do not overlap

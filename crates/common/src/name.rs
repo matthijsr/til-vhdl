@@ -75,6 +75,12 @@ impl From<&Name> for String {
     }
 }
 
+impl From<&Name> for Name {
+    fn from(value: &Name) -> Self {
+        value.clone()
+    }
+}
+
 impl Deref for Name {
     type Target = str;
     fn deref(&self) -> &str {

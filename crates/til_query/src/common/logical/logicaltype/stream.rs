@@ -15,7 +15,7 @@ use crate::common::logical::logical_stream::{LogicalStream, SynthesizeLogicalStr
 use crate::common::logical::split_streams::SplitsStreams;
 use crate::common::physical::complexity::Complexity;
 use crate::common::physical::stream::PhysicalStream;
-use crate::ir::{InternSelf, GetSelf, Ir};
+use crate::ir::{GetSelf, InternSelf, Ir, MoveDb};
 use tydi_common::{
     error::{Error, Result},
     numbers::{NonNegative, PositiveReal},
@@ -454,5 +454,21 @@ impl FromStr for Direction {
                 input
             ))),
         }
+    }
+}
+
+impl MoveDb<Id<Stream>> for Stream {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Stream>> {
+        Ok(Stream::new(
+            self.data_id().move_db(original_db, target_db)?,
+            self.throughput(),
+            self.dimensionality(),
+            self.synchronicity(),
+            self.complexity(),
+            self.direction(),
+            self.user.move_db(original_db, target_db)?,
+            self.keep(),
+        )
+        .intern(target_db))
     }
 }

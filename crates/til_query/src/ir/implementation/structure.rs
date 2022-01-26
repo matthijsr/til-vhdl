@@ -9,7 +9,7 @@ use tydi_intern::Id;
 use crate::ir::{
     connection::{Connection, InterfaceReference},
     physical_properties::InterfaceDirection,
-    GetSelf, Interface, Ir, Streamlet,
+    GetSelf, Interface, Ir, MoveDb, Streamlet,
 };
 
 /// This node represents a structural `Implementation`
@@ -211,6 +211,27 @@ impl Structure {
 impl From<&Streamlet> for Structure {
     fn from(streamlet: &Streamlet) -> Self {
         Structure::new(streamlet.port_ids().clone())
+    }
+}
+
+impl MoveDb<Structure> for Structure {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Structure> {
+        let ports = self
+            .ports
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        let streamlet_instances = self
+            .streamlet_instances
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        let connections = self.connections.clone();
+        Ok(Structure {
+            ports,
+            streamlet_instances,
+            connections,
+        })
     }
 }
 

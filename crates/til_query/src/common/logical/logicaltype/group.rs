@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use std::{collections::BTreeMap, sync::Arc};
 use tydi_intern::Id;
 
-use crate::ir::{GetSelf, Ir};
+use crate::ir::{GetSelf, InternSelf, Ir, MoveDb};
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
@@ -121,6 +121,22 @@ impl From<Group> for LogicalType {
     /// [`LogicalType`]: ./enum.LogicalType.html
     fn from(group: Group) -> Self {
         LogicalType::Group(group)
+    }
+}
+
+impl MoveDb<Id<LogicalType>> for Group {
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<LogicalType>> {
+        let field_order = self.field_order.clone();
+        let fields = self
+            .fields
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .collect::<Result<_>>()?;
+        Ok(LogicalType::from(Group {
+            fields,
+            field_order,
+        })
+        .intern(target_db))
     }
 }
 

@@ -5,8 +5,11 @@ use tydi_common::{
     name::{Name, NameSelf},
     traits::Identify,
 };
+use tydi_intern::Id;
 
 use self::structure::Structure;
+
+use super::{InternSelf, MoveDb};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {
@@ -53,5 +56,22 @@ impl Identify for Implementation {
 impl NameSelf for Implementation {
     fn name(&self) -> &Name {
         &self.name
+    }
+}
+
+impl MoveDb<Id<Implementation>> for Implementation {
+    fn move_db(
+        &self,
+        original_db: &dyn super::Ir,
+        target_db: &dyn super::Ir,
+    ) -> Result<Id<Implementation>> {
+        Ok(match self.kind() {
+            ImplementationKind::Structural(structure) => Implementation {
+                name: self.name.clone(),
+                kind: ImplementationKind::Structural(structure.move_db(original_db, target_db)?),
+            }
+            .intern(target_db),
+            ImplementationKind::Link => todo!(),
+        })
     }
 }
