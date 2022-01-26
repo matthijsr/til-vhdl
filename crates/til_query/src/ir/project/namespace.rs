@@ -44,6 +44,18 @@ impl Namespace {
     pub fn type_ids(&self) -> &BTreeMap<Name, Id<LogicalType>> {
         &self.types
     }
+
+    pub fn streamlet_ids(&self) -> &BTreeMap<Name, Id<Streamlet>> {
+        &self.streamlets
+    }
+
+    pub fn implementation_ids(&self) -> &BTreeMap<Name, Id<Implementation>> {
+        &self.implementations
+    }
+
+    pub fn imports(&self) -> &BTreeMap<PathName, PathName> {
+        &self.imports
+    }
 }
 
 impl Identify for Namespace {
@@ -61,17 +73,17 @@ impl PathNameSelf for Namespace {
 impl MoveDb<Id<Namespace>> for Namespace {
     fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Namespace>> {
         let types = self
-            .types
+            .type_ids()
             .iter()
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
             .collect::<Result<_>>()?;
         let streamlets = self
-            .streamlets
+            .streamlet_ids()
             .iter()
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
             .collect::<Result<_>>()?;
         let implementations = self
-            .implementations
+            .implementation_ids()
             .iter()
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
             .collect::<Result<_>>()?;
@@ -80,7 +92,7 @@ impl MoveDb<Id<Namespace>> for Namespace {
             types,
             streamlets,
             implementations,
-            imports: self.imports.clone(),
+            imports: self.imports().clone(),
         }
         .intern(target_db))
     }

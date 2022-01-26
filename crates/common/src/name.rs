@@ -160,6 +160,7 @@ impl PathName {
                 .collect::<Result<_>>()?,
         ))
     }
+
     /// Returns true if this PathName is empty (∅).
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -216,6 +217,17 @@ impl PathName {
             None
         } else {
             Some(PathName(self.0[..self.len() - 1].to_vec()))
+        }
+    }
+
+    /// Returns all but the last part of the PathName
+    pub fn root(&self) -> PathName {
+        if self.is_empty() {
+            self.clone()
+        } else {
+            let mut names = self.0.clone();
+            names.pop();
+            PathName(names)
         }
     }
 }
