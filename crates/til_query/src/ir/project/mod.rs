@@ -110,23 +110,14 @@ impl Project {
         self.import_project_as(db, project, proj_db, project.name())
     }
 
-    /// Validate whether the project's namespaces do not overlap
-    pub fn validate_namespaces(&self) -> Result<()> {
-        for namespace_name in self.namespaces().keys().map(|path| path.first()) {
-            if let Some(namespace_root) = namespace_name {
-                if self.imports().contains_key(namespace_root) {
-                    return Err(Error::ProjectError(format!(
-                        "Project has overlapping namespace and import {}",
-                        namespace_root
-                    )));
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub fn add_namespace(&mut self, db: &dyn Ir, namespace: Namespace) -> Result<()> {
         let namespace_path = namespace.path_name().clone();
+        if let Some(name) = namespace_path.first() {
+            if self.imports().contains_key(name) {
+                return Err(Error::InvalidArgument(format!("Cannot add namespace with root {}, as this overlaps with an existing project import.", name)));
+            }
+        }
+
         let namespace_id = namespace.intern(db);
         if self.namespaces.insert(namespace_path.clone(), namespace_id) == None {
             Ok(())
