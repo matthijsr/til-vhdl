@@ -142,12 +142,17 @@ impl From<Union> for LogicalType {
 }
 
 impl MoveDb<Id<LogicalType>> for Union {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<LogicalType>> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<LogicalType>> {
         let field_order = self.field_order.clone();
         let fields = self
             .fields
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         Ok(LogicalType::from(Union {
             fields,

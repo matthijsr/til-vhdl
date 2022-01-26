@@ -310,14 +310,20 @@ impl IsNull for LogicalType {
 }
 
 impl MoveDb<Id<LogicalType>> for LogicalType {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Self>> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Self>> {
         Ok(match self {
             LogicalType::Null => self.clone().intern(target_db),
             LogicalType::Bits(_) => self.clone().intern(target_db),
-            LogicalType::Group(group) => group.move_db(original_db, target_db)?,
-            LogicalType::Union(union) => union.move_db(original_db, target_db)?,
+            LogicalType::Group(group) => group.move_db(original_db, target_db, prefix)?,
+            LogicalType::Union(union) => union.move_db(original_db, target_db, prefix)?,
             LogicalType::Stream(stream) => {
-                LogicalType::Stream(stream.move_db(original_db, target_db)?).intern(target_db)
+                LogicalType::Stream(stream.move_db(original_db, target_db, prefix)?)
+                    .intern(target_db)
             }
         })
     }

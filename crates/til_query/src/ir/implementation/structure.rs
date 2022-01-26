@@ -215,16 +215,31 @@ impl From<&Streamlet> for Structure {
 }
 
 impl MoveDb<Structure> for Structure {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Structure> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Structure> {
         let ports = self
             .ports
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| {
+                Ok((
+                    k.clone(),
+                    v.move_db(original_db, target_db, prefix)?,
+                ))
+            })
             .collect::<Result<_>>()?;
         let streamlet_instances = self
             .streamlet_instances
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| {
+                Ok((
+                    k.clone(),
+                    v.move_db(original_db, target_db, prefix)?,
+                ))
+            })
             .collect::<Result<_>>()?;
         let connections = self.connections.clone();
         Ok(Structure {

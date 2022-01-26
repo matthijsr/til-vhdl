@@ -5,8 +5,8 @@ use std::str::FromStr;
 
 use indexmap::IndexMap;
 
-use tydi_common::error::TryResult;
-use tydi_common::name::PathName;
+use tydi_common::error::{TryResult};
+use tydi_common::name::{Name, PathName};
 use tydi_common::numbers::Positive;
 use tydi_common::traits::Reverse;
 use tydi_intern::Id;
@@ -458,15 +458,20 @@ impl FromStr for Direction {
 }
 
 impl MoveDb<Id<Stream>> for Stream {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Stream>> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Stream>> {
         Ok(Stream::new(
-            self.data_id().move_db(original_db, target_db)?,
+            self.data_id().move_db(original_db, target_db, prefix)?,
             self.throughput(),
             self.dimensionality(),
             self.synchronicity(),
             self.complexity(),
             self.direction(),
-            self.user.move_db(original_db, target_db)?,
+            self.user.move_db(original_db, target_db, prefix)?,
             self.keep(),
         )
         .intern(target_db))

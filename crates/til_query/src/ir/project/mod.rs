@@ -51,6 +51,55 @@ impl Project {
         &self.imports
     }
 
+    fn import_project_recursive(
+        &mut self,
+        db: &dyn Ir,
+        project: &Project,
+        proj_db: &dyn Ir,
+        alias_name: Name,
+        is_root: bool,
+    ) -> Result<()> {
+        for (import_name, import_project) in project.imports() {
+            if let Err(err) = self.import_project_recursive(
+                db,
+                import_project,
+                proj_db,
+                import_name.clone(),
+                false,
+            ) {
+                return Err(Error::ProjectError(format!(
+                    "Unable to import project {}, due to a problem importing its dependency {}: {}",
+                    project.name(),
+                    import_name,
+                    err
+                )));
+            }
+        }
+
+        let prefix = if is_root {
+            Some(self.name().clone())
+        } else {
+            None
+        };
+
+        let namespaces = project
+            .namespaces()
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(proj_db, db, &prefix)?)))
+            .collect::<Result<_>>()?;
+        self.imports.insert(
+            alias_name,
+            Project {
+                name: project.name.clone(),
+                location: project.location.clone(),
+                namespaces,
+                imports: BTreeMap::new(),
+            },
+        );
+
+        Ok(())
+    }
+
     /// Import another project using an alias
     pub fn import_project_as(
         &mut self,
@@ -76,27 +125,7 @@ impl Project {
                 &alias_name
             )))
         } else {
-            for (import_name, import_project) in project.imports() {
-                if let Err(err) = self.import_project_as(db, import_project, proj_db, import_name) {
-                    return Err(Error::ProjectError(format!("Unable to import project {}, due to a problem importing its dependency {}: {}", project.name(), import_name, err)));
-                }
-            }
-            let namespaces = project
-                .namespaces()
-                .iter()
-                .map(|(k, v)| Ok((k.clone(), v.move_db(proj_db, db)?)))
-                .collect::<Result<_>>()?;
-            self.imports.insert(
-                alias_name,
-                Project {
-                    name: project.name.clone(),
-                    location: project.location.clone(),
-                    namespaces,
-                    imports: BTreeMap::new(),
-                },
-            );
-
-            Ok(())
+            self.import_project_recursive(db, project, proj_db, alias_name, true)
         }
     }
 

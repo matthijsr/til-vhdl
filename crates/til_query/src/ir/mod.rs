@@ -1,5 +1,5 @@
 use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
-use tydi_common::error::{Result, TryResult};
+use tydi_common::{error::{Result, TryResult}, name::Name};
 use tydi_intern::Id;
 
 use self::{
@@ -55,7 +55,9 @@ pub trait TryIntern<T> {
 }
 
 pub trait MoveDb<T>: Sized {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<T>;
+    /// Move (parts) of an object from one database to another.
+    /// The prefix parameter can be used to prefix names with the name of the original project, to avoid conflicts.
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir, prefix: &Option<Name>) -> Result<T>;
 }
 
 impl<T> MoveDb<Id<T>> for Id<T>
@@ -63,8 +65,8 @@ where
     Id<T>: GetSelf<T>,
     T: MoveDb<Id<T>>,
 {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<T>> {
-        self.get(original_db).move_db(original_db, target_db)
+    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir, prefix: &Option<Name>) -> Result<Id<T>> {
+        self.get(original_db).move_db(original_db, target_db, prefix)
     }
 }
 

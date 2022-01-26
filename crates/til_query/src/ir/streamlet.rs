@@ -14,6 +14,8 @@ use super::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Streamlet {
+    /// Streamlet nodes should be prefixed by their containing namespace
+    /// and can be suffixed with their implementation.
     name: PathName,
     implementation: Option<Id<Implementation>>,
     ports: BTreeMap<Name, Id<Interface>>,
@@ -21,9 +23,9 @@ pub struct Streamlet {
 }
 
 impl Streamlet {
-    pub fn try_portless(name: impl TryResult<Name>) -> Result<Self> {
+    pub fn try_portless(name: impl TryResult<PathName>) -> Result<Self> {
         Ok(Streamlet {
-            name: name.try_result()?.into(),
+            name: name.try_result()?,
             implementation: None,
             ports: BTreeMap::new(),
             port_order: vec![],
@@ -32,7 +34,7 @@ impl Streamlet {
 
     pub fn try_new(
         db: &dyn Ir,
-        name: impl TryResult<Name>,
+        name: impl TryResult<PathName>,
         ports: Vec<impl TryResult<Interface>>,
     ) -> Result<Streamlet> {
         let mut port_order = vec![];
@@ -46,7 +48,7 @@ impl Streamlet {
         }
 
         Ok(Streamlet {
-            name: name.try_result()?.into(),
+            name: name.try_result()?,
             implementation: None,
             ports: port_map,
             port_order,
@@ -129,15 +131,20 @@ impl Identify for Streamlet {
 }
 
 impl MoveDb<Id<Streamlet>> for Streamlet {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Streamlet>> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Streamlet>> {
         let port_order = self.port_order.clone();
         let ports = self
             .ports
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         let implementation = match &self.implementation {
-            Some(id) => Some(id.move_db(original_db, target_db)?),
+            Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
             None => None,
         };
         Ok(Streamlet {

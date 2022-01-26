@@ -9,7 +9,7 @@ use tydi_intern::Id;
 
 use self::structure::Structure;
 
-use super::{InternSelf, MoveDb};
+use super::{InternSelf, Ir, MoveDb};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {
@@ -62,13 +62,18 @@ impl NameSelf for Implementation {
 impl MoveDb<Id<Implementation>> for Implementation {
     fn move_db(
         &self,
-        original_db: &dyn super::Ir,
-        target_db: &dyn super::Ir,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
     ) -> Result<Id<Implementation>> {
         Ok(match self.kind() {
             ImplementationKind::Structural(structure) => Implementation {
                 name: self.name.clone(),
-                kind: ImplementationKind::Structural(structure.move_db(original_db, target_db)?),
+                kind: ImplementationKind::Structural(structure.move_db(
+                    original_db,
+                    target_db,
+                    prefix,
+                )?),
             }
             .intern(target_db),
             ImplementationKind::Link => todo!(),

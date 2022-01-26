@@ -61,21 +61,26 @@ impl PathNameSelf for Namespace {
 }
 
 impl MoveDb<Id<Namespace>> for Namespace {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Namespace>> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Namespace>> {
         let types = self
             .type_ids()
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         let streamlets = self
             .streamlet_ids()
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         let implementations = self
             .implementation_ids()
             .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db)?)))
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         Ok(Namespace {
             name: self.name.clone(),

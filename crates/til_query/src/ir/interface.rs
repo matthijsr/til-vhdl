@@ -78,10 +78,15 @@ where
 }
 
 impl MoveDb<Id<Interface>> for Interface {
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir) -> Result<Id<Interface>> {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Interface>> {
         Ok(Interface {
             name: self.name.clone(),
-            stream: self.stream.move_db(original_db, target_db)?,
+            stream: self.stream.move_db(original_db, target_db, prefix)?,
             physical_properties: self.physical_properties.clone(),
         }
         .intern(target_db))
