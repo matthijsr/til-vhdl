@@ -243,7 +243,10 @@ impl MoveDb<Structure> for Structure {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ir::db::Database, test_utils::test_stream_id};
+    use crate::{
+        ir::{db::Database, traits::InternSelf},
+        test_utils::test_stream_id,
+    };
 
     use super::*;
 
@@ -260,8 +263,10 @@ mod tests {
             ],
         )?;
         let mut structure = Structure::from(&streamlet);
-        structure
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_streamlet_instance(
+            "instance",
+            streamlet.with_implementation(None).intern(db),
+        )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
         Ok(())
@@ -281,8 +286,10 @@ mod tests {
         )?;
 
         let mut structure = Structure::from(&streamlet);
-        structure
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_streamlet_instance(
+            "instance",
+            streamlet.with_implementation(None).intern(db),
+        )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
         // Test: should throw an error if a port is unconnected
@@ -320,8 +327,10 @@ mod tests {
             ],
         )?;
         let mut structure = Structure::from(&streamlet);
-        structure
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_streamlet_instance(
+            "instance",
+            streamlet.with_implementation(None).intern(db),
+        )?;
         structure.try_get_streamlet_instance(&("instance".try_result()?))?;
 
         Ok(())

@@ -9,7 +9,7 @@ use til_query::{
         interner::Interner,
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
-        traits::{GetSelf, InternSelf},
+        traits::{InternSelf},
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
@@ -31,7 +31,8 @@ fn streamlet_new() -> Result<()> {
     let implid = db.intern_implementation(imple.clone());
     let streamlet = Streamlet::new()
         .with_name("test")?
-        .with_implementation(&db, Some(implid));
+        .with_implementation(Some(implid))
+        .intern(&db);
     assert_eq!(
         db.lookup_intern_streamlet(streamlet)
             .implementation(&db)
@@ -262,8 +263,7 @@ fn playground() -> Result<()> {
         .with_name("structural")?
         .intern(db);
     let streamlet = streamlet
-        .with_implementation(db, Some(implementation))
-        .get(db);
+        .with_implementation(Some(implementation));
 
     let package = Package::new_default_empty();
     arch_db.set_default_package(package);

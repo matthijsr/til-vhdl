@@ -53,8 +53,11 @@ fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Streamlet>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::logical::logicaltype::stream::{Direction, Synchronicity};
     use crate::ir::db::Database;
 
+    use super::physical_properties::InterfaceDirection;
+    use super::project::namespace::Namespace;
     use super::*;
     use tydi_common::error::Result;
 
@@ -66,6 +69,56 @@ mod tests {
         let id1 = db.intern_type(LogicalType::try_new_bits(8)?);
         let id2 = db.intern_type(LogicalType::try_new_bits(8)?);
         assert_eq!(id1, id2);
+        Ok(())
+    }
+
+    #[test]
+    fn get_all_streamlets() -> Result<()> {
+        let mut _db = Database::default();
+        let db = &mut _db;
+        let mut project = Project::new("proj", ".")?;
+        let mut namespace = Namespace::new("root.sub")?;
+        namespace.define_type(db, "bits", 4)?;
+        namespace.define_type(db, "null", LogicalType::Null)?;
+        namespace.define_type(
+            db,
+            "stream",
+            Stream::try_new(
+                db,
+                namespace.get_type_id("bits")?,
+                1.0,
+                1,
+                Synchronicity::Sync,
+                4,
+                Direction::Forward,
+                namespace.get_type_id("null")?,
+                false,
+            )?,
+        )?;
+        namespace.define_streamlet(
+            db,
+            "streamlet",
+            Streamlet::new().with_ports(
+                db,
+                vec![(
+                    "a",
+                    namespace.get_stream_id(db, "stream")?,
+                    InterfaceDirection::In,
+                )],
+            )?,
+        )?;
+        namespace.define_streamlet(
+            db,
+            "implemented_streamlet",
+            namespace
+                .get_streamlet(db, "streamlet")?
+                .with_implementation(None),
+        )?;
+        project.add_namespace(db, namespace)?;
+        db.set_project(Arc::new(project));
+
+        assert_eq!(db.all_streamlets().len(), 2);
+
         Ok(())
     }
 }

@@ -59,21 +59,9 @@ impl Streamlet {
         Ok(self)
     }
 
-    pub fn with_implementation(
-        self,
-        db: &dyn Ir,
-        implementation: Option<Id<Implementation>>,
-    ) -> Id<Streamlet> {
-        let name = match &implementation {
-            Some(some) => self.name.with_children(some.get(db).path_name().clone()),
-            None => self.path_name().clone(),
-        };
-        db.intern_streamlet(Streamlet {
-            name: name,
-            implementation,
-            ports: self.ports,
-            port_order: self.port_order,
-        })
+    pub fn with_implementation(mut self, implementation: Option<Id<Implementation>>) -> Streamlet {
+        self.implementation = implementation;
+        self
     }
 
     pub fn implementation(&self, db: &dyn Ir) -> Option<Implementation> {
@@ -176,7 +164,8 @@ mod tests {
         let implid = db.intern_implementation(imple.clone());
         let streamlet = Streamlet::new()
             .with_name("test")?
-            .with_implementation(&db, Some(implid));
+            .with_implementation(Some(implid))
+            .intern(&db);
         assert_eq!(
             db.lookup_intern_streamlet(streamlet)
                 .implementation(&db)

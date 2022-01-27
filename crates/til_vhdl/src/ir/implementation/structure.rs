@@ -109,7 +109,7 @@ mod tests {
         common::logical::logicaltype::LogicalType,
         ir::{
             db::Database, physical_properties::InterfaceDirection, streamlet::Streamlet,
-            traits::TryIntern,
+            traits::{TryIntern, InternSelf},
         },
         test_utils::{test_stream_id, test_stream_id_custom},
     };
@@ -152,7 +152,8 @@ mod tests {
                     ("d", stream2, InterfaceDirection::Out),
                 ],
             )?
-            .with_implementation(ir_db, None); // Streamlet does not have an implementation
+            .with_implementation(None)
+            .intern(ir_db); // Streamlet does not have an implementation
 
         // Create a Structure from the Streamlet definition (this creates a Structure with ports matching the Streamlet)
         let mut structure = Structure::from(&streamlet.get(ir_db));

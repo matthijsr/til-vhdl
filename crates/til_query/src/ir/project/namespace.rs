@@ -163,10 +163,11 @@ impl Namespace {
         Ok(implementation_id)
     }
 
-    pub fn get_type_id(&self, name: impl TryResult<Name>) -> Result<&Id<LogicalType>> {
+    pub fn get_type_id(&self, name: impl TryResult<Name>) -> Result<Id<LogicalType>> {
         let name = name.try_result()?;
         self.type_ids()
             .get(&name)
+            .cloned()
             .ok_or(Error::InvalidArgument(format!(
                 "A type with name {} does not exist in namespace {}",
                 name,
@@ -178,10 +179,11 @@ impl Namespace {
         Ok(self.get_type_id(name)?.get(db))
     }
 
-    pub fn get_streamlet_id(&self, name: impl TryResult<Name>) -> Result<&Id<Streamlet>> {
+    pub fn get_streamlet_id(&self, name: impl TryResult<Name>) -> Result<Id<Streamlet>> {
         let name = name.try_result()?;
         self.streamlet_ids()
             .get(&name)
+            .cloned()
             .ok_or(Error::InvalidArgument(format!(
                 "A streamlet with name {} does not exist in namespace {}",
                 name,
@@ -193,10 +195,11 @@ impl Namespace {
         Ok(self.get_streamlet_id(name)?.get(db))
     }
 
-    pub fn get_implementation_id(&self, name: impl TryResult<Name>) -> Result<&Id<Implementation>> {
+    pub fn get_implementation_id(&self, name: impl TryResult<Name>) -> Result<Id<Implementation>> {
         let name = name.try_result()?;
         self.implementation_ids()
             .get(&name)
+            .cloned()
             .ok_or(Error::InvalidArgument(format!(
                 "An implementation with name {} does not exist in namespace {}",
                 name,
