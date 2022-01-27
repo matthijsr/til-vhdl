@@ -276,6 +276,21 @@ impl From<Name> for PathName {
     }
 }
 
+impl From<&Name> for PathName {
+    fn from(value: &Name) -> Self {
+        PathName::from(value.clone())
+    }
+}
+
+impl From<&Option<Name>> for PathName {
+    fn from(value: &Option<Name>) -> Self {
+        match value {
+            Some(name) => PathName::from(name),
+            None => PathName::new_empty(),
+        }
+    }
+}
+
 impl TryFrom<String> for PathName {
     type Error = Error;
     fn try_from(string: String) -> Result<Self> {

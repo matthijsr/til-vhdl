@@ -148,7 +148,7 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
             None => None,
         };
         Ok(Streamlet {
-            name: self.name.clone(),
+            name: self.name.with_parents(prefix),
             implementation,
             ports,
             port_order,
