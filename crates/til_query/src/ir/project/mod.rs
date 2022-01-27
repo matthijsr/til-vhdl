@@ -12,7 +12,10 @@ use tydi_intern::Id;
 
 use self::namespace::Namespace;
 
-use super::{InternSelf, Ir, MoveDb};
+use super::{
+    traits::{InternSelf, MoveDb},
+    Ir,
+};
 
 pub mod namespace;
 

@@ -4,7 +4,10 @@ use std::{collections::BTreeMap, sync::Arc};
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::ir::{GetSelf, InternSelf, Ir, MoveDb};
+use crate::ir::{
+    traits::{GetSelf, InternSelf, MoveDb},
+    Ir,
+};
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
@@ -178,7 +181,7 @@ impl fmt::Display for Union {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::db::Database;
+    use crate::ir::{db::Database, interner::Interner};
 
     #[test]
     fn test_new() {

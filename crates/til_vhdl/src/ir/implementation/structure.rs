@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use til_query::ir::{connection::InterfaceReference, GetSelf, Ir};
+use til_query::ir::{connection::InterfaceReference, traits::GetSelf, Ir};
 use tydi_common::{
     error::{Result, TryOptional},
     name::Name,
@@ -108,7 +108,8 @@ mod tests {
     use til_query::{
         common::logical::logicaltype::LogicalType,
         ir::{
-            db::Database, physical_properties::InterfaceDirection, streamlet::Streamlet, TryIntern,
+            db::Database, physical_properties::InterfaceDirection, streamlet::Streamlet,
+            traits::TryIntern,
         },
         test_utils::{test_stream_id, test_stream_id_custom},
     };

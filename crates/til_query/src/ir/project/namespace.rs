@@ -9,7 +9,12 @@ use tydi_intern::Id;
 
 use crate::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
-    ir::{implementation::Implementation, streamlet::Streamlet, GetSelf, InternSelf, Ir, MoveDb},
+    ir::{
+        implementation::Implementation,
+        streamlet::Streamlet,
+        traits::{GetSelf, InternSelf, MoveDb},
+        Ir,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -39,12 +44,33 @@ impl Namespace {
         &self.types
     }
 
+    pub fn types(&self, db: &dyn Ir) -> BTreeMap<Name, LogicalType> {
+        self.type_ids()
+            .iter()
+            .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
+    }
+
     pub fn streamlet_ids(&self) -> &BTreeMap<Name, Id<Streamlet>> {
         &self.streamlets
     }
 
+    pub fn streamlets(&self, db: &dyn Ir) -> BTreeMap<Name, Streamlet> {
+        self.streamlet_ids()
+            .iter()
+            .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
+    }
+
     pub fn implementation_ids(&self) -> &BTreeMap<Name, Id<Implementation>> {
         &self.implementations
+    }
+
+    pub fn implementations(&self, db: &dyn Ir) -> BTreeMap<Name, Implementation> {
+        self.implementation_ids()
+            .iter()
+            .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
     }
 
     pub fn import_type(

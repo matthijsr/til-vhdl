@@ -1,8 +1,8 @@
 use tydi_intern::Id;
 
 use super::{
-    project::namespace::Namespace, GetSelf, Implementation, Interface, Ir, LogicalType, Stream,
-    Streamlet,
+    project::namespace::Namespace, traits::GetSelf, Implementation, Interface, Ir, LogicalType,
+    Stream, Streamlet,
 };
 
 impl GetSelf<Implementation> for Id<Implementation> {

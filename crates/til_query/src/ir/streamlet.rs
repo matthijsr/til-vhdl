@@ -8,8 +8,9 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf, Ir,
-    MoveDb,
+    physical_properties::InterfaceDirection,
+    traits::{GetSelf, InternSelf, MoveDb},
+    Implementation, Interface, Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -164,7 +165,7 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
 mod tests {
     use tydi_common::error::Result;
 
-    use crate::ir::db::Database;
+    use crate::ir::{db::Database, interner::Interner};
 
     use super::*;
 

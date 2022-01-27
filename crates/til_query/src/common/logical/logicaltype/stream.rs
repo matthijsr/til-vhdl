@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use indexmap::IndexMap;
 
-use tydi_common::error::{TryResult};
+use tydi_common::error::TryResult;
 use tydi_common::name::{Name, PathName};
 use tydi_common::numbers::Positive;
 use tydi_common::traits::Reverse;
@@ -15,7 +15,10 @@ use crate::common::logical::logical_stream::{LogicalStream, SynthesizeLogicalStr
 use crate::common::logical::split_streams::SplitsStreams;
 use crate::common::physical::complexity::Complexity;
 use crate::common::physical::stream::PhysicalStream;
-use crate::ir::{GetSelf, InternSelf, Ir, MoveDb};
+use crate::ir::{
+    traits::{GetSelf, InternSelf, MoveDb},
+    Ir,
+};
 use tydi_common::{
     error::{Error, Result},
     numbers::{NonNegative, PositiveReal},

@@ -9,7 +9,8 @@ use tydi_intern::Id;
 use crate::ir::{
     connection::{Connection, InterfaceReference},
     physical_properties::InterfaceDirection,
-    GetSelf, Interface, Ir, MoveDb, Streamlet,
+    traits::{GetSelf, MoveDb},
+    Interface, Ir, Streamlet,
 };
 
 /// This node represents a structural `Implementation`

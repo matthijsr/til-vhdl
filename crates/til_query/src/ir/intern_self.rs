@@ -1,8 +1,8 @@
 use tydi_intern::Id;
 
 use super::{
-    project::namespace::Namespace, Implementation, Interface, InternSelf, Ir, LogicalType, Stream,
-    Streamlet,
+    project::namespace::Namespace, traits::InternSelf, Implementation, Interface, Ir, LogicalType,
+    Stream, Streamlet,
 };
 
 // This will almost certainly lead to bad design, so comment it out for now unless I can think of a valid use.

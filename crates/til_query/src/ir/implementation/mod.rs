@@ -9,7 +9,10 @@ use tydi_intern::Id;
 
 use self::structure::Structure;
 
-use super::{InternSelf, Ir, MoveDb};
+use super::{
+    traits::{InternSelf, MoveDb},
+    Ir,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {

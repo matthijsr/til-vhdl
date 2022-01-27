@@ -11,7 +11,8 @@ use crate::common::logical::logicaltype::stream::Stream;
 
 use super::{
     physical_properties::{InterfaceDirection, PhysicalProperties},
-    InternSelf, Ir, MoveDb,
+    traits::{InternSelf, MoveDb},
+    Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

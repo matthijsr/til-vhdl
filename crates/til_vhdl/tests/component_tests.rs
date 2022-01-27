@@ -6,9 +6,10 @@ use til_query::{
     ir::{
         db::Database,
         implementation::{structure::Structure, Implementation},
+        interner::Interner,
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
-        GetSelf, InternSelf, Ir,
+        traits::{GetSelf, InternSelf},
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };

@@ -5,7 +5,10 @@ use crate::{
         stream::{Direction, Stream, Synchronicity, Throughput},
         LogicalType,
     },
-    ir::{InternSelf, Ir, TryIntern},
+    ir::{
+        traits::{InternSelf, TryIntern},
+        Ir,
+    },
 };
 
 use tydi_common::{

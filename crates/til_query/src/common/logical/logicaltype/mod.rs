@@ -3,7 +3,10 @@ use std::sync::Arc;
 
 use crate::{
     common::physical::fields::Fields,
-    ir::{GetSelf, InternSelf, Ir, MoveDb},
+    ir::{
+        traits::{GetSelf, InternSelf, MoveDb},
+        Ir,
+    },
 };
 use indexmap::IndexMap;
 use tydi_common::{
@@ -104,7 +107,7 @@ impl LogicalType {
     /// ```rust
     /// use tydi_common::error::Error;
     /// use til_query::common::logical::logicaltype::LogicalType;
-    /// use til_query::ir::{db::Database, Ir};
+    /// use til_query::ir::{db::Database, Ir, interner::Interner};
     ///
     /// let db = Database::default();
     ///

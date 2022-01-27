@@ -1,15 +1,10 @@
+use std::sync::Arc;
+
 use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
-use tydi_common::{
-    error::{Result, TryResult},
-    name::Name,
-};
-use tydi_intern::Id;
 
 use self::{
-    implementation::Implementation,
-    interface::Interface,
-    project::{namespace::Namespace, Project},
-    streamlet::Streamlet,
+    implementation::Implementation, interface::Interface, interner::Interner, project::Project,
+    streamlet::Streamlet, traits::GetSelf,
 };
 
 pub mod annotation_keys;
@@ -19,79 +14,41 @@ pub mod get_self;
 pub mod implementation;
 pub mod interface;
 pub mod intern_self;
+pub mod interner;
 pub mod physical_properties;
 pub mod project;
 pub mod streamlet;
+pub mod traits;
 
 #[salsa::query_group(IrStorage)]
-pub trait Ir {
+pub trait Ir: Interner {
     #[salsa::input]
     fn annotation(&self, intern_id: salsa::InternId, key: String) -> String;
 
     #[salsa::input]
-    fn project(&self) -> Project;
+    fn project(&self) -> Arc<Project>;
 
-    #[salsa::interned]
-    fn intern_namespace(&self, namespace: Namespace) -> Id<Namespace>;
-    #[salsa::interned]
-    fn intern_implementation(&self, implementation: Implementation) -> Id<Implementation>;
-    #[salsa::interned]
-    fn intern_type(&self, logical_type: LogicalType) -> Id<LogicalType>;
-    #[salsa::interned]
-    fn intern_port(&self, logical_type: Interface) -> Id<Interface>;
-    #[salsa::interned]
-    fn intern_stream(&self, stream: Stream) -> Id<Stream>;
-    #[salsa::interned]
-    fn intern_streamlet(&self, streamlet: Streamlet) -> Id<Streamlet>;
+    fn all_streamlets(&self) -> Arc<Vec<Streamlet>>;
 }
 
-pub trait GetSelf<T> {
-    fn get(&self, db: &dyn Ir) -> T;
-}
+fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Streamlet>> {
+    let project = db.project();
 
-pub trait InternSelf: Sized {
-    fn intern(self, db: &dyn Ir) -> Id<Self>;
-}
-
-pub trait InternAs<T> {
-    fn intern_as(self, db: &dyn Ir) -> Id<T>;
-}
-
-pub trait TryIntern<T> {
-    fn try_intern(self, db: &dyn Ir) -> Result<Id<T>>;
-}
-
-pub trait MoveDb<T>: Sized {
-    /// Move (parts) of an object from one database to another.
-    /// The prefix parameter can be used to prefix names with the name of the original project, to avoid conflicts.
-    fn move_db(&self, original_db: &dyn Ir, target_db: &dyn Ir, prefix: &Option<Name>)
-        -> Result<T>;
-}
-
-impl<T> MoveDb<Id<T>> for Id<T>
-where
-    Id<T>: GetSelf<T>,
-    T: MoveDb<Id<T>>,
-{
-    fn move_db(
-        &self,
-        original_db: &dyn Ir,
-        target_db: &dyn Ir,
-        prefix: &Option<Name>,
-    ) -> Result<Id<T>> {
-        self.get(original_db)
-            .move_db(original_db, target_db, prefix)
-    }
-}
-
-impl<T, U> TryIntern<T> for U
-where
-    U: TryResult<T>,
-    T: InternSelf,
-{
-    fn try_intern(self, db: &dyn Ir) -> Result<Id<T>> {
-        Ok(self.try_result()?.intern(db))
-    }
+    Arc::new(
+        project
+            .namespaces()
+            .iter()
+            .map(|(_, id)| id.get(db))
+            .map(|namespace| {
+                namespace
+                    .streamlets(db)
+                    .into_iter()
+                    .map(|(_, streamlet)| streamlet)
+                    .collect::<Vec<Streamlet>>()
+            })
+            .flatten()
+            .collect(),
+    )
 }
 
 #[cfg(test)]
