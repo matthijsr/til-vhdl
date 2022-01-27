@@ -140,20 +140,18 @@ mod tests {
         // Create another Stream node with data: Union(a: Bits(16), b: Bits(7))
         let stream2 = test_stream_id(ir_db, union)?;
         // Create a Streamlet
-        let streamlet = Streamlet::try_new(
-            ir_db,
-            // The streamlet is called "a"
-            "a",
-            // It has ports "in: a" and "out: b", both using the Stream node as their type
-            // As well as ports "in: c" and "out: d", using the other (Union) Stream node
-            vec![
-                ("a", stream, InterfaceDirection::In),
-                ("b", stream, InterfaceDirection::Out),
-                ("c", stream2, InterfaceDirection::In),
-                ("d", stream2, InterfaceDirection::Out),
-            ],
-        )?
-        .with_implementation(ir_db, None); // Streamlet does not have an implementation
+        let streamlet = Streamlet::new()
+            .with_name("a")?
+            .with_ports(
+                ir_db,
+                vec![
+                    ("a", stream, InterfaceDirection::In),
+                    ("b", stream, InterfaceDirection::Out),
+                    ("c", stream2, InterfaceDirection::In),
+                    ("d", stream2, InterfaceDirection::Out),
+                ],
+            )?
+            .with_implementation(ir_db, None); // Streamlet does not have an implementation
 
         // Create a Structure from the Streamlet definition (this creates a Structure with ports matching the Streamlet)
         let mut structure = Structure::from(&streamlet.get(ir_db));

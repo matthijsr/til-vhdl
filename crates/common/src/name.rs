@@ -294,16 +294,32 @@ impl From<&Option<Name>> for PathName {
 impl TryFrom<String> for PathName {
     type Error = Error;
     fn try_from(string: String) -> Result<Self> {
-        let name: Name = string.try_into()?;
-        Ok(PathName::from(name))
+        if string.trim() == "" {
+            Ok(PathName::new_empty())
+        } else if string.contains(".") {
+            PathName::try_new(string.split("."))
+        } else if string.contains("__") {
+            PathName::try_new(string.split("__"))
+        } else {
+            let name: Name = string.try_into()?;
+            Ok(PathName::from(name))
+        }
     }
 }
 
 impl TryFrom<&str> for PathName {
     type Error = Error;
     fn try_from(str: &str) -> Result<Self> {
-        let name: Name = str.try_into()?;
-        Ok(PathName::from(name))
+        if str.trim() == "" {
+            Ok(PathName::new_empty())
+        } else if str.contains(".") {
+            PathName::try_new(str.split("."))
+        } else if str.contains("__") {
+            PathName::try_new(str.split("__"))
+        } else {
+            let name: Name = str.try_into()?;
+            Ok(PathName::from(name))
+        }
     }
 }
 

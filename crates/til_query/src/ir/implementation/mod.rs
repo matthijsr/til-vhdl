@@ -2,7 +2,7 @@ pub mod structure;
 
 use tydi_common::{
     error::{Result, TryResult},
-    name::{Name, NameSelf},
+    name::{Name, PathName, PathNameSelf},
     traits::Identify,
 };
 use tydi_intern::Id;
@@ -13,7 +13,7 @@ use super::{InternSelf, Ir, MoveDb};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {
-    name: Name,
+    name: PathName,
     kind: ImplementationKind,
 }
 
@@ -24,22 +24,24 @@ pub enum ImplementationKind {
 }
 
 impl Implementation {
-    pub fn structural(
-        name: impl TryResult<Name>,
-        structure: impl TryResult<Structure>,
-    ) -> Result<Self> {
+    pub fn structural(structure: impl TryResult<Structure>) -> Result<Self> {
         Ok(Implementation {
-            name: name.try_result()?,
+            name: PathName::new_empty(),
             kind: ImplementationKind::Structural(structure.try_result()?),
         })
     }
 
     /// TODO
-    pub fn link(name: impl TryResult<Name>) -> Result<Self> {
-        Ok(Implementation {
-            name: name.try_result()?,
+    pub fn link() -> Self {
+        Implementation {
+            name: PathName::new_empty(),
             kind: ImplementationKind::Link,
-        })
+        }
+    }
+
+    pub fn with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
+        self.name = name.try_result()?;
+        Ok(self)
     }
 
     pub fn kind(&self) -> &ImplementationKind {
@@ -49,12 +51,12 @@ impl Implementation {
 
 impl Identify for Implementation {
     fn identifier(&self) -> String {
-        self.name().to_string()
+        self.path_name().to_string()
     }
 }
 
-impl NameSelf for Implementation {
-    fn name(&self) -> &Name {
+impl PathNameSelf for Implementation {
+    fn path_name(&self) -> &PathName {
         &self.name
     }
 }

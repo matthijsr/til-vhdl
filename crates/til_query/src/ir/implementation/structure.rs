@@ -224,22 +224,12 @@ impl MoveDb<Structure> for Structure {
         let ports = self
             .ports
             .iter()
-            .map(|(k, v)| {
-                Ok((
-                    k.clone(),
-                    v.move_db(original_db, target_db, prefix)?,
-                ))
-            })
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         let streamlet_instances = self
             .streamlet_instances
             .iter()
-            .map(|(k, v)| {
-                Ok((
-                    k.clone(),
-                    v.move_db(original_db, target_db, prefix)?,
-                ))
-            })
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         let connections = self.connections.clone();
         Ok(Structure {
@@ -261,9 +251,8 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::try_new(
+        let streamlet = Streamlet::new().with_name("a")?.with_ports(
             db,
-            "a",
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
@@ -282,9 +271,8 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::try_new(
+        let streamlet = Streamlet::new().with_name("a")?.with_ports(
             db,
-            "a",
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
@@ -323,9 +311,8 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::try_new(
+        let streamlet = Streamlet::new().with_name("a")?.with_ports(
             db,
-            "a",
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),

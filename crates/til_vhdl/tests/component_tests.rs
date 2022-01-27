@@ -26,9 +26,11 @@ extern crate til_vhdl;
 #[test]
 fn streamlet_new() -> Result<()> {
     let db = Database::default();
-    let imple = Implementation::link("link")?;
+    let imple = Implementation::link().with_name("link")?;
     let implid = db.intern_implementation(imple.clone());
-    let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
+    let streamlet = Streamlet::new()
+        .with_name("test")?
+        .with_implementation(&db, Some(implid));
     assert_eq!(
         db.lookup_intern_streamlet(streamlet)
             .implementation(&db)
@@ -45,7 +47,9 @@ fn streamlet_to_vhdl() -> Result<()> {
     let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let arch_db = &mut _arch_db;
     let stream = test_stream_id(db, 4)?;
-    let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
+    let streamlet = Streamlet::new()
+        .with_name("test")?
+        .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
     let component = streamlet.canonical(db, arch_db, "")?;
     let mut package = Package::new_default_empty();
     package.add_component(component);
@@ -111,8 +115,9 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
             let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
             let arch_db = &mut _arch_db;
             let stream = test_stream_id_custom(db, 4, 2.0, 0, c)?;
-            let streamlet =
-                Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
+            let streamlet = Streamlet::new()
+                .with_name("test")?
+                .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
             let component: Component = streamlet.canonical(db, arch_db, "")?;
             component.declare(arch_db)
         })
@@ -242,9 +247,8 @@ fn playground() -> Result<()> {
         false,
     )?;
 
-    let streamlet = Streamlet::try_new(
+    let streamlet = Streamlet::new().with_name("test")?.with_ports(
         db,
-        "test",
         vec![
             ("a", stream, InterfaceDirection::In),
             ("b", stream, InterfaceDirection::Out),
@@ -253,7 +257,9 @@ fn playground() -> Result<()> {
 
     let mut structure = Structure::from(&streamlet);
     structure.try_add_connection(db, "a", "b")?;
-    let implementation = Implementation::structural("structural", structure)?.intern(db);
+    let implementation = Implementation::structural(structure)?
+        .with_name("structural")?
+        .intern(db);
     let streamlet = streamlet
         .with_implementation(db, Some(implementation))
         .get(db);

@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{collections::BTreeMap, sync::Arc};
 
 use indexmap::IndexMap;
@@ -159,6 +160,18 @@ impl MoveDb<Id<LogicalType>> for Union {
             field_order,
         })
         .intern(target_db))
+    }
+}
+
+impl fmt::Display for Union {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fields = self
+            .ordered_field_ids()
+            .iter()
+            .map(|(name, id)| format!("{}: {}", name, id))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "({})", fields)
     }
 }
 

@@ -1,3 +1,4 @@
+use core::fmt;
 use indexmap::IndexMap;
 use std::{collections::BTreeMap, sync::Arc};
 use tydi_intern::Id;
@@ -135,18 +136,25 @@ impl MoveDb<Id<LogicalType>> for Group {
         let fields = self
             .fields
             .iter()
-            .map(|(k, v)| {
-                Ok((
-                    k.clone(),
-                    v.move_db(original_db, target_db, prefix)?,
-                ))
-            })
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         Ok(LogicalType::from(Group {
             fields,
             field_order,
         })
         .intern(target_db))
+    }
+}
+
+impl fmt::Display for Group {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fields = self
+            .ordered_field_ids()
+            .iter()
+            .map(|(name, id)| format!("{}: {}", name, id))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "({})", fields)
     }
 }
 

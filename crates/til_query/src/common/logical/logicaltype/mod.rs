@@ -1,3 +1,4 @@
+use core::fmt;
 use std::sync::Arc;
 
 use crate::{
@@ -326,5 +327,17 @@ impl MoveDb<Id<LogicalType>> for LogicalType {
                     .intern(target_db)
             }
         })
+    }
+}
+
+impl fmt::Display for LogicalType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogicalType::Null => write!(f, "Null"),
+            LogicalType::Bits(b) => write!(f, "Bits({})", b),
+            LogicalType::Group(group) => write!(f, "Group({})", group),
+            LogicalType::Union(union) => write!(f, "Union({})", union),
+            LogicalType::Stream(stream_id) => write!(f, "Stream({})", stream_id),
+        }
     }
 }
