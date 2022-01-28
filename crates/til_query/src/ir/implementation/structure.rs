@@ -9,7 +9,8 @@ use tydi_intern::Id;
 use crate::ir::{
     connection::{Connection, InterfaceReference},
     physical_properties::InterfaceDirection,
-    GetSelf, Interface, Ir, Streamlet,
+    traits::{GetSelf, MoveDb},
+    Interface, Ir, Streamlet,
 };
 
 /// This node represents a structural `Implementation`
@@ -214,9 +215,38 @@ impl From<&Streamlet> for Structure {
     }
 }
 
+impl MoveDb<Structure> for Structure {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Structure> {
+        let ports = self
+            .ports
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
+            .collect::<Result<_>>()?;
+        let streamlet_instances = self
+            .streamlet_instances
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
+            .collect::<Result<_>>()?;
+        let connections = self.connections.clone();
+        Ok(Structure {
+            ports,
+            streamlet_instances,
+            connections,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{ir::db::Database, test_utils::test_stream_id};
+    use crate::{
+        ir::{db::Database, traits::InternSelf},
+        test_utils::test_stream_id,
+    };
 
     use super::*;
 
@@ -225,17 +255,18 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::try_new(
+        let streamlet = Streamlet::new().with_name("a")?.with_ports(
             db,
-            "a",
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
         let mut structure = Structure::from(&streamlet);
-        structure
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_streamlet_instance(
+            "instance",
+            streamlet.with_implementation(None).intern(db),
+        )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
         Ok(())
@@ -246,9 +277,8 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::try_new(
+        let streamlet = Streamlet::new().with_name("a")?.with_ports(
             db,
-            "a",
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
@@ -256,8 +286,10 @@ mod tests {
         )?;
 
         let mut structure = Structure::from(&streamlet);
-        structure
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_streamlet_instance(
+            "instance",
+            streamlet.with_implementation(None).intern(db),
+        )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
         // Test: should throw an error if a port is unconnected
@@ -287,17 +319,18 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::try_new(
+        let streamlet = Streamlet::new().with_name("a")?.with_ports(
             db,
-            "a",
             vec![
                 ("a", stream, InterfaceDirection::In),
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
         let mut structure = Structure::from(&streamlet);
-        structure
-            .try_add_streamlet_instance("instance", streamlet.with_implementation(db, None))?;
+        structure.try_add_streamlet_instance(
+            "instance",
+            streamlet.with_implementation(None).intern(db),
+        )?;
         structure.try_get_streamlet_instance(&("instance".try_result()?))?;
 
         Ok(())

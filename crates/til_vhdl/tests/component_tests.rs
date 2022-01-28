@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use til_query::{
     common::logical::logicaltype::{
         stream::{Direction, Stream, Synchronicity},
@@ -6,9 +8,10 @@ use til_query::{
     ir::{
         db::Database,
         implementation::{structure::Structure, Implementation},
+        interner::Interner,
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
-        GetSelf, InternSelf, Ir,
+        traits::InternSelf,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
@@ -26,9 +29,12 @@ extern crate til_vhdl;
 #[test]
 fn streamlet_new() -> Result<()> {
     let db = Database::default();
-    let imple = Implementation::link("link")?;
+    let imple = Implementation::link().with_name("link")?;
     let implid = db.intern_implementation(imple.clone());
-    let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
+    let streamlet = Streamlet::new()
+        .with_name("test")?
+        .with_implementation(Some(implid))
+        .intern(&db);
     assert_eq!(
         db.lookup_intern_streamlet(streamlet)
             .implementation(&db)
@@ -45,8 +51,10 @@ fn streamlet_to_vhdl() -> Result<()> {
     let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let arch_db = &mut _arch_db;
     let stream = test_stream_id(db, 4)?;
-    let streamlet = Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
-    let component = streamlet.canonical(db, arch_db, "")?;
+    let streamlet = Streamlet::new()
+        .with_name("test")?
+        .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
+    let component = Arc::new(streamlet.canonical(db, arch_db, "")?);
     let mut package = Package::new_default_empty();
     package.add_component(component);
 
@@ -54,7 +62,7 @@ fn streamlet_to_vhdl() -> Result<()> {
         r#"library ieee;
 use ieee.std_logic_1164.all;
 
-package work is
+package default is
 
   component test_com
     port (
@@ -68,7 +76,7 @@ package work is
     );
   end component;
 
-end work;"#,
+end default;"#,
         package.declare(arch_db)?
     );
 
@@ -78,7 +86,7 @@ end work;"#,
 use ieee.std_logic_1164.all;
 
 library work;
-use work.work.all;
+use work.default.all;
 
 entity test_com is
   port (
@@ -111,8 +119,9 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
             let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
             let arch_db = &mut _arch_db;
             let stream = test_stream_id_custom(db, 4, 2.0, 0, c)?;
-            let streamlet =
-                Streamlet::try_new(db, "test", vec![("a", stream, InterfaceDirection::In)])?;
+            let streamlet = Streamlet::new()
+                .with_name("test")?
+                .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
             let component: Component = streamlet.canonical(db, arch_db, "")?;
             component.declare(arch_db)
         })
@@ -242,9 +251,8 @@ fn playground() -> Result<()> {
         false,
     )?;
 
-    let streamlet = Streamlet::try_new(
+    let streamlet = Streamlet::new().with_name("test")?.with_ports(
         db,
-        "test",
         vec![
             ("a", stream, InterfaceDirection::In),
             ("b", stream, InterfaceDirection::Out),
@@ -253,12 +261,17 @@ fn playground() -> Result<()> {
 
     let mut structure = Structure::from(&streamlet);
     structure.try_add_connection(db, "a", "b")?;
-    let implementation = Implementation::structural("structural", structure)?.intern(db);
-    let streamlet = streamlet
-        .with_implementation(db, Some(implementation))
-        .get(db);
+    let implementation = Implementation::structural(structure)?
+        .with_name("structural")?
+        .intern(db);
+    let streamlet = streamlet.with_implementation(Some(implementation));
 
-    let package = Package::new_default_empty();
+    let mut package = Package::new_default_empty();
+    let component: Arc<Component> = Arc::new(streamlet.canonical(db, arch_db, "")?);
+    package.add_component(component.clone());
+    arch_db.set_subject_component(component);
+    let package = Arc::new(package);
+
     arch_db.set_default_package(package);
 
     let declaration: String = streamlet.canonical(db, arch_db, "")?;

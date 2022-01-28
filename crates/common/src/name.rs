@@ -6,7 +6,10 @@ use std::{
     str::FromStr,
 };
 
-use crate::error::{Error, Result, TryOptionalFrom, TryResult};
+use crate::{
+    error::{Error, Result, TryOptionalFrom, TryResult},
+    traits::Identify,
+};
 
 /// Type-safe wrapper for valid names.
 ///
@@ -69,6 +72,12 @@ impl From<Name> for String {
 impl From<&Name> for String {
     fn from(name: &Name) -> Self {
         name.0.clone()
+    }
+}
+
+impl From<&Name> for Name {
+    fn from(value: &Name) -> Self {
+        value.clone()
     }
 }
 
@@ -151,6 +160,7 @@ impl PathName {
                 .collect::<Result<_>>()?,
         ))
     }
+
     /// Returns true if this PathName is empty (∅).
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -194,6 +204,10 @@ impl PathName {
         self.0.len()
     }
 
+    pub fn first(&self) -> Option<&Name> {
+        self.0.first()
+    }
+
     pub fn last(&self) -> Option<&Name> {
         self.0.last()
     }
@@ -203,6 +217,17 @@ impl PathName {
             None
         } else {
             Some(PathName(self.0[..self.len() - 1].to_vec()))
+        }
+    }
+
+    /// Returns all but the last part of the PathName
+    pub fn root(&self) -> PathName {
+        if self.is_empty() {
+            self.clone()
+        } else {
+            let mut names = self.0.clone();
+            names.pop();
+            PathName(names)
         }
     }
 }
@@ -251,26 +276,57 @@ impl From<Name> for PathName {
     }
 }
 
+impl From<&Name> for PathName {
+    fn from(value: &Name) -> Self {
+        PathName::from(value.clone())
+    }
+}
+
+impl From<&Option<Name>> for PathName {
+    fn from(value: &Option<Name>) -> Self {
+        match value {
+            Some(name) => PathName::from(name),
+            None => PathName::new_empty(),
+        }
+    }
+}
+
 impl TryFrom<String> for PathName {
     type Error = Error;
     fn try_from(string: String) -> Result<Self> {
-        let name: Name = string.try_into()?;
-        Ok(PathName::from(name))
+        if string.trim() == "" {
+            Ok(PathName::new_empty())
+        } else if string.contains(".") {
+            PathName::try_new(string.split("."))
+        } else if string.contains("__") {
+            PathName::try_new(string.split("__"))
+        } else {
+            let name: Name = string.try_into()?;
+            Ok(PathName::from(name))
+        }
     }
 }
 
 impl TryFrom<&str> for PathName {
     type Error = Error;
     fn try_from(str: &str) -> Result<Self> {
-        let name: Name = str.try_into()?;
-        Ok(PathName::from(name))
+        if str.trim() == "" {
+            Ok(PathName::new_empty())
+        } else if str.contains(".") {
+            PathName::try_new(str.split("."))
+        } else if str.contains("__") {
+            PathName::try_new(str.split("__"))
+        } else {
+            let name: Name = str.try_into()?;
+            Ok(PathName::from(name))
+        }
     }
 }
 
-pub trait NameSelf {
+pub trait NameSelf: Identify {
     fn name(&self) -> &Name;
 }
 
-pub trait PathNameSelf {
+pub trait PathNameSelf: Identify {
     fn path_name(&self) -> &PathName;
 }

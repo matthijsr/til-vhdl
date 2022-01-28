@@ -4,7 +4,7 @@ use tydi_common::name::Name;
 use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
-use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
+use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
     entity::Entity,
@@ -103,7 +103,7 @@ impl Architecture {
         // usings.add_using(Name::try_new("ieee")?, "std_logic_1164.all".to_string());
         let library_id = library_id.try_result()?;
         let mut usings = package.list_usings()?;
-        usings.add_using(library_id, format!("{}.all", package.identifier()));
+        usings.add_using(library_id, format!("{}.all", package.identifier()))?;
         Ok(Architecture {
             identifier: identifier.try_result()?,
             entity: Entity::from(package.get_component(component_id)?),
@@ -118,14 +118,11 @@ impl Architecture {
     pub fn from_database(db: &dyn Arch, identifier: impl TryResult<VhdlName>) -> Result<Self> {
         let package = db.default_package();
         let mut usings = package.list_usings()?;
-        usings.add_using(
-            package.vhdl_name().clone(),
-            format!("{}.all", package.identifier()),
-        );
-        let component = package.get_subject_component(db);
+        usings.add_using("work", format!("{}.all", package.identifier()))?;
+        let component = db.subject_component();
         Ok(Architecture {
             identifier: identifier.try_result()?,
-            entity: Entity::from(component),
+            entity: Entity::from(component.as_ref()),
             usings: usings,
             doc: None,
             declaration: vec![],
@@ -134,7 +131,11 @@ impl Architecture {
     }
 
     /// Add additional usings which weren't already part of the package
-    pub fn add_using(&mut self, library: VhdlName, using: String) -> bool {
+    pub fn add_using(
+        &mut self,
+        library: impl TryResult<VhdlName>,
+        using: impl TryResult<VhdlPathName>,
+    ) -> Result<bool> {
         self.usings.add_using(library, using)
     }
 
@@ -229,6 +230,8 @@ mod tests {
 
     //     use crate::generator::{common::convert::Packify, vhdl::Declare};
 
+    use std::sync::Arc;
+
     use crate::{architecture::arch_storage::db::Database, declaration::Declare, test_tools};
 
     use super::*;
@@ -237,8 +240,8 @@ mod tests {
         Package::try_new(
             "pak",
             &vec![
-                test_tools::empty_component(),
-                test_tools::component_with_nested_types()?,
+                Arc::new(test_tools::empty_component()),
+                Arc::new(test_tools::component_with_nested_types()?),
             ],
             &vec![],
         )

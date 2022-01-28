@@ -7,7 +7,7 @@ use tydi_common::{
 
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
-    common::vhdl_name::{VhdlName, VhdlNameSelf},
+    common::vhdl_name::{VhdlName},
     component::Component,
     declaration::Declare,
     port::Port,
@@ -57,12 +57,6 @@ impl IntoVhdl<String> for Streamlet {
         prefix: impl TryOptional<VhdlName>,
     ) -> Result<String> {
         let prefix = prefix.try_optional()?;
-        let component: Component = self.canonical(ir_db, arch_db, prefix.clone())?;
-        arch_db.set_subject_component_name(component.vhdl_name().clone());
-
-        let mut package = arch_db.default_package();
-        package.add_component(component);
-        arch_db.set_default_package(package);
 
         match self.implementation(ir_db) {
             Some(implementation) => match implementation.kind() {

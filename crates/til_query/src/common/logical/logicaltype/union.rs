@@ -1,9 +1,13 @@
+use core::fmt;
 use std::{collections::BTreeMap, sync::Arc};
 
 use indexmap::IndexMap;
 use tydi_intern::Id;
 
-use crate::ir::{GetSelf, Ir};
+use crate::ir::{
+    traits::{GetSelf, InternSelf, MoveDb},
+    Ir,
+};
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
@@ -141,10 +145,43 @@ impl From<Union> for LogicalType {
     }
 }
 
+impl MoveDb<Id<LogicalType>> for Union {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<LogicalType>> {
+        let field_order = self.field_order.clone();
+        let fields = self
+            .fields
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
+            .collect::<Result<_>>()?;
+        Ok(LogicalType::from(Union {
+            fields,
+            field_order,
+        })
+        .intern(target_db))
+    }
+}
+
+impl fmt::Display for Union {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fields = self
+            .ordered_field_ids()
+            .iter()
+            .map(|(name, id)| format!("{}: {}", name, id))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "({})", fields)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::db::Database;
+    use crate::ir::{db::Database, interner::Interner};
 
     #[test]
     fn test_new() {

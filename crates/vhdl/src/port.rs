@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A port.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Port {
     /// Port identifier.
     identifier: VhdlName,
@@ -155,7 +155,7 @@ impl Reverse for Port {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum Mode {
     In,
     Out,
@@ -181,7 +181,7 @@ impl Display for Mode {
 
 /// A parameter for functions and components (generics).
 /// TODO: Add specific types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Parameter {
     /// Parameter identifier.
     pub identifier: String,

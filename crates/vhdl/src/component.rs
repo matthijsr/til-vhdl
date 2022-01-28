@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// A component.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Component {
     /// Component identifier.
     identifier: VhdlName,

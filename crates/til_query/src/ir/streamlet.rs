@@ -2,17 +2,21 @@ use std::collections::BTreeMap;
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::{Name, NameSelf, PathName, PathNameSelf},
+    name::{Name, PathName, PathNameSelf},
     traits::Identify,
 };
 use tydi_intern::Id;
 
 use super::{
-    physical_properties::InterfaceDirection, GetSelf, Implementation, Interface, InternSelf, Ir,
+    physical_properties::InterfaceDirection,
+    traits::{GetSelf, InternSelf, MoveDb},
+    Implementation, Interface, Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Streamlet {
+    /// Streamlet nodes should be prefixed by their containing namespace
+    /// and can be suffixed with their implementation.
     name: PathName,
     implementation: Option<Id<Implementation>>,
     ports: BTreeMap<Name, Id<Interface>>,
@@ -20,18 +24,18 @@ pub struct Streamlet {
 }
 
 impl Streamlet {
-    pub fn try_portless(name: impl TryResult<Name>) -> Result<Self> {
-        Ok(Streamlet {
-            name: name.try_result()?.into(),
+    pub fn new() -> Self {
+        Streamlet {
+            name: PathName::new_empty(),
             implementation: None,
             ports: BTreeMap::new(),
             port_order: vec![],
-        })
+        }
     }
 
-    pub fn try_new(
+    pub fn with_ports(
+        mut self,
         db: &dyn Ir,
-        name: impl TryResult<Name>,
         ports: Vec<impl TryResult<Interface>>,
     ) -> Result<Streamlet> {
         let mut port_order = vec![];
@@ -44,29 +48,20 @@ impl Streamlet {
             }
         }
 
-        Ok(Streamlet {
-            name: name.try_result()?.into(),
-            implementation: None,
-            ports: port_map,
-            port_order,
-        })
+        self.ports = port_map;
+        self.port_order = port_order;
+
+        Ok(self)
     }
 
-    pub fn with_implementation(
-        self,
-        db: &dyn Ir,
-        implementation: Option<Id<Implementation>>,
-    ) -> Id<Streamlet> {
-        let name = match &implementation {
-            Some(some) => self.name.with_child(some.get(db).name().clone()),
-            None => self.path_name().clone(),
-        };
-        db.intern_streamlet(Streamlet {
-            name: name,
-            implementation,
-            ports: self.ports,
-            port_order: self.port_order,
-        })
+    pub fn with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
+        self.name = name.try_result()?;
+        Ok(self)
+    }
+
+    pub fn with_implementation(mut self, implementation: Option<Id<Implementation>>) -> Streamlet {
+        self.implementation = implementation;
+        self
     }
 
     pub fn implementation(&self, db: &dyn Ir) -> Option<Implementation> {
@@ -127,20 +122,50 @@ impl Identify for Streamlet {
     }
 }
 
+impl MoveDb<Id<Streamlet>> for Streamlet {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Streamlet>> {
+        let port_order = self.port_order.clone();
+        let ports = self
+            .ports
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
+            .collect::<Result<_>>()?;
+        let implementation = match &self.implementation {
+            Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
+            None => None,
+        };
+        Ok(Streamlet {
+            name: self.name.with_parents(prefix),
+            implementation,
+            ports,
+            port_order,
+        }
+        .intern(target_db))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tydi_common::error::Result;
 
-    use crate::ir::db::Database;
+    use crate::ir::{db::Database, interner::Interner};
 
     use super::*;
 
     #[test]
     fn new() -> Result<()> {
         let db = Database::default();
-        let imple = Implementation::link("link")?;
+        let imple = Implementation::link().with_name("link")?;
         let implid = db.intern_implementation(imple.clone());
-        let streamlet = Streamlet::try_portless("test")?.with_implementation(&db, Some(implid));
+        let streamlet = Streamlet::new()
+            .with_name("test")?
+            .with_implementation(Some(implid))
+            .intern(&db);
         assert_eq!(
             db.lookup_intern_streamlet(streamlet)
                 .implementation(&db)

@@ -1,8 +1,12 @@
+use core::fmt;
 use std::sync::Arc;
 
 use crate::{
     common::physical::fields::Fields,
-    ir::{GetSelf, InternSelf, Ir},
+    ir::{
+        traits::{GetSelf, InternSelf, MoveDb},
+        Ir,
+    },
 };
 use indexmap::IndexMap;
 use tydi_common::{
@@ -103,7 +107,7 @@ impl LogicalType {
     /// ```rust
     /// use tydi_common::error::Error;
     /// use til_query::common::logical::logicaltype::LogicalType;
-    /// use til_query::ir::{db::Database, Ir};
+    /// use til_query::ir::{db::Database, Ir, interner::Interner};
     ///
     /// let db = Database::default();
     ///
@@ -305,6 +309,38 @@ impl IsNull for LogicalType {
             }
             LogicalType::Stream(stream) => stream.is_null(db),
             LogicalType::Bits(_) => false,
+        }
+    }
+}
+
+impl MoveDb<Id<LogicalType>> for LogicalType {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<Id<Self>> {
+        Ok(match self {
+            LogicalType::Null => self.clone().intern(target_db),
+            LogicalType::Bits(_) => self.clone().intern(target_db),
+            LogicalType::Group(group) => group.move_db(original_db, target_db, prefix)?,
+            LogicalType::Union(union) => union.move_db(original_db, target_db, prefix)?,
+            LogicalType::Stream(stream) => {
+                LogicalType::Stream(stream.move_db(original_db, target_db, prefix)?)
+                    .intern(target_db)
+            }
+        })
+    }
+}
+
+impl fmt::Display for LogicalType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogicalType::Null => write!(f, "Null"),
+            LogicalType::Bits(b) => write!(f, "Bits({})", b),
+            LogicalType::Group(group) => write!(f, "Group({})", group),
+            LogicalType::Union(union) => write!(f, "Union({})", union),
+            LogicalType::Stream(stream_id) => write!(f, "Stream({})", stream_id),
         }
     }
 }
