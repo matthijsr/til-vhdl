@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
 use indexmap::IndexMap;
-use tydi_common::error::Result;
+use tydi_common::error::{Result, TryResult};
 
-use crate::common::vhdl_name::VhdlName;
+use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 
 /// A list of VHDL usings, indexed by library
 #[derive(Debug, Clone)]
-pub struct Usings(IndexMap<VhdlName, HashSet<String>>);
+pub struct Usings(IndexMap<VhdlName, HashSet<VhdlPathName>>);
 
 impl Usings {
     pub fn new_empty() -> Usings {
@@ -17,14 +17,19 @@ impl Usings {
     /// If the set did not have this value present, `true` is returned.
     ///
     /// If the set did have this value present, `false` is returned.
-    pub fn add_using(&mut self, library: VhdlName, using: impl Into<String>) -> bool {
-        self.0
-            .entry(library)
+    pub fn add_using(
+        &mut self,
+        library: impl TryResult<VhdlName>,
+        using: impl TryResult<VhdlPathName>,
+    ) -> Result<bool> {
+        Ok(self
+            .0
+            .entry(library.try_result()?)
             .or_insert(HashSet::new())
-            .insert(using.into())
+            .insert(using.try_result()?))
     }
 
-    pub fn usings(&self) -> &IndexMap<VhdlName, HashSet<String>> {
+    pub fn usings(&self) -> &IndexMap<VhdlName, HashSet<VhdlPathName>> {
         &self.0
     }
 

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use til_query::{
     common::logical::logicaltype::{
         stream::{Direction, Stream, Synchronicity},
@@ -9,7 +11,7 @@ use til_query::{
         interner::Interner,
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
-        traits::{InternSelf},
+        traits::InternSelf,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
@@ -52,7 +54,7 @@ fn streamlet_to_vhdl() -> Result<()> {
     let streamlet = Streamlet::new()
         .with_name("test")?
         .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
-    let component = streamlet.canonical(db, arch_db, "")?;
+    let component = Arc::new(streamlet.canonical(db, arch_db, "")?);
     let mut package = Package::new_default_empty();
     package.add_component(component);
 
@@ -60,7 +62,7 @@ fn streamlet_to_vhdl() -> Result<()> {
         r#"library ieee;
 use ieee.std_logic_1164.all;
 
-package work is
+package default is
 
   component test_com
     port (
@@ -74,7 +76,7 @@ package work is
     );
   end component;
 
-end work;"#,
+end default;"#,
         package.declare(arch_db)?
     );
 
@@ -84,7 +86,7 @@ end work;"#,
 use ieee.std_logic_1164.all;
 
 library work;
-use work.work.all;
+use work.default.all;
 
 entity test_com is
   port (
@@ -262,10 +264,14 @@ fn playground() -> Result<()> {
     let implementation = Implementation::structural(structure)?
         .with_name("structural")?
         .intern(db);
-    let streamlet = streamlet
-        .with_implementation(Some(implementation));
+    let streamlet = streamlet.with_implementation(Some(implementation));
 
-    let package = Package::new_default_empty();
+    let mut package = Package::new_default_empty();
+    let component: Arc<Component> = Arc::new(streamlet.canonical(db, arch_db, "")?);
+    package.add_component(component.clone());
+    arch_db.set_subject_component(component);
+    let package = Arc::new(package);
+
     arch_db.set_default_package(package);
 
     let declaration: String = streamlet.canonical(db, arch_db, "")?;

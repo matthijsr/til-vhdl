@@ -52,6 +52,15 @@ impl Implementation {
     }
 }
 
+impl From<Structure> for Implementation {
+    fn from(value: Structure) -> Self {
+        Implementation {
+            name: PathName::new_empty(),
+            kind: ImplementationKind::Structural(value),
+        }
+    }
+}
+
 impl Identify for Implementation {
     fn identifier(&self) -> String {
         self.path_name().to_string()

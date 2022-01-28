@@ -23,7 +23,7 @@ impl ListUsings for AssignmentKind {
                         BitVecValue::Others(_) => (),
                         BitVecValue::Full(_) => (),
                         BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => {
-                            usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all");
+                            usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all")?;
                         }
                     },
                 },

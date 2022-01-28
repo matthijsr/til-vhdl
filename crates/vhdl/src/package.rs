@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use indexmap::IndexMap;
 use itertools::Itertools;
 use textwrap::indent;
@@ -23,15 +25,23 @@ pub struct Package {
     /// The identifier.
     identifier: VhdlName,
     /// The components declared within the library.
-    components: IndexMap<VhdlName, Component>,
+    components: IndexMap<VhdlName, Arc<Component>>,
     /// The types declared within the library.
     types: Vec<ObjectType>,
 }
 
 impl Package {
+    pub fn new_named(identifier: impl TryResult<VhdlName>) -> Result<Self> {
+        Ok(Package {
+            identifier: identifier.try_result()?,
+            components: IndexMap::new(),
+            types: vec![],
+        })
+    }
+
     pub fn try_new(
         identifier: impl TryResult<VhdlName>,
-        components: &Vec<Component>,
+        components: &Vec<Arc<Component>>,
         types: &Vec<ObjectType>,
     ) -> Result<Self> {
         let mut all_types: Vec<ObjectType> = types.clone();
@@ -48,20 +58,15 @@ impl Package {
         })
     }
 
-    /// Creates an empty "work" library
+    /// Creates an empty "default" library
     pub fn new_default_empty() -> Self {
-        Package::try_new("work", &vec![], &vec![]).unwrap()
+        Package::try_new("default", &vec![], &vec![]).unwrap()
     }
 
-    pub fn get_subject_component(&self, db: &dyn Arch) -> &Component {
-        let name = db.subject_component_name();
-        self.components.get(&name).unwrap()
-    }
-
-    pub fn get_component(&self, identifier: impl TryResult<VhdlName>) -> Result<Component> {
+    pub fn get_component(&self, identifier: impl TryResult<VhdlName>) -> Result<&Component> {
         let identifier = identifier.try_result()?;
         match self.components.get(&identifier) {
-            Some(component) => Ok(component.clone()),
+            Some(component) => Ok(component),
             None => Err(Error::LibraryError(format!(
                 "Component with identifier {} does not exist in package.",
                 identifier
@@ -69,7 +74,7 @@ impl Package {
         }
     }
 
-    pub fn add_component(&mut self, component: Component) {
+    pub fn add_component(&mut self, component: Arc<Component>) {
         self.components
             .insert(component.vhdl_name().clone(), component);
     }
@@ -78,7 +83,7 @@ impl Package {
         self.types.push(typ);
     }
 
-    pub fn components(&self) -> &IndexMap<VhdlName, Component> {
+    pub fn components(&self) -> &IndexMap<VhdlName, Arc<Component>> {
         &self.components
     }
 
@@ -129,7 +134,7 @@ impl ListUsings for Package {
         }
 
         if types.any(|x| uses_std_logic(&x)) {
-            usings.add_using(VhdlName::try_new("ieee")?, "std_logic_1164.all".to_string());
+            usings.add_using(VhdlName::try_new("ieee")?, "std_logic_1164.all".to_string())?;
         }
 
         Ok(usings)
