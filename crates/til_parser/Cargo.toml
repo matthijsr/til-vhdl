@@ -1,0 +1,15 @@
+[project]
+name = "til-parser"
+version = "0.1.0"
+edition = "2018"
+publish = false
+description = "A grammar and parser for the Tydi Intermediate representation Language"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.14"
+chumsky = "0.7.0"
+tydi-common = { path = "../common" }
+tydi-intern = { path = "../intern" }
+til-query = { path = "../til_query" }
