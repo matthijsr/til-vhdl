@@ -119,10 +119,9 @@ impl Architecture {
         let package = db.default_package();
         let mut usings = package.list_usings()?;
         usings.add_using("work", format!("{}.all", package.identifier()))?;
-        let component = db.subject_component();
         Ok(Architecture {
             identifier: identifier.try_result()?,
-            entity: Entity::from(component.as_ref()),
+            entity: Entity::from(db.subject_component()?.as_ref()),
             usings: usings,
             doc: None,
             declaration: vec![],

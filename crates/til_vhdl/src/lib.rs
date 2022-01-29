@@ -10,9 +10,9 @@ use tydi_common::{
 };
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
-    common::vhdl_name::VhdlName,
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
-    declaration::{Declare},
+    declaration::Declare,
     package::Package,
 };
 
@@ -46,32 +46,28 @@ pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
     let streamlets = db.all_streamlets();
 
     let mut package = Package::new_named(project.identifier())?;
-    let mut streamlet_components = vec![];
+    let mut streamlet_component_names = vec![];
 
     for streamlet in streamlets.iter() {
         let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
         let component: Arc<Component> = Arc::new(streamlet.canonical(db, &mut arch_db, "")?);
-        package.add_component(component.clone());
-        streamlet_components.push((streamlet, component));
+        streamlet_component_names.push((streamlet, component.vhdl_name().clone()));
+        package.add_component(component);
     }
 
     let package = Arc::new(package);
-
     let mut pkg = dir.clone();
     pkg.push(format!("{}_pkg", package.identifier()));
     pkg.set_extension("vhd");
 
-    // TODO: Make the DB optional on declare.
     let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    arch_db.set_default_package(package);
 
-    std::fs::write(pkg.as_path(), package.declare(&arch_db)?)?;
+    std::fs::write(pkg.as_path(), arch_db.default_package().declare(&arch_db)?)?;
     debug!("Wrote {}.", pkg.as_path().to_str().unwrap_or(""));
 
-    for (streamlet, component) in streamlet_components.iter() {
-        arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-        arch_db.set_default_package(package.clone());
-        arch_db.set_subject_component(component.clone());
-
+    for (streamlet, component_name) in streamlet_component_names.into_iter() {
+        arch_db.set_subject_component_name(Arc::new(component_name));
         let streamlet_arch: String = streamlet.canonical(db, &mut arch_db, None)?;
 
         let mut arch = dir.clone();
