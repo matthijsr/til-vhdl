@@ -78,13 +78,19 @@ impl From<Name> for VhdlName {
 
 impl From<PathName> for VhdlName {
     fn from(path: PathName) -> Self {
-        VhdlName::try_new(path.to_string()).unwrap()
+        VhdlName::try_new(path).unwrap()
+    }
+}
+
+impl From<&PathName> for VhdlName {
+    fn from(path: &PathName) -> Self {
+        VhdlName::try_new(path).unwrap()
     }
 }
 
 impl From<VhdlPathName> for VhdlName {
     fn from(path: VhdlPathName) -> Self {
-        VhdlName::try_new(path.to_string()).unwrap()
+        VhdlName::try_new(path).unwrap()
     }
 }
 
@@ -333,6 +339,18 @@ impl TryFrom<&str> for VhdlPathName {
             let name: VhdlName = str.try_into()?;
             Ok(VhdlPathName::from(name))
         }
+    }
+}
+
+impl From<VhdlPathName> for String {
+    fn from(name: VhdlPathName) -> Self {
+        name.to_string()
+    }
+}
+
+impl From<&VhdlPathName> for String {
+    fn from(name: &VhdlPathName) -> Self {
+        name.to_string()
     }
 }
 
