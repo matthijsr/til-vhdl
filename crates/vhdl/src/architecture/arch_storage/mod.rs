@@ -9,7 +9,7 @@ use crate::{
     assignment::AssignmentKind,
     declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectState},
     package::Package,
-    statement::Statement, component::Component,
+    statement::Statement, common::vhdl_name::VhdlName, component::Component,
 };
 
 use super::Architecture;
@@ -24,7 +24,7 @@ pub trait Arch {
     fn default_package(&self) -> Arc<Package>;
 
     #[salsa::input]
-    fn subject_component(&self) -> Arc<Component>;
+    fn subject_component_name(&self) -> Arc<VhdlName>;
 
     #[salsa::input]
     fn architecture(&self) -> Architecture;
@@ -38,10 +38,17 @@ pub trait Arch {
     #[salsa::interned]
     fn intern_object_declaration(&self, obj_decl: ObjectDeclaration) -> Id<ObjectDeclaration>;
 
+    fn subject_component(&self) -> Result<Arc<Component>>;
+
     fn get_object(&self, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration>;
 
     // #[salsa::interned]
     // fn intern_statement(&self, stat: Statement) -> Id<Statement>;
+}
+
+fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
+    let package = db.default_package();
+    package.get_subject_component(db)
 }
 
 fn get_object(db: &dyn Arch, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration> {

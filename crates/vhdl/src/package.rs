@@ -63,6 +63,17 @@ impl Package {
         Package::try_new("default", &vec![], &vec![]).unwrap()
     }
 
+    pub fn get_subject_component(&self, db: &dyn Arch) -> Result<Arc<Component>> {
+        let subj_name = db.subject_component_name();
+        match self.components.get(subj_name.as_ref()) {
+            Some(component) => Ok(component.clone()),
+            None => Err(Error::LibraryError(format!(
+                "Subject Component with identifier {} does not exist in package.",
+                subj_name
+            ))),
+        }
+    }
+
     pub fn get_component(&self, identifier: impl TryResult<VhdlName>) -> Result<&Component> {
         let identifier = identifier.try_result()?;
         match self.components.get(&identifier) {

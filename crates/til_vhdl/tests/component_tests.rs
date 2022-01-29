@@ -19,6 +19,7 @@ use til_vhdl::IntoVhdl;
 use tydi_common::{error::Result, name::Name, numbers::NonNegative};
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
+    common::vhdl_name::VhdlNameSelf,
     component::Component,
     declaration::Declare,
     package::Package,
@@ -268,8 +269,8 @@ fn playground() -> Result<()> {
 
     let mut package = Package::new_default_empty();
     let component: Arc<Component> = Arc::new(streamlet.canonical(db, arch_db, "")?);
-    package.add_component(component.clone());
-    arch_db.set_subject_component(component);
+    arch_db.set_subject_component_name(Arc::new(component.vhdl_name().clone()));
+    package.add_component(component);
     let package = Arc::new(package);
 
     arch_db.set_default_package(package);

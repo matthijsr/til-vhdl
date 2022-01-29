@@ -323,6 +323,18 @@ impl TryFrom<&str> for PathName {
     }
 }
 
+impl From<PathName> for String {
+    fn from(name: PathName) -> Self {
+        name.to_string()
+    }
+}
+
+impl From<&PathName> for String {
+    fn from(name: &PathName) -> Self {
+        name.to_string()
+    }
+}
+
 pub trait NameSelf: Identify {
     fn name(&self) -> &Name;
 }
