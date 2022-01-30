@@ -168,14 +168,14 @@ fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         .or(ident)
         .recover_with(skip_then_retry_until([]));
 
-    let single_comment = just("//").then(take_until(just('\n'))).padded();
-    let multiline_comment = just("///").then(take_until(just("///"))).padded();
+    let single_line = just("//").then(take_until(text::newline())).ignored();
+    let multi_line = just("///").then(take_until(just("///"))).ignored();
+    let comment = multi_line.or(single_line);
 
     token
-        .padded_by(single_comment.repeated())
-        .padded_by(multiline_comment.repeated())
-        .map_with_span(|tok, span| (tok, span))
         .padded()
+        .padded_by(comment.padded().repeated())
+        .map_with_span(|tok, span| (tok, span))
         .repeated()
 }
 
