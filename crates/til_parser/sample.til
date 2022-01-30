@@ -2,14 +2,18 @@
 
 // TIL is *not* whitespace sensitive, but there's no harm in adding some, either.
 
-// Comments use // or /* */ or /// ///
-/* Like
-so */
+// Comments use // or /// ///
 // And so
 /// And
 so ///
 
-// /* */ and /// /// currently aren't explicitly different, but this may change in the future (One of them may be used for documentation)
+// # # delineates documentation for a specific declaration.
+#
+We're using this for math stuff I guess.
+
+Check out our docs.
+#
+type half_byte = Bits(4);
 
 // Annotations and intrinsics may use # and @ in the future
 
@@ -70,7 +74,7 @@ namespace my::new::namespace {
         data: rgb,
         dimensionality: 0,
         synchronicity: Sync,
-        complexity: 4,
+        complexity: 4.3.2, // Sub-versions
         direction: Forward,
     );
     // user defaults to null, keep defaults to false, and throughput defaults to 1.0
