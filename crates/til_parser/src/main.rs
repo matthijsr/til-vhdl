@@ -196,3 +196,46 @@ fn main() {
         println!("{}", err);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_test_til() {
+        let src = std::fs::read_to_string("test.til").unwrap();
+
+        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+
+        if let Some(tks) = tokens {
+            println!("Tokens:");
+            for token in tks {
+                println!("{:?}", token);
+            }
+        }
+
+        println!("Errors:");
+        for err in errs {
+            println!("{}", err);
+        }
+    }
+
+    #[test]
+    fn test_sample_til() {
+        let src = std::fs::read_to_string("sample.til").unwrap();
+
+        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+
+        if let Some(tks) = tokens {
+            println!("Tokens:");
+            for token in tks {
+                println!("{:?}", token);
+            }
+        }
+
+        println!("Errors:");
+        for err in errs {
+            println!("{}", err);
+        }
+    }
+}
