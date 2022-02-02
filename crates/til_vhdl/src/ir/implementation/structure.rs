@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use til_query::ir::{connection::InterfaceReference, traits::GetSelf, Ir};
 use tydi_common::{
-    error::{Result, TryOptional},
+    error::{Error, Result, TryOptional},
     name::Name,
     traits::Identify,
 };
@@ -11,7 +11,8 @@ use tydi_vhdl::{
     architecture::{arch_storage::Arch, ArchitectureBody},
     assignment::Assign,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
-    declaration::ObjectDeclaration,
+    declaration::{ObjectDeclaration, ObjectState},
+    port::Mode,
     statement::PortMapping,
 };
 
@@ -39,11 +40,19 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                     name.clone(),
                     port.canonical(ir_db, arch_db, prefix.clone())?
                         .iter()
-                        .map(|vhdl_port| ObjectDeclaration::from_port(arch_db, vhdl_port, true))
+                        .map(|vhdl_port| {
+                            (
+                                ObjectDeclaration::from_port(arch_db, vhdl_port, true),
+                                match vhdl_port.mode() {
+                                    Mode::In => ObjectState::Assigned,
+                                    Mode::Out => ObjectState::Unassigned,
+                                },
+                            )
+                        })
                         .collect(),
                 ))
             })
-            .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
+            .collect::<Result<BTreeMap<Name, Vec<(Id<ObjectDeclaration>, ObjectState)>>>>()?;
         let clk = ObjectDeclaration::entity_clk(arch_db);
         let rst = ObjectDeclaration::entity_rst(arch_db);
         let mut streamlet_ports = BTreeMap::new();
@@ -67,35 +76,50 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                             None,
                         )?;
                         port_mapping.map_port(arch_db, port.vhdl_name().clone(), &signal)?;
-                        signals.push(signal);
+                        signals.push((
+                            signal,
+                            match port.mode() {
+                                Mode::In => ObjectState::Unassigned,
+                                Mode::Out => ObjectState::Assigned,
+                            },
+                        ));
                         declarations.push(signal.into());
                     }
 
                     Ok((name.clone(), signals))
                 })
-                .collect::<Result<BTreeMap<Name, Vec<Id<ObjectDeclaration>>>>>()?;
+                .collect::<Result<BTreeMap<Name, Vec<(Id<ObjectDeclaration>, ObjectState)>>>>()?;
             streamlet_ports.insert(instance_name, port_map_signals);
             port_mapping.map_port(arch_db, "clk", &clk)?;
             port_mapping.map_port(arch_db, "rst", &rst)?;
             statements.push(port_mapping.finish()?.into());
         }
         for connection in self.connections() {
-            let get_objs = |interface: &InterfaceReference| -> &Vec<Id<ObjectDeclaration>> {
-                match interface.streamlet_instance() {
-                    Some(streamlet_instance) => streamlet_ports
-                        .get(streamlet_instance)
-                        .unwrap()
-                        .get(interface.port())
-                        .unwrap(),
-                    None => own_ports.get(interface.port()).unwrap(),
-                }
-            };
+            let get_objs =
+                |interface: &InterfaceReference| -> &Vec<(Id<ObjectDeclaration>, ObjectState)> {
+                    match interface.streamlet_instance() {
+                        Some(streamlet_instance) => streamlet_ports
+                            .get(streamlet_instance)
+                            .unwrap()
+                            .get(interface.port())
+                            .unwrap(),
+                        None => own_ports.get(interface.port()).unwrap(),
+                    }
+                };
             let sink_objs = get_objs(connection.sink()).clone();
             let source_objs = get_objs(connection.source()).clone();
-            let sink_source: Vec<(Id<ObjectDeclaration>, Id<ObjectDeclaration>)> =
-                sink_objs.into_iter().zip(source_objs.into_iter()).collect();
-            for (sink, source) in sink_source {
-                statements.push(sink.assign(arch_db, &source)?.into());
+            let sink_source: Vec<(
+                (Id<ObjectDeclaration>, ObjectState),
+                (Id<ObjectDeclaration>, ObjectState),
+            )> = sink_objs.into_iter().zip(source_objs.into_iter()).collect();
+            for ((sink, sink_state), (source, source_state)) in sink_source {
+                if sink_state == source_state {
+                    return Err(Error::BackEndError(format!("Something went wrong during VHDL conversion of a connection. Connection {} results in two objects having shared state {}.", connection, sink_state)));
+                } else if sink_state == ObjectState::Assigned {
+                    statements.push(source.assign(arch_db, &sink)?.into());
+                } else {
+                    statements.push(sink.assign(arch_db, &source)?.into());
+                }
             }
         }
 
@@ -108,8 +132,10 @@ mod tests {
     use til_query::{
         common::logical::logicaltype::LogicalType,
         ir::{
-            db::Database, physical_properties::InterfaceDirection, streamlet::Streamlet,
-            traits::{TryIntern, InternSelf},
+            db::Database,
+            physical_properties::InterfaceDirection,
+            streamlet::Streamlet,
+            traits::{InternSelf, TryIntern},
         },
         test_utils::{test_stream_id, test_stream_id_custom},
     };
@@ -290,35 +316,35 @@ instance: a_com port map(
   d_strb => instance__d_strb
 )
 instance__a_valid <= a_valid
-instance__a_ready <= a_ready
+a_ready <= instance__a_ready
 instance__a_data <= a_data
 instance__a_stai <= a_stai
 instance__a_endi <= a_endi
 instance__a_strb <= a_strb
 b_valid <= instance__b_valid
-b_ready <= instance__b_ready
+instance__b_ready <= b_ready
 b_data <= instance__b_data
 b_stai <= instance__b_stai
 b_endi <= instance__b_endi
 b_strb <= instance__b_strb
 d_valid <= c_valid
-d_ready <= c_ready
+c_ready <= d_ready
 d_data <= c_data
 d_last <= c_last
 d_strb <= c_strb
 instance__c_valid <= instance__d_valid
-instance__c_ready <= instance__d_ready
+instance__d_ready <= instance__c_ready
 instance__c_data <= instance__d_data
 instance__c_last <= instance__d_last
 instance__c_strb <= instance__d_strb
 b__a_valid <= b__b_valid
-b__a_ready <= b__b_ready
+b__b_ready <= b__a_ready
 b__a_data <= b__b_data
 b__a_stai <= b__b_stai
 b__a_endi <= b__b_endi
 b__a_strb <= b__b_strb
 b__c_valid <= b__d_valid
-b__c_ready <= b__d_ready
+b__d_ready <= b__c_ready
 b__c_data <= b__d_data
 b__c_last <= b__d_last
 b__c_strb <= b__d_strb

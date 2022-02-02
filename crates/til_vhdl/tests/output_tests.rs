@@ -49,11 +49,18 @@ fn playground() -> Result<()> {
         "streamlet",
         Streamlet::new().with_ports(
             db,
-            vec![(
-                "a",
-                namespace.get_stream_id(db, "stream")?,
-                InterfaceDirection::In,
-            )],
+            vec![
+                (
+                    "a",
+                    namespace.get_stream_id(db, "stream")?,
+                    InterfaceDirection::In,
+                ),
+                (
+                    "b",
+                    namespace.get_stream_id(db, "stream")?,
+                    InterfaceDirection::Out,
+                ),
+            ],
         )?,
     )?;
 
@@ -61,6 +68,7 @@ fn playground() -> Result<()> {
     let mut structure: Structure = (&streamlet_id.get(db)).into();
     structure.try_add_streamlet_instance("a", streamlet_id)?;
     structure.try_add_connection(db, ("a", "a"), "a")?;
+    structure.try_add_connection(db, ("a", "b"), "b")?;
     namespace.define_implementation(db, "implementation", structure)?;
 
     namespace.define_streamlet(
