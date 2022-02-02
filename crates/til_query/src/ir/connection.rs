@@ -105,3 +105,9 @@ impl Reverse for Connection {
         std::mem::swap(&mut self.sink, &mut self.source)
     }
 }
+
+impl fmt::Display for Connection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} <- {}", self.sink(), self.source())
+    }
+}
