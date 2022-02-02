@@ -7,7 +7,7 @@ use til_query::{
     },
     ir::{
         db::Database,
-        implementation::{structure::Structure, Implementation},
+        implementation::structure::Structure,
         physical_properties::InterfaceDirection,
         project::{namespace::Namespace, Project},
         streamlet::Streamlet,
@@ -49,15 +49,18 @@ fn playground() -> Result<()> {
         "streamlet",
         Streamlet::new().with_ports(
             db,
-            vec![(
-                "a",
-                namespace.get_stream_id(db, "stream")?,
-                InterfaceDirection::In,
-            ), (
-                "b",
-                namespace.get_stream_id(db, "stream")?,
-                InterfaceDirection::Out,
-            )],
+            vec![
+                (
+                    "a",
+                    namespace.get_stream_id(db, "stream")?,
+                    InterfaceDirection::In,
+                ),
+                (
+                    "b",
+                    namespace.get_stream_id(db, "stream")?,
+                    InterfaceDirection::Out,
+                ),
+            ],
         )?,
     )?;
 
