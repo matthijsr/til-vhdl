@@ -1,17 +1,16 @@
+use super::Span;
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::{prelude::*, stream::Stream};
 use std::{collections::HashMap, env, fmt, fs, path::PathBuf};
 use tydi_common::name::{Name, PathName};
 
-pub type Span = std::ops::Range<usize>;
-
-struct Error {
-    span: Span,
-    msg: String,
+pub struct LexerError {
+    pub span: Span,
+    pub msg: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum DeclKeyword {
+pub enum DeclKeyword {
     Streamlet,
     Implementation,
     LogicalType,
@@ -19,7 +18,7 @@ enum DeclKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum ImportKeyword {
+pub enum ImportKeyword {
     /// `import`
     Import,
     /// `as`
@@ -29,7 +28,7 @@ enum ImportKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum TypeKeyword {
+pub enum TypeKeyword {
     Bits,
     Group,
     Union,
@@ -38,7 +37,7 @@ enum TypeKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum SynchronicityKeyword {
+pub enum SynchronicityKeyword {
     Sync,
     Flatten,
     Desync,
@@ -46,13 +45,13 @@ enum SynchronicityKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum DirectionKeyword {
+pub enum DirectionKeyword {
     Forward,
     Reverse,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum Operator {
+pub enum Operator {
     /// `=`
     Assign,
     /// `.`
@@ -66,7 +65,7 @@ enum Operator {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum Token {
+pub enum Token {
     /// Identifiers: Names and parts of PathNames
     Identifier(String),
     /// `"../path"`, TIL does not use strings for any other purpose.
@@ -95,7 +94,7 @@ enum Token {
     Boolean(bool),
 }
 
-fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
+pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
     let num = text::int(10)
         .chain::<char, _, _>(just('.').chain(text::digits(10)).or_not().flatten())
         .collect::<String>()
@@ -177,65 +176,4 @@ fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         .padded_by(comment.padded().repeated())
         .map_with_span(|tok, span| (tok, span))
         .repeated()
-}
-
-fn main() {
-    let src = std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap();
-
-    let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
-
-    if let Some(tks) = tokens {
-        println!("Tokens:");
-        for token in tks {
-            println!("{:?}", token);
-        }
-    }
-
-    println!("Errors:");
-    for err in errs {
-        println!("{}", err);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_test_til() {
-        let src = std::fs::read_to_string("test.til").unwrap();
-
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
-
-        if let Some(tks) = tokens {
-            println!("Tokens:");
-            for token in tks {
-                println!("{:?}", token);
-            }
-        }
-
-        println!("Errors:");
-        for err in errs {
-            println!("{}", err);
-        }
-    }
-
-    #[test]
-    fn test_sample_til() {
-        let src = std::fs::read_to_string("sample.til").unwrap();
-
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
-
-        if let Some(tks) = tokens {
-            println!("Tokens:");
-            for token in tks {
-                println!("{:?}", token);
-            }
-        }
-
-        println!("Errors:");
-        for err in errs {
-            println!("{}", err);
-        }
-    }
 }
