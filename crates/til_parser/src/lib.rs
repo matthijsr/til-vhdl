@@ -1,3 +1,4 @@
+pub mod ast;
 pub mod lex;
 pub type Span = std::ops::Range<usize>;
 
@@ -6,8 +7,6 @@ mod tests {
     use crate::lex::lexer;
     use chumsky::Parser;
     use std::path::Path;
-
-    use super::*;
 
     fn test_parse(path: impl AsRef<Path>) {
         let src = std::fs::read_to_string(path).unwrap();

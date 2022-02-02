@@ -2,6 +2,7 @@ use super::Span;
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::{prelude::*, stream::Stream};
 use std::{collections::HashMap, env, fmt, fs, path::PathBuf};
+use til_query::common::logical::logicaltype::stream::{Direction, Synchronicity};
 use tydi_common::name::{Name, PathName};
 
 pub struct LexerError {
@@ -37,23 +38,9 @@ pub enum TypeKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum SynchronicityKeyword {
-    Sync,
-    Flatten,
-    Desync,
-    FlatDesync,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DirectionKeyword {
-    Forward,
-    Reverse,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operator {
     /// `=`
-    Assign,
+    Declare,
     /// `.`
     Select,
     /// `--`
@@ -75,9 +62,9 @@ pub enum Token {
     /// Type keywords: `Bits`, `Group`, `Union`, `Stream`, `Null`
     Type(TypeKeyword),
     /// Synchronicity keywords: `Sync`, `Flatten`, `Desync`, `FlatDesync`
-    Synchronicity(SynchronicityKeyword),
+    Synchronicity(Synchronicity),
     /// Direction keywords: `Forward`, `Reverse`
-    Direction(DirectionKeyword),
+    Direction(Direction),
     /// Words that precede declarations (e.g., `namespace`, `impl`)
     Decl(DeclKeyword),
     /// Operators `=` `.` `--` `::` `*`
@@ -119,7 +106,7 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         .map(Token::Path);
 
     let op = just("=")
-        .to(Operator::Assign)
+        .to(Operator::Declare)
         .or(just(".").to(Operator::Select))
         .or(just("--").to(Operator::Connect))
         .or(just("::").to(Operator::Path))
@@ -143,12 +130,12 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "Union" => Token::Type(TypeKeyword::Union),
         "Stream" => Token::Type(TypeKeyword::Stream),
         "Null" => Token::Type(TypeKeyword::Null),
-        "Sync" => Token::Synchronicity(SynchronicityKeyword::Sync),
-        "Flatten" => Token::Synchronicity(SynchronicityKeyword::Flatten),
-        "Desync" => Token::Synchronicity(SynchronicityKeyword::Desync),
-        "FlatDesync" => Token::Synchronicity(SynchronicityKeyword::FlatDesync),
-        "Forward" => Token::Direction(DirectionKeyword::Forward),
-        "Reverse" => Token::Direction(DirectionKeyword::Reverse),
+        "Sync" => Token::Synchronicity(Synchronicity::Sync),
+        "Flatten" => Token::Synchronicity(Synchronicity::Flatten),
+        "Desync" => Token::Synchronicity(Synchronicity::Desync),
+        "FlatDesync" => Token::Synchronicity(Synchronicity::FlatDesync),
+        "Forward" => Token::Direction(Direction::Forward),
+        "Reverse" => Token::Direction(Direction::Reverse),
         "streamlet" => Token::Decl(DeclKeyword::Streamlet),
         "impl" => Token::Decl(DeclKeyword::Implementation),
         "type" => Token::Decl(DeclKeyword::LogicalType),

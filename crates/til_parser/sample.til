@@ -65,7 +65,7 @@ namespace my::new::namespace {
         synchronicity: Sync,
         complexity: 4,
         direction: Forward,
-        user: null, // The "null" type is defined by default, as Null (note that you cannot use null and Null interchangeably)
+        user: Null, // It's possible to use type definitions directly
         keep: false,
     );
     type empty = Null; // Of course, you can define your own Null type, if this happens to be a useful abstraction

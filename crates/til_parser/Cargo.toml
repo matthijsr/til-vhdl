@@ -11,6 +11,7 @@ description = "A grammar and parser for the Tydi Intermediate representation Lan
 log = "0.4.14"
 ariadne = "0.1.3"
 chumsky = "0.7.0"
+indexmap = "1.7.0"
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
 til-query = { path = "../til_query" }
