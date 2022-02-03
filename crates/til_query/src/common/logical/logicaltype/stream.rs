@@ -1,3 +1,4 @@
+use core::fmt;
 use std::convert::TryFrom;
 use std::hash::Hash;
 use std::ops::Mul;
@@ -419,6 +420,17 @@ impl FromStr for Synchronicity {
     }
 }
 
+impl fmt::Display for Synchronicity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Synchronicity::Sync => write!(f, "Sync"),
+            Synchronicity::Flatten => write!(f, "Flatten"),
+            Synchronicity::Desync => write!(f, "Desync"),
+            Synchronicity::FlatDesync => write!(f, "FlatDesync"),
+        }
+    }
+}
+
 /// Direction of a stream.
 ///
 /// [Reference]
@@ -456,6 +468,15 @@ impl FromStr for Direction {
                 "{} is not a valid Direction",
                 input
             ))),
+        }
+    }
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Direction::Forward => write!(f, "Forward"),
+            Direction::Reverse => write!(f, "Reverse"),
         }
     }
 }
