@@ -2,7 +2,7 @@ use super::Span;
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::{prelude::*, stream::Stream};
 use std::{collections::HashMap, env, fmt, fs, path::PathBuf};
-use til_query::common::logical::logicaltype::stream::{Direction, Synchronicity};
+use til_query::{common::logical::logicaltype::stream::{Direction, Synchronicity}, ir::physical_properties::InterfaceDirection};
 use tydi_common::name::{Name, PathName};
 
 pub struct LexerError {
@@ -97,21 +97,6 @@ impl fmt::Display for Operator {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum PortMode {
-    In,
-    Out,
-}
-
-impl fmt::Display for PortMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PortMode::In => write!(f, "in"),
-            PortMode::Out => write!(f, "out"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     /// Identifiers: Names and parts of PathNames
     Identifier(String),
@@ -140,7 +125,7 @@ pub enum Token {
     /// `true` and `false`, for the `keep` of Streams
     Boolean(bool),
     /// `in` and `out` for ports
-    PortMode(PortMode),
+    PortMode(InterfaceDirection),
 }
 
 impl fmt::Display for Token {
@@ -225,8 +210,8 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "namespace" => Token::Decl(DeclKeyword::Namespace),
         "true" => Token::Boolean(true),
         "false" => Token::Boolean(false),
-        "in" => Token::PortMode(PortMode::In),
-        "out" => Token::PortMode(PortMode::Out),
+        "in" => Token::PortMode(InterfaceDirection::In),
+        "out" => Token::PortMode(InterfaceDirection::Out),
         _ => Token::Identifier(ident),
     });
 

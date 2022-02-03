@@ -1,9 +1,12 @@
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::{prelude::*, stream::Stream};
 use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
-use til_query::common::{
-    logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
-    physical::complexity::Complexity,
+use til_query::{
+    common::{
+        logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
+        physical::complexity::Complexity,
+    },
+    ir::physical_properties::InterfaceDirection,
 };
 use tydi_common::{
     name::{Name, PathName},
@@ -11,7 +14,7 @@ use tydi_common::{
 };
 
 use crate::{
-    lex::{Operator, PortMode, Token, TypeKeyword},
+    lex::{Operator, Token, TypeKeyword},
     Span,
 };
 
@@ -52,6 +55,12 @@ impl Into<Throughput> for HashablePositiveReal {
     }
 }
 
+impl fmt::Display for HashablePositiveReal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.get())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
     Path(PathBuf),
@@ -63,46 +72,77 @@ pub enum Value {
     Boolean(bool),
 }
 
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Path(p) => write!(f, "{}", p.to_string_lossy()),
+            Value::Synchronicity(s) => write!(f, "{}", s),
+            Value::Direction(d) => write!(f, "{}", d),
+            Value::Int(i) => write!(f, "{}", i),
+            Value::Float(ff) => write!(f, "{}", ff),
+            Value::Version(v) => write!(f, "{}", v),
+            Value::Boolean(b) => write!(f, "{}", b),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Ident {
-    Name(Name),
-    PathName(PathName),
+pub enum IdentExpr {
+    Name(Spanned<Name>),
+    PathName(Vec<Spanned<Name>>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PortDef {
+    mode: Spanned<InterfaceDirection>,
+    typ: Box<Spanned<Expr>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Error,
     Value(Value),
-    Ident(Ident),
-    TypeDef(LogicalType),
-    PortDef(Spanned<PortMode>, Box<Spanned<Self>>),
+    Ident(IdentExpr),
+    TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
+    PortList(Vec<(Spanned<Name>, PortDef)>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeDecl {
     name: Spanned<Name>,
-    typ: Spanned<LogicalType>,
+    typ: Spanned<LogicalTypeExpr>,
 }
 
+// Before eval
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum LogicalTypeExpr {
+    Null,
+    Bits(Box<Spanned<Expr>>),
+    Group(Vec<(Spanned<Name>, Box<Spanned<Expr>>)>),
+    Union(Vec<(Spanned<Name>, Box<Spanned<Expr>>)>),
+    Stream(Vec<(Spanned<Name>, Box<Spanned<Expr>>)>),
+}
+
+// After eval
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalType {
     Null,
     Bits(Positive),
-    Group(Vec<(Spanned<Name>, Spanned<LogicalType>)>),
-    Union(Vec<(Spanned<Name>, Spanned<LogicalType>)>),
+    Group(Vec<(Spanned<Name>, Spanned<LogicalTypeExpr>)>),
+    Union(Vec<(Spanned<Name>, Spanned<LogicalTypeExpr>)>),
     Stream(StreamType),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StreamType {
-    data: Box<Spanned<LogicalType>>,
+    data: Box<Spanned<Expr>>,
     throughput: Spanned<Throughput>,
     dimensionality: Spanned<NonNegative>,
     synchronicity: Spanned<Synchronicity>,
     complexity: Spanned<Complexity>,
     direction: Spanned<Direction>,
-    user: Box<Spanned<LogicalType>>,
+    user: Box<Spanned<Expr>>,
     keep: Spanned<bool>,
 }
 
@@ -121,7 +161,7 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                 .then(expr.clone())
                 .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)));
 
-            let val = filter_map(|span, tok| match tok {
+            let raw_val = filter_map(|span, tok| match tok {
                 Token::Num(num) => {
                     if let Ok(i) = num.parse() {
                         Ok(Value::Int(i))
@@ -143,16 +183,18 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                 Token::Boolean(boolean) => Ok(Value::Boolean(boolean)),
                 _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
             })
-            .map(Expr::Value)
             .labelled("value");
+
+            let val = raw_val.map(Expr::Value);
 
             let name = filter_map(|span, tok| match tok {
                 Token::Identifier(ident) => match Name::try_new(ident) {
-                    Ok(name) => Ok(name),
+                    Ok(name) => Ok((name, span)),
                     Err(err) => Err(Simple::custom(span, err)),
                 },
                 _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-            });
+            })
+            .labelled("name");
 
             let path_name = name
                 .clone()
@@ -162,13 +204,71 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                         .repeated()
                         .at_least(1),
                 )
-                .map(|pth| Ident::PathName(PathName::new(pth.into_iter())));
+                .map(|pth| IdentExpr::PathName(pth));
 
-            let ident = path_name.or(name.map(Ident::Name)).labelled("identifier");
+            let ident = path_name
+                .or(name.map(IdentExpr::Name))
+                .labelled("identifier");
 
-            let atom = doc
+            let port_def = filter_map(|span, tok| match tok {
+                Token::PortMode(mode) => Ok(mode),
+                _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
+            })
+            .map_with_span(|mode, span| (mode, span))
+            .then(raw_expr)
+            .map(|(mode, typ)| PortDef {
+                mode,
+                typ: Box::new(typ),
+            });
+
+            let named_item = name
+                .clone()
+                .then_ignore(just(Token::Ctrl(':')))
+                .then(expr.clone());
+
+            // A list of named expressions
+            let named_items = named_item
+                .clone()
+                .chain(
+                    just(Token::Ctrl(','))
+                        .ignore_then(named_item.clone())
+                        .repeated(),
+                )
+                .then_ignore(just(Token::Ctrl(',')).or_not())
+                .or_not()
+                .map(|item| item.unwrap_or_else(Vec::new));
+
+            let type_def = just(Token::Type(TypeKeyword::Null))
+                .to(LogicalTypeExpr::Null)
+                .or(just(Token::Type(TypeKeyword::Bits))
+                    .ignore_then(
+                        expr.clone()
+                            .delimited_by(Token::Ctrl('('), Token::Ctrl(')')),
+                    )
+                    .map(|e| LogicalTypeExpr::Bits(Box::new(e))))
+                .map(Expr::TypeDef);
+
+            let port = name
+                .clone()
+                .then_ignore(just(Token::Ctrl(':')))
+                .then(port_def.clone())
+                .labelled("port definition");
+
+            let port_list = port
+                .clone()
+                .chain(just(Token::Ctrl(',')).ignore_then(port.clone()).repeated())
+                .then_ignore(just(Token::Ctrl(',')).or_not())
+                .or_not()
+                .map(|item| item.unwrap_or_else(Vec::new))
+                .delimited_by(Token::Ctrl('('), Token::Ctrl(')'))
+                .map(Expr::PortList);
+
+            let atom = ident
+                .map(Expr::Ident)
+                .or(doc)
                 .or(val)
-                .or(ident.map(Expr::Ident))
+                .or(type_def)
+                .or(port_list)
                 .map_with_span(|expr, span| (expr, span))
                 // Attempt to recover anything that looks like a parenthesised expression but contains errors
                 .recover_with(nested_delimiters(
@@ -213,6 +313,8 @@ mod tests {
     fn test_expr_parse(src: impl Into<String>) {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+
+        println!("{:#?}", tokens);
 
         let parse_errs = if let Some(tokens) = tokens {
             // println!("Tokens = {:?}", tokens);
@@ -331,7 +433,25 @@ mod tests {
     }
 
     #[test]
+    fn test_doc_expr() {
+        test_expr_parse(
+            r#"#doc
+doc doc# 1.3"#,
+        )
+    }
+
+    #[test]
+    fn test_port_list() {
+        test_expr_parse("(port: in a, port: out b)")
+    }
+
+    #[test]
+    fn test_invalid_port_list() {
+        test_expr_parse("(port: a, port: out b)")
+    }
+
+    #[test]
     fn playground() {
-        test_expr_parse("-1.2");
+        test_expr_parse("Bits(0)");
     }
 }
