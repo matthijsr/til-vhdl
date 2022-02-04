@@ -1,5 +1,5 @@
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, stream::Stream};
+use chumsky::{prelude::*, primitive::Just, stream::Stream};
 use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
 use til_query::{
     common::{
@@ -88,8 +88,8 @@ impl fmt::Display for Value {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IdentExpr {
-    Name(Spanned<Name>),
-    PathName(Vec<Spanned<Name>>),
+    Name(Spanned<String>),
+    PathName(Vec<Spanned<String>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -105,7 +105,7 @@ pub enum Expr {
     Ident(IdentExpr),
     TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    PortList(Vec<(Spanned<Name>, PortDef)>),
+    PortList(Vec<(Spanned<String>, PortDef)>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -119,9 +119,9 @@ pub struct TypeDecl {
 pub enum LogicalTypeExpr {
     Null,
     Bits(Box<Spanned<Expr>>),
-    Group(Vec<(Spanned<Name>, Box<Spanned<Expr>>)>),
-    Union(Vec<(Spanned<Name>, Box<Spanned<Expr>>)>),
-    Stream(Vec<(Spanned<Name>, Box<Spanned<Expr>>)>),
+    Group(Vec<(Spanned<String>, Spanned<Expr>)>),
+    Union(Vec<(Spanned<String>, Spanned<Expr>)>),
+    Stream(Vec<(Spanned<String>, Spanned<Expr>)>),
 }
 
 // After eval
@@ -188,10 +188,7 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
             let val = raw_val.map(Expr::Value);
 
             let name = filter_map(|span, tok| match tok {
-                Token::Identifier(ident) => match Name::try_new(ident) {
-                    Ok(name) => Ok((name, span)),
-                    Err(err) => Err(Simple::custom(span, err)),
-                },
+                Token::Identifier(ident) => Ok((ident, span)),
                 _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
             })
             .labelled("name");
@@ -238,14 +235,33 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                 .or_not()
                 .map(|item| item.unwrap_or_else(Vec::new));
 
-            let type_def = just(Token::Type(TypeKeyword::Null))
+            let group_def = named_items
+                .clone()
+                .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+
+            let type_def = 
+            // Null
+            just(Token::Type(TypeKeyword::Null))
                 .to(LogicalTypeExpr::Null)
+                // Bits
                 .or(just(Token::Type(TypeKeyword::Bits))
                     .ignore_then(
                         expr.clone()
                             .delimited_by(Token::Ctrl('('), Token::Ctrl(')')),
                     )
                     .map(|e| LogicalTypeExpr::Bits(Box::new(e))))
+                // Group
+                .or(just(Token::Type(TypeKeyword::Group))
+                    .ignore_then(group_def.clone())
+                    .map(|g| LogicalTypeExpr::Group(g)))
+                // Union
+                .or(just(Token::Type(TypeKeyword::Union))
+                    .ignore_then(group_def.clone())
+                    .map(|g| LogicalTypeExpr::Union(g)))
+                // Stream
+                .or(just(Token::Type(TypeKeyword::Stream))
+                    .ignore_then(group_def.clone())
+                    .map(|g| LogicalTypeExpr::Stream(g)))
                 .map(Expr::TypeDef);
 
             let port = name
@@ -314,7 +330,7 @@ mod tests {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
 
-        println!("{:#?}", tokens);
+        // println!("{:#?}", tokens);
 
         let parse_errs = if let Some(tokens) = tokens {
             // println!("Tokens = {:?}", tokens);
@@ -448,6 +464,24 @@ doc doc# 1.3"#,
     #[test]
     fn test_invalid_port_list() {
         test_expr_parse("(port: a, port: out b)")
+    }
+
+    #[test]
+    fn test_typedefs() {
+        test_expr_parse("Null");
+        test_expr_parse("Bits(23)");
+        test_expr_parse("Group(a: Bits(32), b: path::name)");
+        test_expr_parse("Union()");
+        test_expr_parse("Stream (
+        data: rgb,
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null, // It's possible to use type definitions directly
+        keep: false,
+    )");
     }
 
     #[test]
