@@ -14,11 +14,11 @@ use tydi_common::{
 };
 
 use crate::{
+    ident_expr::{ident_expr_parser, name_parser, IdentExpr},
     lex::{DeclKeyword, Operator, Token, TypeKeyword},
-    Span,
+    struct_parse::{struct_parser, StructStat},
+    Span, Spanned,
 };
-
-pub type Spanned<T> = (T, Span);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HashablePositiveReal(PositiveReal);
@@ -85,12 +85,6 @@ impl fmt::Display for Value {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum IdentExpr {
-    Name(Spanned<String>),
-    PathName(Vec<Spanned<String>>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PortDef {
     mode: Spanned<InterfaceDirection>,
     typ: Box<Spanned<Expr>>,
@@ -112,7 +106,7 @@ pub enum Expr {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RawImpl {
     // TODO
-    Struct,
+    Struct(Vec<Spanned<StructStat>>),
     // Path
     Behavioural(String),
 }
@@ -149,7 +143,7 @@ pub struct StreamType {
     keep: Spanned<bool>,
 }
 
-fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
+pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     recursive(|expr| {
         let doc_body = filter_map(|span, tok| match tok {
             Token::Documentation(docstr) => Ok(docstr.clone()),
@@ -159,7 +153,6 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
         .labelled("documentation");
 
         let doc = doc_body
-            .clone()
             .then(expr.clone())
             .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)));
 
@@ -188,25 +181,9 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
 
         let val = raw_val.map(Expr::Value);
 
-        let name = filter_map(|span, tok| match tok {
-            Token::Identifier(ident) => Ok((ident, span)),
-            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-        })
-        .labelled("name");
+        let name = name_parser().labelled("name");
 
-        let path_name = name
-            .clone()
-            .chain(
-                just(Token::Op(Operator::Path))
-                    .ignore_then(name.clone())
-                    .repeated()
-                    .at_least(1),
-            )
-            .map(|pth| IdentExpr::PathName(pth));
-
-        let ident = path_name
-            .or(name.map(IdentExpr::Name))
-            .labelled("identifier");
+        let ident = ident_expr_parser().labelled("identifier");
 
         let port_def = filter_map(|span, tok| match tok {
             Token::PortMode(mode) => Ok(mode),
@@ -280,7 +257,18 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
         })
         .labelled("behavioural impl path");
 
-        let raw_impl = behav; // TODO: Or struct
+        let struct_bod = struct_parser()
+            .chain(
+                just(Token::Ctrl(';'))
+                    .ignore_then(struct_parser().clone())
+                    .repeated(),
+            )
+            .then_ignore(just(Token::Ctrl(';')))
+            .or_not()
+            .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
+            .map(|stats| RawImpl::Struct(stats.unwrap_or_else(Vec::new)));
+
+        let raw_impl = behav.or(struct_bod);
 
         let impl_def = expr
             .clone()
@@ -289,29 +277,23 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
 
         doc.or(val)
             .or(ident.map(Expr::Ident))
+            .or(ports_def)
             .or(type_def)
             .or(raw_impl.map(Expr::RawImpl))
-            .or(ports_def)
             .or(impl_def)
             .map_with_span(|expr, span| (expr, span))
-            // // Attempt to recover anything that looks like a parenthesised expression but contains errors
-            // .recover_with(nested_delimiters(
-            //     Token::Ctrl('('),
-            //     Token::Ctrl(')'),
-            //     [
-            //         (Token::Ctrl('['), Token::Ctrl(']')),
-            //         (Token::Ctrl('{'), Token::Ctrl('}')),
-            //     ],
-            //     |span| (Expr::Error, span),
-            // ))
+            // // Attempt to recover anything that looks like a struct block but contains errors
+            .recover_with(nested_delimiters(
+                Token::Ctrl('{'),
+                Token::Ctrl('}'),
+                [(Token::Ctrl('('), Token::Ctrl(')'))],
+                |span| (Expr::Error, span),
+            ))
             // Attempt to recover anything that looks like a list but contains errors
             .recover_with(nested_delimiters(
-                Token::Ctrl('['),
-                Token::Ctrl(']'),
-                [
-                    (Token::Ctrl('('), Token::Ctrl(')')),
-                    (Token::Ctrl('{'), Token::Ctrl('}')),
-                ],
+                Token::Ctrl('('),
+                Token::Ctrl(')'),
+                [(Token::Ctrl('{'), Token::Ctrl('}'))],
                 |span| (Expr::Error, span),
             ))
     })
@@ -492,12 +474,21 @@ doc doc# 1.3"#,
     #[test]
     fn test_raw_impl() {
         test_expr_parse("\"../path\"");
-        // TODO: Struct when done
+        test_expr_parse("{}");
+        test_expr_parse(
+            "{
+            a = a::b;
+            b = c;
+            a -- a.a;
+            b -- b.a;
+        }",
+        );
     }
 
     #[test]
     fn test_impl_def() {
         test_expr_parse("(a: in stream) \"../path\"");
+        test_expr_parse("(a: in stream) { a = a; a -- a.a; }");
         // TODO: Struct when done
     }
 
