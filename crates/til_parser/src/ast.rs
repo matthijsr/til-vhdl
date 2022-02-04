@@ -148,8 +148,7 @@ pub struct StreamType {
 
 fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     recursive(|expr| {
-        let raw_expr = recursive(|raw_expr| {
-            let doc_body = filter_map(|span, tok| match tok {
+        let doc_body = filter_map(|span, tok| match tok {
                 Token::Documentation(docstr) => Ok(docstr.clone()),
                 _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
             })
@@ -212,7 +211,7 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                 _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
             })
             .map_with_span(|mode, span| (mode, span))
-            .then(raw_expr)
+            .then(expr.clone())
             .map(|(mode, typ)| PortDef {
                 mode,
                 typ: Box::new(typ),
@@ -279,7 +278,7 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                 .delimited_by(Token::Ctrl('('), Token::Ctrl(')'))
                 .map(Expr::PortList);
 
-            let atom = ident
+            ident
                 .map(Expr::Ident)
                 .or(doc)
                 .or(val)
@@ -305,12 +304,7 @@ fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + C
                         (Token::Ctrl('{'), Token::Ctrl('}')),
                     ],
                     |span| (Expr::Error, span),
-                ));
-
-            atom
-        });
-
-        raw_expr
+                ))
     })
 }
 
