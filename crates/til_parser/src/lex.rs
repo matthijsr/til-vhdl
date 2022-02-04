@@ -16,6 +16,7 @@ pub enum DeclKeyword {
     Implementation,
     LogicalType,
     Namespace,
+    Ports,
 }
 
 impl fmt::Display for DeclKeyword {
@@ -25,6 +26,7 @@ impl fmt::Display for DeclKeyword {
             DeclKeyword::Implementation => write!(f, "impl"),
             DeclKeyword::LogicalType => write!(f, "type"),
             DeclKeyword::Namespace => write!(f, "namespace"),
+            DeclKeyword::Ports => write!(f, "ports"),
         }
     }
 }
@@ -208,6 +210,7 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "impl" => Token::Decl(DeclKeyword::Implementation),
         "type" => Token::Decl(DeclKeyword::LogicalType),
         "namespace" => Token::Decl(DeclKeyword::Namespace),
+        "ports" => Token::Decl(DeclKeyword::Ports),
         "true" => Token::Boolean(true),
         "false" => Token::Boolean(false),
         "in" => Token::PortMode(InterfaceDirection::In),

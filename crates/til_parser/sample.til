@@ -150,13 +150,8 @@ namespace my::new::namespace {
         impl: struct
     };
 
-    // However, you can also "reimplement" an existing streamlet, like so:
-    streamlet comp4 = comp {
-        impl: struct
-    };
-
     // You can also declare an implementation directly on a streamlet, like so:
-    streamlet comp5 = (
+    streamlet comp4 = (
         a: in stream,
         b: out stream,
         c: in stream2,
@@ -164,7 +159,7 @@ namespace my::new::namespace {
     ) {
         impl: "../path"
     };
-    streamlet comp6 = (
+    streamlet comp5 = (
         a: in stream,
         b: out stream,
         c: in stream2,
@@ -175,7 +170,25 @@ namespace my::new::namespace {
             c -- d;
         }
     };
+
+    // However, you can also "reimplement" an existing streamlet, like so:
+    streamlet comp6 = comp {
+        impl: struct
+    };
+
+    // It's also possible to simply duplicate certain definitions, if this helps clarify things, e.g.:
+    type char = byte;
+    type u8 = byte;
+    type small = byte;
+    
     // This is really no different from how we directly declared a streamlet with impl: None
     // In this case, the implementations' ports are derived from the streamlet itself
 
+    // It's also possible to define an implementation based on another implementation, e.g.:
+    impl beh = (a: in stream, b: out stream) "../wip.vhd";
+    impl stub = beh { a--b };
+
+    // But in cases where you're implementing a common set of ports, it might make more sense to instead define a port list:
+    ports my_standard_ports = (a: in stream, b: out stream);
+    // This is similar to defining an empty streamlet, but avoids generating empty architectures.
 }

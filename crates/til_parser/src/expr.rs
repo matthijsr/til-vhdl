@@ -14,7 +14,7 @@ use tydi_common::{
 };
 
 use crate::{
-    lex::{Operator, Token, TypeKeyword},
+    lex::{DeclKeyword, Operator, Token, TypeKeyword},
     Span,
 };
 
@@ -63,7 +63,6 @@ impl fmt::Display for HashablePositiveReal {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
-    Path(PathBuf),
     Synchronicity(Synchronicity),
     Direction(Direction),
     Int(NonNegative),
@@ -75,7 +74,6 @@ pub enum Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Path(p) => write!(f, "{}", p.to_string_lossy()),
             Value::Synchronicity(s) => write!(f, "{}", s),
             Value::Direction(d) => write!(f, "{}", d),
             Value::Int(i) => write!(f, "{}", i),
@@ -105,13 +103,18 @@ pub enum Expr {
     Ident(IdentExpr),
     TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    PortList(Vec<(Spanned<String>, PortDef)>),
+    PortsDef(Vec<(Spanned<String>, PortDef)>),
+    RawImpl(RawImpl),
+    ImplDef(Box<Spanned<Self>>, Spanned<RawImpl>),
 }
 
+// Implementation definitions without ports. Used when defining an implementation on a streamlet directly.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TypeDecl {
-    name: Spanned<Name>,
-    typ: Spanned<LogicalTypeExpr>,
+pub enum RawImpl {
+    // TODO
+    Struct,
+    // Path
+    Behavioural(String),
 }
 
 // Before eval
@@ -149,162 +152,168 @@ pub struct StreamType {
 fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     recursive(|expr| {
         let doc_body = filter_map(|span, tok| match tok {
-                Token::Documentation(docstr) => Ok(docstr.clone()),
-                _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-            })
-            .map_with_span(|body, span| (body, span))
-            .labelled("documentation");
+            Token::Documentation(docstr) => Ok(docstr.clone()),
+            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
+        })
+        .map_with_span(|body, span| (body, span))
+        .labelled("documentation");
 
-            let doc = doc_body
-                .clone()
-                .then(expr.clone())
-                .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)));
-
-            let raw_val = filter_map(|span, tok| match tok {
-                Token::Num(num) => {
-                    if let Ok(i) = num.parse() {
-                        Ok(Value::Int(i))
-                    } else if let Ok(f) = num.parse() {
-                        Ok(Value::Float(HashablePositiveReal(
-                            PositiveReal::new(f).unwrap(),
-                        )))
-                    } else {
-                        Err(Simple::custom(
-                            span,
-                            format!("Lexer error: {} is neither an integer nor a float.", num),
-                        ))
-                    }
-                }
-                Token::Path(path) => Ok(Value::Path(PathBuf::from(path))),
-                Token::Synchronicity(synch) => Ok(Value::Synchronicity(synch)),
-                Token::Direction(dir) => Ok(Value::Direction(dir)),
-                Token::Version(ver) => Ok(Value::Version(ver)),
-                Token::Boolean(boolean) => Ok(Value::Boolean(boolean)),
-                _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-            })
-            .labelled("value");
-
-            let val = raw_val.map(Expr::Value);
-
-            let name = filter_map(|span, tok| match tok {
-                Token::Identifier(ident) => Ok((ident, span)),
-                _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-            })
-            .labelled("name");
-
-            let path_name = name
-                .clone()
-                .chain(
-                    just(Token::Op(Operator::Path))
-                        .ignore_then(name.clone())
-                        .repeated()
-                        .at_least(1),
-                )
-                .map(|pth| IdentExpr::PathName(pth));
-
-            let ident = path_name
-                .or(name.map(IdentExpr::Name))
-                .labelled("identifier");
-
-            let port_def = filter_map(|span, tok| match tok {
-                Token::PortMode(mode) => Ok(mode),
-                _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-            })
-            .map_with_span(|mode, span| (mode, span))
+        let doc = doc_body
+            .clone()
             .then(expr.clone())
-            .map(|(mode, typ)| PortDef {
-                mode,
-                typ: Box::new(typ),
-            });
+            .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)));
 
-            let named_item = name
-                .clone()
-                .then_ignore(just(Token::Ctrl(':')))
-                .then(expr.clone());
+        let raw_val = filter_map(|span, tok| match tok {
+            Token::Num(num) => {
+                if let Ok(i) = num.parse() {
+                    Ok(Value::Int(i))
+                } else if let Ok(f) = num.parse() {
+                    Ok(Value::Float(HashablePositiveReal(
+                        PositiveReal::new(f).unwrap(),
+                    )))
+                } else {
+                    Err(Simple::custom(
+                        span,
+                        format!("Lexer error: {} is neither an integer nor a float.", num),
+                    ))
+                }
+            }
+            Token::Synchronicity(synch) => Ok(Value::Synchronicity(synch)),
+            Token::Direction(dir) => Ok(Value::Direction(dir)),
+            Token::Version(ver) => Ok(Value::Version(ver)),
+            Token::Boolean(boolean) => Ok(Value::Boolean(boolean)),
+            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
+        })
+        .labelled("value");
 
-            // A list of named expressions
-            let named_items = named_item
-                .clone()
-                .chain(
-                    just(Token::Ctrl(','))
-                        .ignore_then(named_item.clone())
-                        .repeated(),
+        let val = raw_val.map(Expr::Value);
+
+        let name = filter_map(|span, tok| match tok {
+            Token::Identifier(ident) => Ok((ident, span)),
+            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
+        })
+        .labelled("name");
+
+        let path_name = name
+            .clone()
+            .chain(
+                just(Token::Op(Operator::Path))
+                    .ignore_then(name.clone())
+                    .repeated()
+                    .at_least(1),
+            )
+            .map(|pth| IdentExpr::PathName(pth));
+
+        let ident = path_name
+            .or(name.map(IdentExpr::Name))
+            .labelled("identifier");
+
+        let port_def = filter_map(|span, tok| match tok {
+            Token::PortMode(mode) => Ok(mode),
+            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
+        })
+        .map_with_span(|mode, span| (mode, span))
+        .then(expr.clone())
+        .map(|(mode, typ)| PortDef {
+            mode,
+            typ: Box::new(typ),
+        });
+
+        let named_item = name
+            .clone()
+            .then_ignore(just(Token::Ctrl(':')))
+            .then(expr.clone());
+
+        // A list of named expressions
+        let named_items = named_item
+            .clone()
+            .chain(
+                just(Token::Ctrl(','))
+                    .ignore_then(named_item.clone())
+                    .repeated(),
+            )
+            .then_ignore(just(Token::Ctrl(',')).or_not())
+            .or_not()
+            .map(|item| item.unwrap_or_else(Vec::new));
+
+        let group_def = named_items
+            .clone()
+            .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+
+        let type_def = just(Token::Type(TypeKeyword::Null))
+            .to(LogicalTypeExpr::Null)
+            .or(just(Token::Type(TypeKeyword::Bits))
+                .ignore_then(
+                    expr.clone()
+                        .delimited_by(Token::Ctrl('('), Token::Ctrl(')')),
                 )
-                .then_ignore(just(Token::Ctrl(',')).or_not())
-                .or_not()
-                .map(|item| item.unwrap_or_else(Vec::new));
+                .map(|e| LogicalTypeExpr::Bits(Box::new(e))))
+            .or(just(Token::Type(TypeKeyword::Group))
+                .ignore_then(group_def.clone())
+                .map(|g| LogicalTypeExpr::Group(g)))
+            .or(just(Token::Type(TypeKeyword::Union))
+                .ignore_then(group_def.clone())
+                .map(|g| LogicalTypeExpr::Union(g)))
+            .or(just(Token::Type(TypeKeyword::Stream))
+                .ignore_then(group_def.clone())
+                .map(|g| LogicalTypeExpr::Stream(g)))
+            .map(Expr::TypeDef);
 
-            let group_def = named_items
-                .clone()
-                .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+        let port = name
+            .clone()
+            .then_ignore(just(Token::Ctrl(':')))
+            .then(port_def.clone())
+            .labelled("port definition");
 
-            let type_def = 
-            // Null
-            just(Token::Type(TypeKeyword::Null))
-                .to(LogicalTypeExpr::Null)
-                // Bits
-                .or(just(Token::Type(TypeKeyword::Bits))
-                    .ignore_then(
-                        expr.clone()
-                            .delimited_by(Token::Ctrl('('), Token::Ctrl(')')),
-                    )
-                    .map(|e| LogicalTypeExpr::Bits(Box::new(e))))
-                // Group
-                .or(just(Token::Type(TypeKeyword::Group))
-                    .ignore_then(group_def.clone())
-                    .map(|g| LogicalTypeExpr::Group(g)))
-                // Union
-                .or(just(Token::Type(TypeKeyword::Union))
-                    .ignore_then(group_def.clone())
-                    .map(|g| LogicalTypeExpr::Union(g)))
-                // Stream
-                .or(just(Token::Type(TypeKeyword::Stream))
-                    .ignore_then(group_def.clone())
-                    .map(|g| LogicalTypeExpr::Stream(g)))
-                .map(Expr::TypeDef);
+        let ports_def = port
+            .clone()
+            .chain(just(Token::Ctrl(',')).ignore_then(port.clone()).repeated())
+            .then_ignore(just(Token::Ctrl(',')).or_not())
+            .or_not()
+            .map(|item| item.unwrap_or_else(Vec::new))
+            .delimited_by(Token::Ctrl('('), Token::Ctrl(')'))
+            .map(Expr::PortsDef);
 
-            let port = name
-                .clone()
-                .then_ignore(just(Token::Ctrl(':')))
-                .then(port_def.clone())
-                .labelled("port definition");
+        let behav = filter_map(|span, tok| match tok {
+            Token::Path(pth) => Ok(RawImpl::Behavioural(pth)),
+            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
+        })
+        .labelled("behavioural impl path");
 
-            let port_list = port
-                .clone()
-                .chain(just(Token::Ctrl(',')).ignore_then(port.clone()).repeated())
-                .then_ignore(just(Token::Ctrl(',')).or_not())
-                .or_not()
-                .map(|item| item.unwrap_or_else(Vec::new))
-                .delimited_by(Token::Ctrl('('), Token::Ctrl(')'))
-                .map(Expr::PortList);
+        let raw_impl = behav; // TODO: Or struct
 
-            ident
-                .map(Expr::Ident)
-                .or(doc)
-                .or(val)
-                .or(type_def)
-                .or(port_list)
-                .map_with_span(|expr, span| (expr, span))
-                // Attempt to recover anything that looks like a parenthesised expression but contains errors
-                .recover_with(nested_delimiters(
-                    Token::Ctrl('('),
-                    Token::Ctrl(')'),
-                    [
-                        (Token::Ctrl('['), Token::Ctrl(']')),
-                        (Token::Ctrl('{'), Token::Ctrl('}')),
-                    ],
-                    |span| (Expr::Error, span),
-                ))
-                // Attempt to recover anything that looks like a list but contains errors
-                .recover_with(nested_delimiters(
-                    Token::Ctrl('['),
-                    Token::Ctrl(']'),
-                    [
-                        (Token::Ctrl('('), Token::Ctrl(')')),
-                        (Token::Ctrl('{'), Token::Ctrl('}')),
-                    ],
-                    |span| (Expr::Error, span),
-                ))
+        let impl_def = expr
+            .clone()
+            .then(raw_impl.clone().map_with_span(|ri, span| (ri, span)))
+            .map(|(e, ri)| Expr::ImplDef(Box::new(e), ri));
+
+        doc.or(val)
+            .or(ident.map(Expr::Ident))
+            .or(type_def)
+            .or(raw_impl.map(Expr::RawImpl))
+            .or(ports_def)
+            .or(impl_def)
+            .map_with_span(|expr, span| (expr, span))
+            // // Attempt to recover anything that looks like a parenthesised expression but contains errors
+            // .recover_with(nested_delimiters(
+            //     Token::Ctrl('('),
+            //     Token::Ctrl(')'),
+            //     [
+            //         (Token::Ctrl('['), Token::Ctrl(']')),
+            //         (Token::Ctrl('{'), Token::Ctrl('}')),
+            //     ],
+            //     |span| (Expr::Error, span),
+            // ))
+            // Attempt to recover anything that looks like a list but contains errors
+            .recover_with(nested_delimiters(
+                Token::Ctrl('['),
+                Token::Ctrl(']'),
+                [
+                    (Token::Ctrl('('), Token::Ctrl(')')),
+                    (Token::Ctrl('{'), Token::Ctrl('}')),
+                ],
+                |span| (Expr::Error, span),
+            ))
     })
 }
 
@@ -466,7 +475,8 @@ doc doc# 1.3"#,
         test_expr_parse("Bits(23)");
         test_expr_parse("Group(a: Bits(32), b: path::name)");
         test_expr_parse("Union()");
-        test_expr_parse("Stream (
+        test_expr_parse(
+            "Stream (
         data: rgb,
         throughput: 2.0,
         dimensionality: 0,
@@ -475,11 +485,24 @@ doc doc# 1.3"#,
         direction: Forward,
         user: Null, // It's possible to use type definitions directly
         keep: false,
-    )");
+    )",
+        );
+    }
+
+    #[test]
+    fn test_raw_impl() {
+        test_expr_parse("\"../path\"");
+        // TODO: Struct when done
+    }
+
+    #[test]
+    fn test_impl_def() {
+        test_expr_parse("(a: in stream) \"../path\"");
+        // TODO: Struct when done
     }
 
     #[test]
     fn playground() {
-        test_expr_parse("Bits(0)");
+        test_expr_parse("Bits(8)");
     }
 }
