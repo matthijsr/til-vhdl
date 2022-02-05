@@ -495,7 +495,6 @@ doc doc# 1.3"#,
     fn test_impl_def() {
         test_expr_parse("(a: in stream) \"../path\"");
         test_expr_parse("(a: in stream) { a = a; a -- a.a; }");
-        // TODO: Struct when done
     }
 
     #[test]

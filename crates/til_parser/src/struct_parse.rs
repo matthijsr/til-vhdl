@@ -83,3 +83,54 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
 
     stat.or(doc)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::lex::lexer;
+
+    use super::*;
+
+    type Assert = Result<(), String>;
+
+    fn simple_parse(src: impl Into<String>) -> Result<Spanned<StructStat>, String> {
+        let src = src.into();
+        let tokens = lexer().parse(src.as_str());
+        match tokens {
+            Ok(tokens) => {
+                let len = src.chars().count();
+                match struct_parser().parse(Stream::from_iter(len..len + 1, tokens.into_iter())) {
+                    Ok(stat) => Ok(stat),
+                    Err(err) => Err(format!("{:#?}", err)),
+                }
+            }
+            Err(err) => Err(format!("{:#?}", err)),
+        }
+    }
+
+    fn assert_ast_eq(expected: StructStat, actual: Result<Spanned<StructStat>, String>) -> Assert {
+        match actual {
+            Ok((actual, _)) => {
+                if actual == expected {
+                    Ok(())
+                } else {
+                    Err(format!("Expected: {:#?}, Actual: {:#?}", expected, actual))
+                }
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    #[test]
+    fn test_conn_parse() -> Assert {
+        assert_ast_eq(
+            StructStat::Connection(
+                (
+                    PortSel::Instance(("a".to_string(), 0..1), ("a".to_string(), 2..4)),
+                    0..4,
+                ),
+                (PortSel::Own("b".to_string()), 7..8),
+            ),
+            simple_parse("a.a -- b;"),
+        )
+    }
+}
