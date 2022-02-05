@@ -101,6 +101,8 @@ pub enum Expr {
     InterfaceDef(Vec<Spanned<Self>>),
     RawImpl(RawImpl),
     ImplDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
+    StreamletProps(Vec<(Span, StreamletProperty)>),
+    StreamletDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
 }
 
 // Implementation definitions without ports. Used when defining an implementation on a streamlet directly.
@@ -142,6 +144,11 @@ pub struct StreamType {
     direction: Spanned<Direction>,
     user: Box<Spanned<Expr>>,
     keep: Spanned<bool>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum StreamletProperty {
+    Implementation(Box<Spanned<Expr>>),
 }
 
 pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
@@ -306,6 +313,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|i, span| (i, span));
 
     // As with types, interfaces can be declared with identities
+    // Note: Interfaces can also be derived from streamlets and implementations
     let interface = interface_def.or(ident_expr.clone());
 
     // ......
@@ -357,7 +365,43 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // STREAMLET DEFINITIONS
     // ......
 
-    // TODO
+    let impl_prop = just(Token::Decl(DeclKeyword::Implementation))
+        .map_with_span(|_, span| span)
+        .then_ignore(just(Token::Ctrl(':')))
+        .then(ident_expr.clone().or(raw_impl.clone()))
+        .map(|(span, i)| (span, StreamletProperty::Implementation(Box::new(i))));
+
+    // In case more properties are added in the future, use a generic type
+    let streamlet_prop = impl_prop;
+
+    // Then require at least one property
+    let streamlet_props = streamlet_prop
+        .clone()
+        .chain(
+            just(Token::Ctrl(','))
+                .ignore_then(streamlet_prop.clone())
+                .repeated(),
+        )
+        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
+        .map_with_span(|p, span| (Expr::StreamletProps(p), span))
+        .recover_with(nested_delimiters(
+            Token::Ctrl('{'),
+            Token::Ctrl('}'),
+            [],
+            |span| (Expr::Error, span),
+        ));
+
+    let streamlet_def = interface
+        .clone()
+        .then(streamlet_props)
+        .map(|(i, p)| Expr::StreamletDef(Box::new(i), Box::new(p)))
+        .map_with_span(|s, span| (s, span));
+
+    // Note: Streamlet definitions can not have documentation, but streamlet declarations can.
+
+    // A streamlet's definition can be either an interface definition, or a full streamlet definition with properties
+    let streamlet = streamlet_def.or(interface.clone());
 
     // ......
     // RESULT
@@ -369,8 +413,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // All of which can be identities
     // ......
 
-    // // Attempt to recover anything that looks like a struct block but contains errors
-    implementation
+    streamlet
+        .or(implementation)
         .or(interface)
         .or(typ)
         .recover_with(nested_delimiters(
@@ -580,6 +624,6 @@ doc doc# 1.3"#,
 
     #[test]
     fn playground() {
-        test_expr_parse("Bits(8)");
+        test_expr_parse("a { impl: a }");
     }
 }

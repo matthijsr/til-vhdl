@@ -2,7 +2,10 @@ use super::Span;
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::{prelude::*, stream::Stream};
 use std::{collections::HashMap, env, fmt, fs, path::PathBuf};
-use til_query::{common::logical::logicaltype::stream::{Direction, Synchronicity}, ir::physical_properties::InterfaceDirection};
+use til_query::{
+    common::logical::logicaltype::stream::{Direction, Synchronicity},
+    ir::physical_properties::InterfaceDirection,
+};
 use tydi_common::name::{Name, PathName};
 
 pub struct LexerError {
@@ -16,7 +19,7 @@ pub enum DeclKeyword {
     Implementation,
     LogicalType,
     Namespace,
-    Ports,
+    Interface,
 }
 
 impl fmt::Display for DeclKeyword {
@@ -26,7 +29,7 @@ impl fmt::Display for DeclKeyword {
             DeclKeyword::Implementation => write!(f, "impl"),
             DeclKeyword::LogicalType => write!(f, "type"),
             DeclKeyword::Namespace => write!(f, "namespace"),
-            DeclKeyword::Ports => write!(f, "ports"),
+            DeclKeyword::Interface => write!(f, "interface"),
         }
     }
 }
@@ -210,7 +213,7 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "impl" => Token::Decl(DeclKeyword::Implementation),
         "type" => Token::Decl(DeclKeyword::LogicalType),
         "namespace" => Token::Decl(DeclKeyword::Namespace),
-        "ports" => Token::Decl(DeclKeyword::Ports),
+        "interface" => Token::Decl(DeclKeyword::Interface),
         "true" => Token::Boolean(true),
         "false" => Token::Boolean(false),
         "in" => Token::PortMode(InterfaceDirection::In),

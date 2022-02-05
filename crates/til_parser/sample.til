@@ -190,7 +190,7 @@ namespace my::new::namespace {
     impl beh = (a: in stream, b: out stream) "../wip.vhd";
     impl stub = beh { a--b };
 
-    // But in cases where you're implementing a common set of ports, it might make more sense to instead define a port list:
-    ports my_standard_ports = (a: in stream, b: out stream);
+    // But in cases where you're implementing a common set of ports, it might make more sense to instead define an interface:
+    interface my_standard_ports = (a: in stream, b: out stream);
     // This is similar to defining an empty streamlet, but avoids generating empty architectures.
 }
