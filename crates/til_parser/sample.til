@@ -29,7 +29,7 @@ namespace my::new::namespace::sub {
 // Namespaces are not required to be in specific paths, and multiple namespaces can be defined in one file
 namespace my::new::namespace {
 
-    import some::namespace::route::{streamlet(a), impl(a), type {a, b, c }};
+    import some::namespace::route::{streamlet(a), impl(b), type {a, b, c }};
     // Imports a, b, and c from namespace some::namespace::route, (some can also be a project)
     // As names can overlap between streamlets, implementations and types, imports will require specifying what you're importing
 
@@ -193,4 +193,6 @@ namespace my::new::namespace {
     // But in cases where you're implementing a common set of ports, it might make more sense to instead define an interface:
     interface my_standard_ports = (a: in stream, b: out stream);
     // This is similar to defining an empty streamlet, but avoids generating empty architectures.
+
+    // Note that because implementations and streamlets can both be treated as interfaces, none of these three may share a name.
 }

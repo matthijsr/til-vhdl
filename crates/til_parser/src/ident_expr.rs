@@ -31,18 +31,21 @@ pub fn name_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token
     })
 }
 
+pub fn path_name_parser() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> + Clone
+{
+    let name = name_parser().labelled("name");
+
+    name.clone().chain(
+        just(Token::Op(Operator::Path))
+            .ignore_then(name.clone())
+            .repeated(),
+    )
+}
+
 pub fn ident_expr_parser() -> impl Parser<Token, IdentExpr, Error = Simple<Token>> + Clone {
     let name = name_parser().labelled("name");
 
-    let path_name = name
-        .clone()
-        .chain(
-            just(Token::Op(Operator::Path))
-                .ignore_then(name.clone())
-                .repeated()
-                .at_least(1),
-        )
-        .map(|pth| IdentExpr::PathName(pth));
+    let path_name = path_name_parser().map(|pth| IdentExpr::PathName(pth));
 
     path_name.or(name.map(IdentExpr::Name))
 }
