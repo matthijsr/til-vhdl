@@ -258,15 +258,9 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .labelled("behavioural impl path");
 
         let struct_bod = struct_parser()
-            .chain(
-                just(Token::Ctrl(';'))
-                    .ignore_then(struct_parser().clone())
-                    .repeated(),
-            )
-            .then_ignore(just(Token::Ctrl(';')))
-            .or_not()
+            .repeated()
             .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
-            .map(|stats| RawImpl::Struct(stats.unwrap_or_else(Vec::new)));
+            .map(|stats| RawImpl::Struct(stats));
 
         let raw_impl = behav.or(struct_bod);
 
@@ -479,6 +473,18 @@ doc doc# 1.3"#,
             "{
             a = a::b;
             b = c;
+            a -- a.a;
+            b -- b.a;
+        }",
+        );
+    }
+
+    #[test]
+    fn test_invalid_struct() {
+        test_expr_parse(
+            "{
+            a = a::b;
+            b = c
             a -- a.a;
             b -- b.a;
         }",
