@@ -101,7 +101,7 @@ pub enum Expr {
     InterfaceDef(Vec<Spanned<Self>>),
     RawImpl(RawImpl),
     ImplDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
-    StreamletProps(Vec<(Span, StreamletProperty)>),
+    StreamletProps(Vec<(Spanned<Token>, StreamletProperty)>),
     StreamletDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
 }
 
@@ -366,10 +366,10 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // ......
 
     let impl_prop = just(Token::Decl(DeclKeyword::Implementation))
-        .map_with_span(|_, span| span)
+        .map_with_span(|tok, span| (tok, span))
         .then_ignore(just(Token::Ctrl(':')))
         .then(ident_expr.clone().or(raw_impl.clone()))
-        .map(|(span, i)| (span, StreamletProperty::Implementation(Box::new(i))));
+        .map(|(lab, i)| (lab, StreamletProperty::Implementation(Box::new(i))));
 
     // In case more properties are added in the future, use a generic type
     let streamlet_prop = impl_prop;
