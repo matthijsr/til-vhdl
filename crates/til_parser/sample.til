@@ -7,7 +7,9 @@
 /// And
 so ///
 
-// # # delineates documentation for a specific declaration.
+// # # <expression/statement> delineates documentation for a specific declaration.
+// This is passed along to the query storage so that it can also be included in things emitted by a back-end
+// Hence, not all statements and expressions accept documentation.
 #
 We're using this for math stuff I guess.
 

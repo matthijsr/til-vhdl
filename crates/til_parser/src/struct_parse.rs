@@ -84,6 +84,8 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     stat.or(doc)
 }
 
+// TODO: Also do an eval, to confirm the ports and streamlets actually exist
+
 #[cfg(test)]
 mod tests {
     use crate::lex::lexer;
