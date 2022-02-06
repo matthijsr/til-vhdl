@@ -35,9 +35,9 @@ impl IntoVhdl<ArchitectureBody> for Structure {
         let own_ports = self
             .ports(ir_db)
             .iter()
-            .map(|(name, port)| {
+            .map(|port| {
                 Ok((
-                    name.clone(),
+                    port.name().clone(),
                     port.canonical(ir_db, arch_db, prefix.clone())?
                         .iter()
                         .map(|vhdl_port| {
@@ -63,6 +63,7 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                 PortMapping::from_component(arch_db, &component, instance_name.clone())?;
             streamlet_components.insert(instance_name.clone(), component);
             let port_map_signals = streamlet
+                .interface(ir_db)
                 .port_ids()
                 .iter()
                 .map(|(name, id)| {
@@ -129,6 +130,7 @@ impl IntoVhdl<ArchitectureBody> for Structure {
 
 #[cfg(test)]
 mod tests {
+    use core::convert::TryFrom;
     use til_query::{
         common::logical::logicaltype::LogicalType,
         ir::{
@@ -182,7 +184,7 @@ mod tests {
             .intern(ir_db); // Streamlet does not have an implementation
 
         // Create a Structure from the Streamlet definition (this creates a Structure with ports matching the Streamlet)
-        let mut structure = Structure::from(&streamlet.get(ir_db));
+        let mut structure = Structure::try_from(&streamlet.get(ir_db))?;
         // Add an instance (called "instance") of the Streamlet to the Structure
         structure.try_add_streamlet_instance("instance", streamlet)?;
         // Connect the Structure's "a" port with the instance's "a" port

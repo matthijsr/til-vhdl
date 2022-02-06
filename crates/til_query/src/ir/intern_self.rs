@@ -1,8 +1,9 @@
 use tydi_intern::Id;
 
 use super::{
-    project::namespace::Namespace, traits::InternSelf, Implementation, Interface, Ir, LogicalType,
-    Stream, Streamlet,
+    project::{interface_collection::InterfaceCollection, namespace::Namespace},
+    traits::InternSelf,
+    Implementation, Interface, Ir, LogicalType, Stream, Streamlet,
 };
 
 // This will almost certainly lead to bad design, so comment it out for now unless I can think of a valid use.
@@ -46,5 +47,11 @@ impl InternSelf for Stream {
 impl InternSelf for Namespace {
     fn intern(self, db: &dyn Ir) -> Id<Self> {
         db.intern_namespace(self)
+    }
+}
+
+impl InternSelf for InterfaceCollection {
+    fn intern(self, db: &dyn Ir) -> Id<Self> {
+        db.intern_interface_collection(self)
     }
 }

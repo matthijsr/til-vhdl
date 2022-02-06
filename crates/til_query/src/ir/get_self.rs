@@ -1,8 +1,9 @@
 use tydi_intern::Id;
 
 use super::{
-    project::namespace::Namespace, traits::GetSelf, Implementation, Interface, Ir, LogicalType,
-    Stream, Streamlet,
+    project::{interface_collection::InterfaceCollection, namespace::Namespace},
+    traits::GetSelf,
+    Implementation, Interface, Ir, LogicalType, Stream, Streamlet,
 };
 
 impl GetSelf<Implementation> for Id<Implementation> {
@@ -38,5 +39,11 @@ impl GetSelf<Stream> for Id<Stream> {
 impl GetSelf<Namespace> for Id<Namespace> {
     fn get(&self, db: &dyn Ir) -> Namespace {
         db.lookup_intern_namespace(*self)
+    }
+}
+
+impl GetSelf<InterfaceCollection> for Id<InterfaceCollection> {
+    fn get(&self, db: &dyn Ir) -> InterfaceCollection {
+        db.lookup_intern_interface_collection(*self)
     }
 }

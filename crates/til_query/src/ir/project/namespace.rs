@@ -12,7 +12,7 @@ use crate::{
     ir::{
         implementation::Implementation,
         streamlet::Streamlet,
-        traits::{GetSelf, InternSelf, MoveDb},
+        traits::{GetSelf, InternSelf, MoveDb, TryIntern},
         Ir,
     },
 };
@@ -31,7 +31,7 @@ pub struct Namespace {
     /// The implementations declared within the namespace.
     implementations: BTreeMap<Name, Id<Implementation>>,
     /// Interface definitions
-    interfaces: BTreeMap<Name, InterfaceCollection>,
+    interfaces: BTreeMap<Name, Id<InterfaceCollection>>,
 }
 
 impl Namespace {
@@ -78,8 +78,15 @@ impl Namespace {
             .collect()
     }
 
-    pub fn interfaces(&self) -> &BTreeMap<Name, InterfaceCollection> {
+    pub fn interface_ids(&self) -> &BTreeMap<Name, Id<InterfaceCollection>> {
         &self.interfaces
+    }
+
+    pub fn interfaces(&self, db: &dyn Ir) -> BTreeMap<Name, InterfaceCollection> {
+        self.interface_ids()
+            .iter()
+            .map(|(name, id)| (name.clone(), id.get(db)))
+            .collect()
     }
 
     pub fn import_type(
@@ -130,6 +137,22 @@ impl Namespace {
         }
     }
 
+    pub fn import_interface(
+        &mut self,
+        name: impl TryResult<Name>,
+        interface_id: Id<InterfaceCollection>,
+    ) -> Result<()> {
+        let name = name.try_result()?;
+        match self.interfaces.insert(name.clone(), interface_id) {
+            None => Ok(()),
+            Some(_) => Err(Error::InvalidArgument(format!(
+                "An interface with name {} already exists in namespace {}.",
+                name,
+                self.path_name()
+            ))),
+        }
+    }
+
     pub fn define_type(
         &mut self,
         db: &dyn Ir,
@@ -170,6 +193,18 @@ impl Namespace {
         let implementation_id = implementation.intern(db);
         self.import_implementation(name, implementation_id)?;
         Ok(implementation_id)
+    }
+
+    pub fn define_interface(
+        &mut self,
+        db: &dyn Ir,
+        name: impl TryResult<Name>,
+        interface: impl TryIntern<InterfaceCollection>,
+    ) -> Result<Id<InterfaceCollection>> {
+        let name = name.try_result()?;
+        let interface_id = interface.try_intern(db)?;
+        self.import_interface(name, interface_id)?;
+        Ok(interface_id)
     }
 
     pub fn get_type_id(&self, name: impl TryResult<Name>) -> Result<Id<LogicalType>> {
@@ -238,9 +273,9 @@ impl Namespace {
         }
     }
 
-    pub fn get_interface(&self, name: impl TryResult<Name>) -> Result<InterfaceCollection> {
+    pub fn get_interface_id(&self, name: impl TryResult<Name>) -> Result<Id<InterfaceCollection>> {
         let name = name.try_result()?;
-        self.interfaces()
+        self.interface_ids()
             .get(&name)
             .cloned()
             .ok_or(Error::InvalidArgument(format!(
@@ -248,6 +283,14 @@ impl Namespace {
                 name,
                 self.path_name()
             )))
+    }
+
+    pub fn get_interface(
+        &self,
+        db: &dyn Ir,
+        name: impl TryResult<Name>,
+    ) -> Result<InterfaceCollection> {
+        Ok(self.get_interface_id(name)?.get(db))
     }
 
     pub fn get_stream(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Stream> {
@@ -290,7 +333,7 @@ impl MoveDb<Id<Namespace>> for Namespace {
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         let interfaces = self
-            .interfaces()
+            .interface_ids()
             .iter()
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;

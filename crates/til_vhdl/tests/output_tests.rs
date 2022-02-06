@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, convert::TryInto};
 
 use til_query::{
     common::logical::logicaltype::{
@@ -65,7 +65,7 @@ fn playground() -> Result<()> {
     )?;
 
     let streamlet_id = namespace.get_streamlet_id("streamlet")?;
-    let mut structure: Structure = (&streamlet_id.get(db)).into();
+    let mut structure: Structure = (&streamlet_id.get(db)).try_into()?;
     structure.try_add_streamlet_instance("a", streamlet_id)?;
     structure.try_add_connection(db, ("a", "a"), "a")?;
     structure.try_add_connection(db, ("a", "b"), "b")?;

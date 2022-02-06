@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, convert::TryFrom};
 
 use til_query::{
     common::logical::logicaltype::{
@@ -26,24 +26,6 @@ use tydi_vhdl::{
 };
 
 extern crate til_vhdl;
-
-#[test]
-fn streamlet_new() -> Result<()> {
-    let db = Database::default();
-    let imple = Implementation::link().with_name("link")?;
-    let implid = db.intern_implementation(imple.clone());
-    let streamlet = Streamlet::new()
-        .with_name("test")?
-        .with_implementation(Some(implid))
-        .intern(&db);
-    assert_eq!(
-        db.lookup_intern_streamlet(streamlet)
-            .implementation(&db)
-            .unwrap(),
-        imple
-    );
-    Ok(())
-}
 
 #[test]
 fn streamlet_to_vhdl() -> Result<()> {
@@ -260,7 +242,7 @@ fn playground() -> Result<()> {
         ],
     )?;
 
-    let mut structure = Structure::from(&streamlet);
+    let mut structure = Structure::try_from(&streamlet)?;
     structure.try_add_connection(db, "a", "b")?;
     let implementation = Implementation::structural(structure)?
         .with_name("structural")?

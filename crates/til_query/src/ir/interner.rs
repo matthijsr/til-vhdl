@@ -3,7 +3,9 @@ use tydi_intern::Id;
 use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
 
 use super::{
-    implementation::Implementation, interface::Interface, project::namespace::Namespace,
+    implementation::Implementation,
+    interface::Interface,
+    project::{interface_collection::InterfaceCollection, namespace::Namespace},
     streamlet::Streamlet,
 };
 
@@ -21,4 +23,9 @@ pub trait Interner {
     fn intern_stream(&self, stream: Stream) -> Id<Stream>;
     #[salsa::interned]
     fn intern_streamlet(&self, streamlet: Streamlet) -> Id<Streamlet>;
+    #[salsa::interned]
+    fn intern_interface_collection(
+        &self,
+        interface: InterfaceCollection,
+    ) -> Id<InterfaceCollection>;
 }

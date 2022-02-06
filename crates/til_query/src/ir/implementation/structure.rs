@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    convert::{TryFrom, TryInto},
+};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -9,46 +12,51 @@ use tydi_intern::Id;
 use crate::ir::{
     connection::{Connection, InterfaceReference},
     physical_properties::InterfaceDirection,
+    project::interface_collection::InterfaceCollection,
     traits::{GetSelf, MoveDb},
     Interface, Ir, Streamlet,
 };
 
+use super::Implementation;
+
 /// This node represents a structural `Implementation`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Structure {
-    ports: BTreeMap<Name, Id<Interface>>,
+    interface: Id<InterfaceCollection>,
     streamlet_instances: BTreeMap<Name, Id<Streamlet>>,
     connections: Vec<Connection>,
 }
 
 impl Structure {
-    pub fn new(ports: impl Into<BTreeMap<Name, Id<Interface>>>) -> Self {
+    pub fn new(interface: Id<InterfaceCollection>) -> Self {
         Structure {
-            ports: ports.into(),
+            interface,
             streamlet_instances: BTreeMap::new(),
             connections: vec![],
         }
     }
 
-    pub fn port_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
-        &self.ports
+    pub fn interface_id(&self) -> Id<InterfaceCollection> {
+        self.interface
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> BTreeMap<Name, Interface> {
-        self.port_ids()
-            .iter()
-            .map(|(name, id)| (name.clone(), id.get(db)))
-            .collect()
+    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
+        self.interface_id().get(db)
+    }
+
+    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
+        self.interface(db).ports(db)
     }
 
     pub fn interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
-        let mut result = self.local_interface_references();
+        let mut result = self.local_interface_references(db);
         result.extend(self.streamlet_instance_interface_references(db));
         result
     }
 
-    pub fn local_interface_references(&self) -> Vec<InterfaceReference> {
-        self.port_ids()
+    pub fn local_interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
+        self.interface(db)
+            .port_ids()
             .keys()
             .map(|name| InterfaceReference::new(None, name.clone()))
             .collect()
@@ -59,6 +67,7 @@ impl Structure {
             .iter()
             .flat_map(|(name, streamlet)| {
                 streamlet
+                    .interface(db)
                     .port_ids()
                     .keys()
                     .map(|port| InterfaceReference::new(Some(name.clone()), port.clone()))
@@ -101,7 +110,7 @@ impl Structure {
                         interface: x.get(db).try_get_port(db, i.port())?,
                     })
                 }),
-            None => match self.port_ids().get(i.port()) {
+            None => match self.interface(db).port_ids().get(i.port()) {
                 Some(port) => Ok(InterfaceAndStructure {
                     on_streamlet: false,
                     interface: port.get(db),
@@ -209,9 +218,16 @@ impl Structure {
     }
 }
 
-impl From<&Streamlet> for Structure {
-    fn from(streamlet: &Streamlet) -> Self {
-        Structure::new(streamlet.port_ids().clone())
+impl From<&Implementation> for Structure {
+    fn from(implem: &Implementation) -> Self {
+        Structure::new(implem.interface_id())
+    }
+}
+
+impl TryFrom<&Streamlet> for Structure {
+    type Error = Error;
+    fn try_from(streamlet: &Streamlet) -> Result<Self> {
+        Ok(Structure::new(streamlet.try_into()?))
     }
 }
 
@@ -222,11 +238,7 @@ impl MoveDb<Structure> for Structure {
         target_db: &dyn Ir,
         prefix: &Option<Name>,
     ) -> Result<Structure> {
-        let ports = self
-            .ports
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
-            .collect::<Result<_>>()?;
+        let interface = self.interface.move_db(original_db, target_db, prefix)?;
         let streamlet_instances = self
             .streamlet_instances
             .iter()
@@ -234,9 +246,9 @@ impl MoveDb<Structure> for Structure {
             .collect::<Result<_>>()?;
         let connections = self.connections.clone();
         Ok(Structure {
-            ports,
             streamlet_instances,
             connections,
+            interface,
         })
     }
 }
@@ -262,7 +274,7 @@ mod tests {
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
-        let mut structure = Structure::from(&streamlet);
+        let mut structure = Structure::try_from(&streamlet)?;
         structure.try_add_streamlet_instance(
             "instance",
             streamlet.with_implementation(None).intern(db),
@@ -285,7 +297,7 @@ mod tests {
             ],
         )?;
 
-        let mut structure = Structure::from(&streamlet);
+        let mut structure = Structure::try_from(&streamlet)?;
         structure.try_add_streamlet_instance(
             "instance",
             streamlet.with_implementation(None).intern(db),
@@ -326,7 +338,7 @@ mod tests {
                 ("b", stream, InterfaceDirection::Out),
             ],
         )?;
-        let mut structure = Structure::from(&streamlet);
+        let mut structure = Structure::try_from(&streamlet)?;
         structure.try_add_streamlet_instance(
             "instance",
             streamlet.with_implementation(None).intern(db),

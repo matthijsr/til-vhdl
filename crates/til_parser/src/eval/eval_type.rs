@@ -20,17 +20,7 @@ use crate::{
     Span, Spanned,
 };
 
-struct EvalError {
-    span: Span,
-    msg: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Def<T> {
-    Import(PathName),
-    Ident(Name),
-    Def(T),
-}
+use super::{Def, EvalError, eval_name, eval_ident};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalTypeDef {
@@ -51,53 +41,6 @@ pub struct StreamTypeDef {
     direction: Option<Direction>,
     user: Option<Box<Def<LogicalTypeDef>>>,
     keep: Option<bool>,
-}
-
-fn eval_ident<T>(
-    ident: &IdentExpr,
-    span: &Span,
-    defs: &HashMap<Name, Def<T>>,
-    imports: &HashMap<PathName, Def<T>>,
-) -> Result<Def<T>, EvalError> {
-    match ident {
-        IdentExpr::Name((n, s)) => {
-            let name = eval_name(n, s)?;
-            if defs.contains_key(&name) {
-                Ok(Def::Ident(name))
-            } else {
-                Err(EvalError {
-                    span: s.clone(),
-                    msg: format!("No {} with identity {}", type_name::<T>(), &name),
-                })
-            }
-        }
-        IdentExpr::PathName(pth) => {
-            let mut pthn = vec![];
-            for (n, s) in pth {
-                let name_span = eval_name(n, s)?;
-                pthn.push(name_span);
-            }
-            let pthn = PathName::new(pthn.into_iter());
-            if imports.contains_key(&pthn) {
-                Ok(Def::Import(pthn))
-            } else {
-                Err(EvalError {
-                    span: span.clone(),
-                    msg: format!("No imported {} with identity {}", type_name::<T>(), &pthn),
-                })
-            }
-        }
-    }
-}
-
-fn eval_name(n: &String, s: &Span) -> Result<Name, EvalError> {
-    match Name::try_new(n) {
-        Ok(name) => Ok(name),
-        Err(err) => Err(EvalError {
-            span: s.clone(),
-            msg: format!("Invalid identity {}. {}", n, err),
-        }),
-    }
 }
 
 fn eval_type_expr(
