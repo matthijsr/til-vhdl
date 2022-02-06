@@ -20,9 +20,10 @@ use crate::{
     Span, Spanned,
 };
 
+pub mod eval_interface;
 pub mod eval_type;
 
-struct EvalError {
+pub struct EvalError {
     span: Span,
     msg: String,
 }

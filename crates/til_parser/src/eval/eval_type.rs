@@ -43,7 +43,7 @@ pub struct StreamTypeDef {
     keep: Option<bool>,
 }
 
-fn eval_type_expr(
+pub fn eval_type_expr(
     expr: &Spanned<Expr>,
     types: &HashMap<Name, Def<LogicalTypeDef>>,
     type_imports: &HashMap<PathName, Def<LogicalTypeDef>>,
@@ -246,7 +246,6 @@ fn eval_type_expr(
         };
 
     match &expr.0 {
-        Expr::Error => unreachable!(),
         Expr::Ident(ident) => eval_ident(ident, &expr.1, types, type_imports),
         Expr::TypeDef(typ_expr) => match typ_expr {
             LogicalTypeExpr::Null => Ok(Def::Def(LogicalTypeDef::Null)),
@@ -278,7 +277,7 @@ fn eval_type_expr(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use chumsky::{prelude::Simple, Parser, Stream};
     use tydi_common::error::TryResult;
 
@@ -286,7 +285,7 @@ mod tests {
 
     use super::*;
 
-    fn test_expr_parse(
+    pub(crate) fn test_expr_parse_type(
         src: impl Into<String>,
         name: impl TryResult<Name>,
         types: &mut HashMap<Name, Def<LogicalTypeDef>>,
@@ -323,54 +322,61 @@ mod tests {
     #[test]
     fn test_null_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Null", "a", &mut types);
+        test_expr_parse_type("Null", "a", &mut types);
+    }
+
+    #[test]
+    fn test_type_ref() {
+        let mut types = HashMap::new();
+        test_expr_parse_type("Null", "a", &mut types);
+        test_expr_parse_type("a", "b", &mut types);
     }
 
     #[test]
     fn test_bits_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse_type("Bits(3)", "a", &mut types);
     }
 
     #[test]
     fn test_bits_invalid_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(0)", "a", &mut types);
+        test_expr_parse_type("Bits(0)", "a", &mut types);
     }
 
     #[test]
     fn test_group_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse("Group(a: Bits(1), b: a)", "b", &mut types);
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type("Group(a: Bits(1), b: a)", "b", &mut types);
     }
 
     #[test]
     fn test_union_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse("Union(a: Bits(1), b: a)", "b", &mut types);
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type("Union(a: Bits(1), b: a)", "b", &mut types);
     }
 
     #[test]
     fn test_invalid_union_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse("Union(a: Bits(1), a: a)", "b", &mut types);
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type("Union(a: Bits(1), a: a)", "b", &mut types);
     }
 
     #[test]
     fn test_invalid_union_def_names() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse("Union(a: Bits(1), b__b: a)", "b", &mut types);
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type("Union(a: Bits(1), b__b: a)", "b", &mut types);
     }
 
     #[test]
     fn test_stream_def() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse(
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type(
             "Stream (
         data: a,
         throughput: 2.0,
@@ -389,8 +395,8 @@ mod tests {
     #[test]
     fn test_invalid_stream_def_duplicate() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse(
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type(
             "Stream (
         data: a,
         throughput: 2.0,
@@ -410,8 +416,8 @@ mod tests {
     #[test]
     fn test_invalid_stream_def_invalid_property() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse(
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type(
             "Stream (
         data: a,
         throughput: 2.0,
@@ -431,7 +437,7 @@ mod tests {
     #[test]
     fn test_stream_def_empty() {
         let mut types = HashMap::new();
-        test_expr_parse(
+        test_expr_parse_type(
             "Stream (
     )",
             "b",
@@ -442,8 +448,8 @@ mod tests {
     #[test]
     fn test_stream_def_order() {
         let mut types = HashMap::new();
-        test_expr_parse("Bits(3)", "a", &mut types);
-        test_expr_parse(
+        test_expr_parse_type("Bits(3)", "a", &mut types);
+        test_expr_parse_type(
             "Stream (
         synchronicity: Sync,
         complexity: 4.3,

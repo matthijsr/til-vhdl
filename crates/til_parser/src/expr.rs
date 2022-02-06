@@ -86,8 +86,8 @@ impl fmt::Display for Value {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PortProps {
-    mode: Spanned<InterfaceDirection>,
-    typ: Box<Spanned<Expr>>,
+    pub mode: Spanned<InterfaceDirection>,
+    pub typ: Box<Spanned<Expr>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -178,7 +178,10 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             } else {
                 Err(Simple::custom(
                     span,
-                    format!("Lexer error: {} is neither an integer nor a positive float.", num),
+                    format!(
+                        "Lexer error: {} is neither an integer nor a positive float.",
+                        num
+                    ),
                 ))
             }
         }
