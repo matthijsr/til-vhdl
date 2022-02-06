@@ -2,7 +2,7 @@ use std::{cmp::Ordering, convert::TryFrom, fmt, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result},
-    numbers::NonNegative,
+    numbers::{NonNegative, PositiveReal},
 };
 
 /// Interface complexity level.
@@ -94,6 +94,13 @@ impl From<NonNegative> for Complexity {
     /// Convert a NonNegative into complexity with the NonNegative as major version.
     fn from(major: NonNegative) -> Self {
         Complexity::new_major(major)
+    }
+}
+
+impl TryFrom<PositiveReal> for Complexity {
+    type Error = Error;
+    fn try_from(val: PositiveReal) -> Result<Self> {
+        Complexity::from_str(&val.get().to_string())
     }
 }
 

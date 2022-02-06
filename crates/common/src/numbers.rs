@@ -56,3 +56,11 @@ impl TryFrom<f64> for PositiveReal {
         PositiveReal::new(value)
     }
 }
+
+impl TryFrom<u32> for PositiveReal {
+    type Error = Error;
+
+    fn try_from(value: u32) -> Result<Self> {
+        PositiveReal::new(value as f64)
+    }
+}

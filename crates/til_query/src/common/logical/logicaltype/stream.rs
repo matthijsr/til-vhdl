@@ -57,6 +57,12 @@ impl Throughput {
     }
 }
 
+impl From<PositiveReal> for Throughput {
+    fn from(val: PositiveReal) -> Self {
+        Throughput::new(val)
+    }
+}
+
 impl TryFrom<f64> for Throughput {
     type Error = Error;
 

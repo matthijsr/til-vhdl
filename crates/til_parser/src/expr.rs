@@ -178,7 +178,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             } else {
                 Err(Simple::custom(
                     span,
-                    format!("Lexer error: {} is neither an integer nor a float.", num),
+                    format!("Lexer error: {} is neither an integer nor a positive float.", num),
                 ))
             }
         }
