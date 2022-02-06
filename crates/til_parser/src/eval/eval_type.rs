@@ -360,6 +360,13 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_union_def_names() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse("Union(a: Bits(1), b__b: a)", "b", &mut types);
+    }
+
+    #[test]
     fn test_stream_def() {
         let mut types = HashMap::new();
         test_expr_parse("Bits(3)", "a", &mut types);
