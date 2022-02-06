@@ -20,9 +20,12 @@ use crate::{
     Span, Spanned,
 };
 
+pub mod eval_implementation;
 pub mod eval_interface;
+pub mod eval_streamlet;
 pub mod eval_type;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EvalError {
     span: Span,
     msg: String,
@@ -79,5 +82,48 @@ fn eval_name(n: &String, s: &Span) -> Result<Name, EvalError> {
             span: s.clone(),
             msg: format!("Invalid identity {}. {}", n, err),
         }),
+    }
+}
+
+pub fn get_base_def<T: Clone>(
+    sel: &Def<T>,
+    span: &Span,
+    declarations: &HashMap<Name, Def<T>>,
+    previous: &mut HashSet<Name>,
+) -> Result<T, EvalError> {
+    match sel {
+        Def::Import(_) => todo!(),
+        Def::Ident(sel) => {
+            if let Some(def) = declarations.get(sel) {
+                match def {
+                    Def::Import(_) => todo!(),
+                    Def::Ident(name) => {
+                        if !previous.insert(name.clone()) {
+                            // This shouldn't normally be possible, but it doesn't hurt to be careful.
+                            return Err(EvalError {
+                                span: span.clone(),
+                                msg: format!(
+                                    "Circular dependency! {} -> {}",
+                                    previous
+                                        .iter()
+                                        .map(|n| n.to_string())
+                                        .collect::<Vec<String>>()
+                                        .join(" ->\n"),
+                                    sel
+                                ),
+                            });
+                        }
+                        get_base_def(name, span, declarations, previous)
+                    }
+                    Def::Def(result) => Ok(result.clone()),
+                }
+            } else {
+                Err(EvalError {
+                    span: span.clone(),
+                    msg: format!("No such interface {}", sel),
+                })
+            }
+        }
+        Def::Def(def) => Ok(def.clone()),
     }
 }

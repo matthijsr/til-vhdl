@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use til_query::ir::physical_properties::InterfaceDirection;
 use tydi_common::name::{Name, PathName};
 
-use crate::{eval::eval_ident, expr::Expr, Spanned};
+use crate::{eval::eval_ident, expr::Expr, Span, Spanned};
 
 use super::{
     eval_name,
@@ -65,7 +65,9 @@ pub(crate) mod tests {
     use tydi_common::error::TryResult;
 
     use crate::{
-        eval::eval_type::tests::test_expr_parse_type, expr::expr_parser, lex::lexer,
+        eval::{eval_type::tests::test_expr_parse_type, get_base_def},
+        expr::expr_parser,
+        lex::lexer,
         report::report_errors,
     };
 
@@ -133,5 +135,22 @@ pub(crate) mod tests {
         let types = HashMap::new();
         let mut interfaces = HashMap::new();
         test_expr_parse_interface("(a: in Null, a: out Null)", "a", &types, &mut interfaces);
+    }
+
+    #[test]
+    fn test_interface_indirection() {
+        let types = HashMap::new();
+        let mut interfaces = HashMap::new();
+        test_expr_parse_interface("(a: in Null)", "a", &types, &mut interfaces);
+        test_expr_parse_interface("a", "b", &types, &mut interfaces);
+        println!(
+            "{:#?}",
+            get_base_def(
+                &Def::Ident(Name::try_new("b").unwrap()),
+                &(0..0),
+                &interfaces,
+                &mut HashSet::new()
+            )
+        )
     }
 }
