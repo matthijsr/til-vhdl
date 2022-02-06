@@ -46,8 +46,10 @@ pub fn eval_struct_stat(
     stat: &Spanned<StructStat>,
     interface: InterfaceDef,
     connections: &mut HashMap<PortSelOk, PortSelOk>,
-    instances: &mut HashMap<Name, Def<InterfaceDef>>,
+    instances: &mut HashMap<Name, InterfaceDef>,
     streamlets: &HashMap<Name, Def<StreamletDef>>,
+    streamlet_imports: &HashMap<PathName, Def<StreamletDef>>,
+    interfaces: &HashMap<Name, Def<InterfaceDef>>,
     interface_imports: &HashMap<PathName, Def<InterfaceDef>>,
 ) -> Result<StructStatOk, EvalError> {
     match &stat.0 {
@@ -63,6 +65,8 @@ pub fn eval_struct_stat(
                 connections,
                 instances,
                 streamlets,
+                streamlet_imports,
+                interfaces,
                 interface_imports,
             )?),
         )),
@@ -78,7 +82,11 @@ pub fn eval_struct_stat(
                                 get_base_def(streamlet_def, s, streamlets, &mut HashSet::new())?
                                     .interface()
                                     .clone();
-                            if instances.insert(instance_name.clone(), iface.clone()) == None {
+                            if instances.insert(
+                                instance_name.clone(),
+                                get_base_def(&iface, s, interfaces, &mut HashSet::new())?,
+                            ) == None
+                            {
                                 Ok(iface)
                             } else {
                                 Err(EvalError {

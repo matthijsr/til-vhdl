@@ -113,7 +113,7 @@ pub fn get_base_def<T: Clone>(
                                 ),
                             });
                         }
-                        get_base_def(name, span, declarations, previous)
+                        get_base_def(def, span, declarations, previous)
                     }
                     Def::Def(result) => Ok(result.clone()),
                 }
