@@ -9,6 +9,7 @@ use tydi_intern::Id;
 
 use super::{
     physical_properties::InterfaceDirection,
+    project::interface_collection::InterfaceCollection,
     traits::{GetSelf, InternSelf, MoveDb},
     Implementation, Interface, Ir,
 };
@@ -50,6 +51,18 @@ impl Streamlet {
 
         self.ports = port_map;
         self.port_order = port_order;
+
+        Ok(self)
+    }
+
+    pub fn with_interface_collection(
+        mut self,
+        coll: impl TryResult<InterfaceCollection>,
+    ) -> Result<Streamlet> {
+        let coll = coll.try_result()?;
+        let (ports, port_order) = coll.ordered_port_ids();
+        self.ports = ports.clone();
+        self.port_order = port_order.clone();
 
         Ok(self)
     }

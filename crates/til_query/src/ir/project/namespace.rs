@@ -17,6 +17,8 @@ use crate::{
     },
 };
 
+use super::interface_collection::InterfaceCollection;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
     /// The name of the Namespace within its parent project
@@ -28,6 +30,8 @@ pub struct Namespace {
     streamlets: BTreeMap<Name, Id<Streamlet>>,
     /// The implementations declared within the namespace.
     implementations: BTreeMap<Name, Id<Implementation>>,
+    /// Interface definitions
+    interfaces: BTreeMap<Name, InterfaceCollection>,
 }
 
 impl Namespace {
@@ -37,6 +41,7 @@ impl Namespace {
             types: BTreeMap::new(),
             streamlets: BTreeMap::new(),
             implementations: BTreeMap::new(),
+            interfaces: BTreeMap::new(),
         })
     }
 
@@ -71,6 +76,10 @@ impl Namespace {
             .iter()
             .map(|(name, id)| (name.clone(), id.get(db)))
             .collect()
+    }
+
+    pub fn interfaces(&self) -> &BTreeMap<Name, InterfaceCollection> {
+        &self.interfaces
     }
 
     pub fn import_type(
@@ -229,6 +238,18 @@ impl Namespace {
         }
     }
 
+    pub fn get_interface(&self, name: impl TryResult<Name>) -> Result<InterfaceCollection> {
+        let name = name.try_result()?;
+        self.interfaces()
+            .get(&name)
+            .cloned()
+            .ok_or(Error::InvalidArgument(format!(
+                "An interface with name {} does not exist in namespace {}",
+                name,
+                self.path_name()
+            )))
+    }
+
     pub fn get_stream(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Stream> {
         Ok(self.get_stream_id(db, name)?.get(db))
     }
@@ -268,11 +289,17 @@ impl MoveDb<Id<Namespace>> for Namespace {
             .iter()
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
+        let interfaces = self
+            .interfaces()
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
+            .collect::<Result<_>>()?;
         Ok(Namespace {
             name: self.name.clone(),
             types,
             streamlets,
             implementations,
+            interfaces,
         }
         .intern(target_db))
     }

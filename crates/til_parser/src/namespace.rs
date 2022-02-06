@@ -38,10 +38,10 @@ pub enum Statement {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Namespace {
     name: Spanned<Vec<Spanned<String>>>,
-    stats: Vec<Spanned<Statement>>,
+    pub stats: Vec<Spanned<Statement>>,
 }
 
-fn namespaces_parser(
+pub fn namespaces_parser(
 ) -> impl Parser<Token, HashMap<Vec<String>, Namespace>, Error = Simple<Token>> + Clone {
     let namespace_name = path_name_parser().map_with_span(|p, span| (p, span));
     let name = name_parser();
@@ -67,7 +67,7 @@ fn namespaces_parser(
         .then_ignore(just(Token::Ctrl(';')))
         .map(|(n, e)| Decl::InterfaceDecl(n, Box::new(e)));
 
-    let streamlet_decl = just(Token::Decl(DeclKeyword::Interface))
+    let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
         .ignore_then(name.clone())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
@@ -115,4 +115,44 @@ fn namespaces_parser(
             Ok(namespaces)
         })
         .then_ignore(end())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::{lex::lexer, report::report_errors};
+
+    use super::*;
+
+    fn source(path: impl AsRef<Path>) -> String {
+        std::fs::read_to_string(path).unwrap()
+    }
+
+    fn test_namespace_parse(src: impl Into<String>) {
+        let src = src.into();
+        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+
+        // println!("{:#?}", tokens);
+
+        let parse_errs = if let Some(tokens) = tokens {
+            // println!("Tokens = {:?}", tokens);
+            let len = src.chars().count();
+            let (ast, parse_errs) = namespaces_parser()
+                .parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
+
+            println!("{:#?}", ast);
+
+            parse_errs
+        } else {
+            Vec::new()
+        };
+
+        report_errors(&src, errs, parse_errs);
+    }
+
+    #[test]
+    fn test_test_nspace_til() {
+        test_namespace_parse(source("test_nspace.til"))
+    }
 }

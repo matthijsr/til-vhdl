@@ -17,6 +17,7 @@ use super::{
     Ir,
 };
 
+pub mod interface_collection;
 pub mod namespace;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

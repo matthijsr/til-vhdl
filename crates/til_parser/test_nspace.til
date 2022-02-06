@@ -1,0 +1,38 @@
+namespace my::test::space {
+    type byte = Bits(8);
+    type select = Union(val: byte, empty: Null);
+    type rgb = Group(r: select, g: select, b: select);
+    type stream = Stream (
+        data: rgb,
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+    type stream2 = stream;
+
+    streamlet comp1 = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    );
+
+    interface iface1 = (a: in stream, b: out stream);
+
+    streamlet comp2 = iface1;
+
+    streamlet comp3 = comp1 {
+        impl: {
+            p1 = comp2;
+            p2 = comp2;
+            a -- p1.a;
+            b -- p1.b;
+            c -- p2.a;
+            d -- p2.b;
+        }
+    };
+}
