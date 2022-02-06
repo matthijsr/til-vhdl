@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName, PathNameSelf},
@@ -8,7 +6,6 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    physical_properties::InterfaceDirection,
     project::interface_collection::InterfaceCollection,
     traits::{GetSelf, InternSelf, MoveDb, TryIntern},
     Implementation, Interface, Ir,

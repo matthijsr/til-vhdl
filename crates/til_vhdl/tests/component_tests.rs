@@ -1,4 +1,4 @@
-use std::{sync::Arc, convert::TryFrom};
+use std::{convert::TryFrom, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::{
@@ -8,7 +8,6 @@ use til_query::{
     ir::{
         db::Database,
         implementation::{structure::Structure, Implementation},
-        interner::Interner,
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
         traits::InternSelf,
