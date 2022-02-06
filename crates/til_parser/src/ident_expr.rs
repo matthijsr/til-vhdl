@@ -47,5 +47,5 @@ pub fn ident_expr_parser() -> impl Parser<Token, IdentExpr, Error = Simple<Token
 
     let path_name = path_name_parser().map(|pth| IdentExpr::PathName(pth));
 
-    path_name.or(name.map(IdentExpr::Name))
+    name.map(IdentExpr::Name).or(path_name)
 }

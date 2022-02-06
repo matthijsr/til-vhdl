@@ -20,7 +20,7 @@ use crate::{
     Span, Spanned,
 };
 
-use super::{Def, EvalError, eval_name, eval_ident};
+use super::{eval_ident, eval_name, Def, EvalError};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LogicalTypeDef {
@@ -56,7 +56,7 @@ fn eval_type_expr(
             if dups.contains(&name) {
                 return Err(EvalError {
                     span: name_span.clone(),
-                    msg: format!("Duplicate label in Group or Union, {}", name)
+                    msg: format!("Duplicate label in Group or Union, \"{}\"", name)
                 })
             } else {
                 dups.insert(name.clone());
@@ -83,7 +83,7 @@ fn eval_type_expr(
                     |label: &String, label_span: &Span| -> Result<StreamTypeDef, EvalError> {
                         Err(EvalError {
                             span: label_span.clone(),
-                            msg: format!("Invalid Stream property {}", label),
+                            msg: format!("Duplicate Stream property, \"{}\"", label),
                         })
                     };
 
@@ -92,7 +92,7 @@ fn eval_type_expr(
                         Err(EvalError {
                             span: prop_expr.1.clone(),
                             msg: format!(
-                                "Invalid expression {:#?} for property {}",
+                                "Invalid expression {:#?} for property \"{}\"",
                                 prop_expr.0, label
                             ),
                         })
@@ -236,7 +236,7 @@ fn eval_type_expr(
                     _ => {
                         return Err(EvalError {
                             span: name_span.clone(),
-                            msg: format!("Invalid Stream property {}", name_string),
+                            msg: format!("Invalid Stream property, \"{}\"", name_string),
                         })
                     }
                 }
@@ -274,5 +274,181 @@ fn eval_type_expr(
             span: expr.1.clone(),
             msg: format!("Invalid expression {:#?} for type definition", &expr.0),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chumsky::{prelude::Simple, Parser, Stream};
+    use tydi_common::error::TryResult;
+
+    use crate::{expr::expr_parser, lex::lexer, report::report_errors};
+
+    use super::*;
+
+    fn test_expr_parse(
+        src: impl Into<String>,
+        name: impl TryResult<Name>,
+        types: &mut HashMap<Name, Def<LogicalTypeDef>>,
+    ) {
+        let src = src.into();
+        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+
+        // println!("{:#?}", tokens);
+
+        let parse_errs = if let Some(tokens) = tokens {
+            // println!("Tokens = {:?}", tokens);
+            let len = src.chars().count();
+            let (ast, parse_errs) =
+                expr_parser().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
+
+            if let Some(expr) = ast {
+                match eval_type_expr(&expr, types, &HashMap::new()) {
+                    Ok(def) => {
+                        types.insert(name.try_result().unwrap(), def.clone());
+                        println!("{:#?}", def);
+                    }
+                    Err(e) => errs.push(Simple::custom(e.span, e.msg)),
+                };
+            }
+
+            parse_errs
+        } else {
+            Vec::new()
+        };
+
+        report_errors(&src, errs, parse_errs);
+    }
+
+    #[test]
+    fn test_null_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Null", "a", &mut types);
+    }
+
+    #[test]
+    fn test_bits_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+    }
+
+    #[test]
+    fn test_bits_invalid_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(0)", "a", &mut types);
+    }
+
+    #[test]
+    fn test_group_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse("Group(a: Bits(1), b: a)", "b", &mut types);
+    }
+
+    #[test]
+    fn test_union_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse("Union(a: Bits(1), b: a)", "b", &mut types);
+    }
+
+    #[test]
+    fn test_invalid_union_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse("Union(a: Bits(1), a: a)", "b", &mut types);
+    }
+
+    #[test]
+    fn test_stream_def() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse(
+            "Stream (
+        data: a,
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    )",
+            "b",
+            &mut types,
+        );
+    }
+
+    #[test]
+    fn test_invalid_stream_def_duplicate() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse(
+            "Stream (
+        data: a,
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+        keep: true,
+    )",
+            "b",
+            &mut types,
+        );
+    }
+
+    #[test]
+    fn test_invalid_stream_def_invalid_property() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse(
+            "Stream (
+        data: a,
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+        fake: false,
+    )",
+            "b",
+            &mut types,
+        );
+    }
+
+    #[test]
+    fn test_stream_def_empty() {
+        let mut types = HashMap::new();
+        test_expr_parse(
+            "Stream (
+    )",
+            "b",
+            &mut types,
+        );
+    }
+
+    #[test]
+    fn test_stream_def_order() {
+        let mut types = HashMap::new();
+        test_expr_parse("Bits(3)", "a", &mut types);
+        test_expr_parse(
+            "Stream (
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        data: a,
+        throughput: 2.0,
+        dimensionality: 0,
+        user: Null,
+        keep: false,
+    )",
+            "b",
+            &mut types,
+        );
     }
 }
