@@ -120,8 +120,20 @@ impl From<Implementation> for Id<InterfaceCollection> {
     }
 }
 
+impl From<&Implementation> for Id<InterfaceCollection> {
+    fn from(imp: &Implementation) -> Self {
+        imp.interface_id()
+    }
+}
+
 impl From<Structure> for Id<InterfaceCollection> {
     fn from(st: Structure) -> Self {
+        st.interface_id()
+    }
+}
+
+impl From<&Structure> for Id<InterfaceCollection> {
+    fn from(st: &Structure) -> Self {
         st.interface_id()
     }
 }

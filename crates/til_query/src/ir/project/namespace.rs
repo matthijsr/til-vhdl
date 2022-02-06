@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, convert::TryInto};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -30,7 +30,10 @@ pub struct Namespace {
     streamlets: BTreeMap<Name, Id<Streamlet>>,
     /// The implementations declared within the namespace.
     implementations: BTreeMap<Name, Id<Implementation>>,
-    /// Interface definitions
+    /// Interface declarations.
+    /// As implementations and streamlets both contain an Interface,
+    /// they are also declared as interfaces.
+    /// This means that streamlet and implementation names cannot overlap.
     interfaces: BTreeMap<Name, Id<InterfaceCollection>>,
 }
 
@@ -107,10 +110,13 @@ impl Namespace {
 
     pub fn import_streamlet(
         &mut self,
+        db: &dyn Ir,
         name: impl TryResult<Name>,
         streamlet_id: Id<Streamlet>,
     ) -> Result<()> {
         let name = name.try_result()?;
+        let interface_id = streamlet_id.get(db).try_into()?;
+        self.import_interface(name.clone(), interface_id)?;
         match self.streamlets.insert(name.clone(), streamlet_id) {
             None => Ok(()),
             Some(_) => Err(Error::InvalidArgument(format!(
@@ -123,10 +129,13 @@ impl Namespace {
 
     pub fn import_implementation(
         &mut self,
+        db: &dyn Ir,
         name: impl TryResult<Name>,
         implementation_id: Id<Implementation>,
     ) -> Result<()> {
         let name = name.try_result()?;
+        let interface_id = implementation_id.get(db).try_into()?;
+        self.import_interface(name.clone(), interface_id)?;
         match self.implementations.insert(name.clone(), implementation_id) {
             None => Ok(()),
             Some(_) => Err(Error::InvalidArgument(format!(
@@ -176,7 +185,7 @@ impl Namespace {
             .try_result()?
             .with_name(self.path_name().with_child(&name))?;
         let streamlet_id = streamlet.intern(db);
-        self.import_streamlet(name, streamlet_id)?;
+        self.import_streamlet(db, name, streamlet_id)?;
         Ok(streamlet_id)
     }
 
@@ -191,7 +200,7 @@ impl Namespace {
             .try_result()?
             .with_name(self.path_name().with_child(&name))?;
         let implementation_id = implementation.intern(db);
-        self.import_implementation(name, implementation_id)?;
+        self.import_implementation(db, name, implementation_id)?;
         Ok(implementation_id)
     }
 
