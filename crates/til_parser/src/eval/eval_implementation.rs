@@ -7,7 +7,7 @@ use crate::{
     eval::{eval_ident, get_base_def},
     expr::Expr,
     ident_expr::IdentExpr,
-    struct_parse::StructStat,
+    struct_parse::{PortSel, StructStat},
     Spanned,
 };
 
@@ -45,7 +45,7 @@ pub enum PortSelOk {
 pub fn eval_struct_stat(
     stat: &Spanned<StructStat>,
     interface: InterfaceDef,
-    connections: &mut HashMap<PortSelOk, PortSelOk>,
+    connected_ports: &mut HashSet<PortSelOk>,
     instances: &mut HashMap<Name, InterfaceDef>,
     streamlets: &HashMap<Name, Def<StreamletDef>>,
     streamlet_imports: &HashMap<PathName, Def<StreamletDef>>,
@@ -57,12 +57,12 @@ pub fn eval_struct_stat(
             span: stat.1.clone(),
             msg: "Invalid structural statement (ERROR)".to_string(),
         }),
-        StructStat::Documentation((doc, doc_span), sub_stat) => Ok(StructStatOk::Documentation(
+        StructStat::Documentation((doc, _doc_span), sub_stat) => Ok(StructStatOk::Documentation(
             doc.clone(),
             Box::new(eval_struct_stat(
                 sub_stat,
                 interface,
-                connections,
+                connected_ports,
                 instances,
                 streamlets,
                 streamlet_imports,
@@ -108,6 +108,70 @@ pub fn eval_struct_stat(
 
             Ok(StructStatOk::Instance(instance_name, interface))
         }
-        StructStat::Connection((left_sel, left_span), (right_sel, right_span)) => todo!(),
+        StructStat::Connection(left_sel, right_sel) => {
+            let parse_sel = |sel: &Spanned<PortSel>| -> Result<PortSelOk, EvalError> {
+                match &sel.0 {
+                    PortSel::Own(own) => {
+                        let own_name = eval_name(own, &sel.1)?;
+                        if interface.iter().any(|(name, _, _)| name == &own_name) {
+                            Ok(PortSelOk::Own(own_name))
+                        } else {
+                            Err(EvalError {
+                                span: sel.1.clone(),
+                                msg: format!("No port {} on own interface", own_name),
+                            })
+                        }
+                    }
+                    PortSel::Instance(
+                        (instance_string, instance_span),
+                        (port_string, port_span),
+                    ) => {
+                        let instance_name = eval_name(instance_string, instance_span)?;
+                        let port_name = eval_name(port_string, port_span)?;
+                        if let Some(iface) = instances.get(&instance_name) {
+                            if iface.iter().any(|(name, _, _)| name == &port_name) {
+                                Ok(PortSelOk::Instance(instance_name, port_name))
+                            } else {
+                                Err(EvalError {
+                                    span: sel.1.clone(),
+                                    msg: format!(
+                                        "No port {} on instance {}",
+                                        port_name, instance_name
+                                    ),
+                                })
+                            }
+                        } else {
+                            Err(EvalError {
+                                span: instance_span.clone(),
+                                msg: format!("No such instance, {}", instance_name),
+                            })
+                        }
+                    }
+                }
+            };
+            let left = parse_sel(left_sel)?;
+            let right = parse_sel(right_sel)?;
+            if left == right {
+                return Err(EvalError {
+                    span: right_sel.1.clone(),
+                    msg: format!("Cannot connect a port to itself"),
+                });
+            }
+            if connected_ports.contains(&left) {
+                Err(EvalError {
+                    span: left_sel.1.clone(),
+                    msg: "This port was already connected".to_string(),
+                })
+            } else if connected_ports.contains(&right) {
+                Err(EvalError {
+                    span: right_sel.1.clone(),
+                    msg: "This port was already connected".to_string(),
+                })
+            } else {
+                connected_ports.insert(left.clone());
+                connected_ports.insert(right.clone());
+                Ok(StructStatOk::Connection(left, right))
+            }
+        }
     }
 }
