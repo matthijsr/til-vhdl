@@ -317,7 +317,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     // As with types, interfaces can be declared with identities
     // Note: Interfaces can also be derived from streamlets and implementations
-    let interface = interface_def.or(ident_expr.clone());
+    let interface = interface_def.clone().or(ident_expr.clone());
 
     // ......
     // IMPLEMENTATION DEFINITIONS
@@ -361,9 +361,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|d, span| (d, span));
     let impl_def = doc_impl_def.or(impl_def);
 
-    // They can also be declared with identities
-    let implementation = impl_def.or(ident_expr.clone());
-
     // ......
     // STREAMLET DEFINITIONS
     // ......
@@ -371,7 +368,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let impl_prop = just(Token::Decl(DeclKeyword::Implementation))
         .map_with_span(|tok, span| (tok, span))
         .then_ignore(just(Token::Ctrl(':')))
-        .then(ident_expr.clone().or(raw_impl.clone()))
+        .then(raw_impl.clone().or(ident_expr.clone()))
         .map(|(lab, i)| (lab, StreamletProperty::Implementation(Box::new(i))));
 
     // In case more properties are added in the future, use a generic type
@@ -403,9 +400,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     // Note: Streamlet definitions can not have documentation, but streamlet declarations can.
 
-    // A streamlet's definition can be either an interface definition, or a full streamlet definition with properties
-    let streamlet = streamlet_def.or(interface.clone());
-
     // ......
     // RESULT
     // Valid expressions are:
@@ -416,10 +410,11 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // All of which can be identities
     // ......
 
-    streamlet
-        .or(implementation)
-        .or(interface)
+    impl_def
+        .or(streamlet_def)
+        .or(interface_def)
         .or(typ)
+        .or(ident_expr)
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),
             Token::Ctrl('}'),
