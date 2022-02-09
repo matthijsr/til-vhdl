@@ -31,22 +31,23 @@ pub fn eval_streamlet_expr(
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<(Id<Streamlet>, Id<InterfaceCollection>), EvalError> {
     match &expr.0 {
-        Expr::Ident(ident) => match eval_ident(ident, &expr.1, streamlets, streamlet_imports) {
-            Ok(val) => {
+        Expr::Ident(ident) => {
+            if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports) {
                 let interface = eval_ident(ident, &expr.1, interfaces, interface_imports)?;
                 Ok((val, interface))
-            }
-            Err(_) => match eval_ident(ident, &expr.1, interfaces, interface_imports) {
-                Ok(interface) => {
-                    let streamlet: Streamlet = interface.into();
-                    Ok((streamlet.intern(db), interface))
+            } else {
+                match eval_ident(ident, &expr.1, interfaces, interface_imports) {
+                    Ok(interface) => {
+                        let streamlet: Streamlet = interface.into();
+                        Ok((streamlet.intern(db), interface))
+                    }
+                    Err(err) => Err(EvalError {
+                        span: err.span,
+                        msg: "No interface or streamlet with this identity".to_string(),
+                    }),
                 }
-                Err(err) => Err(EvalError {
-                    span: err.span,
-                    msg: "No interface or streamlet with this identity".to_string(),
-                }),
-            },
-        },
+            }
+        }
         Expr::StreamletDef(interface, properties) => {
             let interface = eval_interface_expr(
                 db,

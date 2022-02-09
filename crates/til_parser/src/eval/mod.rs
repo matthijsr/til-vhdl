@@ -39,6 +39,14 @@ impl EvalError {
             msg: msg.into(),
         }
     }
+
+    pub fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    pub fn msg(&self) -> &str {
+        self.msg.as_str()
+    }
 }
 
 pub fn eval_common_error<T>(

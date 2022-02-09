@@ -1,7 +1,20 @@
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::prelude::Simple;
 
-use crate::lex::Token;
+use crate::{eval::EvalError, lex::Token};
+
+pub fn report_eval_errors(src: &str, errs: Vec<EvalError>) {
+    for err in errs {
+        let report = Report::build(ReportKind::Error, (), err.span().start)
+            .with_message(err.msg())
+            .with_label(
+                Label::new(err.span())
+                    .with_message(format!("{}", err.msg().fg(Color::Red)))
+                    .with_color(Color::Red),
+            );
+        report.finish().print(Source::from(src)).unwrap();
+    }
+}
 
 pub fn report_errors(src: &str, errs: Vec<Simple<char>>, parse_errs: Vec<Simple<Token>>) {
     errs.into_iter()

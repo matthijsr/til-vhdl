@@ -21,7 +21,7 @@ use crate::{
     ident_expr::IdentExpr,
     lex::lexer,
     namespace::{namespaces_parser, Decl, Statement},
-    report::report_errors,
+    report::{report_errors, report_eval_errors},
     Spanned,
 };
 
@@ -37,16 +37,13 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
         let (ast, parse_errs) =
             namespaces_parser().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
 
-        println!("{:#?}", ast);
-
         (ast, parse_errs)
     } else {
         (None, Vec::new())
     };
 
-    report_errors(&src, errs.clone(), parse_errs.clone());
-
-    if errs.len() > 1 || parse_errs.len() > 1 {
+    if errs.len() > 0 || parse_errs.len() > 0 {
+        report_errors(&src, errs, parse_errs);
         return Err(Error::ParsingError(
             "Errors during parsing, see report.".to_string(),
         ));
@@ -123,6 +120,13 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                 )),
             }
         }
+    }
+
+    if eval_errors.len() > 0 {
+        report_eval_errors(&src, eval_errors.clone());
+        return Err(Error::ProjectError(
+            "Errors during evaluation, see report.".to_string(),
+        ));
     }
 
     db.set_project(Arc::new(project));
