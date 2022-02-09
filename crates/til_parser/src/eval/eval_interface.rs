@@ -66,7 +66,7 @@ pub fn eval_interface_expr(
         }
         _ => Err(EvalError {
             span: expr.1.clone(),
-            msg: format!("Invalid expression {:#?} for type definition", &expr.0),
+            msg: format!("Invalid expression {:#?} for interface definition", &expr.0),
         }),
     }
 }

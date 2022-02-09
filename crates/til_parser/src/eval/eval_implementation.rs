@@ -1,17 +1,24 @@
-// use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
-// use til_query::ir::physical_properties::InterfaceDirection;
-// use tydi_common::name::{Name, PathName};
+use til_query::{
+    common::logical::logicaltype::LogicalType,
+    ir::{
+        implementation::Implementation, physical_properties::InterfaceDirection,
+        project::interface_collection::InterfaceCollection, streamlet::Streamlet, Ir,
+    },
+};
+use tydi_common::name::{Name, PathName};
+use tydi_intern::Id;
 
-// use crate::{
-//     eval::{eval_ident, get_base_def},
-//     expr::Expr,
-//     ident_expr::IdentExpr,
-//     struct_parse::{PortSel, StructStat},
-//     Spanned,
-// };
+use crate::{
+    eval::eval_ident,
+    expr::Expr,
+    ident_expr::IdentExpr,
+    struct_parse::{PortSel, StructStat},
+    Spanned,
+};
 
-// use super::{eval_name, eval_streamlet::StreamletDef, eval_type::eval_type_expr, Def, EvalError};
+use super::{eval_name, eval_type::eval_type_expr, Def, EvalError};
 
 // #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 // pub struct ImplementationDef {
@@ -169,3 +176,19 @@
 //         }
 //     }
 // }
+
+pub fn eval_implementation_expr(
+    db: &dyn Ir,
+    expr: &Spanned<Expr>,
+    interface: Option<Id<InterfaceCollection>>,
+    implementations: &HashMap<Name, Id<Implementation>>,
+    implementation_imports: &HashMap<PathName, Id<Implementation>>,
+    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
+    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    types: &HashMap<Name, Id<LogicalType>>,
+    type_imports: &HashMap<PathName, Id<LogicalType>>,
+) -> Result<Id<Implementation>, EvalError> {
+    match &expr.0 {
+        _ => todo!(),
+    }
+}
