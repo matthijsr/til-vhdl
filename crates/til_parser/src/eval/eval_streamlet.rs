@@ -47,7 +47,7 @@ pub fn eval_streamlet_expr(
         Expr::StreamletDef(interface, properties) => {
             let interface = eval_interface_expr(
                 db,
-                interface.as_ref(),
+                interface,
                 interfaces,
                 interface_imports,
                 types,
@@ -64,6 +64,8 @@ pub fn eval_streamlet_expr(
                                         db,
                                         impl_expr,
                                         Some(interface),
+                                        streamlets,
+                                        streamlet_imports,
                                         implementations,
                                         implementation_imports,
                                         interfaces,
