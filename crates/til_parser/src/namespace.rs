@@ -30,7 +30,6 @@ pub enum Decl {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Statement {
-    Error,
     Import,
     Decl(Decl),
 }
@@ -38,7 +37,17 @@ pub enum Statement {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Namespace {
     name: Spanned<Vec<Spanned<String>>>,
-    pub stats: Vec<Spanned<Statement>>,
+    stats: Vec<Spanned<Statement>>,
+}
+
+impl Namespace {
+    pub fn name_span(&self) -> &Span {
+        &self.name.1
+    }
+
+    pub fn stats(&self) -> &Vec<Spanned<Statement>> {
+        &self.stats
+    }
 }
 
 pub fn namespaces_parser(

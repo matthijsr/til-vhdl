@@ -107,9 +107,14 @@ pub fn eval_implementation_expr(
     interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<Id<Implementation>, EvalError> {
+) -> Result<(Id<Implementation>, Id<InterfaceCollection>), EvalError> {
     match &expr.0 {
-        Expr::Ident(ident) => eval_ident(ident, &expr.1, implementations, implementation_imports),
+        Expr::Ident(ident) => {
+            let implementation =
+                eval_ident(ident, &expr.1, implementations, implementation_imports)?;
+            let interface = eval_ident(ident, &expr.1, interfaces, interface_imports)?;
+            Ok((implementation, interface))
+        }
         Expr::RawImpl(raw_impl) => {
             if let Some(interface) = interface {
                 match raw_impl {
@@ -130,7 +135,7 @@ pub fn eval_implementation_expr(
                                 type_imports,
                             )?;
                         }
-                        Ok(Implementation::from(structure).intern(db))
+                        Ok((Implementation::from(structure).intern(db), interface))
                     }
                     RawImpl::Behavioural(_) => todo!(),
                 }

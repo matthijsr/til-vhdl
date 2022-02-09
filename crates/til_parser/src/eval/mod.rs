@@ -20,6 +20,7 @@ use crate::{
     Span, Spanned,
 };
 
+pub mod eval_decl;
 pub mod eval_implementation;
 pub mod eval_interface;
 pub mod eval_streamlet;
@@ -29,6 +30,15 @@ pub mod eval_type;
 pub struct EvalError {
     span: Span,
     msg: String,
+}
+
+impl EvalError {
+    pub fn new(span: &Span, msg: impl Into<String>) -> Self {
+        EvalError {
+            span: span.clone(),
+            msg: msg.into(),
+        }
+    }
 }
 
 pub fn eval_common_error<T>(
@@ -51,7 +61,7 @@ pub enum Def<T> {
     Def(T),
 }
 
-fn eval_ident<T: Clone>(
+pub fn eval_ident<T: Clone>(
     ident: &IdentExpr,
     span: &Span,
     defs: &HashMap<Name, T>,
@@ -88,7 +98,7 @@ fn eval_ident<T: Clone>(
     }
 }
 
-fn eval_name(n: &String, s: &Span) -> Result<Name, EvalError> {
+pub fn eval_name(n: &String, s: &Span) -> Result<Name, EvalError> {
     match Name::try_new(n) {
         Ok(name) => Ok(name),
         Err(err) => Err(EvalError {

@@ -29,14 +29,17 @@ pub fn eval_streamlet_expr(
     interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<Id<Streamlet>, EvalError> {
+) -> Result<(Id<Streamlet>, Id<InterfaceCollection>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => match eval_ident(ident, &expr.1, streamlets, streamlet_imports) {
-            Ok(val) => Ok(val),
+            Ok(val) => {
+                let interface = eval_ident(ident, &expr.1, interfaces, interface_imports)?;
+                Ok((val, interface))
+            }
             Err(_) => match eval_ident(ident, &expr.1, interfaces, interface_imports) {
                 Ok(interface) => {
                     let streamlet: Streamlet = interface.into();
-                    Ok(streamlet.intern(db))
+                    Ok((streamlet.intern(db), interface))
                 }
                 Err(err) => Err(EvalError {
                     span: err.span,
@@ -83,10 +86,10 @@ pub fn eval_streamlet_expr(
                         }
                     }
                     let mut streamlet = Streamlet::from(interface);
-                    if let Some(implementation) = implementation {
+                    if let Some((implementation, _)) = implementation {
                         streamlet = streamlet.with_implementation(Some(implementation));
                     }
-                    Ok(streamlet.intern(db))
+                    Ok((streamlet.intern(db), interface))
                 }
                 _ => Err(EvalError {
                     span: properties.1.clone(),
@@ -94,15 +97,11 @@ pub fn eval_streamlet_expr(
                 }),
             }
         }
-        Expr::InterfaceDef(_) => Ok(Streamlet::from(eval_interface_expr(
-            db,
-            expr,
-            interfaces,
-            interface_imports,
-            types,
-            type_imports,
-        )?)
-        .intern(db)),
+        Expr::InterfaceDef(_) => {
+            let interface =
+                eval_interface_expr(db, expr, interfaces, interface_imports, types, type_imports)?;
+            Ok((Streamlet::from(interface).intern(db), interface))
+        }
         _ => Err(EvalError {
             span: expr.1.clone(),
             msg: format!("Invalid expression {:#?} for streamlet definition", &expr.0),

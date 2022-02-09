@@ -16,3 +16,6 @@ til-query = {path = "../til_query"}
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
 tydi-vhdl = { path = "../vhdl" }
+
+[dev-dependencies]
+til-parser = {path = "../til_parser"}
