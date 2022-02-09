@@ -1,3 +1,4 @@
+use core::fmt;
 use std::convert::TryFrom;
 use std::hash::Hash;
 use std::ops::Mul;
@@ -31,8 +32,8 @@ use super::{IsNull, LogicalType, SplitStreams};
 pub struct Throughput(PositiveReal);
 
 impl Throughput {
-    pub fn new(throughput: PositiveReal) -> Self {
-        Throughput(throughput)
+    pub fn new(throughput: impl Into<PositiveReal>) -> Self {
+        Throughput(throughput.into())
     }
 
     pub fn try_new(throughput: impl TryResult<PositiveReal>) -> Result<Self> {
@@ -53,6 +54,12 @@ impl Throughput {
 
     pub fn positive(&self) -> Positive {
         Positive::new(self.non_negative()).unwrap()
+    }
+}
+
+impl From<PositiveReal> for Throughput {
+    fn from(val: PositiveReal) -> Self {
+        Throughput::new(val)
     }
 }
 
@@ -99,6 +106,12 @@ impl Mul for Throughput {
 
     fn mul(self, rhs: Self) -> Self::Output {
         Throughput(self.0 * rhs.0)
+    }
+}
+
+impl Default for Throughput {
+    fn default() -> Self {
+        Throughput(PositiveReal::new(1.0).unwrap())
     }
 }
 
@@ -185,7 +198,7 @@ impl Stream {
         }))
     }
 
-    pub(crate) fn new(
+    pub fn new(
         data: Id<LogicalType>,
         throughput: Throughput,
         dimensionality: NonNegative,
@@ -419,6 +432,17 @@ impl FromStr for Synchronicity {
     }
 }
 
+impl fmt::Display for Synchronicity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Synchronicity::Sync => write!(f, "Sync"),
+            Synchronicity::Flatten => write!(f, "Flatten"),
+            Synchronicity::Desync => write!(f, "Desync"),
+            Synchronicity::FlatDesync => write!(f, "FlatDesync"),
+        }
+    }
+}
+
 /// Direction of a stream.
 ///
 /// [Reference]
@@ -456,6 +480,15 @@ impl FromStr for Direction {
                 "{} is not a valid Direction",
                 input
             ))),
+        }
+    }
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Direction::Forward => write!(f, "Forward"),
+            Direction::Reverse => write!(f, "Reverse"),
         }
     }
 }

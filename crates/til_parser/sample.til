@@ -1,0 +1,198 @@
+// An example TIL file
+
+// TIL is *not* whitespace sensitive, but there's no harm in adding some, either.
+
+// Comments use // or /// ///
+// And so
+/// And
+so ///
+
+// # # <expression/statement> delineates documentation for a specific declaration.
+// This is passed along to the query storage so that it can also be included in things emitted by a back-end
+// Hence, not all statements and expressions accept documentation.
+#
+We're using this for math stuff I guess.
+
+Check out our docs.
+#
+type half_byte = Bits(4);
+
+// Annotations and intrinsics may use # and @ in the future
+
+// Declare a namespace
+// :: delineates components of a path
+namespace my::new::namespace::sub {
+    // A namespace is delineated by { }
+}
+
+// Declare another namespace
+// Namespaces are not required to be in specific paths, and multiple namespaces can be defined in one file
+namespace my::new::namespace {
+
+    import some::namespace::route::{streamlet(a), impl(b), type {a, b, c }};
+    // Imports a, b, and c from namespace some::namespace::route, (some can also be a project)
+    // As names can overlap between streamlets, implementations and types, imports will require specifying what you're importing
+
+    // Statements/declarations should end with ;
+
+    import my::new::namespace::sub::*;
+    // Imports everything from another namespace
+    // Namespaces declared in the same file do not necessarily "see" one another,
+    // imports must be declared explicitly
+
+    import some::namespace::route::streamlet(d) as route::d;
+    import some::namespace::route::streamlet(e) as e2;
+    // "import * as" to disambiguate between overlapping imports
+
+    import some::namespace::other1::{streamlet(a), impl(a), type {a, b, c }} prefixed by namespace::else;
+    import some::namespace::other2::* prefixed by namespace::else;
+    // "import * prefixed by" to prefix larger namespace imports with something to simplify disambiguation
+
+    // Declaring types
+    type byte = Bits(8);
+    type rgb =
+        Group (
+            r: byte, // Red
+            g: byte, // Green
+            b: byte, // Blue
+        );
+    // Statements do not have to be on one line, and dangling commas are allowed
+    // The delimiter ( does not have to be directly connected to the base type, i.e., both Bits(8) and Bits (8) are allowed
+    // Comments can be used within statements, and will be interpreted as whitespace
+
+    type stream = Stream (
+        data: rgb,
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null, // It's possible to use type definitions directly
+        keep: false,
+    );
+    type empty = Null; // Of course, you can define your own Null type, if this happens to be a useful abstraction
+
+    type stream2 = Stream (
+        data: rgb,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3.2, // Sub-versions
+        direction: Forward,
+    );
+    // user defaults to null, keep defaults to false, and throughput defaults to 1.0
+    // Might also allow for complexity to default to parent streams, but not sure about that.
+
+    // Also considering the Dim, New, Des, Flat and Rev abbreviations, but these aren't necessary for now.
+
+    // Declare a streamlet
+    streamlet comp = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    ){
+        impl: None,
+    };
+    // ( ) delimits ports, { } delimits additional information (just implementation for now)
+
+    // Implementation defaults to None
+    streamlet comp2 = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    );
+
+
+    // An independent structural implementation is defined by
+    // impl *name* = ( *ports* ) { *structure* }
+    impl struct = (
+        a: in stream, // Ports are declared as *name* : *direction* *stream name*
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    ){
+        // Ports can be connected with --
+        a -- b;
+
+        // Streamlet instances are declared with
+        // *instance name* = *streamlet name*
+        a = comp;
+        b = comp;
+
+        // Considering c, d = comp;
+
+        // Ports on streamlet instances can be addressed with .
+        a.a--b.b;
+        a.b-- b.a;
+        // As with everything else, whitespace does not matter
+        
+        // Ports on streamlet instances can also be connected to local ports
+        c -- a.c;
+        d -- b.d;
+        a.d -- b.c;
+    };
+
+    // An independent behavioural link implementation is defined by
+    // impl *name* = ( *ports* ) "*relative path*"
+    impl link = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    ) "../something.vhd";
+
+    // Using an implementation on a streamlet works as such:
+    streamlet comp3 = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    ){
+        impl: struct
+    };
+
+    // You can also declare an implementation directly on a streamlet, like so:
+    streamlet comp4 = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    ) {
+        impl: "../path"
+    };
+    streamlet comp5 = (
+        a: in stream,
+        b: out stream,
+        c: in stream2,
+        d: out stream2,
+    ) {
+        impl: {
+            a -- b;
+            c -- d;
+        }
+    };
+
+    // However, you can also "reimplement" an existing streamlet, like so:
+    streamlet comp6 = comp {
+        impl: struct
+    };
+
+    // It's also possible to simply duplicate certain definitions, if this helps clarify things, e.g.:
+    type char = byte;
+    type u8 = byte;
+    type small = byte;
+    
+    // This is really no different from how we directly declared a streamlet with impl: None
+    // In this case, the implementations' ports are derived from the streamlet itself
+
+    // It's also possible to define an implementation based on another implementation, e.g.:
+    impl beh = (a: in stream, b: out stream) "../wip.vhd";
+    impl stub = beh { a--b };
+
+    // But in cases where you're implementing a common set of ports, it might make more sense to instead define an interface:
+    interface my_standard_ports = (a: in stream, b: out stream);
+    // This is similar to defining an empty streamlet, but avoids generating empty architectures.
+
+    // Note that because implementations and streamlets can both be treated as interfaces, none of these three may share a name.
+}

@@ -95,6 +95,13 @@ impl TryFrom<&str> for Name {
     }
 }
 
+impl TryFrom<&String> for Name {
+    type Error = Error;
+    fn try_from(str: &String) -> Result<Self> {
+        Name::try_new(str)
+    }
+}
+
 impl TryFrom<String> for Name {
     type Error = Error;
     fn try_from(string: String) -> Result<Self> {
@@ -320,6 +327,14 @@ impl TryFrom<&str> for PathName {
             let name: Name = str.try_into()?;
             Ok(PathName::from(name))
         }
+    }
+}
+
+impl TryFrom<Vec<String>> for PathName {
+    type Error = Error;
+
+    fn try_from(value: Vec<String>) -> Result<Self> {
+        PathName::try_new(value)
     }
 }
 

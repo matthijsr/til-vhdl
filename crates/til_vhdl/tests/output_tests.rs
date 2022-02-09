@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{convert::TryInto, path::Path, sync::Arc};
 
+use til_parser::query::into_query_storage;
 use til_query::{
     common::logical::logicaltype::{
         stream::{Direction, Stream, Synchronicity},
@@ -19,6 +20,21 @@ use til_vhdl::canonical;
 use tydi_common::error::Result;
 
 extern crate til_vhdl;
+
+fn source(path: impl AsRef<Path>) -> String {
+    std::fs::read_to_string(path).unwrap()
+}
+
+fn parse_to_output(src: impl Into<String>, name: &str) -> Result<()> {
+    let db = into_query_storage(src)?;
+
+    canonical(&db, format!("../../test_output/{}/", name))
+}
+
+#[test]
+fn from_til_parse() -> Result<()> {
+    parse_to_output(source("tests/til_files/test_nspace.til"), "test_nspace")
+}
 
 #[test]
 fn playground() -> Result<()> {
@@ -65,7 +81,7 @@ fn playground() -> Result<()> {
     )?;
 
     let streamlet_id = namespace.get_streamlet_id("streamlet")?;
-    let mut structure: Structure = (&streamlet_id.get(db)).into();
+    let mut structure: Structure = (&streamlet_id.get(db)).try_into()?;
     structure.try_add_streamlet_instance("a", streamlet_id)?;
     structure.try_add_connection(db, ("a", "a"), "a")?;
     structure.try_add_connection(db, ("a", "b"), "b")?;
@@ -81,7 +97,7 @@ fn playground() -> Result<()> {
     project.add_namespace(db, namespace)?;
     db.set_project(Arc::new(project));
 
-    canonical(db, "../../test_output/")?;
+    canonical(db, "../../test_output/playground/")?;
 
     Ok(())
 }

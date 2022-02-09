@@ -2,12 +2,13 @@ use til_query::ir::{implementation::ImplementationKind, Ir};
 use tydi_common::{
     cat,
     error::{Result, TryOptional},
-    traits::Identify, name::PathNameSelf,
+    name::PathNameSelf,
+    traits::Identify,
 };
 
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
-    common::vhdl_name::{VhdlName},
+    common::vhdl_name::VhdlName,
     component::Component,
     declaration::Declare,
     port::Port,
@@ -62,7 +63,13 @@ impl IntoVhdl<String> for Streamlet {
             Some(implementation) => match implementation.kind() {
                 ImplementationKind::Structural(structure) => {
                     let arch_body = structure.canonical(ir_db, arch_db, prefix)?;
-                    let mut architecture = Architecture::from_database(arch_db, implementation.path_name())?;
+                    let name = implementation.path_name();
+
+                    let mut architecture = if name.len() > 0 {
+                        Architecture::from_database(arch_db, name)
+                    } else {
+                        Architecture::from_database(arch_db, "Behaviour")
+                    }?;
                     architecture.add_body(arch_db, &arch_body)?;
 
                     let result_string = architecture.declare(arch_db)?;

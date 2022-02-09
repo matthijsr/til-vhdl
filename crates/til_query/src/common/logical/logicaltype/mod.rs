@@ -1,5 +1,5 @@
 use core::fmt;
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
 use crate::{
     common::physical::fields::Fields,
@@ -338,9 +338,23 @@ impl fmt::Display for LogicalType {
         match self {
             LogicalType::Null => write!(f, "Null"),
             LogicalType::Bits(b) => write!(f, "Bits({})", b),
-            LogicalType::Group(group) => write!(f, "Group({})", group),
-            LogicalType::Union(union) => write!(f, "Union({})", union),
-            LogicalType::Stream(stream_id) => write!(f, "Stream({})", stream_id),
+            LogicalType::Group(group) => write!(f, "Group{}", group),
+            LogicalType::Union(union) => write!(f, "Union{}", union),
+            LogicalType::Stream(stream_id) => write!(f, "Stream(Id: {})", stream_id),
+        }
+    }
+}
+
+impl TryFrom<LogicalType> for Id<Stream> {
+    type Error = Error;
+
+    fn try_from(value: LogicalType) -> Result<Self> {
+        match &value {
+            LogicalType::Stream(id) => Ok(*id),
+            _ => Err(Error::InvalidTarget(format!(
+                "Type is not a Stream, but a {}",
+                value
+            ))),
         }
     }
 }

@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName, PathNameSelf},
@@ -8,8 +6,8 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    physical_properties::InterfaceDirection,
-    traits::{GetSelf, InternSelf, MoveDb},
+    project::interface_collection::InterfaceCollection,
+    traits::{GetSelf, InternSelf, MoveDb, TryIntern},
     Implementation, Interface, Ir,
 };
 
@@ -19,8 +17,7 @@ pub struct Streamlet {
     /// and can be suffixed with their implementation.
     name: PathName,
     implementation: Option<Id<Implementation>>,
-    ports: BTreeMap<Name, Id<Interface>>,
-    port_order: Vec<Name>,
+    interface: Option<Id<InterfaceCollection>>,
 }
 
 impl Streamlet {
@@ -28,8 +25,7 @@ impl Streamlet {
         Streamlet {
             name: PathName::new_empty(),
             implementation: None,
-            ports: BTreeMap::new(),
-            port_order: vec![],
+            interface: None,
         }
     }
 
@@ -38,23 +34,27 @@ impl Streamlet {
         db: &dyn Ir,
         ports: Vec<impl TryResult<Interface>>,
     ) -> Result<Streamlet> {
-        let mut port_order = vec![];
-        let mut port_map = BTreeMap::new();
-        for port in ports {
-            let port = port.try_result()?;
-            port_order.push(port.name().clone());
-            if port_map.insert(port.name().clone(), port.intern(db)) != None {
-                return Err(Error::UnexpectedDuplicate);
-            }
-        }
+        let interface = InterfaceCollection::new(db, ports)?.intern(db);
+        self.interface = Some(interface);
+        Ok(self)
+    }
 
-        self.ports = port_map;
-        self.port_order = port_order;
+    pub fn with_interface_collection(
+        mut self,
+        db: &dyn Ir,
+        coll: impl TryIntern<InterfaceCollection>,
+    ) -> Result<Streamlet> {
+        self.interface = Some(coll.try_intern(db)?);
 
         Ok(self)
     }
 
-    pub fn with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
+    pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    pub fn try_with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
         self.name = name.try_result()?;
         Ok(self)
     }
@@ -72,36 +72,36 @@ impl Streamlet {
         }
     }
 
-    pub fn port_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
-        &self.ports
+    pub fn interface_id(&self) -> Option<Id<InterfaceCollection>> {
+        self.interface.clone()
+    }
+
+    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
+        if let Some(interface_id) = self.interface_id() {
+            interface_id.get(db)
+        } else {
+            let interface = InterfaceCollection::new_empty();
+            interface.clone().intern(db);
+            interface
+        }
     }
 
     pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
-        let mut result = vec![];
-        for name in &self.port_order {
-            result.push(self.port_ids().get(name).unwrap().get(db));
-        }
-        result
+        self.interface(db).ports(db)
     }
 
     pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.ports(db)
-            .into_iter()
-            .filter(|x| x.physical_properties().direction() == InterfaceDirection::In)
-            .collect()
+        self.interface(db).inputs(db)
     }
 
     pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.ports(db)
-            .into_iter()
-            .filter(|x| x.physical_properties().direction() == InterfaceDirection::Out)
-            .collect()
+        self.interface(db).outputs(db)
     }
 
     pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<Interface> {
-        match self.port_ids().get(name) {
-            Some(port) => Ok(port.get(db)),
-            None => Err(Error::InvalidArgument(format!(
+        match self.interface(db).try_get_port(db, name) {
+            Ok(port) => Ok(port),
+            Err(_) => Err(Error::InvalidArgument(format!(
                 "No port with name {} exists on Streamlet {}",
                 name,
                 self.identifier()
@@ -129,12 +129,10 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
         target_db: &dyn Ir,
         prefix: &Option<Name>,
     ) -> Result<Id<Streamlet>> {
-        let port_order = self.port_order.clone();
-        let ports = self
-            .ports
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
-            .collect::<Result<_>>()?;
+        let interface = match &self.interface {
+            Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
+            None => None,
+        };
         let implementation = match &self.implementation {
             Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
             None => None,
@@ -142,36 +140,18 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
         Ok(Streamlet {
             name: self.name.with_parents(prefix),
             implementation,
-            ports,
-            port_order,
+            interface,
         }
         .intern(target_db))
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use tydi_common::error::Result;
-
-    use crate::ir::{db::Database, interner::Interner};
-
-    use super::*;
-
-    #[test]
-    fn new() -> Result<()> {
-        let db = Database::default();
-        let imple = Implementation::link().with_name("link")?;
-        let implid = db.intern_implementation(imple.clone());
-        let streamlet = Streamlet::new()
-            .with_name("test")?
-            .with_implementation(Some(implid))
-            .intern(&db);
-        assert_eq!(
-            db.lookup_intern_streamlet(streamlet)
-                .implementation(&db)
-                .unwrap(),
-            imple
-        );
-        Ok(())
+impl From<Id<InterfaceCollection>> for Streamlet {
+    fn from(id: Id<InterfaceCollection>) -> Self {
+        Streamlet {
+            name: PathName::new_empty(),
+            implementation: None,
+            interface: Some(id),
+        }
     }
 }
