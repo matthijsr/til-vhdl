@@ -9,6 +9,7 @@ use til_query::{
             namespace::{self, Namespace},
             Project,
         },
+        traits::GetSelf,
         Ir,
     },
 };
@@ -105,10 +106,10 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                             namespace.import_interface(name, interface_id)?;
                         }
                         for (name, implementation_id) in implementations {
-                            namespace.import_implementation(name, implementation_id)?;
+                            namespace.define_implementation(db, name, implementation_id.get(db))?;
                         }
                         for (name, streamlet_id) in streamlets {
-                            namespace.import_streamlet(name, streamlet_id)?;
+                            namespace.define_streamlet(db, name, streamlet_id.get(db))?;
                         }
 
                         project.add_namespace(db, namespace)?;
