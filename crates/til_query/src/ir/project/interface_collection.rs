@@ -1,11 +1,13 @@
+use core::fmt;
 use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
 };
 
+use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::Name,
+    name::{Name, NameSelf},
     traits::Identify,
 };
 use tydi_intern::Id;
@@ -50,12 +52,30 @@ impl InterfaceCollection {
         })
     }
 
+    pub fn push(&mut self, db: &dyn Ir, port: impl TryResult<Interface>) -> Result<()> {
+        let port = port.try_result()?;
+        let port_name = port.name().clone();
+        if let Some(_) = self.ports.insert(port.name().clone(), port.intern(db)) {
+            Err(Error::InvalidArgument(format!(
+                "A port with name {} already exists on this interface.",
+                port_name
+            )))
+        } else {
+            self.port_order.push(port_name);
+            Ok(())
+        }
+    }
+
     pub fn port_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
         &self.ports
     }
 
-    pub fn ordered_port_ids(&self) -> (&BTreeMap<Name, Id<Interface>>, &Vec<Name>) {
-        (&self.ports, &self.port_order)
+    pub fn ordered_port_ids(&self) -> IndexMap<Name, Id<Interface>> {
+        let mut result = IndexMap::new();
+        for name in self.port_order.iter() {
+            result.insert(name.clone(), self.port_ids().get(name).unwrap().clone());
+        }
+        result
     }
 
     pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
@@ -158,5 +178,17 @@ impl TryFrom<&Streamlet> for Id<InterfaceCollection> {
                 streamlet.identifier()
             )))
         }
+    }
+}
+
+impl fmt::Display for InterfaceCollection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fields = self
+            .ordered_port_ids()
+            .iter()
+            .map(|(name, id)| format!("{}: Id({})", name, id))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "InterfaceCollection({})", fields)
     }
 }

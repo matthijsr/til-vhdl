@@ -62,17 +62,18 @@ impl Identify for Interface {
     }
 }
 
-impl<N, P> TryFrom<(N, Id<Stream>, P)> for Interface
+impl<N, S, P> TryFrom<(N, S, P)> for Interface
 where
     N: TryResult<Name>,
+    S: TryResult<Id<Stream>>,
     P: TryResult<PhysicalProperties>,
 {
     type Error = Error;
 
-    fn try_from((name, stream, physical_properties): (N, Id<Stream>, P)) -> Result<Self> {
+    fn try_from((name, stream, physical_properties): (N, S, P)) -> Result<Self> {
         Ok(Interface {
             name: name.try_result()?,
-            stream,
+            stream: stream.try_result()?,
             physical_properties: physical_properties.try_result()?,
         })
     }

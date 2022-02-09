@@ -31,6 +31,19 @@ pub struct EvalError {
     msg: String,
 }
 
+pub fn eval_common_error<T>(
+    res: Result<T, tydi_common::error::Error>,
+    span: &Span,
+) -> Result<T, EvalError> {
+    match res {
+        Ok(val) => Ok(val),
+        Err(err) => Err(EvalError {
+            span: span.clone(),
+            msg: err.to_string(),
+        }),
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Def<T> {
     Import(PathName),
@@ -38,17 +51,17 @@ pub enum Def<T> {
     Def(T),
 }
 
-fn eval_ident<T>(
+fn eval_ident<T: Clone>(
     ident: &IdentExpr,
     span: &Span,
-    defs: &HashMap<Name, Def<T>>,
-    imports: &HashMap<PathName, Def<T>>,
-) -> Result<Def<T>, EvalError> {
+    defs: &HashMap<Name, T>,
+    imports: &HashMap<PathName, T>,
+) -> Result<T, EvalError> {
     match ident {
         IdentExpr::Name((n, s)) => {
             let name = eval_name(n, s)?;
-            if defs.contains_key(&name) {
-                Ok(Def::Ident(name))
+            if let Some(val) = defs.get(&name) {
+                Ok(val.clone())
             } else {
                 Err(EvalError {
                     span: s.clone(),
@@ -63,8 +76,8 @@ fn eval_ident<T>(
                 pthn.push(name_span);
             }
             let pthn = PathName::new(pthn.into_iter());
-            if imports.contains_key(&pthn) {
-                Ok(Def::Import(pthn))
+            if let Some(val) = imports.get(&pthn) {
+                Ok(val.clone())
             } else {
                 Err(EvalError {
                     span: span.clone(),
@@ -82,48 +95,5 @@ fn eval_name(n: &String, s: &Span) -> Result<Name, EvalError> {
             span: s.clone(),
             msg: format!("Invalid identity {}. {}", n, err),
         }),
-    }
-}
-
-pub fn get_base_def<T: Clone>(
-    sel: &Def<T>,
-    span: &Span,
-    declarations: &HashMap<Name, Def<T>>,
-    previous: &mut HashSet<Name>,
-) -> Result<T, EvalError> {
-    match sel {
-        Def::Import(_) => todo!(),
-        Def::Ident(sel) => {
-            if let Some(def) = declarations.get(sel) {
-                match def {
-                    Def::Import(_) => todo!(),
-                    Def::Ident(name) => {
-                        if !previous.insert(name.clone()) {
-                            // This shouldn't normally be possible, but it doesn't hurt to be careful.
-                            return Err(EvalError {
-                                span: span.clone(),
-                                msg: format!(
-                                    "Circular dependency! {} -> {}",
-                                    previous
-                                        .iter()
-                                        .map(|n| n.to_string())
-                                        .collect::<Vec<String>>()
-                                        .join(" ->\n"),
-                                    sel
-                                ),
-                            });
-                        }
-                        get_base_def(def, span, declarations, previous)
-                    }
-                    Def::Def(result) => Ok(result.clone()),
-                }
-            } else {
-                Err(EvalError {
-                    span: span.clone(),
-                    msg: format!("No such interface {}", sel),
-                })
-            }
-        }
-        Def::Def(def) => Ok(def.clone()),
     }
 }

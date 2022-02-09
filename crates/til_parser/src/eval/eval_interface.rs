@@ -1,30 +1,37 @@
 use std::collections::{HashMap, HashSet};
 
-use til_query::ir::physical_properties::InterfaceDirection;
-use tydi_common::name::{Name, PathName};
+use til_query::{
+    common::logical::logicaltype::{stream::Stream, LogicalType},
+    ir::{
+        physical_properties::InterfaceDirection,
+        project::interface_collection::InterfaceCollection,
+        traits::{GetSelf, InternSelf},
+        Ir,
+    },
+};
+use tydi_common::{
+    error::TryResult,
+    name::{Name, PathName},
+};
+use tydi_intern::Id;
 
 use crate::{eval::eval_ident, expr::Expr, Span, Spanned};
 
-use super::{
-    eval_name,
-    eval_type::{eval_type_expr, LogicalTypeDef},
-    Def, EvalError,
-};
-
-pub type InterfaceDef = Vec<(Name, InterfaceDirection, Def<LogicalTypeDef>)>;
+use super::{eval_common_error, eval_name, eval_type::eval_type_expr, Def, EvalError};
 
 pub fn eval_interface_expr(
+    db: &dyn Ir,
     expr: &Spanned<Expr>,
-    interfaces: &HashMap<Name, Def<InterfaceDef>>,
-    interface_imports: &HashMap<PathName, Def<InterfaceDef>>,
-    types: &HashMap<Name, Def<LogicalTypeDef>>,
-    type_imports: &HashMap<PathName, Def<LogicalTypeDef>>,
-) -> Result<Def<InterfaceDef>, EvalError> {
+    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
+    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    types: &HashMap<Name, Id<LogicalType>>,
+    type_imports: &HashMap<PathName, Id<LogicalType>>,
+) -> Result<Id<InterfaceCollection>, EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => eval_ident(ident, &expr.1, interfaces, interface_imports),
         Expr::InterfaceDef(iface) => {
             let mut dups = HashSet::new();
-            let mut result = vec![];
+            let mut result = InterfaceCollection::new_empty();
             for port_def_expr in iface {
                 if let Expr::PortDef((name_string, name_span), (props, props_span)) =
                     &port_def_expr.0
@@ -37,11 +44,16 @@ pub fn eval_interface_expr(
                         });
                     } else {
                         dups.insert(name.clone());
-                        result.push((
-                            name,
-                            props.mode.0,
-                            eval_type_expr(props.typ.as_ref(), types, type_imports)?,
-                        ));
+                        let stream_id: Id<Stream> = eval_common_error(
+                            eval_type_expr(db, &props.typ, types, type_imports)?
+                                .get(db)
+                                .try_result(),
+                            &props.typ.1,
+                        )?;
+                        eval_common_error(
+                            result.push(db, (name, stream_id, props.mode.0)),
+                            name_span,
+                        )?;
                     }
                 } else {
                     return Err(EvalError {
@@ -50,7 +62,7 @@ pub fn eval_interface_expr(
                     });
                 }
             }
-            Ok(Def::Def(result))
+            Ok(result.intern(db))
         }
         _ => Err(EvalError {
             span: expr.1.clone(),
@@ -62,12 +74,11 @@ pub fn eval_interface_expr(
 #[cfg(test)]
 pub(crate) mod tests {
     use chumsky::{prelude::Simple, Parser, Stream};
+    use til_query::ir::db::Database;
     use tydi_common::error::TryResult;
 
     use crate::{
-        eval::{eval_type::tests::test_expr_parse_type, get_base_def},
-        expr::expr_parser,
-        lex::lexer,
+        eval::eval_type::tests::test_expr_parse_type, expr::expr_parser, lex::lexer,
         report::report_errors,
     };
 
@@ -76,8 +87,9 @@ pub(crate) mod tests {
     pub(crate) fn test_expr_parse_interface(
         src: impl Into<String>,
         name: impl TryResult<Name>,
-        types: &HashMap<Name, Def<LogicalTypeDef>>,
-        interfaces: &mut HashMap<Name, Def<InterfaceDef>>,
+        db: &dyn Ir,
+        types: &HashMap<Name, Id<LogicalType>>,
+        interfaces: &mut HashMap<Name, Id<InterfaceCollection>>,
     ) {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
@@ -92,6 +104,7 @@ pub(crate) mod tests {
 
             if let Some(expr) = ast {
                 match eval_interface_expr(
+                    db,
                     &expr,
                     interfaces,
                     &HashMap::new(),
@@ -100,7 +113,7 @@ pub(crate) mod tests {
                 ) {
                     Ok(def) => {
                         interfaces.insert(name.try_result().unwrap(), def.clone());
-                        println!("{:#?}", def);
+                        println!("{}", def.get(db));
                     }
                     Err(e) => errs.push(Simple::custom(e.span, e.msg)),
                 };
@@ -116,41 +129,99 @@ pub(crate) mod tests {
 
     #[test]
     fn test_interface_def() {
+        let db = &Database::default();
         let mut types = HashMap::new();
         let mut interfaces = HashMap::new();
-        test_expr_parse_type("Null", "a", &mut types);
-        test_expr_parse_interface("(a: in Null, b: out a)", "a", &types, &mut interfaces);
+        test_expr_parse_type(
+            "Stream (
+        data: Bits(4),
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    )",
+            "a",
+            db,
+            &mut types,
+        );
+        test_expr_parse_interface("(a: in a, b: out a)", "a", db, &types, &mut interfaces);
     }
 
     #[test]
     fn test_interface_ref() {
+        let db = &Database::default();
         let types = HashMap::new();
         let mut interfaces = HashMap::new();
-        test_expr_parse_interface("(a: in Null)", "a", &types, &mut interfaces);
-        test_expr_parse_interface("a", "b", &types, &mut interfaces);
+        test_expr_parse_interface(
+            "(a: in Stream (
+        data: Bits(4),
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    ))",
+            "a",
+            db,
+            &types,
+            &mut interfaces,
+        );
+        test_expr_parse_interface("a", "b", db, &types, &mut interfaces);
     }
 
     #[test]
     fn test_invalid_interface_def_duplicate() {
-        let types = HashMap::new();
+        let db = &Database::default();
+        let mut types = HashMap::new();
         let mut interfaces = HashMap::new();
-        test_expr_parse_interface("(a: in Null, a: out Null)", "a", &types, &mut interfaces);
+        test_expr_parse_type(
+            "Stream (
+        data: Bits(4),
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    )",
+            "a",
+            db,
+            &mut types,
+        );
+        test_expr_parse_interface("(a: in a, a: out a)", "a", db, &types, &mut interfaces);
     }
 
     #[test]
     fn test_interface_indirection() {
-        let types = HashMap::new();
+        let db = &Database::default();
+        let mut types = HashMap::new();
         let mut interfaces = HashMap::new();
-        test_expr_parse_interface("(a: in Null)", "a", &types, &mut interfaces);
-        test_expr_parse_interface("a", "b", &types, &mut interfaces);
-        println!(
-            "{:#?}",
-            get_base_def(
-                &Def::Ident(Name::try_new("b").unwrap()),
-                &(0..0),
-                &interfaces,
-                &mut HashSet::new()
-            )
+        test_expr_parse_type(
+            "Stream (
+        data: Bits(4),
+        throughput: 2.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4.3,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    )",
+            "a",
+            db,
+            &mut types,
+        );
+        test_expr_parse_interface("(a: in a)", "a", db, &types, &mut interfaces);
+        test_expr_parse_interface("a", "b", db, &types, &mut interfaces);
+        assert_eq!(
+            interfaces.get(&Name::try_new("a").unwrap()),
+            interfaces.get(&Name::try_new("b").unwrap()),
         )
     }
 }

@@ -32,8 +32,8 @@ use super::{IsNull, LogicalType, SplitStreams};
 pub struct Throughput(PositiveReal);
 
 impl Throughput {
-    pub fn new(throughput: PositiveReal) -> Self {
-        Throughput(throughput)
+    pub fn new(throughput: impl Into<PositiveReal>) -> Self {
+        Throughput(throughput.into())
     }
 
     pub fn try_new(throughput: impl TryResult<PositiveReal>) -> Result<Self> {
@@ -106,6 +106,12 @@ impl Mul for Throughput {
 
     fn mul(self, rhs: Self) -> Self::Output {
         Throughput(self.0 * rhs.0)
+    }
+}
+
+impl Default for Throughput {
+    fn default() -> Self {
+        Throughput(PositiveReal::new(1.0).unwrap())
     }
 }
 
@@ -192,7 +198,7 @@ impl Stream {
         }))
     }
 
-    pub(crate) fn new(
+    pub fn new(
         data: Id<LogicalType>,
         throughput: Throughput,
         dimensionality: NonNegative,

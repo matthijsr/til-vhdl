@@ -64,3 +64,9 @@ impl TryFrom<u32> for PositiveReal {
         PositiveReal::new(value as f64)
     }
 }
+
+impl From<Positive> for PositiveReal {
+    fn from(val: Positive) -> Self {
+        NonZeroReal(val.get() as f64)
+    }
+}
