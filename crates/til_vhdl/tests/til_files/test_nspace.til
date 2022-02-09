@@ -62,4 +62,38 @@ namespace my::test::space {
             d -- p2.b;
         }
     };
+
+    streamlet comp4 = comp1 {
+        impl: struct
+    };
+
+    // Defining a streamlet as a copy of another streamlet (or of an import)
+    // is partially optimized away during evaluation. Only the first declaration will be emitted.
+    // TODO: Either go all the way (ensure that streamlets queried are also unique,
+    //  as otherwise they're still being (over)written)
+    // or do allow for copies (identical streamlets/implementations, with different names).
+    streamlet comp5 = comp4;
+
+    // Regardless, they can still be used as interfaces
+    streamlet comp6 = comp5 {
+        impl: struct,
+    };
+
+    // Final example, of the relative amount of work required to define a component:
+    type my_stream = Stream(
+        data: Bits(8),
+        throughput: 5.0,
+        dimensionality: 3,
+        synchronicity: Sync,
+        complexity: 7,
+        direction: Forward, // Note, the keep and user properties are not required (nor is throughput, which defaults to 1)
+    );
+    streamlet my_new_streamlet = (
+        in_port: in my_stream,
+        out_port: out my_stream,
+    ) {
+        impl: {
+            in_port -- out_port;
+        },
+    };
 }

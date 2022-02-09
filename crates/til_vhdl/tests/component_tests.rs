@@ -34,7 +34,7 @@ fn streamlet_to_vhdl() -> Result<()> {
     let arch_db = &mut _arch_db;
     let stream = test_stream_id(db, 4)?;
     let streamlet = Streamlet::new()
-        .with_name("test")?
+        .try_with_name("test")?
         .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
     let component = Arc::new(streamlet.canonical(db, arch_db, "")?);
     let mut package = Package::new_default_empty();
@@ -102,7 +102,7 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
             let arch_db = &mut _arch_db;
             let stream = test_stream_id_custom(db, 4, 2.0, 0, c)?;
             let streamlet = Streamlet::new()
-                .with_name("test")?
+                .try_with_name("test")?
                 .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
             let component: Component = streamlet.canonical(db, arch_db, "")?;
             component.declare(arch_db)
@@ -233,7 +233,7 @@ fn playground() -> Result<()> {
         false,
     )?;
 
-    let streamlet = Streamlet::new().with_name("test")?.with_ports(
+    let streamlet = Streamlet::new().try_with_name("test")?.with_ports(
         db,
         vec![
             ("a", stream, InterfaceDirection::In),
@@ -244,7 +244,7 @@ fn playground() -> Result<()> {
     let mut structure = Structure::try_from(&streamlet)?;
     structure.try_add_connection(db, "a", "b")?;
     let implementation = Implementation::structural(structure)?
-        .with_name("structural")?
+        .try_with_name("structural")?
         .intern(db);
     let streamlet = streamlet.with_implementation(Some(implementation));
 

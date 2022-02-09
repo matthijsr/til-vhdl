@@ -177,7 +177,7 @@ impl Namespace {
         let name = name.try_result()?;
         let streamlet = streamlet
             .try_result()?
-            .with_name(self.path_name().with_child(&name))?;
+            .with_name(self.path_name().with_child(&name));
         let streamlet_id = streamlet.intern(db);
         self.import_streamlet(name, streamlet_id)?;
         Ok(streamlet_id)
@@ -192,7 +192,7 @@ impl Namespace {
         let name = name.try_result()?;
         let implementation = implementation
             .try_result()?
-            .with_name(self.path_name().with_child(&name))?;
+            .with_name(self.path_name().with_child(&name));
         let implementation_id = implementation.intern(db);
         self.import_implementation(name, implementation_id)?;
         Ok(implementation_id)

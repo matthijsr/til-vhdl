@@ -49,7 +49,12 @@ impl Streamlet {
         Ok(self)
     }
 
-    pub fn with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
+    pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    pub fn try_with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
         self.name = name.try_result()?;
         Ok(self)
     }

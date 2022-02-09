@@ -253,7 +253,7 @@ pub fn eval_type_expr(
     };
 
     match &expr.0 {
-        Expr::Ident(ident) => eval_ident(ident, &expr.1, types, type_imports),
+        Expr::Ident(ident) => eval_ident(ident, &expr.1, types, type_imports, "streamlet"),
         Expr::TypeDef(typ_expr) => match typ_expr {
             LogicalTypeExpr::Null => Ok(LogicalType::null_id(db)),
             LogicalTypeExpr::Bits((num, num_span)) => {

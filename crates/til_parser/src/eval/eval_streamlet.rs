@@ -21,6 +21,7 @@ use super::{eval_ident, eval_interface::eval_interface_expr, EvalError};
 pub fn eval_streamlet_expr(
     db: &dyn Ir,
     expr: &Spanned<Expr>,
+    name: &PathName,
     streamlets: &HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
@@ -32,14 +33,14 @@ pub fn eval_streamlet_expr(
 ) -> Result<(Id<Streamlet>, Id<InterfaceCollection>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
-            if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports) {
-                let interface = eval_ident(ident, &expr.1, interfaces, interface_imports)?;
+            if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports, "streamlet") {
+                let interface = eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
                 Ok((val, interface))
             } else {
-                match eval_ident(ident, &expr.1, interfaces, interface_imports) {
+                match eval_ident(ident, &expr.1, interfaces, interface_imports, "streamlet") {
                     Ok(interface) => {
                         let streamlet: Streamlet = interface.into();
-                        Ok((streamlet.intern(db), interface))
+                        Ok((streamlet.with_name(name.clone()).intern(db), interface))
                     }
                     Err(err) => Err(EvalError {
                         span: err.span,
@@ -67,6 +68,7 @@ pub fn eval_streamlet_expr(
                                     implementation = Some(eval_implementation_expr(
                                         db,
                                         impl_expr,
+                                        name,
                                         Some(interface),
                                         streamlets,
                                         streamlet_imports,
@@ -90,7 +92,7 @@ pub fn eval_streamlet_expr(
                     if let Some((implementation, _)) = implementation {
                         streamlet = streamlet.with_implementation(Some(implementation));
                     }
-                    Ok((streamlet.intern(db), interface))
+                    Ok((streamlet.with_name(name.clone()).intern(db), interface))
                 }
                 _ => Err(EvalError {
                     span: properties.1.clone(),
@@ -101,7 +103,12 @@ pub fn eval_streamlet_expr(
         Expr::InterfaceDef(_) => {
             let interface =
                 eval_interface_expr(db, expr, interfaces, interface_imports, types, type_imports)?;
-            Ok((Streamlet::from(interface).intern(db), interface))
+            Ok((
+                Streamlet::from(interface)
+                    .with_name(name.clone())
+                    .intern(db),
+                interface,
+            ))
         }
         _ => Err(EvalError {
             span: expr.1.clone(),

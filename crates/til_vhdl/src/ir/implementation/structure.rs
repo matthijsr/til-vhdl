@@ -170,7 +170,7 @@ mod tests {
         let stream2 = test_stream_id(ir_db, union)?;
         // Create a Streamlet
         let streamlet = Streamlet::new()
-            .with_name("a")?
+            .try_with_name("a")?
             .with_ports(
                 ir_db,
                 vec![

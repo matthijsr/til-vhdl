@@ -24,6 +24,7 @@ use super::{eval_name, eval_type::eval_type_expr, EvalError};
 pub fn eval_declaration(
     db: &dyn Ir,
     decl: &Decl,
+    namespace: &PathName,
     streamlets: &mut HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &mut HashMap<Name, Id<Implementation>>,
@@ -56,6 +57,7 @@ pub fn eval_declaration(
             let (impl_id, interface_id) = eval_implementation_expr(
                 db,
                 expr,
+                &namespace.with_child(name.clone()),
                 None,
                 streamlets,
                 streamlet_imports,
@@ -90,6 +92,7 @@ pub fn eval_declaration(
             let (streamlet_id, interface_id) = eval_streamlet_expr(
                 db,
                 expr,
+                &namespace.with_child(name.clone()),
                 streamlets,
                 streamlet_imports,
                 implementations,

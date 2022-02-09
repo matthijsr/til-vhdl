@@ -28,7 +28,9 @@ pub fn eval_interface_expr(
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<Id<InterfaceCollection>, EvalError> {
     match &expr.0 {
-        Expr::Ident(ident) => eval_ident(ident, &expr.1, interfaces, interface_imports),
+        Expr::Ident(ident) => {
+            eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")
+        }
         Expr::InterfaceDef(iface) => {
             let mut dups = HashSet::new();
             let mut result = InterfaceCollection::new_empty();

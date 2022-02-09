@@ -74,6 +74,7 @@ pub fn eval_ident<T: Clone>(
     span: &Span,
     defs: &HashMap<Name, T>,
     imports: &HashMap<PathName, T>,
+    decl_name: &str,
 ) -> Result<T, EvalError> {
     match ident {
         IdentExpr::Name((n, s)) => {
@@ -83,7 +84,7 @@ pub fn eval_ident<T: Clone>(
             } else {
                 Err(EvalError {
                     span: s.clone(),
-                    msg: format!("No {} with identity {}", type_name::<T>(), &name),
+                    msg: format!("No {} with identity {}", decl_name, &name),
                 })
             }
         }
@@ -99,7 +100,7 @@ pub fn eval_ident<T: Clone>(
             } else {
                 Err(EvalError {
                     span: span.clone(),
-                    msg: format!("No imported {} with identity {}", type_name::<T>(), &pthn),
+                    msg: format!("No imported {} with identity {}", decl_name, &pthn),
                 })
             }
         }

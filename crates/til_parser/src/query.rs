@@ -53,9 +53,9 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
     let mut eval_errors = vec![];
     let mut project = Project::new("proj", ".")?;
     if let Some(ast) = ast {
-        for (name, parsed_namespace) in ast.into_iter() {
-            match PathName::try_new(name) {
-                Ok(name) => {
+        for (name_vec, parsed_namespace) in ast.into_iter() {
+            match PathName::try_new(name_vec) {
+                Ok(namespace_name) => {
                     // TODO: Imports currently left immutable as they are unused.
                     let mut types = HashMap::new();
                     let type_imports = HashMap::new();
@@ -78,6 +78,7 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                                 let eval_result = eval_declaration(
                                     db,
                                     decl,
+                                    &namespace_name,
                                     &mut streamlets,
                                     &streamlet_imports,
                                     &mut implementations,
@@ -97,7 +98,7 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
 
                     // Don't bother doing more work if evaluation failed at any point, just use the errors to provide a useful report.
                     if eval_errors.len() == 0 {
-                        let mut namespace = Namespace::new(name)?;
+                        let mut namespace = Namespace::new(namespace_name)?;
 
                         for (name, type_id) in types {
                             namespace.import_type(name, type_id)?;
@@ -106,10 +107,10 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                             namespace.import_interface(name, interface_id)?;
                         }
                         for (name, implementation_id) in implementations {
-                            namespace.define_implementation(db, name, implementation_id.get(db))?;
+                            namespace.import_implementation(name, implementation_id)?;
                         }
                         for (name, streamlet_id) in streamlets {
-                            namespace.define_streamlet(db, name, streamlet_id.get(db))?;
+                            namespace.import_streamlet(name, streamlet_id)?;
                         }
 
                         project.add_namespace(db, namespace)?;

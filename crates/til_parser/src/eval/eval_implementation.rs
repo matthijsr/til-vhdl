@@ -62,7 +62,7 @@ pub fn eval_struct_stat(
         }
         StructStat::Instance((name_string, name_span), (ident_expr, ident_span)) => {
             let name = eval_name(name_string, name_span)?;
-            let streamlet = eval_ident(ident_expr, ident_span, streamlets, streamlet_imports)?;
+            let streamlet = eval_ident(ident_expr, ident_span, streamlets, streamlet_imports, "streamlet")?;
             eval_common_error(
                 structure.try_add_streamlet_instance(name, streamlet),
                 name_span,
@@ -98,6 +98,7 @@ pub fn eval_struct_stat(
 pub fn eval_implementation_expr(
     db: &dyn Ir,
     expr: &Spanned<Expr>,
+    name: &PathName,
     interface: Option<Id<InterfaceCollection>>,
     streamlets: &HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
@@ -111,8 +112,8 @@ pub fn eval_implementation_expr(
     match &expr.0 {
         Expr::Ident(ident) => {
             let implementation =
-                eval_ident(ident, &expr.1, implementations, implementation_imports)?;
-            let interface = eval_ident(ident, &expr.1, interfaces, interface_imports)?;
+                eval_ident(ident, &expr.1, implementations, implementation_imports, "implementation")?;
+            let interface = eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
             Ok((implementation, interface))
         }
         Expr::RawImpl(raw_impl) => {
@@ -135,7 +136,19 @@ pub fn eval_implementation_expr(
                                 type_imports,
                             )?;
                         }
-                        Ok((Implementation::from(structure).intern(db), interface))
+                        if let Err(err) = structure.validate_connections(db) {
+                            Err(EvalError {
+                                span: expr.1.clone(),
+                                msg: err.to_string(),
+                            })
+                        } else {
+                            Ok((
+                                Implementation::from(structure)
+                                    .with_name(name.clone())
+                                    .intern(db),
+                                interface,
+                            ))
+                        }
                     }
                     RawImpl::Behavioural(_) => todo!(),
                 }
@@ -158,6 +171,7 @@ pub fn eval_implementation_expr(
             eval_implementation_expr(
                 db,
                 raw_impl,
+                name,
                 Some(interface),
                 streamlets,
                 streamlet_imports,

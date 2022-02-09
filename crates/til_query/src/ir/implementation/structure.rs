@@ -267,7 +267,7 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::new().with_name("a")?.with_ports(
+        let streamlet = Streamlet::new().try_with_name("a")?.with_ports(
             db,
             vec![
                 ("a", stream, InterfaceDirection::In),
@@ -289,7 +289,7 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::new().with_name("a")?.with_ports(
+        let streamlet = Streamlet::new().try_with_name("a")?.with_ports(
             db,
             vec![
                 ("a", stream, InterfaceDirection::In),
@@ -331,7 +331,7 @@ mod tests {
         let _db = Database::default();
         let db = &_db;
         let stream = test_stream_id(db, 4)?;
-        let streamlet = Streamlet::new().with_name("a")?.with_ports(
+        let streamlet = Streamlet::new().try_with_name("a")?.with_ports(
             db,
             vec![
                 ("a", stream, InterfaceDirection::In),
