@@ -6,7 +6,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    project::interface_collection::InterfaceCollection,
+    project::interface::InterfaceCollection,
     traits::{GetSelf, InternSelf, MoveDb, TryIntern},
     Implementation, Interface, Ir,
 };

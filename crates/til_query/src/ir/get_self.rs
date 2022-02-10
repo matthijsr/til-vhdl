@@ -1,7 +1,7 @@
 use tydi_intern::Id;
 
 use super::{
-    project::{interface_collection::InterfaceCollection, namespace::Namespace},
+    project::{interface::InterfaceCollection, namespace::Namespace},
     traits::GetSelf,
     Implementation, Interface, Ir, LogicalType, Stream, Streamlet,
 };

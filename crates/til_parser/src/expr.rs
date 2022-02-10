@@ -227,13 +227,13 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             .then_ignore(just(Token::Ctrl(',')).or_not())
             .or_not()
             .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         let bits_def = filter_map(|span, tok| match tok {
             Token::Num(num) => Ok((num, span)),
             _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
         })
-        .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         // Stream properties are either values or types
         let stream_prop = typ_el.or(label.clone().then(val.clone()));
@@ -248,7 +248,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             .then_ignore(just(Token::Ctrl(',')).or_not())
             .or_not()
             .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         just(Token::Type(TypeKeyword::Null))
             .to(LogicalTypeExpr::Null)
@@ -311,7 +311,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .or_not()
         .map(|item| item.unwrap_or_else(Vec::new))
-        .delimited_by(Token::Ctrl('('), Token::Ctrl(')'))
+        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
         .map(Expr::InterfaceDef)
         .map_with_span(|i, span| (i, span));
 
@@ -333,7 +333,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     let struct_bod = struct_parser()
         .repeated()
-        .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
+        .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
         .map(|stats| RawImpl::Struct(stats))
         .map(Expr::RawImpl)
         .map_with_span(|ri, span| (ri, span))
@@ -383,7 +383,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
-        .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
+        .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
         .map_with_span(|p, span| (Expr::StreamletProps(p), span))
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),

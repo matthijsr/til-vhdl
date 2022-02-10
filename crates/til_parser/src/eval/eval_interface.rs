@@ -4,7 +4,7 @@ use til_query::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
     ir::{
         physical_properties::InterfaceDirection,
-        project::interface_collection::InterfaceCollection,
+        project::interface::InterfaceCollection,
         traits::{GetSelf, InternSelf},
         Ir,
     },

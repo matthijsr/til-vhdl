@@ -1,12 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        connection::{Connection, InterfaceReference},
+        connection::{InterfaceReference},
         implementation::{structure::Structure, Implementation},
-        physical_properties::InterfaceDirection,
-        project::interface_collection::InterfaceCollection,
+        project::interface::InterfaceCollection,
         streamlet::Streamlet,
         traits::InternSelf,
         Ir,
@@ -18,7 +17,6 @@ use tydi_intern::Id;
 use crate::{
     eval::{eval_ident, eval_interface::eval_interface_expr},
     expr::{Expr, RawImpl},
-    ident_expr::IdentExpr,
     struct_parse::{PortSel, StructStat},
     Spanned,
 };

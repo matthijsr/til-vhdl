@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        implementation::Implementation, project::interface_collection::InterfaceCollection,
-        streamlet::Streamlet, traits::InternSelf, Ir,
+        implementation::Implementation,
+        streamlet::Streamlet, traits::InternSelf, Ir, project::interface::InterfaceCollection,
     },
 };
 use tydi_common::name::{Name, PathName};

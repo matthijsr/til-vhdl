@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::interface_collection::InterfaceCollection;
+use super::interface::InterfaceCollection;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {

@@ -96,7 +96,7 @@ pub fn namespaces_parser(
         .then(
             stat.clone()
                 .repeated()
-                .delimited_by(Token::Ctrl('{'), Token::Ctrl('}')),
+                .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}'))),
         )
         .map(|(name, stats)| {
             let (n, span) = name.clone();

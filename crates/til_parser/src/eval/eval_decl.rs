@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        implementation::Implementation, project::interface_collection::InterfaceCollection,
+        implementation::Implementation, project::interface::InterfaceCollection,
         streamlet::Streamlet, Ir,
     },
 };

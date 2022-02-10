@@ -10,7 +10,7 @@ use tydi_intern::Id;
 use self::structure::Structure;
 
 use super::{
-    project::interface_collection::InterfaceCollection,
+    project::interface::InterfaceCollection,
     traits::{GetSelf, InternSelf, MoveDb},
     Ir,
 };
