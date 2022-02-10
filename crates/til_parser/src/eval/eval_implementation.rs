@@ -1,12 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        connection::{Connection, InterfaceReference},
+        connection::InterfaceReference,
         implementation::{structure::Structure, Implementation},
-        physical_properties::InterfaceDirection,
-        project::interface_collection::InterfaceCollection,
+        project::interface::InterfaceCollection,
         streamlet::Streamlet,
         traits::InternSelf,
         Ir,
@@ -18,12 +17,11 @@ use tydi_intern::Id;
 use crate::{
     eval::{eval_ident, eval_interface::eval_interface_expr},
     expr::{Expr, RawImpl},
-    ident_expr::IdentExpr,
     struct_parse::{PortSel, StructStat},
     Spanned,
 };
 
-use super::{eval_common_error, eval_name, eval_type::eval_type_expr, Def, EvalError};
+use super::{eval_common_error, eval_name, EvalError};
 
 pub fn eval_struct_stat(
     db: &dyn Ir,
@@ -62,7 +60,13 @@ pub fn eval_struct_stat(
         }
         StructStat::Instance((name_string, name_span), (ident_expr, ident_span)) => {
             let name = eval_name(name_string, name_span)?;
-            let streamlet = eval_ident(ident_expr, ident_span, streamlets, streamlet_imports, "streamlet")?;
+            let streamlet = eval_ident(
+                ident_expr,
+                ident_span,
+                streamlets,
+                streamlet_imports,
+                "streamlet",
+            )?;
             eval_common_error(
                 structure.try_add_streamlet_instance(name, streamlet),
                 name_span,
@@ -99,6 +103,7 @@ pub fn eval_implementation_expr(
     db: &dyn Ir,
     expr: &Spanned<Expr>,
     name: &PathName,
+    doc: Option<&String>,
     interface: Option<Id<InterfaceCollection>>,
     streamlets: &HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
@@ -111,8 +116,13 @@ pub fn eval_implementation_expr(
 ) -> Result<(Id<Implementation>, Id<InterfaceCollection>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
-            let implementation =
-                eval_ident(ident, &expr.1, implementations, implementation_imports, "implementation")?;
+            let implementation = eval_ident(
+                ident,
+                &expr.1,
+                implementations,
+                implementation_imports,
+                "implementation",
+            )?;
             let interface = eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
             Ok((implementation, interface))
         }
@@ -142,12 +152,12 @@ pub fn eval_implementation_expr(
                                 msg: err.to_string(),
                             })
                         } else {
-                            Ok((
-                                Implementation::from(structure)
-                                    .with_name(name.clone())
-                                    .intern(db),
-                                interface,
-                            ))
+                            let mut implementation =
+                                Implementation::from(structure).with_name(name.clone());
+                            if let Some(doc) = doc {
+                                implementation.set_doc(doc);
+                            }
+                            Ok((implementation.intern(db), interface))
                         }
                     }
                     RawImpl::Behavioural(_) => todo!(),
@@ -172,6 +182,7 @@ pub fn eval_implementation_expr(
                 db,
                 raw_impl,
                 name,
+                doc,
                 Some(interface),
                 streamlets,
                 streamlet_imports,
@@ -182,6 +193,30 @@ pub fn eval_implementation_expr(
                 types,
                 type_imports,
             )
+        }
+        Expr::Documentation((doc_str, doc_span), sub_expr) => {
+            if doc == None {
+                eval_implementation_expr(
+                    db,
+                    sub_expr,
+                    name,
+                    Some(doc_str),
+                    interface,
+                    streamlets,
+                    streamlet_imports,
+                    implementations,
+                    implementation_imports,
+                    interfaces,
+                    interface_imports,
+                    types,
+                    type_imports,
+                )
+            } else {
+                Err(EvalError::new(
+                    doc_span,
+                    "Documentation already set on declaration.",
+                ))
+            }
         }
         _ => Err(EvalError {
             span: expr.1.clone(),

@@ -1,5 +1,4 @@
 use std::{
-    any::type_name,
     collections::{HashMap, HashSet},
     convert::TryFrom,
     str::FromStr,
@@ -17,17 +16,16 @@ use til_query::{
 };
 use tydi_common::{
     name::{Name, PathName},
-    numbers::{NonNegative, Positive},
+    numbers::NonNegative,
 };
 use tydi_intern::Id;
 
 use crate::{
     expr::{Expr, LogicalTypeExpr, Value},
-    ident_expr::IdentExpr,
     Span, Spanned,
 };
 
-use super::{eval_common_error, eval_ident, eval_name, Def, EvalError};
+use super::{eval_common_error, eval_ident, eval_name, EvalError};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StreamTypeDef {

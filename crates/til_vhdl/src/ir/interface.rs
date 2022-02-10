@@ -5,7 +5,7 @@ use til_query::{
 use tydi_common::{
     cat,
     error::{Result, TryOptional},
-    traits::Identify,
+    traits::{Document, Identify},
 };
 
 use tydi_vhdl::{
@@ -51,6 +51,12 @@ impl IntoVhdl<Vec<Port>> for Interface {
                 .ports()
             {
                 ports.push(port.clone());
+            }
+        }
+
+        if let Some(doc) = self.doc() {
+            if ports.len() > 0 {
+                ports[0].set_doc(doc);
             }
         }
 

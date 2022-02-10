@@ -1,29 +1,18 @@
 use std::{collections::HashMap, sync::Arc};
 
 use chumsky::{Parser, Stream};
-use til_query::{
-    common::logical::logicaltype::LogicalType,
-    ir::{
-        db::Database,
-        project::{
-            namespace::{self, Namespace},
-            Project,
-        },
-        traits::GetSelf,
-        Ir,
-    },
+use til_query::ir::{
+    db::Database,
+    project::{namespace::Namespace, Project},
+    Ir,
 };
 use tydi_common::{error::Error, name::PathName};
-use tydi_intern::Id;
 
 use crate::{
-    eval::{eval_decl::eval_declaration, eval_name, EvalError},
-    expr::Expr,
-    ident_expr::IdentExpr,
+    eval::{eval_decl::eval_declaration, EvalError},
     lex::lexer,
-    namespace::{namespaces_parser, Decl, Statement},
+    namespace::{namespaces_parser, Statement},
     report::{report_errors, report_eval_errors},
-    Spanned,
 };
 
 pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<Database> {
@@ -31,7 +20,7 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
     let db = &mut _db;
 
     let src = src.into();
-    let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+    let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
     let (ast, parse_errs) = if let Some(tokens) = tokens {
         let len = src.chars().count();

@@ -1,6 +1,5 @@
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, primitive::Just, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
+use chumsky::prelude::*;
+use std::{fmt, hash::Hash};
 use til_query::{
     common::{
         logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
@@ -9,13 +8,13 @@ use til_query::{
     ir::physical_properties::InterfaceDirection,
 };
 use tydi_common::{
-    name::{Name, PathName},
+    name::Name,
     numbers::{NonNegative, Positive, PositiveReal},
 };
 
 use crate::{
     ident_expr::{ident_expr_parser, name_parser, IdentExpr},
-    lex::{DeclKeyword, Operator, Token, TypeKeyword},
+    lex::{DeclKeyword, Token, TypeKeyword},
     struct_parse::{struct_parser, StructStat},
     Span, Spanned,
 };
@@ -151,18 +150,16 @@ pub enum StreamletProperty {
     Implementation(Box<Spanned<Expr>>),
 }
 
-pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
-    // ......
-    // DOCUMENTATION
-    // ......
-
-    let doc_body = filter_map(|span, tok| match tok {
+pub fn doc_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
+    filter_map(|span, tok| match tok {
         Token::Documentation(docstr) => Ok(docstr.clone()),
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
     .map_with_span(|body, span| (body, span))
-    .labelled("documentation");
+    .labelled("documentation")
+}
 
+pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     // ......
     // VALUES
     // ......
@@ -227,13 +224,13 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             .then_ignore(just(Token::Ctrl(',')).or_not())
             .or_not()
             .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         let bits_def = filter_map(|span, tok| match tok {
             Token::Num(num) => Ok((num, span)),
             _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
         })
-        .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         // Stream properties are either values or types
         let stream_prop = typ_el.or(label.clone().then(val.clone()));
@@ -248,7 +245,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             .then_ignore(just(Token::Ctrl(',')).or_not())
             .or_not()
             .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(Token::Ctrl('('), Token::Ctrl(')'));
+            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         just(Token::Type(TypeKeyword::Null))
             .to(LogicalTypeExpr::Null)
@@ -294,8 +291,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|p, span| (p, span));
 
     // Individual ports can have documentation
-    let doc_port_def = doc_body
-        .clone()
+    let doc_port_def = doc_parser()
         .then(port_def.clone())
         .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
         .map_with_span(|d, span| (d, span));
@@ -311,7 +307,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .or_not()
         .map(|item| item.unwrap_or_else(Vec::new))
-        .delimited_by(Token::Ctrl('('), Token::Ctrl(')'))
+        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
         .map(Expr::InterfaceDef)
         .map_with_span(|i, span| (i, span));
 
@@ -333,7 +329,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     let struct_bod = struct_parser()
         .repeated()
-        .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
+        .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
         .map(|stats| RawImpl::Struct(stats))
         .map(Expr::RawImpl)
         .map_with_span(|ri, span| (ri, span))
@@ -345,6 +341,12 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         ));
 
     let raw_impl = behav.or(struct_bod);
+    // Implementations can have documentation set on their raw definition, or on their overall declaration.
+    let doc_raw_impl = doc_parser()
+        .then(raw_impl.clone())
+        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
+        .map_with_span(|d, span| (d, span));
+    let raw_impl = doc_raw_impl.or(raw_impl);
 
     // Implementations consist of an interface definition and a structural or behavioural implementation
     let impl_def = interface
@@ -352,14 +354,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .then(raw_impl.clone())
         .map(|(e, ri)| Expr::ImplDef(Box::new(e), Box::new(ri)))
         .map_with_span(|i, span| (i, span));
-
-    // Implementations can have (overall) documentation
-    let doc_impl_def = doc_body
-        .clone()
-        .then(impl_def.clone())
-        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
-        .map_with_span(|d, span| (d, span));
-    let impl_def = doc_impl_def.or(impl_def);
 
     // ......
     // STREAMLET DEFINITIONS
@@ -383,7 +377,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
-        .delimited_by(Token::Ctrl('{'), Token::Ctrl('}'))
+        .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
         .map_with_span(|p, span| (Expr::StreamletProps(p), span))
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),
@@ -434,6 +428,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 mod tests {
     use std::path::Path;
 
+    use chumsky::Stream;
+
     use crate::{lex::lexer, report::report_errors};
 
     use super::*;
@@ -444,7 +440,7 @@ mod tests {
 
     fn test_expr_parse(src: impl Into<String>) {
         let src = src.into();
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+        let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
         // println!("{:#?}", tokens);
 
@@ -497,8 +493,8 @@ mod tests {
     #[test]
     fn test_doc_expr() {
         test_expr_parse(
-            r#"#doc
-doc doc# 1.3"#,
+            r#"(#doc
+doc doc# some_port: in a)"#,
         )
     }
 

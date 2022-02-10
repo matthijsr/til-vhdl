@@ -1,31 +1,19 @@
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, primitive::Just, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
-use til_query::{
-    common::{
-        logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
-        physical::complexity::Complexity,
-    },
-    ir::physical_properties::InterfaceDirection,
-};
-use tydi_common::{
-    name::{Name, PathName},
-    numbers::{NonNegative, Positive, PositiveReal},
-};
+use chumsky::prelude::*;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
-    expr::{expr_parser, Expr},
-    ident_expr::{ident_expr_parser, name_parser, path_name_parser},
-    lex::{DeclKeyword, Operator, Token, TypeKeyword},
+    expr::{doc_parser, expr_parser, Expr},
+    ident_expr::{name_parser, path_name_parser},
+    lex::{DeclKeyword, Operator, Token},
     Span, Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
     TypeDecl(Spanned<String>, Box<Spanned<Expr>>),
-    ImplDecl(Spanned<String>, Box<Spanned<Expr>>),
+    ImplDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
     InterfaceDecl(Spanned<String>, Box<Spanned<Expr>>),
-    StreamletDecl(Spanned<String>, Box<Spanned<Expr>>),
+    StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -66,8 +54,11 @@ pub fn namespaces_parser(
         .ignore_then(name.clone())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
-        .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::ImplDecl(n, Box::new(e)));
+        .then_ignore(just(Token::Ctrl(';')));
+    let doc_impl_decl = doc_parser()
+        .then(impl_decl.clone())
+        .map(|((doc, _), (n, e))| Decl::ImplDecl(Some(doc), n, Box::new(e)));
+    let impl_decl = doc_impl_decl.or(impl_decl.map(|(n, e)| Decl::ImplDecl(None, n, Box::new(e))));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
         .ignore_then(name.clone())
@@ -80,8 +71,12 @@ pub fn namespaces_parser(
         .ignore_then(name.clone())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
-        .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::StreamletDecl(n, Box::new(e)));
+        .then_ignore(just(Token::Ctrl(';')));
+    let doc_streamlet_decl = doc_parser()
+        .then(streamlet_decl.clone())
+        .map(|((doc, _), (n, e))| Decl::StreamletDecl(Some(doc), n, Box::new(e)));
+    let streamlet_decl = doc_streamlet_decl
+        .or(streamlet_decl.map(|(n, e)| Decl::StreamletDecl(None, n, Box::new(e))));
 
     let decl = type_decl
         .or(impl_decl)
@@ -96,7 +91,7 @@ pub fn namespaces_parser(
         .then(
             stat.clone()
                 .repeated()
-                .delimited_by(Token::Ctrl('{'), Token::Ctrl('}')),
+                .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}'))),
         )
         .map(|(name, stats)| {
             let (n, span) = name.clone();
@@ -130,6 +125,8 @@ pub fn namespaces_parser(
 mod tests {
     use std::path::Path;
 
+    use chumsky::Stream;
+
     use crate::{lex::lexer, report::report_errors};
 
     use super::*;
@@ -140,7 +137,7 @@ mod tests {
 
     fn test_namespace_parse(src: impl Into<String>) {
         let src = src.into();
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+        let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
         // println!("{:#?}", tokens);
 

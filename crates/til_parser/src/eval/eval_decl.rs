@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        implementation::Implementation, project::interface_collection::InterfaceCollection,
+        implementation::Implementation, project::interface::InterfaceCollection,
         streamlet::Streamlet, Ir,
     },
 };
@@ -52,12 +52,13 @@ pub fn eval_declaration(
                 Ok(())
             }
         }
-        Decl::ImplDecl((n, s), expr) => {
+        Decl::ImplDecl(doc, (n, s), expr) => {
             let name = eval_name(n, s)?;
             let (impl_id, interface_id) = eval_implementation_expr(
                 db,
                 expr,
                 &namespace.with_child(name.clone()),
+                doc.as_ref(),
                 None,
                 streamlets,
                 streamlet_imports,
@@ -87,12 +88,13 @@ pub fn eval_declaration(
                 Ok(())
             }
         }
-        Decl::StreamletDecl((n, s), expr) => {
+        Decl::StreamletDecl(doc, (n, s), expr) => {
             let name = eval_name(n, s)?;
             let (streamlet_id, interface_id) = eval_streamlet_expr(
                 db,
                 expr,
                 &namespace.with_child(name.clone()),
+                doc,
                 streamlets,
                 streamlet_imports,
                 implementations,

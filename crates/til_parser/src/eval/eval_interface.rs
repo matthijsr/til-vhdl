@@ -1,10 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+};
 
 use til_query::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
     ir::{
-        physical_properties::InterfaceDirection,
-        project::interface_collection::InterfaceCollection,
+        interface::Interface,
+        project::interface::InterfaceCollection,
         traits::{GetSelf, InternSelf},
         Ir,
     },
@@ -15,9 +18,9 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-use crate::{eval::eval_ident, expr::Expr, Span, Spanned};
+use crate::{eval::eval_ident, expr::Expr, Spanned};
 
-use super::{eval_common_error, eval_name, eval_type::eval_type_expr, Def, EvalError};
+use super::{eval_common_error, eval_name, eval_type::eval_type_expr, EvalError};
 
 pub fn eval_interface_expr(
     db: &dyn Ir,
@@ -35,9 +38,14 @@ pub fn eval_interface_expr(
             let mut dups = HashSet::new();
             let mut result = InterfaceCollection::new_empty();
             for port_def_expr in iface {
-                if let Expr::PortDef((name_string, name_span), (props, props_span)) =
-                    &port_def_expr.0
-                {
+                let mut port_def_expr = port_def_expr;
+                let mut doc = None;
+                if let (Expr::Documentation((doc_str, _), sub_expr), _) = port_def_expr {
+                    port_def_expr = sub_expr;
+                    doc = Some(doc_str);
+                };
+
+                if let Expr::PortDef((name_string, name_span), (props, _)) = &port_def_expr.0 {
                     let name = eval_name(name_string, name_span)?;
                     if dups.contains(&name) {
                         return Err(EvalError {
@@ -52,10 +60,14 @@ pub fn eval_interface_expr(
                                 .try_result(),
                             &props.typ.1,
                         )?;
-                        eval_common_error(
-                            result.push(db, (name, stream_id, props.mode.0)),
+                        let mut port = eval_common_error(
+                            Interface::try_from((name, stream_id, props.mode.0)),
                             name_span,
                         )?;
+                        if let Some(doc) = doc {
+                            port.set_doc(doc);
+                        }
+                        eval_common_error(result.push(db, port), name_span)?;
                     }
                 } else {
                     return Err(EvalError {

@@ -5,7 +5,7 @@ use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
 use super::{
     implementation::Implementation,
     interface::Interface,
-    project::{interface_collection::InterfaceCollection, namespace::Namespace},
+    project::{interface::InterfaceCollection, namespace::Namespace},
     streamlet::Streamlet,
 };
 

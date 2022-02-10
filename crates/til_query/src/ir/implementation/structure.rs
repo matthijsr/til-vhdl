@@ -12,7 +12,7 @@ use tydi_intern::Id;
 use crate::ir::{
     connection::{Connection, InterfaceReference},
     physical_properties::InterfaceDirection,
-    project::interface_collection::InterfaceCollection,
+    project::interface::InterfaceCollection,
     traits::{GetSelf, MoveDb},
     Interface, Ir, Streamlet,
 };
