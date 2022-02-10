@@ -14,6 +14,7 @@ namespace my::test::space {
     );
     type stream2 = stream;
 
+    #documentation#
     streamlet comp1 = (
         # some doc # a: in stream,
         b: out stream,
@@ -92,12 +93,19 @@ It will still be emitted, as the name has changed.
         complexity: 7,
         direction: Forward, // Note, the keep and user properties are not required (nor is throughput, which defaults to 1)
     );
+    #This is streamlet documentation
+Newline.#
     streamlet my_new_streamlet = (
         in_port: in my_stream,
+        #This is port documentation
+Newline.#
         out_port: out my_stream,
     ) {
-        impl: {
+        impl: #This is impl documentation
+Newline.# {
             in_port -- out_port;
         },
     };
+
+    streamlet comp7 = comp4;
 }
