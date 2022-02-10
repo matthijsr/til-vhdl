@@ -120,12 +120,11 @@ pub fn eval_streamlet_expr(
         Expr::InterfaceDef(_) => {
             let interface =
                 eval_interface_expr(db, expr, interfaces, interface_imports, types, type_imports)?;
-            Ok((
-                Streamlet::from(interface)
-                    .with_name(name.clone())
-                    .intern(db),
-                interface,
-            ))
+            let mut streamlet = Streamlet::from(interface);
+            if let Some(doc) = doc {
+                streamlet.set_doc(doc);
+            }
+            Ok((streamlet.with_name(name.clone()).intern(db), interface))
         }
         _ => Err(EvalError {
             span: expr.1.clone(),
