@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::Name,
-    traits::Identify,
+    traits::{Document, Identify},
 };
 use tydi_intern::Id;
 
@@ -20,6 +20,8 @@ pub struct Interface {
     name: Name,
     stream: Id<Stream>,
     physical_properties: PhysicalProperties,
+    /// Documentation.
+    doc: Option<String>,
 }
 
 impl Interface {
@@ -32,7 +34,12 @@ impl Interface {
             name: name.try_result()?,
             stream,
             physical_properties,
+            doc: None,
         })
+    }
+
+    pub fn with_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 
     pub fn name(&self) -> &Name {
@@ -75,6 +82,7 @@ where
             name: name.try_result()?,
             stream: stream.try_result()?,
             physical_properties: physical_properties.try_result()?,
+            doc: None,
         })
     }
 }
@@ -90,7 +98,14 @@ impl MoveDb<Id<Interface>> for Interface {
             name: self.name.clone(),
             stream: self.stream.move_db(original_db, target_db, prefix)?,
             physical_properties: self.physical_properties.clone(),
+            doc: self.doc.clone(),
         }
         .intern(target_db))
+    }
+}
+
+impl Document for Interface {
+    fn doc(&self) -> Option<String> {
+        self.doc.clone()
     }
 }

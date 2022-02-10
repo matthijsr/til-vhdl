@@ -188,9 +188,9 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
 
     let ctrl = one_of("(){}:,;").map(|c| Token::Ctrl(c));
 
-    let doc = just('#')
-        .ignore_then(filter(|c| *c != '#').repeated())
-        .then_ignore(just('#'))
+    let doc = filter(|c| *c != '#')
+        .repeated()
+        .delimited_by(just('#'), just('#'))
         .collect::<String>()
         .map(Token::Documentation);
 

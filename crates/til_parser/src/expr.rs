@@ -497,8 +497,8 @@ mod tests {
     #[test]
     fn test_doc_expr() {
         test_expr_parse(
-            r#"#doc
-doc doc# 1.3"#,
+            r#"(#doc
+doc doc# some_port: in a)"#,
         )
     }
 

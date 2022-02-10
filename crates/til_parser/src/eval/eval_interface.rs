@@ -1,8 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+};
 
 use til_query::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
     ir::{
+        interface::Interface,
         physical_properties::InterfaceDirection,
         project::interface::InterfaceCollection,
         traits::{GetSelf, InternSelf},
@@ -35,6 +39,13 @@ pub fn eval_interface_expr(
             let mut dups = HashSet::new();
             let mut result = InterfaceCollection::new_empty();
             for port_def_expr in iface {
+                let mut port_def_expr = port_def_expr;
+                let mut doc = None;
+                if let (Expr::Documentation((doc_str, _), sub_expr), _) = port_def_expr {
+                    port_def_expr = sub_expr;
+                    doc = Some(doc_str);
+                };
+
                 if let Expr::PortDef((name_string, name_span), (props, props_span)) =
                     &port_def_expr.0
                 {
@@ -52,10 +63,14 @@ pub fn eval_interface_expr(
                                 .try_result(),
                             &props.typ.1,
                         )?;
-                        eval_common_error(
-                            result.push(db, (name, stream_id, props.mode.0)),
+                        let mut port = eval_common_error(
+                            Interface::try_from((name, stream_id, props.mode.0)),
                             name_span,
                         )?;
+                        if let Some(doc) = doc {
+                            port.with_doc(doc);
+                        }
+                        eval_common_error(result.push(db, port), name_span)?;
                     }
                 } else {
                     return Err(EvalError {

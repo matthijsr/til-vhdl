@@ -15,7 +15,7 @@ namespace my::test::space {
     type stream2 = stream;
 
     streamlet comp1 = (
-        a: in stream,
+        # some doc # a: in stream,
         b: out stream,
         c: in stream2,
         d: out stream2,
