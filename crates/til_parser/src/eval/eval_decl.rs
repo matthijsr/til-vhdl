@@ -52,12 +52,13 @@ pub fn eval_declaration(
                 Ok(())
             }
         }
-        Decl::ImplDecl((n, s), expr) => {
+        Decl::ImplDecl(doc, (n, s), expr) => {
             let name = eval_name(n, s)?;
             let (impl_id, interface_id) = eval_implementation_expr(
                 db,
                 expr,
                 &namespace.with_child(name.clone()),
+                doc.as_ref(),
                 None,
                 streamlets,
                 streamlet_imports,

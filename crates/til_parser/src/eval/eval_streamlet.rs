@@ -3,8 +3,11 @@ use std::collections::HashMap;
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        implementation::Implementation, project::interface::InterfaceCollection,
-        streamlet::Streamlet, traits::InternSelf, Ir,
+        implementation::Implementation,
+        project::interface::InterfaceCollection,
+        streamlet::Streamlet,
+        traits::{GetSelf, InternSelf},
+        Ir,
     },
 };
 use tydi_common::name::{Name, PathName};
@@ -38,7 +41,11 @@ pub fn eval_streamlet_expr(
             {
                 let interface =
                     eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
-                Ok((val, interface))
+                let mut streamlet = val.get(db).with_name(name.clone());
+                if let Some(doc) = doc {
+                    streamlet.set_doc(doc);
+                }
+                Ok((streamlet.intern(db), interface))
             } else {
                 match eval_ident(ident, &expr.1, interfaces, interface_imports, "streamlet") {
                     Ok(interface) => {
@@ -75,6 +82,7 @@ pub fn eval_streamlet_expr(
                                         db,
                                         impl_expr,
                                         name,
+                                        None,
                                         Some(interface),
                                         streamlets,
                                         streamlet_imports,

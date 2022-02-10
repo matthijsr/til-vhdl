@@ -3,7 +3,7 @@ pub mod structure;
 use tydi_common::{
     error::{Result, TryResult},
     name::{Name, PathName, PathNameSelf},
-    traits::Identify,
+    traits::{Document, Identify},
 };
 use tydi_intern::Id;
 
@@ -20,6 +20,7 @@ pub struct Implementation {
     name: PathName,
     interface: Id<InterfaceCollection>,
     kind: ImplementationKind,
+    doc: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -35,6 +36,7 @@ impl Implementation {
             name: PathName::new_empty(),
             interface: structure.interface_id(),
             kind: ImplementationKind::Structural(structure.try_result()?),
+            doc: None,
         })
     }
 
@@ -45,6 +47,15 @@ impl Implementation {
     //         kind: ImplementationKind::Link,
     //     }
     // }
+
+    pub fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into())
+    }
+
+    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
+        self.doc = Some(doc.into());
+        self
+    }
 
     pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
         self.name = name.into();
@@ -75,6 +86,7 @@ impl From<Structure> for Implementation {
             name: PathName::new_empty(),
             interface: value.interface_id(),
             kind: ImplementationKind::Structural(value),
+            doc: None,
         }
     }
 }
@@ -82,6 +94,12 @@ impl From<Structure> for Implementation {
 impl Identify for Implementation {
     fn identifier(&self) -> String {
         self.path_name().to_string()
+    }
+}
+
+impl Document for Implementation {
+    fn doc(&self) -> Option<String> {
+        self.doc.clone()
     }
 }
 
@@ -107,6 +125,7 @@ impl MoveDb<Id<Implementation>> for Implementation {
                     target_db,
                     prefix,
                 )?),
+                doc: self.doc.clone(),
             }
             .intern(target_db),
             ImplementationKind::Link => todo!(),

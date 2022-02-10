@@ -341,6 +341,12 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         ));
 
     let raw_impl = behav.or(struct_bod);
+    // Implementations can have documentation set on their raw definition, or on their overall declaration.
+    let doc_raw_impl = doc_parser()
+        .then(raw_impl.clone())
+        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
+        .map_with_span(|d, span| (d, span));
+    let raw_impl = doc_raw_impl.or(raw_impl);
 
     // Implementations consist of an interface definition and a structural or behavioural implementation
     let impl_def = interface
@@ -348,13 +354,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .then(raw_impl.clone())
         .map(|(e, ri)| Expr::ImplDef(Box::new(e), Box::new(ri)))
         .map_with_span(|i, span| (i, span));
-
-    // Implementations can have (overall) documentation
-    let doc_impl_def = doc_parser()
-        .then(impl_def.clone())
-        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
-        .map_with_span(|d, span| (d, span));
-    let impl_def = doc_impl_def.or(impl_def);
 
     // ......
     // STREAMLET DEFINITIONS

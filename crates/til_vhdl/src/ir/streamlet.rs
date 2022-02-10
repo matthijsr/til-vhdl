@@ -75,6 +75,9 @@ impl IntoVhdl<String> for Streamlet {
                         Architecture::from_database(arch_db, "Behaviour")
                     }?;
                     architecture.add_body(arch_db, &arch_body)?;
+                    if let Some(doc) = implementation.doc() {
+                        architecture.set_doc(doc);
+                    }
 
                     let result_string = architecture.declare(arch_db)?;
                     arch_db.set_architecture(architecture);

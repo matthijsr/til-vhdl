@@ -27,6 +27,8 @@ namespace my::test::space {
 bla bla bla#
     streamlet comp2 = iface1;
 
+    #This is implementation
+documentation, it can work as part of a declaration.#
     impl struct = (
         a: in stream, // Ports are declared as *name* : *direction* *stream name*
         b: out stream,
@@ -55,7 +57,9 @@ bla bla bla#
     };
 
     streamlet comp3 = comp1 {
-        impl: {
+        impl:
+        #This is implementation documentation, too.#
+        {
             p1 = comp2;
             p2 = comp2;
             a -- p1.a;
@@ -69,11 +73,9 @@ bla bla bla#
         impl: struct
     };
 
-    // Defining a streamlet as a copy of another streamlet (or of an import)
-    // is partially optimized away during evaluation. Only the first declaration will be emitted.
-    // TODO: Either go all the way (ensure that streamlets queried are also unique,
-    //  as otherwise they're still being (over)written)
-    // or do allow for copies (identical streamlets/implementations, with different names).
+    #This is a copy of an existing streamlet.
+It will still be emitted, as the name has changed.
+(And we're adding documentation).#
     streamlet comp5 = comp4;
 
     // Regardless, they can still be used as interfaces
