@@ -23,6 +23,8 @@ namespace my::test::space {
 
     interface iface1 = (a: in stream, b: out stream);
 
+    #streamlet documentation
+bla bla bla#
     streamlet comp2 = iface1;
 
     impl struct = (

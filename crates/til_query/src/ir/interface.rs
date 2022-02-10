@@ -38,7 +38,12 @@ impl Interface {
         })
     }
 
-    pub fn with_doc(&mut self, doc: impl Into<String>) {
+    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
+        self.doc = Some(doc.into());
+        self
+    }
+
+    pub fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into());
     }
 

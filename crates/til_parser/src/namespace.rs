@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
-    expr::{expr_parser, Expr},
+    expr::{doc_parser, expr_parser, Expr},
     ident_expr::{name_parser, path_name_parser},
     lex::{DeclKeyword, Operator, Token},
     Span, Spanned,
@@ -13,7 +13,7 @@ pub enum Decl {
     TypeDecl(Spanned<String>, Box<Spanned<Expr>>),
     ImplDecl(Spanned<String>, Box<Spanned<Expr>>),
     InterfaceDecl(Spanned<String>, Box<Spanned<Expr>>),
-    StreamletDecl(Spanned<String>, Box<Spanned<Expr>>),
+    StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -68,8 +68,12 @@ pub fn namespaces_parser(
         .ignore_then(name.clone())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
-        .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::StreamletDecl(n, Box::new(e)));
+        .then_ignore(just(Token::Ctrl(';')));
+    let doc_streamlet_decl = doc_parser()
+        .then(streamlet_decl.clone())
+        .map(|((doc, _), (n, e))| Decl::StreamletDecl(Some(doc), n, Box::new(e)));
+    let streamlet_decl = doc_streamlet_decl
+        .or(streamlet_decl.map(|(n, e)| Decl::StreamletDecl(None, n, Box::new(e))));
 
     let decl = type_decl
         .or(impl_decl)

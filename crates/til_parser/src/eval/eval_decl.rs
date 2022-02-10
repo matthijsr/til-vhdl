@@ -87,12 +87,13 @@ pub fn eval_declaration(
                 Ok(())
             }
         }
-        Decl::StreamletDecl((n, s), expr) => {
+        Decl::StreamletDecl(doc, (n, s), expr) => {
             let name = eval_name(n, s)?;
             let (streamlet_id, interface_id) = eval_streamlet_expr(
                 db,
                 expr,
                 &namespace.with_child(name.clone()),
+                doc,
                 streamlets,
                 streamlet_imports,
                 implementations,

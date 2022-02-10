@@ -56,7 +56,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
 
         if let Some(doc) = self.doc() {
             if ports.len() > 0 {
-                ports[0].with_doc(doc);
+                ports[0].set_doc(doc);
             }
         }
 

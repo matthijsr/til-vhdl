@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        implementation::Implementation,
-        streamlet::Streamlet, traits::InternSelf, Ir, project::interface::InterfaceCollection,
+        implementation::Implementation, project::interface::InterfaceCollection,
+        streamlet::Streamlet, traits::InternSelf, Ir,
     },
 };
 use tydi_common::name::{Name, PathName};
@@ -22,6 +22,7 @@ pub fn eval_streamlet_expr(
     db: &dyn Ir,
     expr: &Spanned<Expr>,
     name: &PathName,
+    doc: &Option<String>,
     streamlets: &HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
@@ -33,13 +34,18 @@ pub fn eval_streamlet_expr(
 ) -> Result<(Id<Streamlet>, Id<InterfaceCollection>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
-            if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports, "streamlet") {
-                let interface = eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
+            if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports, "streamlet")
+            {
+                let interface =
+                    eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
                 Ok((val, interface))
             } else {
                 match eval_ident(ident, &expr.1, interfaces, interface_imports, "streamlet") {
                     Ok(interface) => {
-                        let streamlet: Streamlet = interface.into();
+                        let mut streamlet: Streamlet = interface.into();
+                        if let Some(doc) = doc {
+                            streamlet.set_doc(doc);
+                        }
                         Ok((streamlet.with_name(name.clone()).intern(db), interface))
                     }
                     Err(err) => Err(EvalError {
@@ -91,6 +97,9 @@ pub fn eval_streamlet_expr(
                     let mut streamlet = Streamlet::from(interface);
                     if let Some((implementation, _)) = implementation {
                         streamlet = streamlet.with_implementation(Some(implementation));
+                    }
+                    if let Some(doc) = doc {
+                        streamlet.set_doc(doc);
                     }
                     Ok((streamlet.with_name(name.clone()).intern(db), interface))
                 }

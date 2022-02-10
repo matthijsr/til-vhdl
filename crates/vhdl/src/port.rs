@@ -98,8 +98,9 @@ impl Port {
     // }
 
     /// Return this port with documentation added.
-    pub fn with_doc(&mut self, doc: impl Into<String>) {
+    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
         self.doc = Some(doc.into());
+        self
     }
 
     /// Set the documentation of this port.

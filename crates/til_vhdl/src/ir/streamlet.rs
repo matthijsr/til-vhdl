@@ -3,7 +3,7 @@ use tydi_common::{
     cat,
     error::{Result, TryOptional},
     name::PathNameSelf,
-    traits::Identify,
+    traits::{Document, Identify},
 };
 
 use tydi_vhdl::{
@@ -40,9 +40,13 @@ impl IntoVhdl<Component> for Streamlet {
         for output in self.outputs(ir_db) {
             ports.extend(output.canonical(ir_db, arch_db, prefix.clone())?);
         }
-        // TODO: Streamlet should also have documentation?
 
-        Ok(Component::new(VhdlName::try_new(n)?, vec![], ports, None))
+        let mut component = Component::new(VhdlName::try_new(n)?, vec![], ports, None);
+        if let Some(doc) = self.doc() {
+            component.set_doc(doc);
+        }
+
+        Ok(component)
     }
 }
 

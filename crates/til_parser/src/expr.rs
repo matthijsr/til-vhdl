@@ -150,18 +150,16 @@ pub enum StreamletProperty {
     Implementation(Box<Spanned<Expr>>),
 }
 
-pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
-    // ......
-    // DOCUMENTATION
-    // ......
-
-    let doc_body = filter_map(|span, tok| match tok {
+pub fn doc_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
+    filter_map(|span, tok| match tok {
         Token::Documentation(docstr) => Ok(docstr.clone()),
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
     .map_with_span(|body, span| (body, span))
-    .labelled("documentation");
+    .labelled("documentation")
+}
 
+pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     // ......
     // VALUES
     // ......
@@ -293,8 +291,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|p, span| (p, span));
 
     // Individual ports can have documentation
-    let doc_port_def = doc_body
-        .clone()
+    let doc_port_def = doc_parser()
         .then(port_def.clone())
         .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
         .map_with_span(|d, span| (d, span));
@@ -353,8 +350,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|i, span| (i, span));
 
     // Implementations can have (overall) documentation
-    let doc_impl_def = doc_body
-        .clone()
+    let doc_impl_def = doc_parser()
         .then(impl_def.clone())
         .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
         .map_with_span(|d, span| (d, span));

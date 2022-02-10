@@ -1,7 +1,7 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName, PathNameSelf},
-    traits::Identify,
+    traits::{Document, Identify},
 };
 use tydi_intern::Id;
 
@@ -18,6 +18,7 @@ pub struct Streamlet {
     name: PathName,
     implementation: Option<Id<Implementation>>,
     interface: Option<Id<InterfaceCollection>>,
+    doc: Option<String>,
 }
 
 impl Streamlet {
@@ -26,6 +27,7 @@ impl Streamlet {
             name: PathName::new_empty(),
             implementation: None,
             interface: None,
+            doc: None,
         }
     }
 
@@ -52,6 +54,15 @@ impl Streamlet {
     pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
         self.name = name.into();
         self
+    }
+
+    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
+        self.doc = Some(doc.into());
+        self
+    }
+
+    pub fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 
     pub fn try_with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
@@ -122,6 +133,12 @@ impl Identify for Streamlet {
     }
 }
 
+impl Document for Streamlet {
+    fn doc(&self) -> Option<String> {
+        self.doc.clone()
+    }
+}
+
 impl MoveDb<Id<Streamlet>> for Streamlet {
     fn move_db(
         &self,
@@ -141,6 +158,7 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
             name: self.name.with_parents(prefix),
             implementation,
             interface,
+            doc: self.doc.clone(),
         }
         .intern(target_db))
     }
@@ -152,6 +170,7 @@ impl From<Id<InterfaceCollection>> for Streamlet {
             name: PathName::new_empty(),
             implementation: None,
             interface: Some(id),
+            doc: None,
         }
     }
 }
