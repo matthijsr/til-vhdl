@@ -7,7 +7,6 @@ use til_query::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
     ir::{
         interface::Interface,
-        physical_properties::InterfaceDirection,
         project::interface::InterfaceCollection,
         traits::{GetSelf, InternSelf},
         Ir,
@@ -19,9 +18,9 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-use crate::{eval::eval_ident, expr::Expr, Span, Spanned};
+use crate::{eval::eval_ident, expr::Expr, Spanned};
 
-use super::{eval_common_error, eval_name, eval_type::eval_type_expr, Def, EvalError};
+use super::{eval_common_error, eval_name, eval_type::eval_type_expr, EvalError};
 
 pub fn eval_interface_expr(
     db: &dyn Ir,
@@ -46,9 +45,7 @@ pub fn eval_interface_expr(
                     doc = Some(doc_str);
                 };
 
-                if let Expr::PortDef((name_string, name_span), (props, props_span)) =
-                    &port_def_expr.0
-                {
+                if let Expr::PortDef((name_string, name_span), (props, _)) = &port_def_expr.0 {
                     let name = eval_name(name_string, name_span)?;
                     if dups.contains(&name) {
                         return Err(EvalError {

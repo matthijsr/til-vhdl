@@ -1,6 +1,5 @@
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, primitive::Just, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
+use chumsky::prelude::*;
+use std::{fmt, hash::Hash};
 use til_query::{
     common::{
         logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
@@ -9,13 +8,13 @@ use til_query::{
     ir::physical_properties::InterfaceDirection,
 };
 use tydi_common::{
-    name::{Name, PathName},
+    name::Name,
     numbers::{NonNegative, Positive, PositiveReal},
 };
 
 use crate::{
     ident_expr::{ident_expr_parser, name_parser, IdentExpr},
-    lex::{DeclKeyword, Operator, Token, TypeKeyword},
+    lex::{DeclKeyword, Token, TypeKeyword},
     struct_parse::{struct_parser, StructStat},
     Span, Spanned,
 };
@@ -434,6 +433,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 mod tests {
     use std::path::Path;
 
+    use chumsky::Stream;
+
     use crate::{lex::lexer, report::report_errors};
 
     use super::*;
@@ -444,7 +445,7 @@ mod tests {
 
     fn test_expr_parse(src: impl Into<String>) {
         let src = src.into();
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+        let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
         // println!("{:#?}", tokens);
 

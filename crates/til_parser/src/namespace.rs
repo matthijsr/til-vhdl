@@ -1,22 +1,10 @@
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, primitive::Just, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
-use til_query::{
-    common::{
-        logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
-        physical::complexity::Complexity,
-    },
-    ir::physical_properties::InterfaceDirection,
-};
-use tydi_common::{
-    name::{Name, PathName},
-    numbers::{NonNegative, Positive, PositiveReal},
-};
+use chumsky::prelude::*;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     expr::{expr_parser, Expr},
-    ident_expr::{ident_expr_parser, name_parser, path_name_parser},
-    lex::{DeclKeyword, Operator, Token, TypeKeyword},
+    ident_expr::{name_parser, path_name_parser},
+    lex::{DeclKeyword, Operator, Token},
     Span, Spanned,
 };
 
@@ -130,6 +118,8 @@ pub fn namespaces_parser(
 mod tests {
     use std::path::Path;
 
+    use chumsky::Stream;
+
     use crate::{lex::lexer, report::report_errors};
 
     use super::*;
@@ -140,7 +130,7 @@ mod tests {
 
     fn test_namespace_parse(src: impl Into<String>) {
         let src = src.into();
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+        let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
         // println!("{:#?}", tokens);
 

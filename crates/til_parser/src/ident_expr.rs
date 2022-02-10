@@ -1,21 +1,9 @@
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, primitive::Just, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
-use til_query::{
-    common::{
-        logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
-        physical::complexity::Complexity,
-    },
-    ir::physical_properties::InterfaceDirection,
-};
-use tydi_common::{
-    name::{Name, PathName},
-    numbers::{NonNegative, Positive, PositiveReal},
-};
+use chumsky::prelude::*;
+use std::hash::Hash;
 
 use crate::{
-    lex::{DeclKeyword, Operator, Token, TypeKeyword},
-    Span, Spanned,
+    lex::{Operator, Token},
+    Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

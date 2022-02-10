@@ -21,7 +21,7 @@ use crate::{
     Spanned,
 };
 
-use super::{eval_common_error, eval_name, eval_type::eval_type_expr, Def, EvalError};
+use super::{eval_common_error, eval_name, EvalError};
 
 pub fn eval_struct_stat(
     db: &dyn Ir,

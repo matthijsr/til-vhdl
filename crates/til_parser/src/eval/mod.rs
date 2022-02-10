@@ -1,24 +1,8 @@
-use std::{
-    any::type_name,
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-    str::FromStr,
-};
+use std::collections::HashMap;
 
-use til_query::common::{
-    logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
-    physical::complexity::Complexity,
-};
-use tydi_common::{
-    name::{Name, PathName},
-    numbers::{NonNegative, Positive},
-};
+use tydi_common::name::{Name, PathName};
 
-use crate::{
-    expr::{Expr, LogicalTypeExpr, Value},
-    ident_expr::IdentExpr,
-    Span, Spanned,
-};
+use crate::{ident_expr::IdentExpr, Span};
 
 pub mod eval_decl;
 pub mod eval_implementation;
@@ -60,13 +44,6 @@ pub fn eval_common_error<T>(
             msg: err.to_string(),
         }),
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Def<T> {
-    Import(PathName),
-    Ident(Name),
-    Def(T),
 }
 
 pub fn eval_ident<T: Clone>(

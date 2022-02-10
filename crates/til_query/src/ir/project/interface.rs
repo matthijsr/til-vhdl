@@ -7,7 +7,7 @@ use std::{
 use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::{Name, NameSelf},
+    name::Name,
     traits::Identify,
 };
 use tydi_intern::Id;

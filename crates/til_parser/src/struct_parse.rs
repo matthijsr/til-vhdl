@@ -5,16 +5,9 @@ use crate::{
     lex::{Operator, Token},
     Spanned,
 };
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, primitive::Just, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, hash::Hash, path::PathBuf};
-use til_query::{
-    common::{
-        logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
-        physical::complexity::Complexity,
-    },
-    ir::physical_properties::InterfaceDirection,
-};
+
+use chumsky::prelude::*;
+use std::hash::Hash;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StructStat {
@@ -88,6 +81,8 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
 
 #[cfg(test)]
 mod tests {
+    use chumsky::Stream;
+
     use crate::lex::lexer;
 
     use super::*;

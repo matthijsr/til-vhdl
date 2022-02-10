@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, convert::TryInto};
+use std::collections::BTreeMap;
 
 use tydi_common::{
     error::{Error, Result, TryResult},

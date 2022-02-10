@@ -1,12 +1,11 @@
 use super::Span;
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use chumsky::{prelude::*, stream::Stream};
-use std::{collections::HashMap, env, fmt, fs, path::PathBuf};
+
+use chumsky::prelude::*;
+use std::fmt;
 use til_query::{
     common::logical::logicaltype::stream::{Direction, Synchronicity},
     ir::physical_properties::InterfaceDirection,
 };
-use tydi_common::name::{Name, PathName};
 
 pub struct LexerError {
     pub span: Span,
@@ -244,19 +243,13 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chumsky::{prelude::Simple, Parser};
-    use std::{ops::Range, path::Path};
-
-    fn lex_path(path: impl AsRef<Path>) -> (Option<Vec<(Token, Range<usize>)>>, Vec<Simple<char>>) {
-        let src = std::fs::read_to_string(path).unwrap();
-
-        lexer().parse_recovery(src.as_str())
-    }
+    use chumsky::Parser;
+    use std::path::Path;
 
     fn test_lex(path: impl AsRef<Path>) {
         let src = std::fs::read_to_string(path).unwrap();
 
-        let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+        let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
         if let Some(tokens) = tokens {
             println!("Tokens:");
