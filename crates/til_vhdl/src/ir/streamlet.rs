@@ -84,7 +84,7 @@ impl IntoVhdl<String> for Streamlet {
 
                     Ok(result_string)
                 }
-                ImplementationKind::Link => todo!(),
+                ImplementationKind::Link(_) => todo!(),
             },
             None => {
                 let architecture = Architecture::from_database(arch_db, "Behavioral")?;

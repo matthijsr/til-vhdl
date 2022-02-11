@@ -1,3 +1,4 @@
+pub mod link;
 pub mod structure;
 
 use tydi_common::{
@@ -7,7 +8,7 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-use self::structure::Structure;
+use self::{link::Link, structure::Structure};
 
 use super::{
     project::interface::InterfaceCollection,
@@ -26,7 +27,7 @@ pub struct Implementation {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ImplementationKind {
     Structural(Structure),
-    Link,
+    Link(Link),
 }
 
 impl Implementation {
@@ -36,6 +37,16 @@ impl Implementation {
             name: PathName::new_empty(),
             interface: structure.interface_id(),
             kind: ImplementationKind::Structural(structure.try_result()?),
+            doc: None,
+        })
+    }
+
+    pub fn link(link: impl TryResult<Link>, interface: Id<InterfaceCollection>) -> Result<Self> {
+        let link = link.try_result()?;
+        Ok(Implementation {
+            name: PathName::new_empty(),
+            interface,
+            kind: ImplementationKind::Link(link),
             doc: None,
         })
     }
@@ -128,7 +139,7 @@ impl MoveDb<Id<Implementation>> for Implementation {
                 doc: self.doc.clone(),
             }
             .intern(target_db),
-            ImplementationKind::Link => todo!(),
+            ImplementationKind::Link(_) => todo!(),
         })
     }
 }

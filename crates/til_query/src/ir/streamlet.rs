@@ -6,6 +6,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
+    implementation::ImplementationKind,
     project::interface::InterfaceCollection,
     traits::{GetSelf, InternSelf, MoveDb, TryIntern},
     Implementation, Interface, Ir,
@@ -16,6 +17,8 @@ pub struct Streamlet {
     /// Streamlet nodes should be prefixed by their containing namespace
     /// and can be suffixed with their implementation.
     name: PathName,
+    /// If this streamlet is defined through a hard link or intrinsic, its name may need to be fixed.
+    lock_name: bool,
     implementation: Option<Id<Implementation>>,
     interface: Option<Id<InterfaceCollection>>,
     doc: Option<String>,
@@ -26,6 +29,7 @@ impl Streamlet {
         Streamlet {
             name: PathName::new_empty(),
             implementation: None,
+            lock_name: false,
             interface: None,
             doc: None,
         }
@@ -52,7 +56,9 @@ impl Streamlet {
     }
 
     pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
-        self.name = name.into();
+        if !self.name_is_locked() {
+            self.name = name.into();
+        }
         self
     }
 
@@ -66,13 +72,31 @@ impl Streamlet {
     }
 
     pub fn try_with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
-        self.name = name.try_result()?;
+        self = self.with_name(name.try_result()?);
         Ok(self)
     }
 
-    pub fn with_implementation(mut self, implementation: Option<Id<Implementation>>) -> Streamlet {
-        self.implementation = implementation;
+    pub fn with_implementation(
+        mut self,
+        db: &dyn Ir,
+        implementation: Option<Implementation>,
+    ) -> Streamlet {
+        if let Some(implementation) = implementation {
+            if let ImplementationKind::Link(link) = implementation.kind() {
+                self = self.with_name(link.path_name());
+                self.lock_name = true;
+            }
+            self.implementation = Some(implementation.intern(db));
+        } else {
+            self.implementation = None;
+            self.lock_name = false;
+        }
         self
+    }
+
+    /// Indicate whether the name of this streamlet is locked. (try_with_name will still return OK, but will not )
+    pub fn name_is_locked(&self) -> bool {
+        self.lock_name
     }
 
     pub fn implementation(&self, db: &dyn Ir) -> Option<Implementation> {
@@ -157,6 +181,7 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
         Ok(Streamlet {
             name: self.name.with_parents(prefix),
             implementation,
+            lock_name: self.lock_name,
             interface,
             doc: self.doc.clone(),
         }
@@ -169,6 +194,7 @@ impl From<Id<InterfaceCollection>> for Streamlet {
         Streamlet {
             name: PathName::new_empty(),
             implementation: None,
+            lock_name: false,
             interface: Some(id),
             doc: None,
         }

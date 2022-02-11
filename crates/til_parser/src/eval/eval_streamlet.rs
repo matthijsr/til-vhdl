@@ -104,7 +104,7 @@ pub fn eval_streamlet_expr(
                     }
                     let mut streamlet = Streamlet::from(interface);
                     if let Some((implementation, _)) = implementation {
-                        streamlet = streamlet.with_implementation(Some(implementation));
+                        streamlet = streamlet.with_implementation(db, Some(implementation.get(db)));
                     }
                     if let Some(doc) = doc {
                         streamlet.set_doc(doc);

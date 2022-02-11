@@ -298,6 +298,12 @@ impl From<&Option<Name>> for PathName {
     }
 }
 
+impl From<&PathName> for PathName {
+    fn from(value: &PathName) -> Self {
+        value.clone()
+    }
+}
+
 impl TryFrom<String> for PathName {
     type Error = Error;
     fn try_from(string: String) -> Result<Self> {

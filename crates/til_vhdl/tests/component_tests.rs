@@ -244,9 +244,8 @@ fn playground() -> Result<()> {
     let mut structure = Structure::try_from(&streamlet)?;
     structure.try_add_connection(db, "a", "b")?;
     let implementation = Implementation::structural(structure)?
-        .try_with_name("structural")?
-        .intern(db);
-    let streamlet = streamlet.with_implementation(Some(implementation));
+        .try_with_name("structural")?;
+    let streamlet = streamlet.with_implementation(db, Some(implementation));
 
     let mut package = Package::new_default_empty();
     let component: Arc<Component> = Arc::new(streamlet.canonical(db, arch_db, "")?);

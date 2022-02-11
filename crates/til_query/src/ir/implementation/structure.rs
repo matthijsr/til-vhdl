@@ -277,7 +277,7 @@ mod tests {
         let mut structure = Structure::try_from(&streamlet)?;
         structure.try_add_streamlet_instance(
             "instance",
-            streamlet.with_implementation(None).intern(db),
+            streamlet.with_implementation(db, None).intern(db),
         )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
@@ -300,7 +300,7 @@ mod tests {
         let mut structure = Structure::try_from(&streamlet)?;
         structure.try_add_streamlet_instance(
             "instance",
-            streamlet.with_implementation(None).intern(db),
+            streamlet.with_implementation(db, None).intern(db),
         )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
@@ -341,7 +341,7 @@ mod tests {
         let mut structure = Structure::try_from(&streamlet)?;
         structure.try_add_streamlet_instance(
             "instance",
-            streamlet.with_implementation(None).intern(db),
+            streamlet.with_implementation(db, None).intern(db),
         )?;
         structure.try_get_streamlet_instance(&("instance".try_result()?))?;
 

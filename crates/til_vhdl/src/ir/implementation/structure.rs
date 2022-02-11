@@ -180,7 +180,7 @@ mod tests {
                     ("d", stream2, InterfaceDirection::Out),
                 ],
             )?
-            .with_implementation(None)
+            .with_implementation(ir_db, None)
             .intern(ir_db); // Streamlet does not have an implementation
 
         // Create a Structure from the Streamlet definition (this creates a Structure with ports matching the Streamlet)

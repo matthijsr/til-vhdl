@@ -92,7 +92,10 @@ fn playground() -> Result<()> {
         "implemented_streamlet",
         namespace
             .get_streamlet(db, "streamlet")?
-            .with_implementation(Some(namespace.get_implementation_id("implementation")?)),
+            .with_implementation(
+                db,
+                Some(namespace.get_implementation(db, "implementation")?),
+            ),
     )?;
     project.add_namespace(db, namespace)?;
     db.set_project(Arc::new(project));

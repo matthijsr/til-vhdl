@@ -112,7 +112,7 @@ mod tests {
             "implemented_streamlet",
             namespace
                 .get_streamlet(db, "streamlet")?
-                .with_implementation(None),
+                .with_implementation(db, None),
         )?;
         project.add_namespace(db, namespace)?;
         db.set_project(Arc::new(project));
