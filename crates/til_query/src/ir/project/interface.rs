@@ -13,7 +13,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::ir::{
-    implementation::{structure::Structure, Implementation},
+    implementation::structure::Structure,
     interface::Interface,
     physical_properties::InterfaceDirection,
     streamlet::Streamlet,
@@ -131,18 +131,6 @@ impl MoveDb<Id<InterfaceCollection>> for InterfaceCollection {
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
         Ok(InterfaceCollection { ports, port_order }.intern(target_db))
-    }
-}
-
-impl From<Implementation> for Id<InterfaceCollection> {
-    fn from(imp: Implementation) -> Self {
-        imp.interface_id()
-    }
-}
-
-impl From<&Implementation> for Id<InterfaceCollection> {
-    fn from(imp: &Implementation) -> Self {
-        imp.interface_id()
     }
 }
 

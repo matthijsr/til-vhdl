@@ -1,3 +1,4 @@
+pub mod link;
 pub mod structure;
 
 use tydi_common::{
@@ -7,18 +8,16 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-use self::structure::Structure;
+use self::{link::Link, structure::Structure};
 
 use super::{
-    project::interface::InterfaceCollection,
-    traits::{GetSelf, InternSelf, MoveDb},
+    traits::{InternSelf, MoveDb},
     Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Implementation {
     name: PathName,
-    interface: Id<InterfaceCollection>,
     kind: ImplementationKind,
     doc: Option<String>,
 }
@@ -26,27 +25,25 @@ pub struct Implementation {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ImplementationKind {
     Structural(Structure),
-    Link,
+    Link(Link),
 }
 
 impl Implementation {
     pub fn structural(structure: impl TryResult<Structure>) -> Result<Self> {
-        let structure = structure.try_result()?;
         Ok(Implementation {
             name: PathName::new_empty(),
-            interface: structure.interface_id(),
             kind: ImplementationKind::Structural(structure.try_result()?),
             doc: None,
         })
     }
 
-    /// TODO
-    // pub fn link() -> Self {
-    //     Implementation {
-    //         name: PathName::new_empty(),
-    //         kind: ImplementationKind::Link,
-    //     }
-    // }
+    pub fn link(link: impl TryResult<Link>) -> Result<Self> {
+        Ok(Implementation {
+            name: PathName::new_empty(),
+            kind: ImplementationKind::Link(link.try_result()?),
+            doc: None,
+        })
+    }
 
     pub fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into())
@@ -70,21 +67,12 @@ impl Implementation {
     pub fn kind(&self) -> &ImplementationKind {
         &self.kind
     }
-
-    pub fn interface_id(&self) -> Id<InterfaceCollection> {
-        self.interface
-    }
-
-    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
-        self.interface_id().get(db)
-    }
 }
 
 impl From<Structure> for Implementation {
     fn from(value: Structure) -> Self {
         Implementation {
             name: PathName::new_empty(),
-            interface: value.interface_id(),
             kind: ImplementationKind::Structural(value),
             doc: None,
         }
@@ -119,7 +107,6 @@ impl MoveDb<Id<Implementation>> for Implementation {
         Ok(match self.kind() {
             ImplementationKind::Structural(structure) => Implementation {
                 name: self.name.clone(),
-                interface: structure.interface_id(),
                 kind: ImplementationKind::Structural(structure.move_db(
                     original_db,
                     target_db,
@@ -128,7 +115,7 @@ impl MoveDb<Id<Implementation>> for Implementation {
                 doc: self.doc.clone(),
             }
             .intern(target_db),
-            ImplementationKind::Link => todo!(),
+            ImplementationKind::Link(_) => todo!(),
         })
     }
 }
