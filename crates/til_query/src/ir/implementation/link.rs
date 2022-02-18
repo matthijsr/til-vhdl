@@ -73,4 +73,13 @@ mod tests {
         assert_eq!(expected, actual);
         Ok(())
     }
+
+    #[test]
+    fn try_invalid() -> Result<()> {
+        match Link::try_new("gibberish") {
+            Err(Error::FileIOError(_)) => Ok(()),
+            Ok(_) => Err(Error::BackEndError("Expected FileIOError".to_string())),
+            Err(err) => Err(err),
+        }
+    }
 }
