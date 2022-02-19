@@ -79,6 +79,16 @@ impl From<Structure> for Implementation {
     }
 }
 
+impl From<Link> for Implementation {
+    fn from(value: Link) -> Self {
+        Implementation {
+            name: PathName::new_empty(),
+            kind: ImplementationKind::Link(value),
+            doc: None,
+        }
+    }
+}
+
 impl Identify for Implementation {
     fn identifier(&self) -> String {
         self.path_name().to_string()

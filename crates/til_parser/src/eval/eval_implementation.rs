@@ -4,7 +4,7 @@ use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
         connection::InterfaceReference,
-        implementation::{structure::Structure, Implementation},
+        implementation::{link::Link, structure::Structure, Implementation},
         project::interface::InterfaceCollection,
         streamlet::Streamlet,
         traits::InternSelf,
@@ -146,21 +146,22 @@ pub fn eval_implementation_expr(
                                 type_imports,
                             )?;
                         }
-                        if let Err(err) = structure.validate_connections(db) {
-                            Err(EvalError {
-                                span: expr.1.clone(),
-                                msg: err.to_string(),
-                            })
-                        } else {
-                            let mut implementation =
-                                Implementation::from(structure).with_name(name.clone());
-                            if let Some(doc) = doc {
-                                implementation.set_doc(doc);
-                            }
-                            Ok((implementation.intern(db), interface))
+                        eval_common_error(structure.validate_connections(db), &expr.1)?;
+                        let mut implementation =
+                            Implementation::from(structure).with_name(name.clone());
+                        if let Some(doc) = doc {
+                            implementation.set_doc(doc);
                         }
+                        Ok((implementation.intern(db), interface))
                     }
-                    RawImpl::Behavioural(_) => todo!(),
+                    RawImpl::Link(pth) => {
+                        let link = eval_common_error(Link::try_new(pth), &expr.1)?;
+                        let mut implementation = Implementation::from(link).with_name(name.clone());
+                        if let Some(doc) = doc {
+                            implementation.set_doc(doc);
+                        }
+                        Ok((implementation.intern(db), interface))
+                    }
                 }
             } else {
                 Err(EvalError {
