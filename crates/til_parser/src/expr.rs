@@ -110,7 +110,7 @@ pub enum RawImpl {
     // Structural
     Struct(Vec<Spanned<StructStat>>),
     // Path
-    Behavioural(String),
+    Link(String),
 }
 
 // Before eval
@@ -320,7 +320,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // ......
 
     let behav = filter_map(|span, tok| match tok {
-        Token::Path(pth) => Ok(RawImpl::Behavioural(pth)),
+        Token::Path(pth) => Ok(RawImpl::Link(pth)),
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
     .labelled("behavioural impl path")

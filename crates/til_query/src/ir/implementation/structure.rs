@@ -17,8 +17,6 @@ use crate::ir::{
     Interface, Ir, Streamlet,
 };
 
-use super::Implementation;
-
 /// This node represents a structural `Implementation`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Structure {
@@ -215,12 +213,6 @@ impl Structure {
         }
 
         Ok(())
-    }
-}
-
-impl From<&Implementation> for Structure {
-    fn from(implem: &Implementation) -> Self {
-        Structure::new(implem.interface_id())
     }
 }
 
