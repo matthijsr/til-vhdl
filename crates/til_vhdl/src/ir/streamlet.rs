@@ -1,7 +1,9 @@
+use std::fs;
+
 use til_query::ir::{implementation::ImplementationKind, Ir};
 use tydi_common::{
     cat,
-    error::{Result, TryOptional},
+    error::{Error, Result, TryOptional},
     name::PathNameSelf,
     traits::{Document, Identify},
 };
@@ -84,7 +86,41 @@ impl IntoVhdl<String> for Streamlet {
 
                     Ok(result_string)
                 }
-                ImplementationKind::Link(_) => todo!(),
+                ImplementationKind::Link(link) => {
+                    let mut file_pth = link.path().to_path_buf();
+                    file_pth.push(self.identifier());
+                    file_pth.set_extension("vhd");
+                    if file_pth.exists() {
+                        if file_pth.is_file() {
+                            let result_string = fs::read_to_string(file_pth.as_path())
+                                .map_err(|err| Error::FileIOError(err.to_string()))?;
+                            Ok(result_string)
+                        } else {
+                            Err(Error::FileIOError(format!(
+                                "Path {} exists, but is not a file.",
+                                file_pth.display()
+                            )))
+                        }
+                    } else {
+                        let name = implementation.path_name();
+
+                        let architecture = if name.len() > 0 {
+                            Architecture::from_database(arch_db, name)
+                        } else {
+                            Architecture::from_database(arch_db, "Behaviour")
+                        }?;
+
+                        // TODO: Make whether to create a file if one doesn't exist configurable (Yes/No/Ask)
+                        let result_string = architecture.declare(arch_db)?;
+                        fs::write(file_pth.as_path(), &result_string)
+                            .map_err(|err| Error::FileIOError(err.to_string()))?;
+                        arch_db.set_architecture(architecture);
+
+                        // TODO for much later: Try to incorporate "fancy wrapper" work into this
+
+                        Ok(result_string)
+                    }
+                }
             },
             None => {
                 let architecture = Architecture::from_database(arch_db, "Behavioral")?;
