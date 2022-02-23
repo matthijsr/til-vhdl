@@ -199,85 +199,75 @@ impl<T> IntoIterator for SignalList<T> {
 
 impl<'a, T> IntoIterator for &'a SignalList<T> {
     type Item = &'a T;
-    type IntoIter = SignalListIterator<'a, T>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        SignalListIterator {
-            list: self,
-            index: 0,
+        let mut result = vec![];
+        if let Some(val) = self.valid() {
+            result.push(val);
         }
+        if let Some(val) = self.ready() {
+            result.push(val);
+        }
+        if let Some(val) = self.data() {
+            result.push(val);
+        }
+        if let Some(val) = self.last() {
+            result.push(val);
+        }
+        if let Some(val) = self.stai() {
+            result.push(val);
+        }
+        if let Some(val) = self.endi() {
+            result.push(val);
+        }
+        if let Some(val) = self.strb() {
+            result.push(val);
+        }
+        if let Some(val) = self.user() {
+            result.push(val);
+        }
+
+        result.into_iter()
     }
 }
 
-pub struct SignalListIterator<'a, T> {
-    list: &'a SignalList<T>,
-    index: usize,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl<'a, T> Iterator for SignalListIterator<'a, T> {
-    type Item = &'a T;
+    #[test]
+    fn test_iter() -> Result<()> {
+        let empty: SignalList<i32> = SignalList::new();
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let result = match self.index {
-            0 => match self.list.valid() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            1 => match self.list.ready() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            2 => match self.list.data() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            3 => match self.list.last() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            4 => match self.list.stai() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            5 => match self.list.endi() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            6 => match self.list.strb() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            7 => match self.list.user() {
-                Some(val) => val,
-                None => {
-                    self.index += 1;
-                    return self.next();
-                }
-            },
-            _ => return None,
-        };
-        self.index += 1;
-        Some(result)
+        let empty_iter = (&empty).into_iter();
+        assert_eq!(empty_iter.len(), 0);
+        let empty_iter = empty.into_iter();
+        assert_eq!(empty_iter.len(), 0);
+
+        let full: SignalList<i32> = SignalList::new()
+            .with_valid(0)?
+            .with_ready(0)?
+            .with_data(0)?
+            .with_last(0)?
+            .with_stai(0)?
+            .with_endi(0)?
+            .with_strb(0)?
+            .with_user(0)?;
+
+        let mut one_removed = full.clone();
+        one_removed.set_user(None)?;
+
+        let full_iter = (&full).into_iter();
+        assert_eq!(full_iter.len(), 8);
+        let full_iter = full.into_iter();
+        assert_eq!(full_iter.len(), 8);
+
+        let one_removed_iter = (&one_removed).into_iter();
+        assert_eq!(one_removed_iter.len(), 7);
+        let one_removed_iter = one_removed.into_iter();
+        assert_eq!(one_removed_iter.len(), 7);
+
+        Ok(())
     }
 }
