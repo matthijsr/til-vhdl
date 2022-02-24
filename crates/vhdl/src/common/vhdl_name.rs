@@ -34,20 +34,22 @@ impl VhdlName {
         if name.is_empty() {
             Err(Error::InvalidArgument("name cannot be empty".to_string()))
         } else if name.chars().next().unwrap().is_ascii_digit() {
-            Err(Error::InvalidArgument(
-                "name cannot start with a digit".to_string(),
-            ))
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot start with a digit",
+                name
+            )))
         } else if name.starts_with('_') || name.ends_with('_') {
-            Err(Error::InvalidArgument(
-                "name cannot start or end with an underscore".to_string(),
-            ))
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot start or end with an underscore",
+                name
+            )))
         } else if !name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c.eq(&'_'))
         {
             Err(Error::InvalidArgument(
                 format!(
-                    "name must consist of letters, numbers, and/or underscores {}",
+                    "{}: name must consist of letters, numbers, and/or underscores",
                     name
                 )
                 .to_string(),
@@ -339,6 +341,12 @@ impl TryFrom<&str> for VhdlPathName {
             let name: VhdlName = str.try_into()?;
             Ok(VhdlPathName::from(name))
         }
+    }
+}
+
+impl From<&PathName> for VhdlPathName {
+    fn from(path: &PathName) -> Self {
+        VhdlPathName::new(path.into_iter().map(|n| VhdlName::from(n.clone())))
     }
 }
 

@@ -112,4 +112,30 @@ Newline.# {
     streamlet link_comp = comp4 {
         impl: "tests/til_files/test_nspace_src",
     };
+
+    type stream_base1 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+    type stream_base2 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Reverse,
+    );
+    type multi_stream_group = Group(a: stream_base1, b: stream_base1, c: stream_base2);
+    type multi_stream = Stream(
+        data: multi_stream_group,
+        throughput: 3.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+
+    streamlet multi_streamlet = (x: in multi_stream, y: out multi_stream);
 }

@@ -35,24 +35,27 @@ impl Name {
         if name.is_empty() {
             Err(Error::InvalidArgument("name cannot be empty".to_string()))
         } else if name.chars().next().unwrap().is_ascii_digit() {
-            Err(Error::InvalidArgument(
-                "name cannot start with a digit".to_string(),
-            ))
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot start with a digit",
+                name
+            )))
         } else if name.starts_with('_') || name.ends_with('_') {
-            Err(Error::InvalidArgument(
-                "name cannot start or end with an underscore".to_string(),
-            ))
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot start or end with an underscore",
+                name
+            )))
         } else if name.contains("__") {
-            Err(Error::InvalidArgument(
-                "name cannot contain two or more consecutive underscores".to_string(),
-            ))
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot contain two or more consecutive underscores",
+                name
+            )))
         } else if !name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c.eq(&'_'))
         {
             Err(Error::InvalidArgument(
                 format!(
-                    "name must consist of letters, numbers, and/or underscores {}",
+                    "{}: name must consist of letters, numbers, and/or underscores",
                     name
                 )
                 .to_string(),
@@ -307,6 +310,8 @@ impl TryFrom<String> for PathName {
             PathName::try_new(string.split("."))
         } else if string.contains("__") {
             PathName::try_new(string.split("__"))
+        } else if string.contains("::") {
+            PathName::try_new(string.split("::"))
         } else {
             let name: Name = string.try_into()?;
             Ok(PathName::from(name))
@@ -323,6 +328,8 @@ impl TryFrom<&str> for PathName {
             PathName::try_new(str.split("."))
         } else if str.contains("__") {
             PathName::try_new(str.split("__"))
+        } else if str.contains("::") {
+            PathName::try_new(str.split("::"))
         } else {
             let name: Name = str.try_into()?;
             Ok(PathName::from(name))

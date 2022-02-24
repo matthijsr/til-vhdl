@@ -129,7 +129,7 @@ impl LogicalType {
     ///
     /// assert_eq!(
     ///     LogicalType::try_new_group(None, vec![("1badname", a)]),
-    ///     Err(Error::InvalidArgument("name cannot start with a digit".to_string()))
+    ///     Err(Error::InvalidArgument("1badname: name cannot start with a digit".to_string()))
     /// );
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
