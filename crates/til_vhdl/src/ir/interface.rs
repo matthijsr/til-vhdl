@@ -25,17 +25,18 @@ impl IntoVhdl<Vec<Port>> for Interface {
         arch_db: &mut dyn Arch,
         prefix: impl TryOptional<VhdlName>,
     ) -> Result<Vec<Port>> {
-        let n: String = match prefix.try_optional()? {
-            Some(some) => cat!(some, self.identifier()),
-            None => self.identifier().to_string(),
+        let n: VhdlName = match prefix.try_optional()? {
+            Some(some) => VhdlName::try_new(cat!(some, self.identifier()))?,
+            None => self.name().clone().into(),
         };
         let mut ports = Vec::new();
 
         let synth = self.stream_id().synthesize(ir_db);
 
         for (path, width) in synth.signals() {
+            let signal_path = format!("{}__{}", &n, path);
             ports.push(Port::new(
-                VhdlName::try_new(cat!(n.clone(), path.to_string()))?,
+                VhdlName::try_new(signal_path.to_string())?,
                 match self.physical_properties().direction() {
                     InterfaceDirection::Out => Mode::Out,
                     InterfaceDirection::In => Mode::In,
@@ -45,8 +46,13 @@ impl IntoVhdl<Vec<Port>> for Interface {
         }
 
         for (path, phys) in synth.streams() {
+            let phys_name = if path.len() > 0 {
+                format!("{}__{}", &n, path)
+            } else {
+                n.to_string()
+            };
             for port in phys
-                .canonical(ir_db, arch_db, cat!(&n, path).as_str())?
+                .canonical(ir_db, arch_db, phys_name.as_str())?
                 .with_direction(self.physical_properties().direction())
                 .ports()
             {

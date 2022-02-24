@@ -17,12 +17,10 @@ impl LogicalStream {
         LogicalStream { signals, streams }
     }
 
-    #[allow(dead_code)]
     pub fn signals(&self) -> impl Iterator<Item = (&PathName, &BitCount)> {
         self.signals.iter()
     }
 
-    #[allow(dead_code)]
     pub fn streams(&self) -> impl Iterator<Item = (&PathName, &PhysicalStream)> {
         self.streams.iter()
     }

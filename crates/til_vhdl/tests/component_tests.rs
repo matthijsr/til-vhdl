@@ -1,5 +1,9 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
+use til_parser::query::into_query_storage;
 use til_query::{
     common::logical::logicaltype::{
         stream::{Direction, Stream, Synchronicity},
@@ -10,7 +14,8 @@ use til_query::{
         implementation::{structure::Structure, Implementation},
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
-        traits::InternSelf,
+        traits::{GetSelf, InternSelf},
+        Ir,
     },
     test_utils::{test_stream_id, test_stream_id_custom},
 };
@@ -205,6 +210,82 @@ end component;"#,
 end component;"#,
         complexity_decls[6],
         "Complexity 7"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn split_streams_path_names() -> Result<()> {
+    let db = into_query_storage(
+        "
+namespace my::test::space {
+    type stream_base1 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+    type stream_base2 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Reverse,
+    );
+    type multi_stream_group = Group(a: stream_base1, b: stream_base1, c: stream_base2);
+    type multi_stream = Stream(
+        data: multi_stream_group,
+        throughput: 3.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+
+    streamlet multi_streamlet = (x: in multi_stream, y: out multi_stream);
+}
+    ",
+    )?;
+
+    let proj = db.project();
+    let streamlet = proj
+        .namespaces()
+        .get(&("my::test::space".try_into()?))
+        .unwrap()
+        .get(&db)
+        .get_streamlet(&db, "multi_streamlet")?;
+
+    let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+
+    let comp: Component = streamlet.canonical(&db, &mut arch_db, None)?;
+    assert_eq!(
+        r#"component my__test__space__multi_streamlet_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    x__a_valid : in std_logic;
+    x__a_ready : out std_logic;
+    x__a_data : in std_logic_vector(23 downto 0);
+    x__b_valid : in std_logic;
+    x__b_ready : out std_logic;
+    x__b_data : in std_logic_vector(23 downto 0);
+    x__c_valid : in std_logic;
+    x__c_ready : out std_logic;
+    x__c_data : in std_logic_vector(23 downto 0);
+    y__a_valid : out std_logic;
+    y__a_ready : in std_logic;
+    y__a_data : out std_logic_vector(23 downto 0);
+    y__b_valid : out std_logic;
+    y__b_ready : in std_logic;
+    y__b_data : out std_logic_vector(23 downto 0);
+    y__c_valid : out std_logic;
+    y__c_ready : in std_logic;
+    y__c_data : out std_logic_vector(23 downto 0)
+  );
+end component;"#,
+        comp.declare(&arch_db)?
     );
 
     Ok(())
