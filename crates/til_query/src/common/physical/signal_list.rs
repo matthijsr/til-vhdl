@@ -159,6 +159,22 @@ impl<T> SignalList<T> {
     pub fn user(&self) -> &Option<T> {
         &self.user
     }
+
+    pub fn map<F, R>(self, mut f: F) -> SignalList<R>
+    where
+        F: FnMut(T) -> R,
+    {
+        SignalList {
+            valid: self.valid.map(|x| f(x)),
+            ready: self.ready.map(|x| f(x)),
+            data: self.data.map(|x| f(x)),
+            last: self.last.map(|x| f(x)),
+            stai: self.stai.map(|x| f(x)),
+            endi: self.endi.map(|x| f(x)),
+            strb: self.strb.map(|x| f(x)),
+            user: self.user.map(|x| f(x)),
+        }
+    }
 }
 
 impl<T> IntoIterator for SignalList<T> {
@@ -267,6 +283,45 @@ mod tests {
         assert_eq!(one_removed_iter.len(), 7);
         let one_removed_iter = one_removed.into_iter();
         assert_eq!(one_removed_iter.len(), 7);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_map() -> Result<()> {
+        let full: SignalList<i32> = SignalList::new()
+            .with_valid(0)?
+            .with_ready(1)?
+            .with_data(2)?
+            .with_last(3)?
+            .with_stai(4)?
+            .with_endi(5)?
+            .with_strb(6)?
+            .with_user(7)?;
+        let mut one_removed = full.clone();
+        one_removed.set_ready(None)?;
+
+        let mapped = full.map(|x| x.to_string());
+
+        assert_eq!(mapped.valid, Some("0".to_string()));
+        assert_eq!(mapped.ready, Some("1".to_string()));
+        assert_eq!(mapped.data, Some("2".to_string()));
+        assert_eq!(mapped.last, Some("3".to_string()));
+        assert_eq!(mapped.stai, Some("4".to_string()));
+        assert_eq!(mapped.endi, Some("5".to_string()));
+        assert_eq!(mapped.strb, Some("6".to_string()));
+        assert_eq!(mapped.user, Some("7".to_string()));
+
+        let mapped = one_removed.map(|x| x.to_string());
+
+        assert_eq!(mapped.valid, Some("0".to_string()));
+        assert_eq!(mapped.ready, None);
+        assert_eq!(mapped.data, Some("2".to_string()));
+        assert_eq!(mapped.last, Some("3".to_string()));
+        assert_eq!(mapped.stai, Some("4".to_string()));
+        assert_eq!(mapped.endi, Some("5".to_string()));
+        assert_eq!(mapped.strb, Some("6".to_string()));
+        assert_eq!(mapped.user, Some("7".to_string()));
 
         Ok(())
     }
