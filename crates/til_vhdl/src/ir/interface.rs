@@ -54,7 +54,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
             for port in phys
                 .canonical(ir_db, arch_db, phys_name.as_str())?
                 .with_direction(self.physical_properties().direction())
-                .ports()
+                .signal_list()
             {
                 ports.push(port.clone());
             }

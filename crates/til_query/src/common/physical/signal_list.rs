@@ -1,4 +1,7 @@
-use tydi_common::error::{Result, TryOptional, TryResult};
+use tydi_common::{
+    error::{Result, TryOptional, TryResult},
+    name::Name,
+};
 
 #[derive(Debug, Clone, Hash)]
 pub struct SignalList<T> {
@@ -160,6 +163,7 @@ impl<T> SignalList<T> {
         &self.user
     }
 
+    /// Use a function to convert the SignalList's fields from `T` to `R`
     pub fn map<F, R>(self, mut f: F) -> SignalList<R>
     where
         F: FnMut(T) -> R,
@@ -174,6 +178,69 @@ impl<T> SignalList<T> {
             strb: self.strb.map(|x| f(x)),
             user: self.user.map(|x| f(x)),
         }
+    }
+
+    /// Use a function to convert the SignalList's fields from `T` to `R`, inserts the canonical name of each signal into the function
+    pub fn map_named<F, R>(self, mut f: F) -> SignalList<R>
+    where
+        F: FnMut(Name, T) -> R,
+    {
+        SignalList {
+            valid: self.valid.map(|x| f(Name::try_new("valid").unwrap(), x)),
+            ready: self.ready.map(|x| f(Name::try_new("ready").unwrap(), x)),
+            data: self.data.map(|x| f(Name::try_new("data").unwrap(), x)),
+            last: self.last.map(|x| f(Name::try_new("last").unwrap(), x)),
+            stai: self.stai.map(|x| f(Name::try_new("stai").unwrap(), x)),
+            endi: self.endi.map(|x| f(Name::try_new("endi").unwrap(), x)),
+            strb: self.strb.map(|x| f(Name::try_new("strb").unwrap(), x)),
+            user: self.user.map(|x| f(Name::try_new("user").unwrap(), x)),
+        }
+    }
+
+    /// Apply a mutating function to the SignalList's fields
+    pub fn apply<'a, F>(&'a mut self, mut f: F)
+    where
+        F: FnMut(&'a mut T),
+    {
+        self.valid.as_mut().map(|x| f(x));
+        self.ready.as_mut().map(|x| f(x));
+        self.data.as_mut().map(|x| f(x));
+        self.last.as_mut().map(|x| f(x));
+        self.stai.as_mut().map(|x| f(x));
+        self.endi.as_mut().map(|x| f(x));
+        self.strb.as_mut().map(|x| f(x));
+        self.user.as_mut().map(|x| f(x));
+    }
+
+    /// Apply a mutating function to the SignalList's fields, inserts the canonical name of each signal into the function
+    pub fn apply_named<'a, F>(&'a mut self, mut f: F)
+    where
+        F: FnMut(Name, &'a T),
+    {
+        self.valid
+            .as_ref()
+            .map(|x| f(Name::try_new("valid").unwrap(), x));
+        self.ready
+            .as_ref()
+            .map(|x| f(Name::try_new("ready").unwrap(), x));
+        self.data
+            .as_ref()
+            .map(|x| f(Name::try_new("data").unwrap(), x));
+        self.last
+            .as_ref()
+            .map(|x| f(Name::try_new("last").unwrap(), x));
+        self.stai
+            .as_ref()
+            .map(|x| f(Name::try_new("stai").unwrap(), x));
+        self.endi
+            .as_ref()
+            .map(|x| f(Name::try_new("endi").unwrap(), x));
+        self.strb
+            .as_ref()
+            .map(|x| f(Name::try_new("strb").unwrap(), x));
+        self.user
+            .as_ref()
+            .map(|x| f(Name::try_new("user").unwrap(), x));
     }
 }
 
@@ -322,6 +389,32 @@ mod tests {
         assert_eq!(mapped.endi, Some("5".to_string()));
         assert_eq!(mapped.strb, Some("6".to_string()));
         assert_eq!(mapped.user, Some("7".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_map_named() -> Result<()> {
+        let full: SignalList<i32> = SignalList::new()
+            .with_valid(0)?
+            .with_ready(1)?
+            .with_data(2)?
+            .with_last(3)?
+            .with_stai(4)?
+            .with_endi(5)?
+            .with_strb(6)?
+            .with_user(7)?;
+
+        let mapped = full.map_named(|n, x| format!("{} {}", n, x.to_string()));
+
+        assert_eq!(mapped.valid, Some("valid 0".to_string()));
+        assert_eq!(mapped.ready, Some("ready 1".to_string()));
+        assert_eq!(mapped.data, Some("data 2".to_string()));
+        assert_eq!(mapped.last, Some("last 3".to_string()));
+        assert_eq!(mapped.stai, Some("stai 4".to_string()));
+        assert_eq!(mapped.endi, Some("endi 5".to_string()));
+        assert_eq!(mapped.strb, Some("strb 6".to_string()));
+        assert_eq!(mapped.user, Some("user 7".to_string()));
 
         Ok(())
     }
