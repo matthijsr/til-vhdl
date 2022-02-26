@@ -186,19 +186,25 @@ impl Stream {
         user: Id<LogicalType>,
         keep: bool,
     ) -> Result<Id<Self>> {
-        Ok(db.intern_stream(Stream {
-            data: data,
-            throughput: throughput.try_result()?,
-            dimensionality,
-            synchronicity,
-            complexity: complexity.try_result()?,
-            direction,
-            user: user,
-            keep,
-        }))
+        let user_typ = user.get(db);
+        if user_typ.is_element_only(db) {
+            Ok(db.intern_stream(Stream {
+                data: data,
+                throughput: throughput.try_result()?,
+                dimensionality,
+                synchronicity,
+                complexity: complexity.try_result()?,
+                direction,
+                user: user,
+                keep,
+            }))
+        } else {
+            Err(Error::InvalidArgument(format!("User field must only contain element-manipulating types, and cannot contain Stream types. Is: {}", user_typ)))
+        }
     }
 
-    pub fn new(
+    /// For internal use only. Does not validate the User field
+    pub(crate) fn new(
         data: Id<LogicalType>,
         throughput: Throughput,
         dimensionality: NonNegative,
@@ -511,5 +517,47 @@ impl MoveDb<Id<Stream>> for Stream {
             self.keep(),
         )
         .intern(target_db))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ir::{db::Database, traits::TryIntern};
+
+    use super::*;
+
+    #[test]
+    fn user_must_be_element() -> Result<()> {
+        let _db = Database::default();
+        let db = &_db;
+        let stream1 = Stream::try_new(
+            db,
+            LogicalType::null_id(db),
+            1.0,
+            1,
+            Synchronicity::Sync,
+            4,
+            Direction::Forward,
+            LogicalType::null_id(db),
+            false,
+        )?
+        .try_intern(db)?;
+        let stream_result = Stream::try_new(
+            db,
+            LogicalType::null_id(db),
+            1.0,
+            1,
+            Synchronicity::Sync,
+            4,
+            Direction::Forward,
+            stream1,
+            false,
+        );
+        assert!(match stream_result {
+            Err(Error::InvalidArgument(_)) => true,
+            _ => false,
+        });
+
+        Ok(())
     }
 }
