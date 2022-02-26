@@ -7,7 +7,7 @@ use tydi_common::{
     util::log2_ceil,
 };
 
-use super::{complexity::Complexity, fields::Fields};
+use super::{complexity::Complexity, fields::Fields, signal_list::SignalList};
 
 /// Physical stream.
 ///
@@ -182,5 +182,27 @@ impl PhysicalStream {
     /// Returns the bit count of the user fields in this physical stream.
     pub fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
+    }
+}
+
+impl From<&PhysicalStream> for SignalList<Positive> {
+    fn from(phys: &PhysicalStream) -> Self {
+        SignalList::try_new(
+            Positive::new(1),
+            Positive::new(1),
+            Positive::new(phys.data_bit_count()),
+            Positive::new(phys.last_bit_count()),
+            Positive::new(phys.stai_bit_count()),
+            Positive::new(phys.endi_bit_count()),
+            Positive::new(phys.strb_bit_count()),
+            Positive::new(phys.user_bit_count()),
+        )
+        .unwrap()
+    }
+}
+
+impl From<PhysicalStream> for SignalList<Positive> {
+    fn from(phys: PhysicalStream) -> Self {
+        (&phys).into()
     }
 }

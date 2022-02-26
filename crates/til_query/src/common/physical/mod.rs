@@ -1,4 +1,4 @@
 pub mod complexity;
 pub mod fields;
-pub mod signals;
+pub mod signal_list;
 pub mod stream;
