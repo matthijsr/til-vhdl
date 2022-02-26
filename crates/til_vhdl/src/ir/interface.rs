@@ -36,7 +36,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
         for (path, width) in synth.signals() {
             let signal_path = format!("{}__{}", &n, path);
             ports.push(Port::new(
-                VhdlName::try_new(signal_path.to_string())?,
+                VhdlName::try_new(signal_path)?,
                 match self.physical_properties().direction() {
                     InterfaceDirection::Out => Mode::Out,
                     InterfaceDirection::In => Mode::In,
