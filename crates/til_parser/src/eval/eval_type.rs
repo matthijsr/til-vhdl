@@ -237,21 +237,24 @@ pub fn eval_type_expr(
             }
         };
 
-        Ok(Stream::new(
-            stream.data.ok_or(missing_err("data"))?,
-            stream.throughput.unwrap_or_default(),
-            stream.dimensionality.ok_or(missing_err("dimensionality"))?,
-            stream.synchronicity.ok_or(missing_err("synchronicity"))?,
-            stream.complexity.ok_or(missing_err("complexity"))?,
-            stream.direction.ok_or(missing_err("direction"))?,
-            stream.user.unwrap_or(LogicalType::null_id(db)),
-            stream.keep.unwrap_or(false),
+        eval_common_error(
+            Stream::try_new(
+                db,
+                stream.data.ok_or(missing_err("data"))?,
+                stream.throughput.unwrap_or_default(),
+                stream.dimensionality.ok_or(missing_err("dimensionality"))?,
+                stream.synchronicity.ok_or(missing_err("synchronicity"))?,
+                stream.complexity.ok_or(missing_err("complexity"))?,
+                stream.direction.ok_or(missing_err("direction"))?,
+                stream.user.unwrap_or(LogicalType::null_id(db)),
+                stream.keep.unwrap_or(false),
+            ),
+            span,
         )
-        .intern(db))
     };
 
     match &expr.0 {
-        Expr::Ident(ident) => eval_ident(ident, &expr.1, types, type_imports, "streamlet"),
+        Expr::Ident(ident) => eval_ident(ident, &expr.1, types, type_imports, "type"),
         Expr::TypeDef(typ_expr) => match typ_expr {
             LogicalTypeExpr::Null => Ok(LogicalType::null_id(db)),
             LogicalTypeExpr::Bits((num, num_span)) => {
