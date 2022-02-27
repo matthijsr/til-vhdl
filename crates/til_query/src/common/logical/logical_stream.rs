@@ -1,31 +1,31 @@
 use indexmap::IndexMap;
-use tydi_common::{name::PathName, numbers::BitCount};
+use tydi_common::{name::PathName};
 
 use crate::{
-    common::physical::{fields::Fields, stream::PhysicalStream},
+    common::physical::{fields::Fields},
     ir::Ir,
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct LogicalStream {
-    signals: Fields,
-    streams: IndexMap<PathName, PhysicalStream>,
+pub struct LogicalStream<F, P> {
+    signals: Fields<F>,
+    streams: IndexMap<PathName, P>,
 }
 
-impl LogicalStream {
-    pub fn new(signals: Fields, streams: IndexMap<PathName, PhysicalStream>) -> Self {
+impl<F, P> LogicalStream<F, P> {
+    pub fn new(signals: Fields<F>, streams: IndexMap<PathName, P>) -> Self {
         LogicalStream { signals, streams }
     }
 
-    pub fn signals(&self) -> impl Iterator<Item = (&PathName, &BitCount)> {
+    pub fn signals(&self) -> impl Iterator<Item = (&PathName, &F)> {
         self.signals.iter()
     }
 
-    pub fn streams(&self) -> impl Iterator<Item = (&PathName, &PhysicalStream)> {
+    pub fn streams(&self) -> impl Iterator<Item = (&PathName, &P)> {
         self.streams.iter()
     }
 }
 
-pub trait SynthesizeLogicalStream {
-    fn synthesize(&self, db: &dyn Ir) -> LogicalStream;
+pub trait SynthesizeLogicalStream<F, P> {
+    fn synthesize(&self, db: &dyn Ir) -> LogicalStream<F, P>;
 }

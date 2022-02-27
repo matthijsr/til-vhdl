@@ -188,7 +188,7 @@ impl LogicalType {
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#field-conversion-function)
     ///
     /// [`Fields`]: ./struct.Fields.html
-    pub(crate) fn fields(&self, db: &dyn Ir) -> Fields {
+    pub(crate) fn fields(&self, db: &dyn Ir) -> Fields<BitCount> {
         let mut fields = Fields::new_empty();
         match self {
             LogicalType::Null | LogicalType::Stream(_) => fields,
