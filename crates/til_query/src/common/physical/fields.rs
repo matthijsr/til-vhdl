@@ -27,6 +27,10 @@ impl<T> Fields<T> {
         Fields(IndexMap::new())
     }
 
+    pub fn indexed(&self) -> &IndexMap<PathName, T> {
+        &self.0
+    }
+
     pub fn insert(&mut self, path_name: PathName, bit_count: T) -> Result<()> {
         self.0
             .insert(path_name, bit_count)

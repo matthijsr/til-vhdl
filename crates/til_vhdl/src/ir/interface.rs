@@ -33,7 +33,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
 
         let synth = self.stream_id().synthesize(ir_db);
 
-        for (path, width) in synth.signals() {
+        for (path, width) in synth.fields_iter() {
             let signal_path = format!("{}__{}", &n, path);
             ports.push(Port::new(
                 VhdlName::try_new(signal_path)?,
@@ -45,7 +45,7 @@ impl IntoVhdl<Vec<Port>> for Interface {
             ));
         }
 
-        for (path, phys) in synth.streams() {
+        for (path, phys) in synth.streams_iter() {
             let phys_name = if path.len() > 0 {
                 format!("{}__{}", &n, path)
             } else {
