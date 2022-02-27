@@ -3,7 +3,7 @@ use tydi_common::{
     name::Name,
 };
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq)]
 pub struct SignalList<T> {
     valid: Option<T>,
     ready: Option<T>,
@@ -241,6 +241,40 @@ impl<T> SignalList<T> {
         self.user
             .as_ref()
             .map(|x| f(Name::try_new("user").unwrap(), x));
+    }
+
+    /// Modify the first `Some` signal
+    ///
+    /// Primarily used for setting documentation
+    pub fn apply_first<'a, F>(&'a mut self, mut f: F)
+    where
+        F: FnMut(&'a mut T),
+    {
+        if let Some(valid) = self.valid.as_mut() {
+            f(valid);
+            return;
+        } else if let Some(ready) = self.ready.as_mut() {
+            f(ready);
+            return;
+        } else if let Some(data) = self.data.as_mut() {
+            f(data);
+            return;
+        } else if let Some(last) = self.last.as_mut() {
+            f(last);
+            return;
+        } else if let Some(stai) = self.stai.as_mut() {
+            f(stai);
+            return;
+        } else if let Some(endi) = self.endi.as_mut() {
+            f(endi);
+            return;
+        } else if let Some(strb) = self.strb.as_mut() {
+            f(strb);
+            return;
+        } else if let Some(user) = self.user.as_mut() {
+            f(user);
+            return;
+        }
     }
 }
 

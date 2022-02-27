@@ -1,6 +1,9 @@
 use std::fs;
 
-use til_query::ir::{implementation::ImplementationKind, Ir};
+use til_query::{
+    common::{logical::logical_stream::LogicalStream, physical::signal_list::SignalList},
+    ir::{implementation::ImplementationKind, Ir},
+};
 use tydi_common::{
     cat,
     error::{Error, Result, TryOptional},
@@ -36,11 +39,32 @@ impl IntoVhdl<Component> for Streamlet {
         let mut ports = vec![];
         ports.push(Port::clk());
         ports.push(Port::rst());
+        let logical_stream_to_ports = |logical_stream: LogicalStream<Port, SignalList<Port>>| {
+            let field_ports = logical_stream.fields().iter().map(|(_, p)| p);
+            let stream_ports = logical_stream
+                .streams()
+                .iter()
+                .map(|(_, s)| s.into_iter())
+                .flatten();
+            field_ports
+                .chain(stream_ports)
+                .cloned()
+                .collect::<Vec<Port>>()
+        };
+
         for input in self.inputs(ir_db) {
-            ports.extend(input.canonical(ir_db, arch_db, prefix.clone())?);
+            ports.extend(logical_stream_to_ports(input.canonical(
+                ir_db,
+                arch_db,
+                prefix.clone(),
+            )?));
         }
         for output in self.outputs(ir_db) {
-            ports.extend(output.canonical(ir_db, arch_db, prefix.clone())?);
+            ports.extend(logical_stream_to_ports(output.canonical(
+                ir_db,
+                arch_db,
+                prefix.clone(),
+            )?));
         }
 
         let mut component = Component::new(VhdlName::try_new(n)?, vec![], ports, None);
@@ -51,6 +75,8 @@ impl IntoVhdl<Component> for Streamlet {
         Ok(component)
     }
 }
+
+// TODO: Add Component/Entity (or change existing ones) which keeps track of the LogicalStreams and original Interfaces
 
 // TODO: For now, assume architecture output will be a string.
 // The architecture for Structural and None is stored in the arch_db.

@@ -6,9 +6,9 @@ use tydi_common::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Fields<T>(IndexMap<PathName, T>);
+pub struct Fields<T: Clone + PartialEq>(IndexMap<PathName, T>);
 
-impl<T> Fields<T> {
+impl<T: Clone + PartialEq> Fields<T> {
     pub fn new(iter: impl IntoIterator<Item = (PathName, T)>) -> Result<Self> {
         let fields = iter.into_iter();
         let (lower, upper) = fields.size_hint();
@@ -50,9 +50,17 @@ impl<T> Fields<T> {
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.0.values()
     }
+
+    /// Use a function to convert the Fields from `T` to `R`
+    pub fn map<F, R: Clone + PartialEq>(self, mut f: F) -> Fields<R>
+    where
+        F: FnMut(T) -> R,
+    {
+        Fields(self.0.into_iter().map(|(n, x)| (n, f(x))).collect())
+    }
 }
 
-impl<'a, T> IntoIterator for &'a Fields<T> {
+impl<'a, T: Clone + PartialEq> IntoIterator for &'a Fields<T> {
     type Item = (&'a PathName, &'a T);
     type IntoIter = indexmap::map::Iter<'a, PathName, T>;
 
