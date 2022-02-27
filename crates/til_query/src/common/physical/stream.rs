@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use tydi_common::{
     error::{Error, Result},
     name::PathName,
-    numbers::{NonNegative, Positive},
+    numbers::{BitCount, NonNegative, Positive},
     util::log2_ceil,
 };
 
@@ -19,7 +19,7 @@ use super::{complexity::Complexity, fields::Fields, signal_list::SignalList};
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhysicalStream {
     /// Element content.
-    element_fields: Fields,
+    element_fields: Fields<BitCount>,
     /// Number of element lanes.
     element_lanes: Positive,
     /// Dimensionality.
@@ -27,7 +27,7 @@ pub struct PhysicalStream {
     /// Complexity.
     complexity: Complexity,
     /// User-defined transfer content.
-    user: Fields,
+    user: Fields<BitCount>,
 }
 
 impl PhysicalStream {
@@ -92,11 +92,11 @@ impl PhysicalStream {
     /// Constructs a new PhysicalStream using provided arguments. Returns an
     /// error when provided argument are not valid.
     pub fn new(
-        element_fields: impl Into<Fields>,
+        element_fields: impl Into<Fields<BitCount>>,
         element_lanes: Positive,
         dimensionality: NonNegative,
         complexity: impl Into<Complexity>,
-        user: impl Into<Fields>,
+        user: impl Into<Fields<BitCount>>,
     ) -> Self {
         PhysicalStream {
             element_fields: element_fields.into(),
@@ -108,7 +108,7 @@ impl PhysicalStream {
     }
 
     /// Returns the element fields in this physical stream.
-    pub fn element_fields(&self) -> &Fields {
+    pub fn element_fields(&self) -> &Fields<BitCount> {
         &self.element_fields
     }
 
@@ -128,7 +128,7 @@ impl PhysicalStream {
     }
 
     /// Returns the user fields in this physical stream.
-    pub fn user(&self) -> &Fields {
+    pub fn user(&self) -> &Fields<BitCount> {
         &self.user
     }
 

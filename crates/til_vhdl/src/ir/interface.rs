@@ -1,5 +1,9 @@
+use indexmap::IndexMap;
 use til_query::{
-    common::logical::logical_stream::SynthesizeLogicalStream,
+    common::{
+        logical::logical_stream::{LogicalStream, SynthesizeLogicalStream},
+        physical::{fields::Fields, signal_list::SignalList},
+    },
     ir::{physical_properties::InterfaceDirection, Ir},
 };
 use tydi_common::{
@@ -18,54 +22,57 @@ use crate::IntoVhdl;
 
 pub(crate) type Interface = til_query::ir::interface::Interface;
 
-impl IntoVhdl<Vec<Port>> for Interface {
+impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
         prefix: impl TryOptional<VhdlName>,
-    ) -> Result<Vec<Port>> {
+    ) -> Result<LogicalStream<Port, SignalList<Port>>> {
         let n: VhdlName = match prefix.try_optional()? {
             Some(some) => VhdlName::try_new(cat!(some, self.identifier()))?,
             None => self.name().clone().into(),
         };
-        let mut ports = Vec::new();
 
         let synth = self.stream_id().synthesize(ir_db);
 
-        for (path, width) in synth.signals() {
-            let signal_path = format!("{}__{}", &n, path);
-            ports.push(Port::new(
-                VhdlName::try_new(signal_path)?,
-                match self.physical_properties().direction() {
-                    InterfaceDirection::Out => Mode::Out,
-                    InterfaceDirection::In => Mode::In,
-                },
-                width.clone().into(),
-            ));
-        }
+        let fields = Fields::new(synth.fields_iter().map(|(path, width)| {
+            let prefixed_path = format!("{}__{}", &n, path);
+            (
+                path.clone(),
+                Port::new(
+                    VhdlName::try_new(prefixed_path).unwrap(),
+                    match self.physical_properties().direction() {
+                        InterfaceDirection::Out => Mode::Out,
+                        InterfaceDirection::In => Mode::In,
+                    },
+                    width.clone().into(),
+                ),
+            )
+        }))?;
 
-        for (path, phys) in synth.streams() {
+        let mut first = false;
+        let mut streams = IndexMap::new();
+        for (path, phys) in synth.streams_iter() {
             let phys_name = if path.len() > 0 {
                 format!("{}__{}", &n, path)
             } else {
                 n.to_string()
             };
-            for port in phys
+            let mut signal_list = phys
                 .canonical(ir_db, arch_db, phys_name.as_str())?
                 .with_direction(self.physical_properties().direction())
                 .signal_list()
-            {
-                ports.push(port.clone());
+                .clone();
+            if first && (&signal_list).into_iter().len() > 0 {
+                if let Some(doc) = self.doc() {
+                    signal_list.apply_first(|p| p.set_doc(doc.clone()));
+                }
+                first = false;
             }
+            streams.insert(path.clone(), signal_list.clone());
         }
 
-        if let Some(doc) = self.doc() {
-            if ports.len() > 0 {
-                ports[0].set_doc(doc);
-            }
-        }
-
-        Ok(ports)
+        Ok(LogicalStream::new(fields, streams))
     }
 }

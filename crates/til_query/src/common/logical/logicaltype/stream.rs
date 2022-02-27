@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 
 use tydi_common::error::TryResult;
 use tydi_common::name::{Name, PathName};
-use tydi_common::numbers::Positive;
+use tydi_common::numbers::{Positive, BitCount};
 use tydi_common::traits::Reverse;
 use tydi_intern::Id;
 
@@ -305,8 +305,8 @@ impl Stream {
     }
 }
 
-impl SynthesizeLogicalStream for Id<Stream> {
-    fn synthesize(&self, db: &dyn Ir) -> LogicalStream {
+impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
+    fn synthesize(&self, db: &dyn Ir) -> LogicalStream<BitCount, PhysicalStream> {
         let split = self.split_streams(db);
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
         LogicalStream::new(

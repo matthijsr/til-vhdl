@@ -36,10 +36,17 @@ impl IntoVhdl<ArchitectureBody> for Structure {
             .ports(ir_db)
             .iter()
             .map(|port| {
+                let logical_stream = port.canonical(ir_db, arch_db, prefix.clone())?;
+                let field_ports = logical_stream.fields().iter().map(|(_, p)| p);
+                let stream_ports = logical_stream
+                    .streams()
+                    .iter()
+                    .map(|(_, s)| s.into_iter())
+                    .flatten();
                 Ok((
                     port.name().clone(),
-                    port.canonical(ir_db, arch_db, prefix.clone())?
-                        .iter()
+                    field_ports
+                        .chain(stream_ports)
                         .map(|vhdl_port| {
                             (
                                 ObjectDeclaration::from_port(arch_db, vhdl_port, true),
@@ -67,7 +74,14 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                 .port_ids()
                 .iter()
                 .map(|(name, id)| {
-                    let ports = id.get(ir_db).canonical(ir_db, arch_db, prefix.clone())?;
+                    let logical_stream = id.get(ir_db).canonical(ir_db, arch_db, prefix.clone())?;
+                    let field_ports = logical_stream.fields().iter().map(|(_, p)| p);
+                    let stream_ports = logical_stream
+                        .streams()
+                        .iter()
+                        .map(|(_, s)| s.into_iter())
+                        .flatten();
+                    let ports = field_ports.chain(stream_ports);
                     let mut signals = vec![];
                     for port in ports {
                         let signal = ObjectDeclaration::signal(
