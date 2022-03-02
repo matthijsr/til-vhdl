@@ -18,6 +18,7 @@ use tydi_vhdl::{
 
 pub mod common;
 pub mod ir;
+pub mod tydi;
 
 pub trait IntoVhdl<T> {
     fn canonical(

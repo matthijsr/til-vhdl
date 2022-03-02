@@ -5,13 +5,13 @@ use indexmap::map::IndexMap;
 
 use array_assignment::ArrayAssignment;
 use textwrap::indent;
-use tydi_common::error::{Error, Result};
+use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::name::Name;
 use tydi_common::traits::{Document, Identify};
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
-use crate::declaration::{Declare};
+use crate::declaration::Declare;
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
@@ -31,7 +31,7 @@ pub trait Assign {
     fn assign(
         &self,
         db: &dyn Arch,
-        assignment: &(impl Into<Assignment> + Clone),
+        assignment: impl TryResult<Assignment>,
     ) -> Result<AssignDeclaration>;
 }
 
@@ -136,7 +136,7 @@ impl AssignDeclaration {
         match self.assignment().kind() {
             AssignmentKind::Object(object) => Ok(object.object().assign(
                 db,
-                &Assignment::from(
+                Assignment::from(
                     ObjectAssignment::from(self.object())
                         .assign_from(db, self.assignment().to_field())?,
                 )

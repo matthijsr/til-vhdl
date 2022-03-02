@@ -144,7 +144,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                     result.push(
                         flat_id.assign(
                             db,
-                            &Assignment::from(
+                            Assignment::from(
                                 ObjectAssignment::from(self.clone()).assign_from(db, &new_from)?,
                             )
                             .to_nested(&new_to),

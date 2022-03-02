@@ -1,12 +1,11 @@
-
 use std::fmt;
-
 
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::{Arch, InternSelf};
+use crate::assignment::{Assign, AssignDeclaration, Assignment, ObjectAssignment};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::port::{Mode, Port};
 

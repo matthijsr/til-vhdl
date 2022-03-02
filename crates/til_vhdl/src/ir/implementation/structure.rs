@@ -90,7 +90,7 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                             port.typ().clone(),
                             None,
                         )?;
-                        port_mapping.map_port(arch_db, port.vhdl_name().clone(), &signal)?;
+                        port_mapping.map_port(arch_db, port.vhdl_name().clone(), signal)?;
                         signals.push((
                             signal,
                             match port.mode() {
@@ -105,8 +105,8 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                 })
                 .collect::<Result<BTreeMap<Name, Vec<(Id<ObjectDeclaration>, ObjectState)>>>>()?;
             streamlet_ports.insert(instance_name, port_map_signals);
-            port_mapping.map_port(arch_db, "clk", &clk)?;
-            port_mapping.map_port(arch_db, "rst", &rst)?;
+            port_mapping.map_port(arch_db, "clk", clk)?;
+            port_mapping.map_port(arch_db, "rst", rst)?;
             statements.push(port_mapping.finish()?.into());
         }
         for connection in self.connections() {
@@ -131,9 +131,9 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                 if sink_state == source_state {
                     return Err(Error::BackEndError(format!("Something went wrong during VHDL conversion of a connection. Connection {} results in two objects having shared state {}.", connection, sink_state)));
                 } else if sink_state == ObjectState::Assigned {
-                    statements.push(source.assign(arch_db, &sink)?.into());
+                    statements.push(source.assign(arch_db, sink)?.into());
                 } else {
-                    statements.push(sink.assign(arch_db, &source)?.into());
+                    statements.push(sink.assign(arch_db, source)?.into());
                 }
             }
         }

@@ -1,14 +1,12 @@
-
-
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     traits::Identify,
 };
 use tydi_intern::Id;
 
 use crate::{
     architecture::arch_storage::Arch,
-    declaration::{ObjectDeclaration, ObjectKind},
+    declaration::{AliasDeclaration, ObjectDeclaration, ObjectKind},
 };
 
 use super::{Assign, AssignDeclaration, Assignment};
@@ -17,9 +15,9 @@ impl Assign for Id<ObjectDeclaration> {
     fn assign(
         &self,
         db: &dyn Arch,
-        assignment: &(impl Into<Assignment> + Clone),
+        assignment: impl TryResult<Assignment>,
     ) -> Result<AssignDeclaration> {
-        let true_assignment = assignment.clone().into();
+        let true_assignment = assignment.try_result()?;
         let self_obj = db.lookup_intern_object_declaration(*self);
         // TODO: Fix this nonsense
         match self_obj.kind() {
@@ -39,16 +37,13 @@ impl Assign for Id<ObjectDeclaration> {
     }
 }
 
-// impl<T> Assign for T
-// where
-//     T: TryInto<Id<ObjectDeclaration>, Error = Error> + Clone,
-// {
-//     fn assign(
-//         &self,
-//         db: &dyn Arch,
-//         assignment: &(impl Into<Assignment> + Clone),
-//     ) -> Result<AssignDeclaration> {
-//         let decl = self.clone().try_into()?;
-//         decl.assign(db, assignment)
-//     }
-// }
+impl Assign for AliasDeclaration {
+    fn assign(
+        &self,
+        db: &dyn Arch,
+        assignment: impl TryResult<Assignment>,
+    ) -> Result<AssignDeclaration> {
+        let assignment = assignment.try_result()?.to_nested(self.field_selection());
+        self.object().assign(db, assignment)
+    }
+}
