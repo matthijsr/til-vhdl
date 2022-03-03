@@ -10,8 +10,9 @@ pub mod port;
 pub struct VhdlPhysicalStream {
     /// The objects making up a physical stream.
     signal_list: SignalList<Id<ObjectDeclaration>>,
-    /// Elements, as lanes with fields, aliasing the data signals of the SignalList.
-    elements: Vec<Fields<AliasDeclaration>>,
+    /// Elements, as lanes with fields,
+    /// aliasing the data, last, stai, endi and strb signals of the SignalList.
+    elements: Vec<Fields<SignalList<AliasDeclaration>>>,
     /// Dimensionality.
     dimensionality: NonNegative,
     /// Complexity.
