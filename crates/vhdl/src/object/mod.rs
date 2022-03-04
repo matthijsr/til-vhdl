@@ -22,6 +22,20 @@ pub mod array;
 pub mod object_from;
 pub mod record;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+pub struct Assignable {
+    /// Can be assigned to
+    pub to: bool,
+    /// Can be assigned from
+    pub from: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Object {
+    typ: ObjectType,
+    assignable: Assignable,
+}
+
 /// Types of VHDL objects, possibly referring to fields
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectType {

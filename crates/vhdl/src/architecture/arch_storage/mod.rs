@@ -1,5 +1,3 @@
-
-
 use std::sync::Arc;
 
 use tydi_common::error::{Result, TryResult};
@@ -7,19 +5,24 @@ use tydi_intern::Id;
 
 use crate::{
     assignment::AssignmentKind,
-    declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectState},
+    common::vhdl_name::VhdlName,
+    component::Component,
+    declaration::{ObjectDeclaration, ObjectState},
     package::Package,
-    statement::Statement, common::vhdl_name::VhdlName, component::Component,
+    statement::Statement,
 };
+
+use self::interner::Interner;
 
 use super::Architecture;
 
 pub mod db;
 pub mod get_self;
 pub mod intern_self;
+pub mod interner;
 
 #[salsa::query_group(ArchStorage)]
-pub trait Arch {
+pub trait Arch: Interner {
     #[salsa::input]
     fn default_package(&self) -> Arc<Package>;
 
@@ -28,15 +31,6 @@ pub trait Arch {
 
     #[salsa::input]
     fn architecture(&self) -> Architecture;
-
-    #[salsa::interned]
-    fn intern_architecture_declaration(
-        &self,
-        arch_decl: ArchitectureDeclaration,
-    ) -> Id<ArchitectureDeclaration>;
-
-    #[salsa::interned]
-    fn intern_object_declaration(&self, obj_decl: ObjectDeclaration) -> Id<ObjectDeclaration>;
 
     fn subject_component(&self) -> Result<Arc<Component>>;
 
