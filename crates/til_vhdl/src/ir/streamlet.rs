@@ -35,7 +35,6 @@ impl IntoVhdl<Component> for Streamlet {
             Some(some) => cat!(some, self.identifier(), "com"),
             None => cat!(self.identifier(), "com"),
         };
-        let n = VhdlName::try_new(n)?;
 
         let mut ports = vec![];
         ports.push(Port::clk());
