@@ -3,31 +3,31 @@ use std::iter::FromIterator;
 use indexmap::IndexMap;
 use textwrap::indent;
 use tydi_common::error::{Error, Result};
-use tydi_common::name::Name;
 
 use crate::architecture::arch_storage::Arch;
+use crate::common::vhdl_name::VhdlName;
 use crate::declaration::DeclareWithIndent;
 use crate::object::ObjectType;
 
 /// A record object
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RecordObject {
-    type_name: Name,
+    type_name: VhdlName,
     fields: Vec<RecordField>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RecordField {
-    field: Name,
+    field: VhdlName,
     typ: ObjectType,
 }
 
 impl RecordField {
-    pub fn new(field: Name, typ: ObjectType) -> Self {
+    pub fn new(field: VhdlName, typ: ObjectType) -> Self {
         RecordField { field, typ }
     }
 
-    pub fn field(&self) -> &Name {
+    pub fn field(&self) -> &VhdlName {
         &self.field
     }
 
@@ -37,7 +37,10 @@ impl RecordField {
 }
 
 impl RecordObject {
-    pub fn new(type_name: impl Into<Name>, fields: IndexMap<Name, ObjectType>) -> RecordObject {
+    pub fn new(
+        type_name: impl Into<VhdlName>,
+        fields: IndexMap<VhdlName, ObjectType>,
+    ) -> RecordObject {
         RecordObject {
             type_name: type_name.into(),
             fields: fields
@@ -51,11 +54,11 @@ impl RecordObject {
         self.type_name.to_string()
     }
 
-    pub fn fields(&self) -> IndexMap<Name, &ObjectType> {
+    pub fn fields(&self) -> IndexMap<VhdlName, &ObjectType> {
         IndexMap::from_iter(self.fields.iter().map(|x| (x.field().clone(), x.typ())))
     }
 
-    pub fn get_field(&self, field_name: &Name) -> Result<&ObjectType> {
+    pub fn get_field(&self, field_name: &VhdlName) -> Result<&ObjectType> {
         match self.fields().get(field_name) {
             Some(field) => Ok(field),
             None => Err(Error::InvalidArgument(format!(

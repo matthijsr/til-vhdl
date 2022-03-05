@@ -1,6 +1,5 @@
 use indexmap::IndexMap;
 use tydi_common::error::TryResult;
-use tydi_common::name::Name;
 use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
@@ -84,12 +83,7 @@ impl Architecture {
         package: &Package,
         component_id: impl TryResult<VhdlName>,
     ) -> Result<Architecture> {
-        Architecture::new(
-            Name::try_new("work")?,
-            VhdlName::try_new("Behavioral")?,
-            package,
-            component_id,
-        )
+        Architecture::new("work", "Behavioral", package, component_id)
     }
 
     /// Create the architecture based on a component contained within a package, specify the library (project) in which the package is contained
@@ -250,8 +244,7 @@ mod tests {
     fn test_architecture() -> Result<()> {
         let db = Database::default();
         let package = test_package()?;
-        let architecture =
-            Architecture::new_default(&package, Name::try_new("component_with_nested_types")?)?;
+        let architecture = Architecture::new_default(&package, "component_with_nested_types")?;
         assert_eq!(
             r#"library ieee;
 use ieee.std_logic_1164.all;

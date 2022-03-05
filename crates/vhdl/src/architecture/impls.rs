@@ -118,7 +118,7 @@ mod tests {
     //     fn architecture_declare_usings() {
     //         let package = test_package();
     //         let architecture =
-    //             Architecture::new_default(&package, Name::try_new("test").unwrap()).unwrap();
+    //             Architecture::new_default(&package, VhdlName::try_new("test").unwrap()).unwrap();
     //         let usings = architecture.declare_usings().unwrap();
     //         assert_eq!(
     //             usings,
@@ -136,7 +136,7 @@ mod tests {
     //     fn architecture_declare() {
     //         let package = test_package();
     //         let architecture =
-    //             Architecture::new_default(&package, Name::try_new("test").unwrap()).unwrap();
+    //             Architecture::new_default(&package, VhdlName::try_new("test").unwrap()).unwrap();
     //         let decl = architecture.declare().unwrap();
     //         assert_eq!(
     //             decl,

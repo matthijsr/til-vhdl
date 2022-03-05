@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 
-use tydi_common::{
-    error::{Error, Result},
-    name::Name,
-};
+use tydi_common::error::{Error, Result, TryResult};
 
-use crate::{architecture::arch_storage::Arch, declaration::Declare, object::ObjectType};
+use crate::{
+    architecture::arch_storage::Arch, common::vhdl_name::VhdlName, declaration::Declare,
+    object::ObjectType,
+};
 
 /// An array object, arrays contain a single type of object, but can contain nested objects
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -41,7 +41,7 @@ impl ArrayObject {
         high: i32,
         low: i32,
         object: ObjectType,
-        type_name: impl Into<Name>,
+        type_name: impl TryResult<VhdlName>,
     ) -> Result<ArrayObject> {
         if low > high {
             Err(Error::InvalidArgument(format!(
@@ -53,7 +53,7 @@ impl ArrayObject {
                 high,
                 low,
                 typ: Box::new(object),
-                type_name: type_name.into().to_string(),
+                type_name: type_name.try_result()?.to_string(),
                 is_std_logic_vector: false,
             })
         }

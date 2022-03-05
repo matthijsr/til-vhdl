@@ -31,10 +31,11 @@ impl IntoVhdl<Component> for Streamlet {
         prefix: impl TryOptional<VhdlName>,
     ) -> Result<Component> {
         let prefix = prefix.try_optional()?;
-        let n: String = match &prefix {
+        let n = match &prefix {
             Some(some) => cat!(some, self.identifier(), "com"),
             None => cat!(self.identifier(), "com"),
         };
+        let n = VhdlName::try_new(n)?;
 
         let mut ports = vec![];
         ports.push(Port::clk());
@@ -67,7 +68,7 @@ impl IntoVhdl<Component> for Streamlet {
             )?));
         }
 
-        let mut component = Component::new(VhdlName::try_new(n)?, vec![], ports, None);
+        let mut component = Component::try_new(n, vec![], ports, None)?;
         if let Some(doc) = self.doc() {
             component.set_doc(doc);
         }

@@ -1,8 +1,9 @@
 use textwrap::indent;
-use tydi_common::error::Result;
+use tydi_common::error::{Result, TryResult};
 use tydi_common::traits::{Document, Identify};
 
 use crate::architecture::arch_storage::Arch;
+use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::declaration::DeclareWithIndent;
 use crate::traits::VhdlDocument;
 use crate::{
@@ -37,7 +38,7 @@ impl DeclareWithIndent for Entity {
 
 impl Identify for Entity {
     fn identifier(&self) -> String {
-        self.identifier.clone()
+        self.identifier.to_string()
     }
 }
 
@@ -49,18 +50,18 @@ impl Document for Entity {
 
 impl Entity {
     /// Create a new entity.
-    pub fn new(
-        identifier: impl Into<String>,
+    pub fn try_new(
+        identifier: impl TryResult<VhdlName>,
         parameters: Vec<Parameter>,
         ports: Vec<Port>,
         doc: Option<String>,
-    ) -> Entity {
-        Entity {
-            identifier: identifier.into(),
+    ) -> Result<Entity> {
+        Ok(Entity {
+            identifier: identifier.try_result()?,
             parameters,
             ports,
             doc,
-        }
+        })
     }
 
     /// Return a reference to the ports of this entity.
@@ -87,12 +88,12 @@ impl Entity {
 
 impl From<&Component> for Entity {
     fn from(comp: &Component) -> Self {
-        Entity::new(
-            comp.identifier(),
-            comp.parameters().to_vec(),
-            comp.ports().to_vec(),
-            comp.doc(),
-        )
+        Entity {
+            identifier: comp.vhdl_name().clone(),
+            parameters: comp.parameters().to_vec(),
+            ports: comp.ports().to_vec(),
+            doc: comp.doc(),
+        }
     }
 }
 

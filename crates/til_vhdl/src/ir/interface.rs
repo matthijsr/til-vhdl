@@ -40,14 +40,15 @@ impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
             let prefixed_path = format!("{}__{}", &n, path);
             (
                 path.clone(),
-                Port::new(
-                    VhdlName::try_new(prefixed_path).unwrap(),
+                Port::try_new(
+                    prefixed_path,
                     match self.physical_properties().direction() {
                         InterfaceDirection::Out => Mode::Out,
                         InterfaceDirection::In => Mode::In,
                     },
-                    width.clone().into(),
-                ),
+                    width.clone(),
+                )
+                .unwrap(),
             )
         }))?;
 

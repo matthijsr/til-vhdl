@@ -3,8 +3,7 @@ use std::{convert::TryInto, fmt};
 use array::ArrayObject;
 use record::RecordObject;
 use tydi_common::{
-    error::{Error, Result},
-    name::Name,
+    error::{Error, Result, TryResult},
     numbers::BitCount,
 };
 
@@ -14,6 +13,7 @@ use crate::{
         array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
         FieldSelection, RangeConstraint, ValueAssignment,
     },
+    common::vhdl_name::VhdlName,
     declaration::{Declare, DeclareWithIndent},
     properties::Analyze,
 };
@@ -102,7 +102,7 @@ impl ObjectType {
                                     range.high(),
                                     range.low(),
                                     array.typ().clone(),
-                                    Name::try_new(array.type_name())?,
+                                    array.type_name(),
                                 )
                             }
                         } else {
@@ -141,7 +141,7 @@ impl ObjectType {
         high: i32,
         low: i32,
         object: ObjectType,
-        type_name: impl Into<Name>,
+        type_name: impl TryResult<VhdlName>,
     ) -> Result<ObjectType> {
         Ok(ObjectType::Array(ArrayObject::array(
             high, low, object, type_name,
@@ -381,5 +381,38 @@ impl From<BitCount> for ObjectType {
         } else {
             ObjectType::bit_vector((bits.get() - 1).try_into().unwrap(), 0).unwrap()
         }
+    }
+}
+
+impl<T> From<std::ops::Range<T>> for ObjectType
+where
+    T: Into<i32>,
+{
+    fn from(range: std::ops::Range<T>) -> Self {
+        let start = range.start.into();
+        let end = range.end.into();
+        let (high, low) = if start > end {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        ObjectType::bit_vector(high, low).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bit_vector_from_range() {
+        assert_eq!(
+            ObjectType::from(0..2),
+            ObjectType::bit_vector(2, 0).unwrap()
+        );
+        assert_eq!(
+            ObjectType::from(2..0),
+            ObjectType::bit_vector(2, 0).unwrap()
+        );
     }
 }

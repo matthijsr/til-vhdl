@@ -4,12 +4,9 @@ use tydi_common::error::{Result, TryResult};
 use tydi_intern::Id;
 
 use crate::{
-    assignment::AssignmentKind,
     common::vhdl_name::VhdlName,
     component::Component,
-    declaration::{ObjectDeclaration, ObjectState},
     package::Package,
-    statement::Statement,
 };
 
 use self::interner::Interner;
@@ -33,51 +30,11 @@ pub trait Arch: Interner {
     fn architecture(&self) -> Architecture;
 
     fn subject_component(&self) -> Result<Arc<Component>>;
-
-    fn get_object(&self, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration>;
-
-    // #[salsa::interned]
-    // fn intern_statement(&self, stat: Statement) -> Id<Statement>;
 }
 
 fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
     let package = db.default_package();
     package.get_subject_component(db)
-}
-
-fn get_object(db: &dyn Arch, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration> {
-    let mut obj = db.lookup_intern_object_declaration(id);
-    for stat in db.architecture().statements() {
-        match stat {
-            Statement::Assignment(ass) => {
-                if ass.object() == id {
-                    if ass.assignment().to_field().is_empty() {
-                        match ass.assignment().kind() {
-                            AssignmentKind::Object(oa) => {
-                                obj.set_state(oa.selected_object(db)?.state())?
-                            }
-                            AssignmentKind::Direct(_) => obj.set_state(ObjectState::Assigned)?,
-                        }
-                    } else {
-                        todo!()
-                        // Need to be able to keep track of individual fields, or collections of fields... which is very hard (consider that an array consists of multiple fields, but can also be assigned in slices)
-                        // Should use a similar function to this one to track such things, rather than give them all individual IDs...
-                    }
-                }
-            }
-            Statement::PortMapping(pm) => {
-                // TODO: Currently port mappings assume that ports are assigned completely, rather than assigning individual fields...
-                if pm
-                    .mappings()
-                    .values()
-                    .any(|x| x.object() == id && x.assignment().to_field().is_empty())
-                {
-                    obj.set_state(ObjectState::Assigned)?
-                }
-            }
-        }
-    }
-    Ok(obj)
 }
 
 pub trait GetSelf<T> {

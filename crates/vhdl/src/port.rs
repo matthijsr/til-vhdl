@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use tydi_common::{
-    error::Result,
+    error::{Result, TryResult},
     traits::{Document, Identify, Reverse, Reversed},
 };
 
@@ -28,58 +28,68 @@ pub struct Port {
 
 impl Port {
     /// Create a new port.
-    pub fn new(name: impl Into<VhdlName>, mode: Mode, typ: ObjectType) -> Port {
-        Port {
-            identifier: name.into(),
-            mode,
-            typ,
+    pub fn try_new(
+        name: impl TryResult<VhdlName>,
+        mode: impl TryResult<Mode>,
+        typ: impl TryResult<ObjectType>,
+    ) -> Result<Self> {
+        Ok(Port {
+            identifier: name.try_result()?,
+            mode: mode.try_result()?,
+            typ: typ.try_result()?,
             doc: None,
-        }
+        })
     }
 
     /// Create a new port with documentation.
-    pub fn new_documented(
-        name: impl Into<VhdlName>,
-        mode: Mode,
-        typ: ObjectType,
+    pub fn try_new_documented(
+        name: impl TryResult<VhdlName>,
+        mode: impl TryResult<Mode>,
+        typ: impl TryResult<ObjectType>,
         doc: impl Into<String>,
-    ) -> Port {
-        Port {
-            identifier: name.into(),
-            mode,
-            typ,
+    ) -> Result<Self> {
+        Ok(Port {
+            identifier: name.try_result()?,
+            mode: mode.try_result()?,
+            typ: typ.try_result()?,
             doc: Some(doc.into()),
-        }
+        })
     }
 
     /// Create a new port with `Mode::In`
-    pub fn new_in(name: impl Into<VhdlName>, typ: ObjectType) -> Port {
-        Port::new(name, Mode::In, typ)
+    pub fn try_new_in(
+        name: impl TryResult<VhdlName>,
+        typ: impl TryResult<ObjectType>,
+    ) -> Result<Self> {
+        Port::try_new(name, Mode::In, typ)
     }
 
     /// Create a new port with `Mode::Out`
-    pub fn new_out(name: impl Into<VhdlName>, typ: ObjectType) -> Port {
-        Port::new(name, Mode::Out, typ)
+    pub fn try_new_out(
+        name: impl TryResult<VhdlName>,
+        typ: impl TryResult<ObjectType>,
+    ) -> Result<Self> {
+        Port::try_new(name, Mode::Out, typ)
     }
 
     /// Create an in port with type `std_logic`
-    pub fn bit_in(name: impl Into<VhdlName>) -> Port {
-        Port::new(name, Mode::In, ObjectType::Bit)
+    pub fn try_bit_in(name: impl TryResult<VhdlName>) -> Result<Self> {
+        Port::try_new(name, Mode::In, ObjectType::Bit)
     }
 
     /// Create an out port with type `std_logic`
-    pub fn bit_out(name: impl Into<VhdlName>) -> Port {
-        Port::new(name, Mode::Out, ObjectType::Bit)
+    pub fn try_bit_out(name: impl TryResult<VhdlName>) -> Result<Self> {
+        Port::try_new(name, Mode::Out, ObjectType::Bit)
     }
 
     /// Create a `clk` port, `clk : in std_logic`.
     pub fn clk() -> Port {
-        Port::new(VhdlName::try_new("clk").unwrap(), Mode::In, ObjectType::Bit)
+        Port::try_new("clk", Mode::In, ObjectType::Bit).unwrap()
     }
 
     /// Create a `rst` port, `rst : in std_logic`.
     pub fn rst() -> Port {
-        Port::new(VhdlName::try_new("rst").unwrap(), Mode::In, ObjectType::Bit)
+        Port::try_new("rst", Mode::In, ObjectType::Bit).unwrap()
     }
 
     /// Return the port mode.
@@ -184,5 +194,5 @@ impl Display for Mode {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Parameter {
     /// Parameter identifier.
-    pub identifier: String,
+    pub identifier: VhdlName,
 }
