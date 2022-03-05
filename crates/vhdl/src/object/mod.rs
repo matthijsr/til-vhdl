@@ -1,4 +1,5 @@
 use object_type::ObjectType;
+use tydi_intern::Id;
 
 pub mod array;
 pub mod object_from;
@@ -13,8 +14,8 @@ pub struct Assignable {
     pub from: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub struct Object {
-    typ: ObjectType,
-    assignable: Assignable,
+    pub typ: Id<ObjectType>,
+    pub assignable: Assignable,
 }

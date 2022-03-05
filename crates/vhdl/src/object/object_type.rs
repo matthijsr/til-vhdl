@@ -4,6 +4,7 @@ use std::fmt;
 use tydi_common::error::Result;
 use tydi_common::error::{Error, TryResult};
 use tydi_common::numbers::BitCount;
+use tydi_common::traits::Identify;
 
 use crate::architecture::arch_storage::Arch;
 use crate::assignment::array_assignment::ArrayAssignment;
@@ -153,13 +154,21 @@ impl ObjectType {
             }
             ObjectType::Array(to_array) => {
                 if let ObjectType::Array(from_array) = typ {
-                    if from_array.width() == to_array.width() {
-                        to_array.typ().can_assign_type(from_array.typ())
+                    if from_array.identifier() == to_array.identifier() {
+                        if from_array.width() == to_array.width() {
+                            to_array.typ().can_assign_type(from_array.typ())
+                        } else {
+                            Err(Error::InvalidTarget(format!(
+                                "Cannot assign array with width {} to array with width {}",
+                                from_array.width(),
+                                to_array.width(),
+                            )))
+                        }
                     } else {
                         Err(Error::InvalidTarget(format!(
-                            "Cannot assign array with width {} to array with width {}",
-                            from_array.width(),
-                            to_array.width(),
+                            "Cannot assign array type {} to array type {}",
+                            from_array.identifier(),
+                            to_array.identifier(),
                         )))
                     }
                 } else {
@@ -171,13 +180,13 @@ impl ObjectType {
             }
             ObjectType::Record(to_record) => {
                 if let ObjectType::Record(from_record) = typ {
-                    if from_record.declaration_type_name() == to_record.declaration_type_name() {
+                    if from_record.identifier() == to_record.identifier() {
                         Ok(())
                     } else {
                         Err(Error::InvalidTarget(format!(
                             "Cannot assign record type {} to record type {}",
-                            from_record.declaration_type_name(),
-                            to_record.declaration_type_name(),
+                            from_record.identifier(),
+                            to_record.identifier(),
                         )))
                     }
                 } else {
