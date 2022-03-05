@@ -4,12 +4,13 @@ use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;
 use tydi_intern::Id;
 
-use crate::architecture::arch_storage::{Arch, InternSelf};
+use crate::architecture::arch_storage::Arch;
+use crate::architecture::arch_storage::interner::InternSelf;
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
+use crate::object::object_type::ObjectType;
 use crate::port::{Mode, Port};
 
 use super::assignment::{AssignmentKind, FieldSelection};
-use crate::object::object_type::ObjectType;
 
 pub mod architecturedeclaration_from;
 pub mod declare;
@@ -439,7 +440,6 @@ impl VhdlNameSelf for AliasDeclaration {
 
 #[cfg(test)]
 pub mod tests {
-
     use indexmap::IndexMap;
 
     use crate::{architecture::arch_storage::db::Database, object::record::RecordObject};

@@ -1,13 +1,15 @@
 use std::convert::TryInto;
 use std::fmt;
 
-use tydi_common::error;
+use tydi_common::error::Result;
 use tydi_common::error::{Error, TryResult};
 use tydi_common::numbers::BitCount;
 
 use crate::architecture::arch_storage::Arch;
-use crate::assignment::{Assignment, AssignmentKind, DirectAssignment, FieldSelection, RangeConstraint, ValueAssignment};
 use crate::assignment::array_assignment::ArrayAssignment;
+use crate::assignment::{
+    Assignment, AssignmentKind, DirectAssignment, FieldSelection, RangeConstraint, ValueAssignment,
+};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::array::ArrayObject;
@@ -58,7 +60,7 @@ impl fmt::Display for ObjectType {
 }
 
 impl ObjectType {
-    pub fn get_field(&self, field: &FieldSelection) -> error::Result<ObjectType> {
+    pub fn get_field(&self, field: &FieldSelection) -> Result<ObjectType> {
         match self {
             ObjectType::Bit => Err(Error::InvalidTarget(
                 "Cannot select a field on a Bit".to_string(),
@@ -111,7 +113,7 @@ impl ObjectType {
         }
     }
 
-    pub fn get_nested(&self, nested: &Vec<FieldSelection>) -> error::Result<ObjectType> {
+    pub fn get_nested(&self, nested: &Vec<FieldSelection>) -> Result<ObjectType> {
         let mut result = self.clone();
         for field in nested {
             result = result.get_field(field)?;
@@ -125,18 +127,19 @@ impl ObjectType {
         low: i32,
         object: ObjectType,
         type_name: impl TryResult<VhdlName>,
-    ) -> error::Result<ObjectType> {
+    ) -> Result<ObjectType> {
         Ok(ObjectType::Array(ArrayObject::array(
             high, low, object, type_name,
         )?))
     }
 
     /// Create a bit vector object
-    pub fn bit_vector(high: i32, low: i32) -> error::Result<ObjectType> {
+    pub fn bit_vector(high: i32, low: i32) -> Result<ObjectType> {
         Ok(ArrayObject::bit_vector(high, low)?.into())
     }
 
-    pub fn can_assign_type(&self, typ: &ObjectType) -> error::Result<()> {
+    /// Test whether two `ObjectType`s can be assigned to one another
+    pub fn can_assign_type(&self, typ: &ObjectType) -> Result<()> {
         match self {
             ObjectType::Bit => {
                 if let ObjectType::Bit = typ {
@@ -187,7 +190,7 @@ impl ObjectType {
         }
     }
 
-    pub fn can_assign(&self, db: &dyn Arch, assignment: &Assignment) -> error::Result<()> {
+    pub fn can_assign(&self, db: &dyn Arch, assignment: &Assignment) -> Result<()> {
         let mut to_object = self.clone();
         for field in assignment.to_field() {
             to_object = to_object.get_field(field)?;
@@ -348,7 +351,7 @@ impl Analyze for ObjectType {
 }
 
 impl DeclareWithIndent for ObjectType {
-    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> error::Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
         match self {
             ObjectType::Bit => Err(Error::BackEndError(
                 "Invalid type, Bit (std_logic) cannot be declared.".to_string(),

@@ -1,9 +1,10 @@
 use indexmap::IndexMap;
-use tydi_common::error::TryResult;
+
+use arch_storage::interner::GetSelf;
 use tydi_common::{error::Result, traits::Identify};
+use tydi_common::error::TryResult;
 use tydi_intern::Id;
 
-use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
     entity::Entity,
@@ -11,8 +12,9 @@ use crate::{
     statement::Statement,
     usings::{ListUsings, Usings},
 };
+use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 
-use self::arch_storage::{Arch, GetSelf};
+use self::arch_storage::Arch;
 
 pub mod arch_storage;
 pub mod impls;

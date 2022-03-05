@@ -1,6 +1,6 @@
-use super::{interner::InternerStorage, ArchStorage};
+use super::{interner::InternerStorage, object_queries::ObjectStorage, ArchStorage};
 
-#[salsa::database(ArchStorage, InternerStorage)]
+#[salsa::database(ArchStorage, InternerStorage, ObjectStorage)]
 #[derive(Default)]
 pub struct Database {
     storage: salsa::Storage<Database>,
