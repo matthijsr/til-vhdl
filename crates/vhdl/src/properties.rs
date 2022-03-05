@@ -1,6 +1,6 @@
 use tydi_common::numbers::NonNegative;
 
-use crate::object::ObjectType;
+use crate::object::object_type::ObjectType;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Width {

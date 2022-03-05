@@ -9,9 +9,9 @@ use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::Declare,
-    object::ObjectType,
-    traits::VhdlDocument,
+    traits::VhdlDocument, object::object_type::DeclarationTypeName,
 };
+use crate::object::object_type::ObjectType;
 
 /// A port.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -148,7 +148,7 @@ impl Declare for Port {
                 "{} : {} {}",
                 self.identifier(),
                 self.mode(),
-                self.typ().type_name()
+                self.typ().declaration_type_name()
             )
             .as_str(),
         );

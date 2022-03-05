@@ -1,10 +1,10 @@
 use tydi_common::{
-    error::{Result},
+    error::Result,
     traits::Identify,
 };
 use tydi_intern::Id;
 
-use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
+use crate::{architecture::{arch_storage::Arch, ArchitectureDeclare}, object::object_type::DeclarationTypeName};
 
 use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind, ObjectState};
 
@@ -45,7 +45,7 @@ impl ArchitectureDeclare for ObjectDeclaration {
                 ObjectState::Unassigned => result.push_str("in "),
             };
         }
-        result.push_str(self.typ().type_name().as_str());
+        result.push_str(self.typ().declaration_type_name().as_str());
         if let Some(default) = self.default() {
             result.push_str(" := ");
             result.push_str(&default.declare_for(db, self.identifier(), indent_style)?);
@@ -64,8 +64,9 @@ impl ArchitectureDeclare for Id<ObjectDeclaration> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        architecture::arch_storage::db::Database, assignment::StdLogicValue, object::ObjectType,
+        architecture::arch_storage::db::Database, assignment::StdLogicValue,
     };
+    use crate::object::object_type::ObjectType;
 
     use super::*;
 

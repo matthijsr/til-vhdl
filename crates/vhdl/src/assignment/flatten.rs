@@ -1,17 +1,19 @@
 use std::convert::TryFrom;
 
-use super::{AssignDeclaration, Assignment, FieldSelection};
-use crate::{
-    architecture::arch_storage::Arch,
-    assignment::{Assign, ObjectAssignment, RangeConstraint},
-    declaration::ObjectDeclaration,
-    object::ObjectType,
-};
 use tydi_common::{
     error::{Error, Result},
     traits::Identify,
 };
 use tydi_intern::Id;
+
+use crate::{
+    architecture::arch_storage::Arch,
+    assignment::{Assign, ObjectAssignment, RangeConstraint},
+    declaration::ObjectDeclaration,
+};
+use crate::object::object_type::ObjectType;
+
+use super::{AssignDeclaration, Assignment, FieldSelection};
 
 pub trait FlatLength {
     /// Returns the total length of the object when flattened

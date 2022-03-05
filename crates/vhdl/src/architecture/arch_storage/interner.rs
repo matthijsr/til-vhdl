@@ -2,8 +2,9 @@ use tydi_intern::Id;
 
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
-    object::{Object, ObjectType},
+    object::Object,
 };
+use crate::object::object_type::ObjectType;
 
 #[salsa::query_group(InternerStorage)]
 pub trait Interner {

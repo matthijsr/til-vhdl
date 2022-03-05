@@ -9,7 +9,7 @@ use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::port::{Mode, Port};
 
 use super::assignment::{AssignmentKind, FieldSelection};
-use super::object::ObjectType;
+use crate::object::object_type::ObjectType;
 
 pub mod architecturedeclaration_from;
 pub mod declare;

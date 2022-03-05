@@ -15,7 +15,7 @@ use crate::declaration::Declare;
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
-use super::object::ObjectType;
+use crate::object::object_type::ObjectType;
 
 use self::bitvec::BitVecValue;
 

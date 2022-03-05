@@ -1,18 +1,18 @@
 use til_query::common::physical::signal_list::SignalList;
-use til_query::ir::physical_properties::InterfaceDirection;
 use til_query::ir::Ir;
-use tydi_common::error::TryOptional;
-use tydi_common::numbers::Positive;
+use til_query::ir::physical_properties::InterfaceDirection;
 use tydi_common::{
     cat,
     error::Result,
     traits::{Reverse, Reversed},
 };
-use tydi_vhdl::architecture::arch_storage::Arch;
+use tydi_common::error::TryOptional;
+use tydi_common::numbers::Positive;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
     port::{Mode, Port},
 };
+use tydi_vhdl::architecture::arch_storage::Arch;
 
 use crate::IntoVhdl;
 
@@ -86,7 +86,8 @@ mod tests {
         name::{Name, PathName},
         numbers::{BitCount, Positive},
     };
-    use tydi_vhdl::{declaration::Declare, object::ObjectType};
+    use tydi_vhdl::declaration::Declare;
+    use tydi_vhdl::object::object_type::ObjectType;
 
     use super::*;
 

@@ -1,12 +1,14 @@
 use indexmap::IndexMap;
+
 use tydi_common::error::Result;
 
 use crate::{
     common::vhdl_name::VhdlName,
     component::Component,
-    object::{record::RecordObject, ObjectType},
+    object::record::RecordObject,
     port::{Mode, Port},
 };
+use crate::object::object_type::ObjectType;
 
 pub(crate) fn empty_component() -> Component {
     Component::try_new("empty_component", vec![], vec![], None).unwrap()

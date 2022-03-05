@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use textwrap::indent;
+
 use tydi_common::{
     error::{Result, TryResult},
     traits::{Document, Identify},
@@ -9,11 +10,11 @@ use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{Declare, DeclareWithIndent},
-    object::ObjectType,
     port::{Parameter, Port},
     properties::Analyze,
-    traits::VhdlDocument,
+    traits::VhdlDocument, object::object_type::DeclarationTypeName,
 };
+use crate::object::object_type::ObjectType;
 
 /// A component.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -94,7 +95,7 @@ impl Analyze for Component {
         for p in self.ports().iter() {
             result.append(&mut p.typ().list_nested_types())
         }
-        result.into_iter().unique_by(|x| x.type_name()).collect()
+        result.into_iter().unique_by(|x| x.declaration_type_name()).collect()
     }
 }
 
@@ -122,7 +123,6 @@ impl DeclareWithIndent for Component {
 
 #[cfg(test)]
 mod tests {
-
     use crate::{architecture::arch_storage::db::Database, port::Mode, test_tools};
 
     use super::*;
