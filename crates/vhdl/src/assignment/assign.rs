@@ -23,7 +23,7 @@ impl Assign for Id<ObjectDeclaration> {
         let self_obj = db.lookup_intern_object_declaration(*self);
         // TODO: Fix this nonsense
         match self_obj.kind() {
-            ObjectKind::EntityPort | ObjectKind::ComponentPort
+            ObjectKind::EntityPort(_) | ObjectKind::ComponentPort(_)
                 if !true_assignment.to_field().is_empty() =>
             {
                 Err(Error::BackEndError(format!(

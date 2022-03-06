@@ -94,9 +94,9 @@ pub enum ObjectKind {
     Variable,
     Constant,
     /// Represents ports declared on the entity this architecture is describing
-    EntityPort,
+    EntityPort(Mode),
     /// Represents ports on components within the architecture
-    ComponentPort,
+    ComponentPort(Mode),
 }
 
 impl fmt::Display for ObjectKind {
@@ -105,8 +105,8 @@ impl fmt::Display for ObjectKind {
             ObjectKind::Signal => write!(f, "Signal"),
             ObjectKind::Variable => write!(f, "Variable"),
             ObjectKind::Constant => write!(f, "Constant"),
-            ObjectKind::EntityPort => write!(f, "EntityPort"),
-            ObjectKind::ComponentPort => write!(f, "ComponentPort"),
+            ObjectKind::EntityPort(mode) => write!(f, "EntityPort({})", mode),
+            ObjectKind::ComponentPort(mode) => write!(f, "ComponentPort({})", mode),
         }
     }
 }
@@ -254,7 +254,7 @@ impl ObjectDeclaration {
                 Mode::Out => ObjectMode::new(false, ObjectState::Unassigned),
             },
             default: None,
-            kind: ObjectKind::EntityPort,
+            kind: ObjectKind::EntityPort(mode),
         }
         .intern(db))
     }
@@ -273,7 +273,7 @@ impl ObjectDeclaration {
                 Mode::Out => ObjectMode::new(false, ObjectState::Assigned), // An "out" port is already assigned a value
             },
             default: None,
-            kind: ObjectKind::ComponentPort,
+            kind: ObjectKind::ComponentPort(mode),
         }
         .intern(db))
     }

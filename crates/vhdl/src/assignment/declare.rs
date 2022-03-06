@@ -20,8 +20,8 @@ impl ArchitectureDeclare for AssignDeclaration {
                 ObjectKind::Signal => " <= ",
                 ObjectKind::Variable => " := ",
                 ObjectKind::Constant => " := ",
-                ObjectKind::EntityPort => " <= ",
-                ObjectKind::ComponentPort => " => ",
+                ObjectKind::EntityPort(_) => " <= ",
+                ObjectKind::ComponentPort(_) => " => ",
             },
         );
         result.push_str(&self.assignment().declare_for(
