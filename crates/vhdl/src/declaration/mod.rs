@@ -97,7 +97,7 @@ pub enum ObjectKind {
     EntityPort(Mode),
     /// Represents ports on components within the architecture
     ComponentPort(Mode),
-    Alias(Box<ObjectKind>),
+    Alias(String, Box<ObjectKind>),
 }
 
 impl fmt::Display for ObjectKind {
@@ -108,7 +108,7 @@ impl fmt::Display for ObjectKind {
             ObjectKind::Constant => write!(f, "Constant"),
             ObjectKind::EntityPort(mode) => write!(f, "EntityPort({})", mode),
             ObjectKind::ComponentPort(mode) => write!(f, "ComponentPort({})", mode),
-            ObjectKind::Alias(kind) => write!(f, "Alias({})", kind),
+            ObjectKind::Alias(obj, kind) => write!(f, "Alias({}, {})", obj, kind),
         }
     }
 }
@@ -284,7 +284,10 @@ impl ObjectDeclaration {
                 .clone()
                 .with_nested(selection),
             default: None,
-            kind: ObjectKind::Alias(Box::new(object_declaration.kind().clone())),
+            kind: ObjectKind::Alias(
+                object_declaration.identifier(),
+                Box::new(object_declaration.kind().clone()),
+            ),
         }
         .intern(db))
     }

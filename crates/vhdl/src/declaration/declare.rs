@@ -59,7 +59,22 @@ impl ArchitectureDeclare for ObjectDeclaration {
                 self.object(db)?.typ(db).declaration_type_name(),
                 default_string
             ),
-            ObjectKind::Alias(_) => todo!(),
+            ObjectKind::Alias(obj, _) => {
+                let field_selection_string = self
+                    .object_key()
+                    .selection()
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join("");
+                format!(
+                    "alias {} : {} is {}{}",
+                    self.identifier(),
+                    self.object(db)?.typ(db).declaration_type_name(),
+                    obj,
+                    field_selection_string
+                )
+            }
         })
     }
 }
@@ -80,36 +95,32 @@ mod tests {
 
     #[test]
     fn test_declarations() -> Result<()> {
-        let mut db = Database::default();
-        assert_eq!(
-            "signal TestSignal : std_logic",
-            ObjectDeclaration::signal(&mut db, "TestSignal", ObjectType::Bit, None)?
-                .declare(&db)?
-        );
+        let _db = Database::default();
+        let db = &_db;
+        let test_signal = ObjectDeclaration::signal(db, "TestSignal", ObjectType::Bit, None)?;
+        assert_eq!("signal TestSignal : std_logic", test_signal.declare(db)?);
         assert_eq!(
             "variable TestVariable : std_logic",
-            ObjectDeclaration::variable(&mut db, "TestVariable", ObjectType::Bit, None)?
-                .declare(&db)?
+            ObjectDeclaration::variable(db, "TestVariable", ObjectType::Bit, None)?.declare(db)?
         );
         assert_eq!(
             "signal SignalWithDefault : std_logic := 'U'",
             ObjectDeclaration::signal(
-                &mut db,
+                db,
                 "SignalWithDefault",
                 ObjectType::Bit,
                 Some(StdLogicValue::U.into())
             )?
-            .declare(&mut db)?
+            .declare(db)?
         );
         assert_eq!(
             "constant TestConstant : std_logic := 'U'",
-            ObjectDeclaration::constant(
-                &mut db,
-                "TestConstant",
-                ObjectType::Bit,
-                StdLogicValue::U
-            )?
-            .declare(&db)?
+            ObjectDeclaration::constant(db, "TestConstant", ObjectType::Bit, StdLogicValue::U)?
+                .declare(db)?
+        );
+        assert_eq!(
+            "alias TestAlias : std_logic is TestSignal",
+            ObjectDeclaration::alias(db, "TestAlias", test_signal, vec![])?.declare(db)?
         );
         Ok(())
     }

@@ -22,7 +22,7 @@ impl ArchitectureDeclare for AssignDeclaration {
                 ObjectKind::Constant => " := ".to_string(),
                 ObjectKind::EntityPort(_) => " <= ".to_string(),
                 ObjectKind::ComponentPort(_) => " => ".to_string(),
-                ObjectKind::Alias(kind) => assign_symbol(kind),
+                ObjectKind::Alias(_, kind) => assign_symbol(kind),
             }
         }
         result.push_str(&assign_symbol(

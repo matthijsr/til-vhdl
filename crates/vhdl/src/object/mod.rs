@@ -84,7 +84,7 @@ impl From<&ObjectKind> for Assignable {
                     from: true,
                 },
             },
-            ObjectKind::Alias(kind) => Assignable::from(kind.as_ref()),
+            ObjectKind::Alias(_, kind) => Assignable::from(kind.as_ref()),
         }
     }
 }
