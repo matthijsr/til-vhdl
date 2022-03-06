@@ -9,13 +9,14 @@ use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::{Document, Identify};
 use tydi_intern::Id;
 
+use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
+
 use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::VhdlName;
 use crate::declaration::Declare;
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
-use crate::object::object_type::ObjectType;
 
 use self::bitvec::BitVecValue;
 
@@ -137,8 +138,7 @@ impl AssignDeclaration {
             AssignmentKind::Object(object) => Ok(object.object().assign(
                 db,
                 &Assignment::from(
-                    ObjectAssignment::from(self.object())
-                        .assign_from(db, self.assignment().to_field())?,
+                    ObjectAssignment::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
             )?),
@@ -442,37 +442,21 @@ impl ObjectAssignment {
     }
 
     /// Select fields from the object being assigned
-    pub fn assign_from(mut self, db: &dyn Arch, fields: &Vec<FieldSelection>) -> Result<Self> {
-        let mut object = db
-            .lookup_intern_object_declaration(self.object())
-            .typ()
-            .clone();
-        // Verify the fields exist
-        for field in self.from_field() {
-            object = object.get_field(field)?;
-        }
-        for field in fields {
-            object = object.get_field(field)?;
-            self.from_field.push(field.clone())
-        }
+    pub fn assign_from(mut self, fields: &Vec<FieldSelection>) -> Self {
+        self.from_field.append(&mut fields.clone());
 
-        Ok(self)
+        self
     }
 
     pub fn from_field(&self) -> &Vec<FieldSelection> {
         &self.from_field
     }
 
-    /// Returns the object type of the selected field
-    pub fn typ(&self, db: &dyn Arch) -> Result<ObjectType> {
-        let mut object = db
-            .lookup_intern_object_declaration(self.object())
-            .typ()
-            .clone();
-        for field in self.from_field() {
-            object = object.get_field(field)?;
-        }
-        Ok(object)
+    pub fn as_object_key(&self, db: &dyn Arch) -> ObjectKey {
+        db.lookup_intern_object_declaration(self.object())
+            .object_key()
+            .clone()
+            .with_nested(self.from_field().clone())
     }
 }
 

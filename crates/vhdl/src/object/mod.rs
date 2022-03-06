@@ -2,8 +2,12 @@ use object_type::ObjectType;
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
-use crate::architecture::arch_storage::{
-    interner::TryIntern, object_queries::object_key::ObjectKey, Arch,
+use crate::{
+    architecture::arch_storage::{
+        interner::TryIntern, object_queries::object_key::ObjectKey, Arch,
+    },
+    declaration::ObjectKind,
+    port::Mode,
 };
 
 pub mod array;
@@ -43,6 +47,52 @@ impl Assignable {
     }
 }
 
+impl From<&ObjectKind> for Assignable {
+    fn from(kind: &ObjectKind) -> Self {
+        match kind {
+            ObjectKind::Signal => Assignable {
+                to: true,
+                from: true,
+            },
+            ObjectKind::Variable => Assignable {
+                to: true,
+                from: true,
+            },
+            ObjectKind::Constant => Assignable {
+                to: false,
+                from: true,
+            },
+            ObjectKind::EntityPort(mode) => match mode {
+                Mode::In => Assignable {
+                    to: false,
+                    from: true,
+                },
+                Mode::Out => Assignable {
+                    to: true,
+                    from: false,
+                },
+            },
+            ObjectKind::ComponentPort(mode) => match mode {
+                Mode::In => Assignable {
+                    to: true,
+                    from: false,
+                },
+                Mode::Out => Assignable {
+                    to: false,
+                    from: true,
+                },
+            },
+            ObjectKind::Alias(kind) => Assignable::from(kind.as_ref()),
+        }
+    }
+}
+
+impl From<ObjectKind> for Assignable {
+    fn from(kind: ObjectKind) -> Self {
+        Assignable::from(&kind)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub struct Object {
     pub typ: Id<ObjectType>,
@@ -64,5 +114,9 @@ impl Object {
             typ.try_intern(db)?,
             assignable.try_result()?,
         ))
+    }
+
+    pub fn typ(&self, db: &dyn Arch) -> ObjectType {
+        db.lookup_intern_object_type(self.typ)
     }
 }

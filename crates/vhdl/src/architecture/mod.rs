@@ -1,10 +1,11 @@
 use indexmap::IndexMap;
 
 use arch_storage::interner::GetSelf;
-use tydi_common::{error::Result, traits::Identify};
 use tydi_common::error::TryResult;
+use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
+use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
     entity::Entity,
@@ -12,7 +13,6 @@ use crate::{
     statement::Statement,
     usings::{ListUsings, Usings},
 };
-use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 
 use self::arch_storage::Arch;
 
@@ -154,12 +154,6 @@ impl Architecture {
         match &declaration {
             ArchitectureDeclaration::Object(object) => {
                 self.usings.combine(&object.get(db).list_usings()?);
-            }
-            ArchitectureDeclaration::Alias(alias) => {
-                self.usings.combine(
-                    &db.lookup_intern_object_declaration(alias.object())
-                        .list_usings()?,
-                );
             }
             ArchitectureDeclaration::Type(_)
             | ArchitectureDeclaration::SubType(_)

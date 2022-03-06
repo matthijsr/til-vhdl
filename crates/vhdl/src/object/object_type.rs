@@ -7,10 +7,7 @@ use tydi_common::numbers::BitCount;
 use tydi_common::traits::Identify;
 
 use crate::architecture::arch_storage::Arch;
-use crate::assignment::array_assignment::ArrayAssignment;
-use crate::assignment::{
-    Assignment, AssignmentKind, DirectAssignment, FieldSelection, RangeConstraint, ValueAssignment,
-};
+use crate::assignment::{FieldSelection, RangeConstraint};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::array::ArrayObject;
@@ -196,121 +193,6 @@ impl ObjectType {
                     )))
                 }
             }
-        }
-    }
-
-    pub fn can_assign(&self, db: &dyn Arch, assignment: &Assignment) -> Result<()> {
-        let mut to_object = self.clone();
-        for field in assignment.to_field() {
-            to_object = to_object.get_field(field)?;
-        }
-        match assignment.kind() {
-            AssignmentKind::Object(object) => to_object.can_assign_type(&object.typ(db)?),
-            AssignmentKind::Direct(direct) => match direct {
-                DirectAssignment::Value(value) => match value {
-                    ValueAssignment::Bit(_) => match to_object {
-                        ObjectType::Bit => Ok(()),
-                        ObjectType::Array(_) | ObjectType::Record(_) => Err(Error::InvalidTarget(
-                            format!("Cannot assign Bit to {}", to_object),
-                        )),
-                    },
-                    ValueAssignment::BitVec(bitvec) => match to_object {
-                        ObjectType::Array(array) if array.is_bitvector() => {
-                            bitvec.validate_width(array.width())
-                        }
-                        _ => Err(Error::InvalidTarget(format!(
-                            "Cannot assign Bit Vector to {}",
-                            to_object
-                        ))),
-                    },
-                },
-                DirectAssignment::FullRecord(record) => {
-                    if let ObjectType::Record(to_record) = &to_object {
-                        if to_record.fields().len() == record.len() {
-                            for ra in record {
-                                let to_field = to_object
-                                    .get_field(&FieldSelection::name(ra.field().clone()))?;
-                                to_field
-                                    .can_assign(db, &Assignment::from(ra.assignment().clone()))?;
-                            }
-                            Ok(())
-                        } else {
-                            Err(Error::InvalidArgument(format!("Attempted full record assignment. Number of fields do not match. Record has {} fields, assignment has {} fields", to_record.fields().len(), record.len())))
-                        }
-                    } else {
-                        Err(Error::InvalidTarget(format!(
-                            "Cannot perform full Record assignment to {}",
-                            to_object
-                        )))
-                    }
-                }
-                DirectAssignment::FullArray(array) => {
-                    if let ObjectType::Array(to_array) = &to_object {
-                        match array {
-                            ArrayAssignment::Direct(direct) => {
-                                if to_array.width() == direct.len().try_into().unwrap() {
-                                    for value in direct {
-                                        to_array
-                                            .typ()
-                                            .can_assign(db, &Assignment::from(value.clone()))?;
-                                    }
-                                    Ok(())
-                                } else {
-                                    Err(Error::InvalidArgument(format!("Attempted full array assignment. Number of fields do not match. Array has {} fields, assignment has {} fields", to_array.width(), direct.len())))
-                                }
-                            }
-                            ArrayAssignment::Sliced { direct, others } => {
-                                let mut ranges_assigned: Vec<&RangeConstraint> = vec![];
-                                for ra in direct {
-                                    let range = ra.constraint();
-                                    if !range.is_between(to_array.high(), to_array.low())? {
-                                        return Err(Error::InvalidArgument(format!(
-                                            "{} is not between {} and {}",
-                                            range,
-                                            to_array.high(),
-                                            to_array.low()
-                                        )));
-                                    }
-                                    if ranges_assigned.iter().any(|x| x.overlaps(range)) {
-                                        return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range)));
-                                    }
-                                    to_array.typ().can_assign(
-                                        db,
-                                        &Assignment::from(ra.assignment().clone()),
-                                    )?;
-                                    ranges_assigned.push(range);
-                                }
-                                let total_assigned: u32 =
-                                    ranges_assigned.iter().map(|x| x.width_u32()).sum();
-                                if total_assigned == to_array.width() {
-                                    if let Some(_) = others {
-                                        return Err(Error::InvalidArgument("Sliced array assignment contains an 'others' field, but already assigns all fields directly.".to_string()));
-                                    } else {
-                                        Ok(())
-                                    }
-                                } else {
-                                    if let Some(value) = others {
-                                        to_array.typ().can_assign(
-                                            db,
-                                            &Assignment::from(value.as_ref().clone()),
-                                        )
-                                    } else {
-                                        Err(Error::InvalidArgument("Sliced array assignment does not assign all values directly, but does not contain an 'others' field.".to_string()))
-                                    }
-                                }
-                            }
-                            ArrayAssignment::Others(others) => to_array
-                                .typ()
-                                .can_assign(db, &Assignment::from(others.as_ref().clone())),
-                        }
-                    } else {
-                        Err(Error::InvalidTarget(format!(
-                            "Cannot perform full Array assignment to {}",
-                            to_object
-                        )))
-                    }
-                }
-            },
         }
     }
 

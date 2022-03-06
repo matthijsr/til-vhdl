@@ -1,5 +1,3 @@
-
-
 use tydi_common::{
     error::{Error, Result},
     traits::Identify,
@@ -32,7 +30,7 @@ impl Assign for Id<ObjectDeclaration> {
                 )))
             }
             _ => {
-                self_obj.typ().can_assign(db, &true_assignment)?;
+                db.can_assign(self_obj.object_key().clone(), true_assignment.clone())?;
                 Ok(AssignDeclaration::new(*self, true_assignment))
             }
         }

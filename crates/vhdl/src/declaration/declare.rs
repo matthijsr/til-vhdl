@@ -16,7 +16,6 @@ impl ArchitectureDeclare for ArchitectureDeclaration {
             ArchitectureDeclaration::Procedure(_) => todo!(),
             ArchitectureDeclaration::Function(_) => todo!(),
             ArchitectureDeclaration::Object(object) => object.declare_with_indent(db, indent_style),
-            ArchitectureDeclaration::Alias(_) => todo!(),
             ArchitectureDeclaration::Component(_) => todo!(),
             ArchitectureDeclaration::Custom(_) => todo!(),
         }
@@ -37,19 +36,19 @@ impl ArchitectureDeclare for ObjectDeclaration {
             ObjectKind::Signal => format!(
                 "signal {} : {}{}",
                 self.identifier(),
-                self.typ().declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(),
                 default_string
             ),
             ObjectKind::Variable => format!(
                 "variable {} : {}{}",
                 self.identifier(),
-                self.typ().declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(),
                 default_string
             ),
             ObjectKind::Constant => format!(
                 "constant {} : {}{}",
                 self.identifier(),
-                self.typ().declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(),
                 default_string
             ),
             ObjectKind::EntityPort(_) => "".to_string(), // Entity ports are part of the architecture, but aren't declared in the declaration part
@@ -57,9 +56,10 @@ impl ArchitectureDeclare for ObjectDeclaration {
                 "{} : {} {}{}",
                 self.identifier(),
                 mode,
-                self.typ().declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(),
                 default_string
             ),
+            ObjectKind::Alias(_) => todo!(),
         })
     }
 }
