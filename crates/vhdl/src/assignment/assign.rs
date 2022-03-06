@@ -19,20 +19,23 @@ impl Assign for Id<ObjectDeclaration> {
     ) -> Result<AssignDeclaration> {
         let true_assignment = assignment.clone().into();
         let self_obj = db.lookup_intern_object_declaration(*self);
-        // TODO: Fix this nonsense
         match self_obj.kind() {
-            ObjectKind::EntityPort(_) | ObjectKind::ComponentPort(_)
-                if !true_assignment.to_field().is_empty() =>
-            {
+            ObjectKind::ComponentPort(_) if !true_assignment.to_field().is_empty() => {
+                // TODO: Validating whether all fields are assigned, and assigned in order,
+                // is too complex to implement without a good use-case.
                 Err(Error::BackEndError(format!(
-                    "Back-end cannot assign a field of a port ({}) directly, please use an indermediary signal.",
+                    "Back-end cannot assign a field of a component port ({}) directly, please use an indermediary signal.",
                     self_obj.identifier()
                 )))
             }
-            _ => {
-                db.can_assign(self_obj.object_key().clone(), true_assignment.clone())?;
-                Ok(AssignDeclaration::new(*self, true_assignment))
-            }
+            _ => match db.can_assign(self_obj.object_key().clone(), true_assignment.clone()) {
+                Ok(_) => Ok(AssignDeclaration::new(*self, true_assignment)),
+                Err(err) => Err(Error::InvalidArgument(format!(
+                    "Cannot assign {}: {}",
+                    self_obj.identifier(),
+                    err
+                ))),
+            },
         }
     }
 }
