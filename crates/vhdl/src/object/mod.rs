@@ -2,7 +2,9 @@ use object_type::ObjectType;
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
-use crate::architecture::arch_storage::{interner::TryIntern, Arch};
+use crate::architecture::arch_storage::{
+    interner::TryIntern, object_queries::object_key::ObjectKey, Arch,
+};
 
 pub mod array;
 pub mod object_from;
@@ -48,15 +50,15 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn new(db: &dyn Arch, typ: Id<ObjectType>, assignable: Assignable) -> Id<Object> {
-        db.intern_object(Object { typ, assignable })
+    pub fn new(db: &dyn Arch, typ: Id<ObjectType>, assignable: Assignable) -> ObjectKey {
+        db.intern_object(Object { typ, assignable }).into()
     }
 
     pub fn try_new(
         db: &dyn Arch,
         typ: impl TryIntern<ObjectType>,
         assignable: impl TryResult<Assignable>,
-    ) -> Result<Id<Object>> {
+    ) -> Result<ObjectKey> {
         Ok(Object::new(
             db,
             typ.try_intern(db)?,

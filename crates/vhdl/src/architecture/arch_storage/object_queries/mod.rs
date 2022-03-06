@@ -1,12 +1,13 @@
 use tydi_common::error::Result;
 use tydi_intern::Id;
 
-use crate::{
-    assignment::FieldSelection,
-    object::{object_type::ObjectType, Object},
-};
+use crate::object::{object_type::ObjectType, Object};
+
+use self::object_key::ObjectKey;
 
 use super::interner::Interner;
+
+pub mod object_key;
 
 #[salsa::query_group(ObjectStorage)]
 pub trait ObjectQueries: Interner {
@@ -18,36 +19,6 @@ pub trait ObjectQueries: Interner {
 
     /// Get an object based on its key
     fn get_object(&self, key: ObjectKey) -> Result<Object>;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ObjectKey {
-    obj: Id<Object>,
-    selection: Vec<FieldSelection>,
-}
-
-impl ObjectKey {
-    pub fn new(obj: Id<Object>, selection: Vec<FieldSelection>) -> Self {
-        ObjectKey { obj, selection }
-    }
-
-    pub fn obj(&self) -> Id<Object> {
-        self.obj
-    }
-
-    pub fn selection(&self) -> &Vec<FieldSelection> {
-        &self.selection
-    }
-
-    pub fn with_selection(mut self, selection: FieldSelection) -> Self {
-        self.selection.push(selection);
-        self
-    }
-
-    pub fn with_nested(mut self, mut selection: Vec<FieldSelection>) -> Self {
-        self.selection.append(&mut selection);
-        self
-    }
 }
 
 fn assignable_types(
