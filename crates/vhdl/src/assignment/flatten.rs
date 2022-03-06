@@ -1,23 +1,25 @@
 use std::convert::TryFrom;
 
-use super::{AssignDeclaration, Assignment, FieldSelection};
-use crate::{
-    architecture::arch_storage::Arch,
-    assignment::{Assign, ObjectAssignment, RangeConstraint},
-    declaration::ObjectDeclaration,
-    object::ObjectType,
-};
 use tydi_common::{
     error::{Error, Result},
     traits::Identify,
 };
 use tydi_intern::Id;
 
+use crate::object::{object_type::ObjectType, Object};
+use crate::{
+    architecture::arch_storage::Arch,
+    assignment::{Assign, ObjectAssignment, RangeConstraint},
+    declaration::ObjectDeclaration,
+};
+
+use super::{AssignDeclaration, Assignment, FieldSelection};
+
 pub trait FlatLength {
     /// Returns the total length of the object when flattened
-    fn flat_length(&self) -> Result<u32>;
+    fn flat_length(&self, db: &dyn Arch) -> Result<u32>;
     /// Returns the total length of a field of the object
-    fn flat_length_for(&self, nested_fields: &Vec<FieldSelection>) -> Result<u32>;
+    fn flat_length_for(&self, db: &dyn Arch, nested_fields: &Vec<FieldSelection>) -> Result<u32>;
 }
 
 /// This trait enables connecting complex objects and flat (bit/bit vector) objects
@@ -43,32 +45,54 @@ pub trait FlatAssignment {
 }
 
 impl FlatLength for ObjectType {
-    fn flat_length(&self) -> Result<u32> {
+    fn flat_length(&self, db: &dyn Arch) -> Result<u32> {
         Ok(match self {
             ObjectType::Bit => 1,
-            ObjectType::Array(arr) => arr.width() * arr.typ().flat_length()?,
+            ObjectType::Array(arr) => arr.width() * arr.typ().flat_length(db)?,
             ObjectType::Record(rec) => {
                 let mut total: u32 = 0;
                 for (_, typ) in rec.fields() {
-                    total += typ.flat_length()?;
+                    total += typ.flat_length(db)?;
                 }
                 total
             }
         })
     }
 
-    fn flat_length_for(&self, nested_fields: &Vec<FieldSelection>) -> Result<u32> {
-        self.get_nested(nested_fields)?.flat_length()
+    fn flat_length_for(&self, db: &dyn Arch, nested_fields: &Vec<FieldSelection>) -> Result<u32> {
+        self.get_nested(nested_fields)?.flat_length(db)
+    }
+}
+
+impl FlatLength for Object {
+    fn flat_length(&self, db: &dyn Arch) -> Result<u32> {
+        db.lookup_intern_object_type(self.typ).flat_length(db)
+    }
+
+    fn flat_length_for(&self, db: &dyn Arch, nested_fields: &Vec<FieldSelection>) -> Result<u32> {
+        db.lookup_intern_object_type(self.typ)
+            .flat_length_for(db, nested_fields)
     }
 }
 
 impl FlatLength for ObjectDeclaration {
-    fn flat_length(&self) -> Result<u32> {
-        self.typ().flat_length()
+    fn flat_length(&self, db: &dyn Arch) -> Result<u32> {
+        self.object(db)?.flat_length(db)
     }
 
-    fn flat_length_for(&self, nested_fields: &Vec<FieldSelection>) -> Result<u32> {
-        self.typ().flat_length_for(nested_fields)
+    fn flat_length_for(&self, db: &dyn Arch, nested_fields: &Vec<FieldSelection>) -> Result<u32> {
+        self.object(db)?.flat_length_for(db, nested_fields)
+    }
+}
+
+impl FlatLength for Id<ObjectDeclaration> {
+    fn flat_length(&self, db: &dyn Arch) -> Result<u32> {
+        db.lookup_intern_object_declaration(*self).flat_length(db)
+    }
+
+    fn flat_length_for(&self, db: &dyn Arch, nested_fields: &Vec<FieldSelection>) -> Result<u32> {
+        db.lookup_intern_object_declaration(*self)
+            .flat_length_for(db, nested_fields)
     }
 }
 
@@ -86,7 +110,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
             ))
         } else {
             let self_obj = db.lookup_intern_object_declaration(*self);
-            let self_typ = self_obj.typ().get_nested(from_field)?;
+            let self_typ = self_obj.object(db)?.typ(db).get_nested(from_field)?;
             if !self_typ.is_flat() {
                 Err(Error::InvalidArgument(format!(
                     "self ({}{}) must be flat, is a {} instead",
@@ -117,13 +141,13 @@ impl FlatAssignment for Id<ObjectDeclaration> {
             ))
         } else {
             let self_obj = db.lookup_intern_object_declaration(*self);
-            let self_typ = self_obj.typ().get_nested(from_field)?;
+            let self_typ = self_obj.object(db)?.typ(db).get_nested(from_field)?;
             let flat_obj = db.lookup_intern_object_declaration(flat_id);
-            let flat_typ = flat_obj.typ().get_nested(to_field)?;
-            if self_typ.flat_length() != flat_typ.flat_length() {
+            let flat_typ = flat_obj.object(db)?.typ(db).get_nested(to_field)?;
+            if self_typ.flat_length(db) != flat_typ.flat_length(db) {
                 Err(Error::InvalidArgument(format!("Can't assign objects to one another, mismatched length (self ({}{}): {}, flat object ({}{}): {})",
-             self_obj.identifier(), write_fields(from_field), self_obj.flat_length_for(from_field)?,
-             flat_obj.identifier(), write_fields(to_field), flat_obj.flat_length_for(to_field)?)))
+             self_obj.identifier(), write_fields(from_field), self_obj.flat_length_for(db, from_field)?,
+             flat_obj.identifier(), write_fields(to_field), flat_obj.flat_length_for(db, to_field)?)))
             } else if !flat_typ.is_flat() {
                 Err(Error::InvalidArgument(format!(
                     "flat_object ({}{}) must be flat, is a {} instead",
@@ -137,7 +161,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                     let mut new_from = from_field.clone();
                     let mut new_to = to_field.clone();
                     // If the length == 1 and one object is a Bit, make sure that both select a Bit (avoid left(1) <= right(0 downto 0))
-                    if self_typ.flat_length()? == 1 {
+                    if self_typ.flat_length(db)? == 1 {
                         match_bit_field_selection(&flat_typ, &self_typ, &mut new_from);
                         match_bit_field_selection(&self_typ, &flat_typ, &mut new_to);
                     }
@@ -145,7 +169,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                         flat_id.assign(
                             db,
                             &Assignment::from(
-                                ObjectAssignment::from(self.clone()).assign_from(db, &new_from)?,
+                                ObjectAssignment::from(self.clone()).assign_from(&new_from),
                             )
                             .to_nested(&new_to),
                         )?,
@@ -172,7 +196,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                         } else {
                             for index in arr.low()..(arr.high() + 1) {
                                 let normalized_index = (index - arr.low()) as u32;
-                                let typ_length = arr.typ().flat_length()?;
+                                let typ_length = arr.typ().flat_length(db)?;
                                 let mut new_from = from_field.clone();
                                 new_from.push(FieldSelection::index(index));
                                 // Subdivide the range selection on the flat object to match the length of each field of the complex object
@@ -193,7 +217,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                             let mut new_to = to_field.clone();
                             let mut new_from = from_field.clone();
                             new_from.push(FieldSelection::try_name(name.to_string())?);
-                            let field_length = field.flat_length()?;
+                            let field_length = field.flat_length(db)?;
                             select_specific_flat_range(
                                 &mut new_to,
                                 preceding_length,

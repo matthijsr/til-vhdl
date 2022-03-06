@@ -5,17 +5,18 @@ use indexmap::map::IndexMap;
 
 use array_assignment::ArrayAssignment;
 use textwrap::indent;
-use tydi_common::error::{Error, Result};
-use tydi_common::name::Name;
+use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::{Document, Identify};
 use tydi_intern::Id;
 
+use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
+
 use crate::architecture::arch_storage::Arch;
-use crate::declaration::{Declare};
+use crate::common::vhdl_name::VhdlName;
+use crate::declaration::Declare;
 use crate::properties::Width;
 
 use super::declaration::ObjectDeclaration;
-use super::object::ObjectType;
 
 use self::bitvec::BitVecValue;
 
@@ -134,14 +135,13 @@ impl AssignDeclaration {
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
     pub fn reverse(&self, db: &dyn Arch) -> Result<AssignDeclaration> {
         match self.assignment().kind() {
-            AssignmentKind::Object(object) => Ok(object.object().assign(
+            AssignmentKind::Object(object) => object.object().assign(
                 db,
                 &Assignment::from(
-                    ObjectAssignment::from(self.object())
-                        .assign_from(db, self.assignment().to_field())?,
+                    ObjectAssignment::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
-            )?),
+            ),
             AssignmentKind::Direct(_) => Err(Error::InvalidTarget(
                 "Cannot reverse a direct assignment.".to_string(),
             )),
@@ -176,8 +176,8 @@ impl Assignment {
     }
 
     /// Append a named field selection
-    pub fn to_named(self, to: Name) -> Self {
-        self.to(FieldSelection::Name(to))
+    pub fn to_named(self, to: impl Into<VhdlName>) -> Self {
+        self.to(FieldSelection::Name(to.into()))
     }
 
     /// Append a range field selection
@@ -213,7 +213,7 @@ impl Assignment {
     pub fn declare_for(
         &self,
         db: &dyn Arch,
-        object_identifier: String,
+        object_identifier: impl TryResult<VhdlName>,
         indent_style: &str,
     ) -> Result<String> {
         if let AssignmentKind::Direct(DirectAssignment::Value(ValueAssignment::BitVec(bitvec))) =
@@ -237,7 +237,7 @@ pub enum AssignmentKind {
 }
 
 impl AssignmentKind {
-    pub fn full_record(fields: IndexMap<Name, AssignmentKind>) -> AssignmentKind {
+    pub fn full_record(fields: IndexMap<VhdlName, AssignmentKind>) -> AssignmentKind {
         AssignmentKind::Direct(DirectAssignment::FullRecord(
             fields
                 .into_iter()
@@ -343,16 +343,16 @@ impl AssignmentKind {
     pub fn declare_for(
         &self,
         db: &dyn Arch,
-        object_identifier: impl Into<String>,
+        object_identifier: impl TryResult<VhdlName>,
         indent_style: &str,
     ) -> Result<String> {
-        let object_identifier: &str = &object_identifier.into();
+        let object_identifier = object_identifier.try_result()?;
         match self {
             AssignmentKind::Object(object) => object.declare(db),
             AssignmentKind::Direct(direct) => match direct {
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
-                    ValueAssignment::BitVec(bitvec) => Ok(bitvec.declare_for(object_identifier)),
+                    ValueAssignment::BitVec(bitvec) => bitvec.declare_for(object_identifier),
                 },
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
@@ -441,46 +441,22 @@ impl ObjectAssignment {
         self.object
     }
 
-    pub fn selected_object(&self, db: &dyn Arch) -> Result<ObjectDeclaration> {
-        if self.from_field().is_empty() {
-            db.get_object(self.object())
-        } else {
-            todo!() // Need to be able to keep track of individual fields, or collections of fields... which is very hard (consider that an array consists of multiple fields, but can also be assigned in slices)
-        }
-    }
-
     /// Select fields from the object being assigned
-    pub fn assign_from(mut self, db: &dyn Arch, fields: &Vec<FieldSelection>) -> Result<Self> {
-        let mut object = db
-            .lookup_intern_object_declaration(self.object())
-            .typ()
-            .clone();
-        // Verify the fields exist
-        for field in self.from_field() {
-            object = object.get_field(field)?;
-        }
-        for field in fields {
-            object = object.get_field(field)?;
-            self.from_field.push(field.clone())
-        }
+    pub fn assign_from(mut self, fields: &Vec<FieldSelection>) -> Self {
+        self.from_field.append(&mut fields.clone());
 
-        Ok(self)
+        self
     }
 
     pub fn from_field(&self) -> &Vec<FieldSelection> {
         &self.from_field
     }
 
-    /// Returns the object type of the selected field
-    pub fn typ(&self, db: &dyn Arch) -> Result<ObjectType> {
-        let mut object = db
-            .lookup_intern_object_declaration(self.object())
-            .typ()
-            .clone();
-        for field in self.from_field() {
-            object = object.get_field(field)?;
-        }
-        Ok(object)
+    pub fn as_object_key(&self, db: &dyn Arch) -> ObjectKey {
+        db.lookup_intern_object_declaration(self.object())
+            .object_key()
+            .clone()
+            .with_nested(self.from_field().clone())
     }
 }
 
@@ -573,16 +549,16 @@ pub enum DirectAssignment {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FieldAssignment {
-    field: Name,
+    field: VhdlName,
     assignment: AssignmentKind,
 }
 
 impl FieldAssignment {
-    pub fn new(field: Name, assignment: AssignmentKind) -> Self {
+    pub fn new(field: VhdlName, assignment: AssignmentKind) -> Self {
         FieldAssignment { field, assignment }
     }
 
-    pub fn field(&self) -> &Name {
+    pub fn field(&self) -> &VhdlName {
         &self.field
     }
 
@@ -612,7 +588,7 @@ pub enum FieldSelection {
     /// The most common kind of constraint, a specific range or index
     Range(RangeConstraint),
     /// The field of a record
-    Name(Name),
+    Name(VhdlName),
 }
 
 impl fmt::Display for FieldSelection {
@@ -643,11 +619,11 @@ impl FieldSelection {
         FieldSelection::Range(RangeConstraint::Index(index.into()))
     }
 
-    pub fn try_name(name: impl Into<String>) -> Result<FieldSelection> {
-        Ok(FieldSelection::Name(Name::try_new(name)?))
+    pub fn try_name(name: impl TryResult<VhdlName>) -> Result<FieldSelection> {
+        Ok(FieldSelection::Name(name.try_result()?))
     }
 
-    pub fn name(name: impl Into<Name>) -> FieldSelection {
+    pub fn name(name: impl Into<VhdlName>) -> FieldSelection {
         FieldSelection::Name(name.into())
     }
 }

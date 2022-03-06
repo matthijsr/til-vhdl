@@ -1,6 +1,7 @@
 use indexmap::IndexMap;
+
+use arch_storage::interner::GetSelf;
 use tydi_common::error::TryResult;
-use tydi_common::name::Name;
 use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
@@ -13,7 +14,7 @@ use crate::{
     usings::{ListUsings, Usings},
 };
 
-use self::arch_storage::{Arch, GetSelf};
+use self::arch_storage::Arch;
 
 pub mod arch_storage;
 pub mod impls;
@@ -84,12 +85,7 @@ impl Architecture {
         package: &Package,
         component_id: impl TryResult<VhdlName>,
     ) -> Result<Architecture> {
-        Architecture::new(
-            Name::try_new("work")?,
-            VhdlName::try_new("Behavioral")?,
-            package,
-            component_id,
-        )
+        Architecture::new("work", "Behavioral", package, component_id)
     }
 
     /// Create the architecture based on a component contained within a package, specify the library (project) in which the package is contained
@@ -158,12 +154,6 @@ impl Architecture {
         match &declaration {
             ArchitectureDeclaration::Object(object) => {
                 self.usings.combine(&object.get(db).list_usings()?);
-            }
-            ArchitectureDeclaration::Alias(alias) => {
-                self.usings.combine(
-                    &db.lookup_intern_object_declaration(alias.object())
-                        .list_usings()?,
-                );
             }
             ArchitectureDeclaration::Type(_)
             | ArchitectureDeclaration::SubType(_)
@@ -250,8 +240,7 @@ mod tests {
     fn test_architecture() -> Result<()> {
         let db = Database::default();
         let package = test_package()?;
-        let architecture =
-            Architecture::new_default(&package, Name::try_new("component_with_nested_types")?)?;
+        let architecture = Architecture::new_default(&package, "component_with_nested_types")?;
         assert_eq!(
             r#"library ieee;
 use ieee.std_logic_1164.all;

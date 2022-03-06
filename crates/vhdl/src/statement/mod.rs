@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use tydi_common::{
-    error::{Error, Result, TryResult},
-    traits::Identify,
-};
+use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
 use crate::{
@@ -42,7 +39,7 @@ impl From<PortMapping> for Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortMapping {
     label: VhdlName,
-    component_name: String,
+    component_name: VhdlName,
     /// The ports, in the order they were declared on the component
     ports: IndexMap<VhdlName, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
@@ -63,7 +60,7 @@ impl PortMapping {
         }
         Ok(PortMapping {
             label: label.try_result()?,
-            component_name: component.identifier().to_string(),
+            component_name: component.vhdl_name().clone(),
             ports,
             mappings: HashMap::new(),
         })
@@ -82,7 +79,7 @@ impl PortMapping {
         db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
         assignment: &(impl Into<Assignment> + Clone),
-    ) -> Result<&mut Self> {
+    ) -> Result<()> {
         let identifier = identifier.try_result()?;
         let port = self
             .ports()
@@ -93,7 +90,7 @@ impl PortMapping {
             )))?;
         let assigned = port.assign(db, assignment)?;
         self.mappings.insert(identifier, assigned);
-        Ok(self)
+        Ok(())
     }
 
     pub fn finish(self) -> Result<Self> {
@@ -108,12 +105,12 @@ impl PortMapping {
         }
     }
 
-    pub fn label(&self) -> &str {
-        self.label.as_ref()
+    pub fn label(&self) -> &VhdlName {
+        &self.label
     }
 
-    pub fn component_name(&self) -> &str {
-        self.component_name.as_str()
+    pub fn component_name(&self) -> &VhdlName {
+        &self.component_name
     }
 }
 

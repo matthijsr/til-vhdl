@@ -1,17 +1,18 @@
-
 use std::fmt;
-
 
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;
 use tydi_intern::Id;
 
-use crate::architecture::arch_storage::{Arch, InternSelf};
+use crate::architecture::arch_storage::interner::InternSelf;
+use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
+use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
+use crate::object::object_type::ObjectType;
+use crate::object::Object;
 use crate::port::{Mode, Port};
 
 use super::assignment::{AssignmentKind, FieldSelection};
-use super::object::ObjectType;
 
 pub mod architecturedeclaration_from;
 pub mod declare;
@@ -82,22 +83,21 @@ pub enum ArchitectureDeclaration {
     /// *Ports cannot be declared within the architecture itself, but can be used in the statement part,
     /// as such, the ports of the entity implemented are treated as inferred declarations.
     Object(Id<ObjectDeclaration>),
-    /// Alias for an object declaration, with optional range constraint
-    Alias(AliasDeclaration),
     Component(String), // TODO: Component declarations within the architecture
     Custom(String),    // TODO: Custom (templates?)
 }
 
 /// The kind of object declared (signal, variable, constant, ports)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectKind {
     Signal,
     Variable,
     Constant,
     /// Represents ports declared on the entity this architecture is describing
-    EntityPort,
+    EntityPort(Mode),
     /// Represents ports on components within the architecture
-    ComponentPort,
+    ComponentPort(Mode),
+    Alias(String, Box<ObjectKind>),
 }
 
 impl fmt::Display for ObjectKind {
@@ -106,8 +106,9 @@ impl fmt::Display for ObjectKind {
             ObjectKind::Signal => write!(f, "Signal"),
             ObjectKind::Variable => write!(f, "Variable"),
             ObjectKind::Constant => write!(f, "Constant"),
-            ObjectKind::EntityPort => write!(f, "EntityPort"),
-            ObjectKind::ComponentPort => write!(f, "ComponentPort"),
+            ObjectKind::EntityPort(mode) => write!(f, "EntityPort({})", mode),
+            ObjectKind::ComponentPort(mode) => write!(f, "ComponentPort({})", mode),
+            ObjectKind::Alias(obj, kind) => write!(f, "Alias({}, {})", obj, kind),
         }
     }
 }
@@ -177,9 +178,8 @@ impl fmt::Display for ObjectState {
 pub struct ObjectDeclaration {
     /// Name of the signal
     identifier: VhdlName,
-    /// (Sub-)Type of the object
-    typ: ObjectType,
-    mode: ObjectMode,
+    /// The Object this declaration refers to
+    obj: ObjectKey,
     /// Default value assigned to the object (required for constants, cannot be used for ports)
     default: Option<AssignmentKind>,
     /// The kind of object
@@ -188,53 +188,49 @@ pub struct ObjectDeclaration {
 
 impl ObjectDeclaration {
     pub fn signal(
-        db: &mut dyn Arch,
+        db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         default: Option<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
+        let kind = ObjectKind::Signal;
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
-            mode: ObjectMode::new(true, ObjectState::Unassigned),
+            obj: Object::try_new(db, typ, &kind)?,
             default,
-            kind: ObjectKind::Signal,
+            kind,
         }
         .intern(db))
     }
 
     pub fn variable(
-        db: &mut dyn Arch,
+        db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         default: Option<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
+        let kind = ObjectKind::Variable;
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
-            mode: if let Some(_) = default {
-                ObjectMode::new(true, ObjectState::Assigned)
-            } else {
-                ObjectMode::new(true, ObjectState::Unassigned)
-            },
+            obj: Object::try_new(db, typ, &kind)?,
             default,
-            kind: ObjectKind::Variable,
+            kind,
         }
         .intern(db))
     }
 
     pub fn constant(
-        db: &mut dyn Arch,
+        db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         value: impl Into<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
+        let kind = ObjectKind::Constant;
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
-            mode: ObjectMode::new(false, ObjectState::Unassigned),
+            obj: Object::try_new(db, typ, &kind)?,
             default: Some(value.into()),
-            kind: ObjectKind::Constant,
+            kind,
         }
         .intern(db))
     }
@@ -242,39 +238,56 @@ impl ObjectDeclaration {
     /// Entity Ports serve as a way to represent the ports of an entity the architecture is describing.
     /// They are not declared within the architecture itself, but can drive or be driven by other objects.
     pub fn entity_port(
-        db: &mut dyn Arch,
+        db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         mode: Mode,
     ) -> Result<Id<ObjectDeclaration>> {
+        let kind = ObjectKind::EntityPort(mode);
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
-            mode: match mode {
-                Mode::In => ObjectMode::new(false, ObjectState::Assigned),
-                Mode::Out => ObjectMode::new(false, ObjectState::Unassigned),
-            },
+            obj: Object::try_new(db, typ, &kind)?,
             default: None,
-            kind: ObjectKind::EntityPort,
+            kind,
         }
         .intern(db))
     }
 
     pub fn component_port(
-        db: &mut dyn Arch,
+        db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         mode: Mode,
     ) -> Result<Id<ObjectDeclaration>> {
+        let kind = ObjectKind::ComponentPort(mode);
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
-            mode: match mode {
-                Mode::In => ObjectMode::new(false, ObjectState::Unassigned), // An "in" port requires an object going out of the architecture
-                Mode::Out => ObjectMode::new(false, ObjectState::Assigned), // An "out" port is already assigned a value
-            },
+            obj: Object::try_new(db, typ, &kind)?,
             default: None,
-            kind: ObjectKind::ComponentPort,
+            kind,
+        }
+        .intern(db))
+    }
+
+    /// Aliases an existing object, with optional field constraint
+    pub fn alias(
+        db: &dyn Arch,
+        identifier: impl TryResult<VhdlName>,
+        object_declaration: Id<ObjectDeclaration>,
+        selection: Vec<FieldSelection>,
+    ) -> Result<Id<ObjectDeclaration>> {
+        let object_declaration = db.lookup_intern_object_declaration(object_declaration);
+        Ok(ObjectDeclaration {
+            identifier: identifier.try_result()?,
+            obj: object_declaration
+                .object_key()
+                .clone()
+                .with_nested(selection),
+            default: None,
+            kind: ObjectKind::Alias(
+                object_declaration.identifier(),
+                Box::new(object_declaration.kind().clone()),
+            ),
         }
         .intern(db))
     }
@@ -289,38 +302,20 @@ impl ObjectDeclaration {
         ObjectDeclaration::entity_port(db, "rst", ObjectType::Bit, Mode::In).unwrap()
     }
 
-    pub fn kind(&self) -> ObjectKind {
-        self.kind
-    }
-
-    pub fn typ(&self) -> &ObjectType {
-        &self.typ
+    pub fn kind(&self) -> &ObjectKind {
+        &self.kind
     }
 
     pub fn default(&self) -> &Option<AssignmentKind> {
         &self.default
     }
 
-    pub fn mode(&self) -> ObjectMode {
-        self.mode
+    pub fn object_key(&self) -> &ObjectKey {
+        &self.obj
     }
 
-    pub fn can_be_modified(&self) -> bool {
-        self.mode().can_be_modified()
-    }
-
-    pub fn state(&self) -> ObjectState {
-        self.mode().state()
-    }
-
-    pub fn set_state(&mut self, state: ObjectState) -> Result<()> {
-        match self.mode.set_state(state) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(Error::InvalidTarget(format!(
-                "Cannot set state of object {}",
-                self.identifier()
-            ))),
-        }
+    pub fn object(&self, db: &dyn Arch) -> Result<Object> {
+        db.get_object(self.object_key().clone())
     }
 
     pub fn from_port(db: &mut dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
@@ -353,221 +348,5 @@ impl Identify for ObjectDeclaration {
 impl VhdlNameSelf for ObjectDeclaration {
     fn vhdl_name(&self) -> &VhdlName {
         &self.identifier
-    }
-}
-
-/// Aliases an existing object, with optional field constraint
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AliasDeclaration {
-    identifier: String,
-    /// Reference to an existing object declaration
-    object: Id<ObjectDeclaration>,
-    /// Optional field selection(s) - when assigning to or from the alias, this is used to determine the fields it represents
-    field_selection: Vec<FieldSelection>,
-}
-
-impl AliasDeclaration {
-    pub fn new(
-        db: &dyn Arch,
-        object: Id<ObjectDeclaration>,
-        identifier: impl Into<String>,
-        fields: Vec<FieldSelection>,
-    ) -> Result<AliasDeclaration> {
-        AliasDeclaration::from_object(object, identifier).with_selection(db, fields)
-    }
-
-    pub fn from_object(
-        object: Id<ObjectDeclaration>,
-        identifier: impl Into<String>,
-    ) -> AliasDeclaration {
-        AliasDeclaration {
-            identifier: identifier.into(),
-            object,
-            field_selection: vec![],
-        }
-    }
-
-    /// Apply one or more field selections to the alias
-    pub fn with_selection(mut self, db: &dyn Arch, fields: Vec<FieldSelection>) -> Result<Self> {
-        let mut object = db
-            .lookup_intern_object_declaration(self.object())
-            .typ()
-            .clone();
-        for field in self.field_selection() {
-            object = object.get_field(field)?;
-        }
-        for field in fields {
-            object = object.get_field(&field)?;
-            self.field_selection.push(field)
-        }
-
-        Ok(self)
-    }
-
-    /// Returns the actual object this is aliasing
-    pub fn object(&self) -> Id<ObjectDeclaration> {
-        self.object
-    }
-
-    /// Returns the optional field selection of this alias
-    pub fn field_selection(&self) -> &Vec<FieldSelection> {
-        &self.field_selection
-    }
-
-    /// Returns the alias's identifier
-    pub fn identifier(&self) -> String {
-        self.identifier.clone()
-    }
-
-    /// Returns the object type of the alias (after fields have been selected)
-    pub fn typ(&self, db: &dyn Arch) -> Result<ObjectType> {
-        let mut object = db
-            .lookup_intern_object_declaration(self.object())
-            .typ()
-            .clone();
-        for field in self.field_selection() {
-            object = object.get_field(field)?;
-        }
-        Ok(object)
-    }
-}
-
-// impl TryInto<ObjectDeclaration> for AliasDeclaration {
-//     type Error = Error;
-
-//     fn try_into(self) -> Result<ObjectDeclaration> {
-//         Ok(ObjectDeclaration {
-//             identifier: self.identifier().to_string(),
-//             typ: self.typ()?,
-//             mode: self.object().mode().clone(),
-//             default: None,
-//             kind: self.object().kind().clone(),
-//         })
-//     }
-// }
-
-#[cfg(test)]
-pub mod tests {
-    use std::convert::TryFrom;
-
-    use indexmap::IndexMap;
-    use tydi_common::name::Name;
-
-    use crate::{architecture::arch_storage::db::Database, object::record::RecordObject};
-
-    use super::*;
-
-    pub(crate) fn test_bit_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
-        ObjectDeclaration::signal(db, "test_signal", ObjectType::Bit, None)
-    }
-
-    pub(crate) fn test_complex_signal(db: &mut dyn Arch) -> Result<Id<ObjectDeclaration>> {
-        let mut fields = IndexMap::new();
-        fields.insert(Name::try_new("a")?, ObjectType::bit_vector(10, -4)?);
-        ObjectDeclaration::signal(
-            db,
-            "test_signal",
-            ObjectType::Record(RecordObject::new(
-                Name::try_new("record_typ".to_string())?,
-                fields,
-            )),
-            None,
-        )
-    }
-
-    #[test]
-    fn alias_verification_success() -> Result<()> {
-        let mut db = Database::default();
-        let test_bit_signal = test_bit_signal(&mut db)?;
-        let test_complex_signal = test_complex_signal(&mut db)?;
-        AliasDeclaration::from_object(test_bit_signal, Name::try_from("test_signal_alias")?);
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
-            .with_selection(&db, vec![FieldSelection::try_name("a")?])?;
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-            &db,
-            vec![
-                FieldSelection::try_name("a")?,
-                FieldSelection::downto(10, -4)?,
-            ],
-        )?;
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
-            .with_selection(&db, vec![FieldSelection::try_name("a")?])?
-            .with_selection(&db, vec![FieldSelection::downto(10, -4)?])?;
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-            &db,
-            vec![
-                FieldSelection::try_name("a")?,
-                FieldSelection::downto(4, -1)?,
-            ],
-        )?;
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-            &db,
-            vec![FieldSelection::try_name("a")?, FieldSelection::to(-4, 10)?],
-        )?;
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-            &db,
-            vec![FieldSelection::try_name("a")?, FieldSelection::index(10)],
-        )?;
-        AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-            &db,
-            vec![FieldSelection::try_name("a")?, FieldSelection::index(-4)],
-        )?;
-        Ok(())
-    }
-
-    #[test]
-    fn alias_verification_error() -> Result<()> {
-        let mut db = Database::default();
-        let test_bit_signal = test_bit_signal(&mut db)?;
-        let test_complex_signal = test_complex_signal(&mut db)?;
-        is_invalid_target(
-            AliasDeclaration::from_object(test_bit_signal, "test_signal_alias")
-                .with_selection(&db, vec![FieldSelection::try_name("a")?]),
-        )?;
-        is_invalid_target(
-            AliasDeclaration::from_object(test_bit_signal, "test_signal_alias")
-                .with_selection(&db, vec![FieldSelection::index(1)]),
-        )?;
-        is_invalid_target(
-            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
-                .with_selection(&db, vec![FieldSelection::index(1)]),
-        )?;
-        is_invalid_argument(
-            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias")
-                .with_selection(&db, vec![FieldSelection::try_name("b")?]),
-        )?;
-        is_invalid_target(
-            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-                &db,
-                vec![
-                    FieldSelection::try_name("a")?,
-                    FieldSelection::try_name("a")?,
-                ],
-            ),
-        )?;
-        is_invalid_argument(
-            AliasDeclaration::from_object(test_complex_signal, "test_signal_alias").with_selection(
-                &db,
-                vec![
-                    FieldSelection::try_name("a")?,
-                    FieldSelection::downto(11, -4)?,
-                ],
-            ),
-        )?;
-        Ok(())
-    }
-
-    fn is_invalid_target<T>(result: Result<T>) -> Result<()> {
-        match result {
-            Err(Error::InvalidTarget(_)) => Ok(()),
-            _ => Err(Error::UnknownError),
-        }
-    }
-
-    fn is_invalid_argument<T>(result: Result<T>) -> Result<()> {
-        match result {
-            Err(Error::InvalidArgument(_)) => Ok(()),
-            _ => Err(Error::UnknownError),
-        }
     }
 }

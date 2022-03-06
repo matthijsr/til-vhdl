@@ -15,15 +15,19 @@ impl ArchitectureDeclare for AssignDeclaration {
             result.push_str(&doc);
         }
         result.push_str(&self.object_string(db));
-        result.push_str(
-            match db.lookup_intern_object_declaration(self.object).kind() {
-                ObjectKind::Signal => " <= ",
-                ObjectKind::Variable => " := ",
-                ObjectKind::Constant => " := ",
-                ObjectKind::EntityPort => " <= ",
-                ObjectKind::ComponentPort => " => ",
-            },
-        );
+        fn assign_symbol(kind: &ObjectKind) -> String {
+            match kind {
+                ObjectKind::Signal => " <= ".to_string(),
+                ObjectKind::Variable => " := ".to_string(),
+                ObjectKind::Constant => " := ".to_string(),
+                ObjectKind::EntityPort(_) => " <= ".to_string(),
+                ObjectKind::ComponentPort(_) => " => ".to_string(),
+                ObjectKind::Alias(_, kind) => assign_symbol(kind),
+            }
+        }
+        result.push_str(&assign_symbol(
+            db.lookup_intern_object_declaration(self.object).kind(),
+        ));
         result.push_str(&self.assignment().declare_for(
             db,
             self.object_string(db),

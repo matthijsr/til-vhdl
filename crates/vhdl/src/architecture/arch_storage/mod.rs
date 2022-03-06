@@ -1,25 +1,33 @@
-
-
 use std::sync::Arc;
 
-use tydi_common::error::{Result, TryResult};
-use tydi_intern::Id;
+use tydi_common::error::{Error, Result};
 
-use crate::{
-    assignment::AssignmentKind,
-    declaration::{ArchitectureDeclaration, ObjectDeclaration, ObjectState},
-    package::Package,
-    statement::Statement, common::vhdl_name::VhdlName, component::Component,
-};
+use crate::{common::vhdl_name::VhdlName, component::Component, package::Package};
 
 use super::Architecture;
+
+use self::{interner::Interner, object_queries::ObjectQueries};
+
+use std::convert::TryInto;
+
+use crate::{
+    assignment::{
+        array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
+        FieldSelection, RangeConstraint, ValueAssignment,
+    },
+    object::object_type::ObjectType,
+};
+
+use self::object_queries::object_key::ObjectKey;
 
 pub mod db;
 pub mod get_self;
 pub mod intern_self;
+pub mod interner;
+pub mod object_queries;
 
 #[salsa::query_group(ArchStorage)]
-pub trait Arch {
+pub trait Arch: Interner + ObjectQueries {
     #[salsa::input]
     fn default_package(&self) -> Arc<Package>;
 
@@ -29,21 +37,9 @@ pub trait Arch {
     #[salsa::input]
     fn architecture(&self) -> Architecture;
 
-    #[salsa::interned]
-    fn intern_architecture_declaration(
-        &self,
-        arch_decl: ArchitectureDeclaration,
-    ) -> Id<ArchitectureDeclaration>;
-
-    #[salsa::interned]
-    fn intern_object_declaration(&self, obj_decl: ObjectDeclaration) -> Id<ObjectDeclaration>;
-
     fn subject_component(&self) -> Result<Arc<Component>>;
 
-    fn get_object(&self, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration>;
-
-    // #[salsa::interned]
-    // fn intern_statement(&self, stat: Statement) -> Id<Statement>;
+    fn can_assign(&self, to: ObjectKey, assignment: Assignment) -> Result<()>;
 }
 
 fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
@@ -51,77 +47,130 @@ fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
     package.get_subject_component(db)
 }
 
-fn get_object(db: &dyn Arch, id: Id<ObjectDeclaration>) -> Result<ObjectDeclaration> {
-    let mut obj = db.lookup_intern_object_declaration(id);
-    for stat in db.architecture().statements() {
-        match stat {
-            Statement::Assignment(ass) => {
-                if ass.object() == id {
-                    if ass.assignment().to_field().is_empty() {
-                        match ass.assignment().kind() {
-                            AssignmentKind::Object(oa) => {
-                                obj.set_state(oa.selected_object(db)?.state())?
+fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()> {
+    let to_key = to.with_nested(assignment.to_field().clone());
+    let to = db.get_object(to_key.clone())?;
+    match assignment.kind() {
+        AssignmentKind::Object(object_assignment) => {
+            db.assignable_objects(to_key, object_assignment.as_object_key(db))
+        }
+        AssignmentKind::Direct(direct) => {
+            let to_typ = db.lookup_intern_object_type(to.typ);
+            match direct {
+                DirectAssignment::Value(value) => match value {
+                    ValueAssignment::Bit(_) => match to_typ {
+                        ObjectType::Bit => Ok(()),
+                        ObjectType::Array(_) | ObjectType::Record(_) => Err(Error::InvalidTarget(
+                            format!("Cannot assign Bit to {}", to_typ),
+                        )),
+                    },
+                    ValueAssignment::BitVec(bitvec) => match to_typ {
+                        ObjectType::Array(array) if array.is_bitvector() => {
+                            bitvec.validate_width(array.width())
+                        }
+                        _ => Err(Error::InvalidTarget(format!(
+                            "Cannot assign Bit Vector to {}",
+                            to_typ
+                        ))),
+                    },
+                },
+                DirectAssignment::FullRecord(record) => {
+                    if let ObjectType::Record(to_record) = &to_typ {
+                        if to_record.fields().len() == record.len() {
+                            for ra in record {
+                                let to_field_key = to_key
+                                    .clone()
+                                    .with_selection(FieldSelection::name(ra.field().clone()));
+                                db.can_assign(
+                                    to_field_key,
+                                    Assignment::from(ra.assignment().clone()),
+                                )?;
                             }
-                            AssignmentKind::Direct(_) => obj.set_state(ObjectState::Assigned)?,
+                            Ok(())
+                        } else {
+                            Err(Error::InvalidArgument(format!("Attempted full record assignment. Number of fields do not match. Record has {} fields, assignment has {} fields", to_record.fields().len(), record.len())))
                         }
                     } else {
-                        todo!()
-                        // Need to be able to keep track of individual fields, or collections of fields... which is very hard (consider that an array consists of multiple fields, but can also be assigned in slices)
-                        // Should use a similar function to this one to track such things, rather than give them all individual IDs...
+                        Err(Error::InvalidTarget(format!(
+                            "Cannot perform full Record assignment to {}",
+                            to_typ
+                        )))
+                    }
+                }
+                DirectAssignment::FullArray(array) => {
+                    if let ObjectType::Array(to_array) = &to_typ {
+                        // As each element is the same and we only really care about the type, using a single ObjectKey to represent all queries
+                        // will be more efficient. (As this means Salsa is more likely to reuse previous results.)
+                        let to_array_elem_key = to_key.clone().with_selection(
+                            FieldSelection::Range(RangeConstraint::Index(to_array.high())),
+                        );
+                        match array {
+                            ArrayAssignment::Direct(direct) => {
+                                if to_array.width() == direct.len().try_into().unwrap() {
+                                    for value in direct {
+                                        db.can_assign(
+                                            to_array_elem_key.clone(),
+                                            Assignment::from(value.clone()),
+                                        )?;
+                                    }
+                                    Ok(())
+                                } else {
+                                    Err(Error::InvalidArgument(format!("Attempted full array assignment. Number of fields do not match. Array has {} fields, assignment has {} fields", to_array.width(), direct.len())))
+                                }
+                            }
+                            ArrayAssignment::Sliced { direct, others } => {
+                                let mut ranges_assigned: Vec<&RangeConstraint> = vec![];
+                                for ra in direct {
+                                    let range = ra.constraint();
+                                    if !range.is_between(to_array.high(), to_array.low())? {
+                                        return Err(Error::InvalidArgument(format!(
+                                            "{} is not between {} and {}",
+                                            range,
+                                            to_array.high(),
+                                            to_array.low()
+                                        )));
+                                    }
+                                    if ranges_assigned.iter().any(|x| x.overlaps(range)) {
+                                        return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range)));
+                                    }
+                                    db.can_assign(
+                                        to_array_elem_key.clone(),
+                                        Assignment::from(ra.assignment().clone()),
+                                    )?;
+                                    ranges_assigned.push(range);
+                                }
+                                let total_assigned: u32 =
+                                    ranges_assigned.iter().map(|x| x.width_u32()).sum();
+                                if total_assigned == to_array.width() {
+                                    if let Some(_) = others {
+                                        return Err(Error::InvalidArgument("Sliced array assignment contains an 'others' field, but already assigns all fields directly.".to_string()));
+                                    } else {
+                                        Ok(())
+                                    }
+                                } else {
+                                    if let Some(value) = others {
+                                        db.can_assign(
+                                            to_array_elem_key,
+                                            Assignment::from(value.as_ref().clone()),
+                                        )
+                                    } else {
+                                        Err(Error::InvalidArgument("Sliced array assignment does not assign all values directly, but does not contain an 'others' field.".to_string()))
+                                    }
+                                }
+                            }
+                            ArrayAssignment::Others(others) => db.can_assign(
+                                to_array_elem_key,
+                                Assignment::from(others.as_ref().clone()),
+                            ),
+                        }
+                    } else {
+                        Err(Error::InvalidTarget(format!(
+                            "Cannot perform full Array assignment to {}",
+                            to_typ
+                        )))
                     }
                 }
             }
-            Statement::PortMapping(pm) => {
-                // TODO: Currently port mappings assume that ports are assigned completely, rather than assigning individual fields...
-                if pm
-                    .mappings()
-                    .values()
-                    .any(|x| x.object() == id && x.assignment().to_field().is_empty())
-                {
-                    obj.set_state(ObjectState::Assigned)?
-                }
-            }
         }
-    }
-    Ok(obj)
-}
-
-pub trait GetSelf<T> {
-    fn get(&self, db: &dyn Arch) -> T;
-}
-
-pub trait InternSelf: Sized {
-    fn intern(self, db: &dyn Arch) -> Id<Self>;
-}
-
-pub trait InternAs<T> {
-    fn intern_as(self, db: &dyn Arch) -> Id<T>;
-}
-
-pub trait TryIntern<T> {
-    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>>;
-}
-
-pub trait TryInternAs<T> {
-    fn try_intern_as(self, db: &dyn Arch) -> Result<Id<T>>;
-}
-
-impl<T, U> InternAs<T> for U
-where
-    U: Into<T>,
-    T: InternSelf,
-{
-    fn intern_as(self, db: &dyn Arch) -> Id<T> {
-        self.into().intern(db)
-    }
-}
-
-impl<T, U> TryIntern<T> for U
-where
-    U: TryResult<T>,
-    T: InternSelf,
-{
-    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>> {
-        Ok(self.try_result()?.intern(db))
     }
 }

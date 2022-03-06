@@ -1,11 +1,18 @@
 use std::convert::TryInto;
 
+use textwrap::indent;
 use tydi_common::{
-    error::{Error, Result},
-    name::Name,
+    error::{Error, Result, TryResult},
+    traits::Identify,
 };
 
-use crate::{architecture::arch_storage::Arch, declaration::Declare, object::ObjectType};
+use crate::{
+    architecture::arch_storage::Arch,
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
+};
+use crate::{declaration::DeclareWithIndent, object::object_type::ObjectType};
+
+use super::object_type::DeclarationTypeName;
 
 /// An array object, arrays contain a single type of object, but can contain nested objects
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -13,7 +20,7 @@ pub struct ArrayObject {
     high: i32,
     low: i32,
     typ: Box<ObjectType>,
-    type_name: String,
+    type_name: VhdlName,
     is_std_logic_vector: bool,
 }
 
@@ -30,7 +37,7 @@ impl ArrayObject {
                 high,
                 low,
                 typ: Box::new(ObjectType::Bit),
-                type_name: format!("std_logic_vector({} downto {})", high, low),
+                type_name: VhdlName::try_new("std_logic_vector")?,
                 is_std_logic_vector: true,
             })
         }
@@ -41,7 +48,7 @@ impl ArrayObject {
         high: i32,
         low: i32,
         object: ObjectType,
-        type_name: impl Into<Name>,
+        type_name: impl TryResult<VhdlName>,
     ) -> Result<ArrayObject> {
         if low > high {
             Err(Error::InvalidArgument(format!(
@@ -53,7 +60,7 @@ impl ArrayObject {
                 high,
                 low,
                 typ: Box::new(object),
-                type_name: type_name.into().to_string(),
+                type_name: type_name.try_result()?,
                 is_std_logic_vector: false,
             })
         }
@@ -85,25 +92,46 @@ impl ArrayObject {
     pub fn is_std_logic_vector(&self) -> bool {
         self.is_std_logic_vector
     }
-
-    pub fn type_name(&self) -> String {
-        self.type_name.clone()
-    }
 }
 
-impl Declare for ArrayObject {
-    fn declare(&self, _db: &dyn Arch) -> Result<String> {
+impl DeclareWithIndent for ArrayObject {
+    fn declare_with_indent(&self, _db: &dyn Arch, indent_style: &str) -> Result<String> {
         if self.is_std_logic_vector() {
             Err(Error::BackEndError(
                 "Invalid type, std_logic_vector cannot be declared.".to_string(),
             ))
         } else {
-            Ok(format!(
-                "type {} is array ({} to {}) of ",
-                self.type_name(),
-                self.low(),
-                self.high()
+            Ok(indent(
+                &format!(
+                    "type {} is array ({} to {}) of ",
+                    self.vhdl_name(),
+                    self.low(),
+                    self.high()
+                ),
+                indent_style,
             ))
+        }
+    }
+}
+
+impl Identify for ArrayObject {
+    fn identifier(&self) -> String {
+        self.vhdl_name().to_string()
+    }
+}
+
+impl VhdlNameSelf for ArrayObject {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.type_name
+    }
+}
+
+impl DeclarationTypeName for ArrayObject {
+    fn declaration_type_name(&self) -> String {
+        if self.is_std_logic_vector() {
+            format!("std_logic_vector({} downto {})", self.high(), self.low())
+        } else {
+            self.identifier()
         }
     }
 }

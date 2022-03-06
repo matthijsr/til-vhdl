@@ -9,7 +9,7 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, ArchitectureBody},
-    assignment::Assign,
+    assignment::{Assign, AssignDeclaration},
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{ObjectDeclaration, ObjectState},
     port::Mode,
@@ -64,11 +64,23 @@ impl IntoVhdl<ArchitectureBody> for Structure {
         let rst = ObjectDeclaration::entity_rst(arch_db);
         let mut streamlet_ports = BTreeMap::new();
         let mut streamlet_components = BTreeMap::new();
+
         for (instance_name, streamlet) in self.streamlet_instances(ir_db) {
             let component = streamlet.canonical(ir_db, arch_db, prefix.clone())?;
             let mut port_mapping =
                 PortMapping::from_component(arch_db, &component, instance_name.clone())?;
             streamlet_components.insert(instance_name.clone(), component);
+
+            let wrap_portmap_err = |result: Result<()>| -> Result<()> {
+                match result {
+                        Ok(result) => Ok(result),
+                        Err(err) => Err(Error::BackEndError(format!(
+                    "Something went wrong trying to generate port mappings for streamlet instance {} (type: {}):\n\t{}",
+                    &instance_name, streamlet.identifier(), err
+                ))),
+                    }
+            };
+
             let port_map_signals = streamlet
                 .interface(ir_db)
                 .port_ids()
@@ -90,7 +102,11 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                             port.typ().clone(),
                             None,
                         )?;
-                        port_mapping.map_port(arch_db, port.vhdl_name().clone(), &signal)?;
+                        wrap_portmap_err(port_mapping.map_port(
+                            arch_db,
+                            port.vhdl_name().clone(),
+                            &signal,
+                        ))?;
                         signals.push((
                             signal,
                             match port.mode() {
@@ -104,9 +120,9 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                     Ok((name.clone(), signals))
                 })
                 .collect::<Result<BTreeMap<Name, Vec<(Id<ObjectDeclaration>, ObjectState)>>>>()?;
-            streamlet_ports.insert(instance_name, port_map_signals);
-            port_mapping.map_port(arch_db, "clk", &clk)?;
-            port_mapping.map_port(arch_db, "rst", &rst)?;
+            streamlet_ports.insert(instance_name.clone(), port_map_signals);
+            wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
+            wrap_portmap_err(port_mapping.map_port(arch_db, "rst", &rst))?;
             statements.push(port_mapping.finish()?.into());
         }
         for connection in self.connections() {
@@ -128,12 +144,19 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                 (Id<ObjectDeclaration>, ObjectState),
             )> = sink_objs.into_iter().zip(source_objs.into_iter()).collect();
             for ((sink, sink_state), (source, source_state)) in sink_source {
+                let wrap_assign_err =
+                    |result: Result<AssignDeclaration>| -> Result<AssignDeclaration> {
+                        match result {
+                        Ok(result) => Ok(result),
+                        Err(err) => Err(Error::BackEndError(format!("Something went wrong trying to generate assignments for connection {}:\n\t{}", connection, err))),
+                    }
+                    };
                 if sink_state == source_state {
                     return Err(Error::BackEndError(format!("Something went wrong during VHDL conversion of a connection. Connection {} results in two objects having shared state {}.", connection, sink_state)));
                 } else if sink_state == ObjectState::Assigned {
-                    statements.push(source.assign(arch_db, &sink)?.into());
+                    statements.push(wrap_assign_err(source.assign(arch_db, &sink))?.into());
                 } else {
-                    statements.push(sink.assign(arch_db, &source)?.into());
+                    statements.push(wrap_assign_err(sink.assign(arch_db, &source))?.into());
                 }
             }
         }

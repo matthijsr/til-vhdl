@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use textwrap::indent;
+
 use tydi_common::{
-    error::Result,
+    error::{Result, TryResult},
     traits::{Document, Identify},
 };
 
@@ -9,11 +10,11 @@ use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{Declare, DeclareWithIndent},
-    object::ObjectType,
     port::{Parameter, Port},
     properties::Analyze,
-    traits::VhdlDocument,
+    traits::VhdlDocument, object::object_type::DeclarationTypeName,
 };
+use crate::object::object_type::ObjectType;
 
 /// A component.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -30,18 +31,18 @@ pub struct Component {
 
 impl Component {
     /// Create a new component.
-    pub fn new(
-        identifier: impl Into<VhdlName>,
+    pub fn try_new(
+        identifier: impl TryResult<VhdlName>,
         parameters: Vec<Parameter>,
         ports: Vec<Port>,
         doc: Option<String>,
-    ) -> Component {
-        Component {
-            identifier: identifier.into(),
+    ) -> Result<Component> {
+        Ok(Component {
+            identifier: identifier.try_result()?,
             parameters,
             ports,
             doc,
-        }
+        })
     }
 
     /// Return a reference to the ports of this component.
@@ -94,7 +95,7 @@ impl Analyze for Component {
         for p in self.ports().iter() {
             result.append(&mut p.typ().list_nested_types())
         }
-        result.into_iter().unique_by(|x| x.type_name()).collect()
+        result.into_iter().unique_by(|x| x.declaration_type_name()).collect()
     }
 }
 
@@ -122,14 +123,12 @@ impl DeclareWithIndent for Component {
 
 #[cfg(test)]
 mod tests {
-    use tydi_common::name::Name;
-
     use crate::{architecture::arch_storage::db::Database, port::Mode, test_tools};
 
     use super::*;
 
     #[test]
-    fn test_declare() {
+    fn test_declare() -> Result<()> {
         let db = Database::default();
         let empty_comp = test_tools::empty_component().with_doc("test\ntest");
         assert_eq!(
@@ -140,26 +139,17 @@ component empty_component
 
   );
 end component;"#,
-            empty_comp.declare(&db).unwrap()
+            empty_comp.declare(&db)?
         );
-        let port1 = Port::new_documented(
-            Name::try_new("some_port").unwrap(),
+        let port1 = Port::try_new_documented(
+            "some_port",
             Mode::In,
             ObjectType::Bit,
             "This is port documentation\nNext line.",
-        );
-        let port2 = Port::new(
-            Name::try_new("some_other_port").unwrap(),
-            Mode::Out,
-            ObjectType::bit_vector(43, 0).unwrap(),
-        );
-        let clk = Port::new(Name::try_new("clk").unwrap(), Mode::In, ObjectType::Bit);
-        let comp = Component::new(
-            VhdlName::try_new("test").unwrap(),
-            vec![],
-            vec![port1, port2, clk],
-            None,
-        );
+        )?;
+        let port2 = Port::try_new("some_other_port", Mode::Out, 43..0)?;
+        let clk = Port::clk();
+        let comp = Component::try_new("test", vec![], vec![port1, port2, clk], None)?;
         assert_eq!(
             r#"component test
   port (
@@ -170,7 +160,9 @@ end component;"#,
     clk : in std_logic
   );
 end component;"#,
-            comp.declare(&db).unwrap()
+            comp.declare(&db)?
         );
+
+        Ok(())
     }
 }

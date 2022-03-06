@@ -1,4 +1,4 @@
-use crate::port::{Parameter, Port};
+use crate::{port::{Parameter, Port}, common::vhdl_name::VhdlName};
 
 mod impls;
 
@@ -6,7 +6,7 @@ mod impls;
 #[derive(Debug, Clone)]
 pub struct Entity {
     /// Component identifier.
-    identifier: String,
+    identifier: VhdlName,
     /// The parameters of the entity..
     parameters: Vec<Parameter>,
     /// The ports of the entity.

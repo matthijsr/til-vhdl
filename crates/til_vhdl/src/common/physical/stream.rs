@@ -1,18 +1,18 @@
 use til_query::common::physical::signal_list::SignalList;
-use til_query::ir::physical_properties::InterfaceDirection;
 use til_query::ir::Ir;
-use tydi_common::error::TryOptional;
-use tydi_common::numbers::Positive;
+use til_query::ir::physical_properties::InterfaceDirection;
 use tydi_common::{
     cat,
     error::Result,
     traits::{Reverse, Reversed},
 };
-use tydi_vhdl::architecture::arch_storage::Arch;
+use tydi_common::error::TryOptional;
+use tydi_common::numbers::Positive;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
     port::{Mode, Port},
 };
+use tydi_vhdl::architecture::arch_storage::Arch;
 
 use crate::IntoVhdl;
 
@@ -33,11 +33,7 @@ impl IntoVhdl<PortList> for PhysicalStream {
 
         let signal_list: SignalList<Positive> = self.into();
         let mut signal_list = signal_list.map_named(|n, x| {
-            Port::new(
-                VhdlName::try_new(cat!(prefix, n)).unwrap(), // As the prefix is either a VhdlName or empty, and all signal names are valid
-                mode,
-                x.into(),
-            )
+            Port::try_new(cat!(prefix, n), mode, x).unwrap() // As the prefix is either a VhdlName or empty, and all signal names are valid
         });
 
         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
@@ -90,7 +86,8 @@ mod tests {
         name::{Name, PathName},
         numbers::{BitCount, Positive},
     };
-    use tydi_vhdl::{declaration::Declare, object::ObjectType};
+    use tydi_vhdl::declaration::Declare;
+    use tydi_vhdl::object::object_type::ObjectType;
 
     use super::*;
 
@@ -165,21 +162,9 @@ a_strb : out std_logic_vector(1 downto 0)"#,
     fn reverse_all_signal_list() -> Result<()> {
         let mut port_list = PortList::new(
             SignalList::try_new(
-                Some(Port::new(
-                    VhdlName::try_new("valid")?,
-                    Mode::Out,
-                    ObjectType::Bit,
-                )),
-                Some(Port::new(
-                    VhdlName::try_new("ready")?,
-                    Mode::Out,
-                    ObjectType::Bit,
-                )),
-                Some(Port::new(
-                    VhdlName::try_new("data")?,
-                    Mode::Out,
-                    ObjectType::Bit,
-                )),
+                Some(Port::try_new("valid", Mode::Out, ObjectType::Bit)?),
+                Some(Port::try_new("ready", Mode::Out, ObjectType::Bit)?),
+                Some(Port::try_new("data", Mode::Out, ObjectType::Bit)?),
                 None,
                 None,
                 None,
@@ -252,21 +237,9 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         // Verify whether ports are reversed properly, not just assigned a single mode.
         let mut port_list = PortList::new(
             SignalList::try_new(
-                Some(Port::new(
-                    VhdlName::try_new("valid")?,
-                    Mode::In,
-                    ObjectType::Bit,
-                )),
-                Some(Port::new(
-                    VhdlName::try_new("ready")?,
-                    Mode::Out,
-                    ObjectType::Bit,
-                )),
-                Some(Port::new(
-                    VhdlName::try_new("data")?,
-                    Mode::In,
-                    ObjectType::Bit,
-                )),
+                Some(Port::try_new("valid", Mode::In, ObjectType::Bit)?),
+                Some(Port::try_new("ready", Mode::Out, ObjectType::Bit)?),
+                Some(Port::try_new("data", Mode::In, ObjectType::Bit)?),
                 None,
                 None,
                 None,

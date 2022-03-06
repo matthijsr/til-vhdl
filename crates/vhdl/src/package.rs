@@ -3,6 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use textwrap::indent;
+
 use tydi_common::{
     error::{Error, Result, TryResult},
     traits::Identify,
@@ -13,10 +14,10 @@ use crate::{
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent},
-    object::ObjectType,
     properties::Analyze,
-    usings::{DeclareUsings, ListUsings, Usings},
+    usings::{DeclareUsings, ListUsings, Usings}, object::object_type::DeclarationTypeName,
 };
+use crate::object::object_type::ObjectType;
 
 // TODO: Eventually functions as well.
 /// A library of components and types.
@@ -54,7 +55,7 @@ impl Package {
                 .iter()
                 .map(|c| (c.vhdl_name().clone(), c.clone()))
                 .collect(),
-            types: all_types.into_iter().unique_by(|x| x.type_name()).collect(),
+            types: all_types.into_iter().unique_by(|x| x.declaration_type_name()).collect(),
         })
     }
 

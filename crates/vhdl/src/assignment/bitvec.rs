@@ -1,5 +1,5 @@
-use crate::assignment::*;
-use tydi_common::error::{Error, Result};
+use crate::{assignment::*, common::vhdl_name::VhdlName};
+use tydi_common::error::{Error, Result, TryResult};
 
 /// Quick way to get the minimum number of binary values required for an unsigned integer
 fn min_length_unsigned(value: u32) -> u32 {
@@ -106,20 +106,20 @@ impl BitVecValue {
     }
 
     /// Declares the value assigned for the object being assigned to (identifier required in case Range is empty)
-    pub fn declare_for(&self, object_identifier: impl Into<String>) -> String {
-        match self {
+    pub fn declare_for(&self, object_identifier: impl TryResult<VhdlName>) -> Result<String> {
+        Ok(match self {
             BitVecValue::Others(_) | BitVecValue::Full(_) => self.declare().unwrap(),
             BitVecValue::Unsigned(value) => format!(
                 "std_logic_vector(to_unsigned({}, {}'length))",
                 value,
-                object_identifier.into()
+                object_identifier.try_result()?
             ),
             BitVecValue::Signed(value) => format!(
                 "std_logic_vector(to_signed({}, {}'length))",
                 value,
-                object_identifier.into()
+                object_identifier.try_result()?
             ),
-        }
+        })
     }
 
     /// Declares the value assigned for the range being assigned to
