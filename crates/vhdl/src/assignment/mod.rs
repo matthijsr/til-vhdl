@@ -135,13 +135,13 @@ impl AssignDeclaration {
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
     pub fn reverse(&self, db: &dyn Arch) -> Result<AssignDeclaration> {
         match self.assignment().kind() {
-            AssignmentKind::Object(object) => Ok(object.object().assign(
+            AssignmentKind::Object(object) => object.object().assign(
                 db,
                 &Assignment::from(
                     ObjectAssignment::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
-            )?),
+            ),
             AssignmentKind::Direct(_) => Err(Error::InvalidTarget(
                 "Cannot reverse a direct assignment.".to_string(),
             )),

@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use tydi_common::{
-    error::{Error, Result, TryResult},
-};
+use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
 use crate::{
@@ -81,7 +79,7 @@ impl PortMapping {
         db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
         assignment: &(impl Into<Assignment> + Clone),
-    ) -> Result<&mut Self> {
+    ) -> Result<()> {
         let identifier = identifier.try_result()?;
         let port = self
             .ports()
@@ -92,7 +90,7 @@ impl PortMapping {
             )))?;
         let assigned = port.assign(db, assignment)?;
         self.mappings.insert(identifier, assigned);
-        Ok(self)
+        Ok(())
     }
 
     pub fn finish(self) -> Result<Self> {
