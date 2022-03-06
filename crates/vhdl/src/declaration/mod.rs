@@ -4,8 +4,8 @@ use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;
 use tydi_intern::Id;
 
-use crate::architecture::arch_storage::Arch;
 use crate::architecture::arch_storage::interner::InternSelf;
+use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::object::object_type::ObjectType;
 use crate::port::{Mode, Port};
@@ -189,12 +189,12 @@ impl ObjectDeclaration {
     pub fn signal(
         db: &mut dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         default: Option<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
+            typ: typ.try_result()?,
             mode: ObjectMode::new(true, ObjectState::Unassigned),
             default,
             kind: ObjectKind::Signal,
@@ -205,12 +205,12 @@ impl ObjectDeclaration {
     pub fn variable(
         db: &mut dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         default: Option<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
+            typ: typ.try_result()?,
             mode: if let Some(_) = default {
                 ObjectMode::new(true, ObjectState::Assigned)
             } else {
@@ -225,12 +225,12 @@ impl ObjectDeclaration {
     pub fn constant(
         db: &mut dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         value: impl Into<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
+            typ: typ.try_result()?,
             mode: ObjectMode::new(false, ObjectState::Unassigned),
             default: Some(value.into()),
             kind: ObjectKind::Constant,
@@ -243,12 +243,12 @@ impl ObjectDeclaration {
     pub fn entity_port(
         db: &mut dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         mode: Mode,
     ) -> Result<Id<ObjectDeclaration>> {
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
+            typ: typ.try_result()?,
             mode: match mode {
                 Mode::In => ObjectMode::new(false, ObjectState::Assigned),
                 Mode::Out => ObjectMode::new(false, ObjectState::Unassigned),
@@ -262,12 +262,12 @@ impl ObjectDeclaration {
     pub fn component_port(
         db: &mut dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        typ: ObjectType,
+        typ: impl TryResult<ObjectType>,
         mode: Mode,
     ) -> Result<Id<ObjectDeclaration>> {
         Ok(ObjectDeclaration {
             identifier: identifier.try_result()?,
-            typ,
+            typ: typ.try_result()?,
             mode: match mode {
                 Mode::In => ObjectMode::new(false, ObjectState::Unassigned), // An "in" port requires an object going out of the architecture
                 Mode::Out => ObjectMode::new(false, ObjectState::Assigned), // An "out" port is already assigned a value
