@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use std::{collections::BTreeMap, fmt::Display};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A Map which keeps track of insertion order, but also implements Eq and Hash
@@ -9,13 +9,13 @@ use std::{collections::BTreeMap, fmt::Display};
 ///
 /// This map does not support Remove, and will return an Error when attempting to
 /// insert an item with a key which already exists.
-pub struct InsertionOrderedMap<K: Ord + Clone + Display, V: Clone> {
+pub struct InsertionOrderedMap<K: Ord + Clone, V: Clone> {
     len: usize,
     keys: BTreeMap<usize, K>,
     items: BTreeMap<K, V>,
 }
 
-impl<K: Ord + Clone + Display, V: Clone> InsertionOrderedMap<K, V> {
+impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
     pub fn new() -> Self {
         InsertionOrderedMap {
             len: 0,
@@ -27,13 +27,10 @@ impl<K: Ord + Clone + Display, V: Clone> InsertionOrderedMap<K, V> {
     /// Tries to insert a key and value in to the map.
     ///
     /// If an item with the given key already exists in the map, this function
-    /// will return an `Error::InvalidArgument`.
+    /// will return an `Error::UnexpectedDuplicate`.
     pub fn try_insert(&mut self, key: K, value: V) -> Result<()> {
         match self.items.insert(key.clone(), value) {
-            Some(_) => Err(Error::InvalidArgument(format!(
-                "An item with key {} already exists on this InsertionOrderedMap",
-                key
-            ))),
+            Some(_) => Err(Error::UnexpectedDuplicate),
             None => {
                 self.keys.insert(self.len, key);
                 self.len += 1;
@@ -68,15 +65,19 @@ impl<K: Ord + Clone + Display, V: Clone> InsertionOrderedMap<K, V> {
     pub fn len(&self) -> usize {
         self.len
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+        (&self).into_iter()
+    }
 }
 
-pub struct InsertionOrderedMapIter<'a, K: Ord + Clone + Display, V: Clone> {
+pub struct InsertionOrderedMapIter<'a, K: Ord + Clone, V: Clone> {
     len: usize,
     index: usize,
     insertion_ordered_map: &'a InsertionOrderedMap<K, V>,
 }
 
-impl<'a, K: Ord + Clone + Display, V: Clone> Iterator for InsertionOrderedMapIter<'a, K, V> {
+impl<'a, K: Ord + Clone, V: Clone> Iterator for InsertionOrderedMapIter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -90,15 +91,13 @@ impl<'a, K: Ord + Clone + Display, V: Clone> Iterator for InsertionOrderedMapIte
     }
 }
 
-impl<'a, K: Ord + Clone + Display, V: Clone> ExactSizeIterator
-    for InsertionOrderedMapIter<'a, K, V>
-{
+impl<'a, K: Ord + Clone, V: Clone> ExactSizeIterator for InsertionOrderedMapIter<'a, K, V> {
     fn len(&self) -> usize {
         self.len
     }
 }
 
-impl<'a, K: Ord + Clone + Display, V: Clone> IntoIterator for &'a InsertionOrderedMap<K, V> {
+impl<'a, K: Ord + Clone, V: Clone> IntoIterator for &'a InsertionOrderedMap<K, V> {
     type Item = (&'a K, &'a V);
 
     type IntoIter = InsertionOrderedMapIter<'a, K, V>;

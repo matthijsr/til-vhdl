@@ -1,5 +1,5 @@
-use indexmap::IndexMap;
-use tydi_common::{error::Result, name::PathName};
+
+use tydi_common::{error::Result, insertion_ordered_map::InsertionOrderedMap, name::PathName};
 use tydi_intern::Id;
 
 use crate::ir::Ir;
@@ -9,17 +9,21 @@ use super::logicaltype::{stream::Stream, LogicalType};
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SplitStreams {
     signals: Id<LogicalType>,
-    streams: IndexMap<PathName, Id<Stream>>,
+    streams: InsertionOrderedMap<PathName, Id<Stream>>,
 }
 
 impl SplitStreams {
-    pub fn new(signals: Id<LogicalType>, streams: IndexMap<PathName, Id<Stream>>) -> Self {
+    pub fn new(
+        signals: Id<LogicalType>,
+        streams: InsertionOrderedMap<PathName, Id<Stream>>,
+    ) -> Self {
         SplitStreams { signals, streams }
     }
 
     pub fn streams(&self) -> impl Iterator<Item = (&PathName, &Id<Stream>)> {
-        self.streams.iter()
+        (&self.streams).into_iter()
     }
+
     pub fn signals(&self) -> Id<LogicalType> {
         self.signals
     }

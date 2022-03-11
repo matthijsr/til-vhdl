@@ -4,9 +4,8 @@ use std::hash::Hash;
 use std::ops::Mul;
 use std::str::FromStr;
 
-use indexmap::IndexMap;
-
-use tydi_common::error::TryResult;
+use tydi_common::error::{TryResult, WrapError};
+use tydi_common::insertion_ordered_map::InsertionOrderedMap;
 use tydi_common::name::{Name, PathName};
 use tydi_common::numbers::{BitCount, Positive};
 use tydi_common::traits::Reverse;
@@ -322,10 +321,10 @@ impl SplitsStreams for Id<Stream> {
     fn split_streams(&self, db: &dyn Ir) -> Result<SplitStreams> {
         let this_stream = self.get(db);
         let split = this_stream.data.split_streams(db)?;
-        let mut streams = IndexMap::new();
+        let mut streams = InsertionOrderedMap::new();
         let (element, rest) = (split.signals(), split.streams());
         if this_stream.keep() || !element.is_null(db) || !this_stream.user_id().is_null(db) {
-            streams.insert(
+            streams.try_insert(
                 PathName::new_empty(),
                 Stream::new(
                     element,
@@ -338,10 +337,10 @@ impl SplitsStreams for Id<Stream> {
                     this_stream.keep(),
                 )
                 .intern(db),
-            );
+            )?;
         }
 
-        streams.extend(rest.into_iter().map(|(name, stream_id)| {
+        for (name, stream_id) in rest.into_iter() {
             let mut stream = stream_id.get(db);
             if this_stream.direction() == Direction::Reverse {
                 stream.reverse();
@@ -353,8 +352,11 @@ impl SplitsStreams for Id<Stream> {
             }
             stream.set_throughput(stream.throughput() * this_stream.throughput());
 
-            (name.clone(), stream.intern(db))
-        }));
+            streams.try_insert(name.clone(), stream.intern(db)).wrap_err(Error::InvalidArgument(
+                r#"An error occurred during the SplitStreams function due to overlapping Stream names.
+This is usually because a Stream contains another Stream as its Data type, and the Streams cannot be flattened.
+You must ensure that only one Stream has a Keep and/or User property."#.to_string()))?;
+        }
 
         Ok(SplitStreams::new(
             db.intern_type(LogicalType::Null),
