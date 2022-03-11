@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use tydi_common::name::PathName;
+use tydi_common::{error::Result, name::PathName};
 use tydi_intern::Id;
 
 use crate::ir::Ir;
@@ -29,5 +29,5 @@ pub(crate) trait SplitsStreams {
     /// Splits a logical stream type into simplified stream types.
     ///
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#split-function)
-    fn split_streams(&self, db: &dyn Ir) -> SplitStreams;
+    fn split_streams(&self, db: &dyn Ir) -> Result<SplitStreams>;
 }

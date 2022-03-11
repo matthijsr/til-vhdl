@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 
 use tydi_common::error::TryResult;
 use tydi_common::name::{Name, PathName};
-use tydi_common::numbers::{Positive, BitCount};
+use tydi_common::numbers::{BitCount, Positive};
 use tydi_common::traits::Reverse;
 use tydi_intern::Id;
 
@@ -306,22 +306,22 @@ impl Stream {
 }
 
 impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
-    fn synthesize(&self, db: &dyn Ir) -> LogicalStream<BitCount, PhysicalStream> {
-        let split = self.split_streams(db);
+    fn synthesize(&self, db: &dyn Ir) -> Result<LogicalStream<BitCount, PhysicalStream>> {
+        let split = self.split_streams(db)?;
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
-        LogicalStream::new(
+        Ok(LogicalStream::new(
             signals,
             rest.into_iter()
                 .map(|(path_name, stream)| (path_name.clone(), stream.get(db).physical(db)))
                 .collect(),
-        )
+        ))
     }
 }
 
 impl SplitsStreams for Id<Stream> {
-    fn split_streams(&self, db: &dyn Ir) -> SplitStreams {
+    fn split_streams(&self, db: &dyn Ir) -> Result<SplitStreams> {
         let this_stream = self.get(db);
-        let split = this_stream.data.split_streams(db);
+        let split = this_stream.data.split_streams(db)?;
         let mut streams = IndexMap::new();
         let (element, rest) = (split.signals(), split.streams());
         if this_stream.keep() || !element.is_null(db) || !this_stream.user_id().is_null(db) {
@@ -356,7 +356,10 @@ impl SplitsStreams for Id<Stream> {
             (name.clone(), stream.intern(db))
         }));
 
-        SplitStreams::new(db.intern_type(LogicalType::Null), streams)
+        Ok(SplitStreams::new(
+            db.intern_type(LogicalType::Null),
+            streams,
+        ))
     }
 }
 

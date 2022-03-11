@@ -34,7 +34,7 @@ impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
             None => self.name().clone().into(),
         };
 
-        let synth = self.stream_id().synthesize(ir_db);
+        let synth = self.stream_id().synthesize(ir_db)?;
 
         let fields = Fields::new(synth.fields_iter().map(|(path, width)| {
             let prefixed_path = format!("{}__{}", &n, path);
