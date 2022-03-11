@@ -1,7 +1,7 @@
 use core::fmt;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{sync::Arc};
 
-use indexmap::IndexMap;
+
 use tydi_intern::Id;
 
 use crate::ir::{
@@ -9,7 +9,8 @@ use crate::ir::{
     Ir,
 };
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Result, TryResult},
+    insertion_ordered_map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::{BitCount, NonNegative},
     util::log2_ceil,
@@ -22,8 +23,7 @@ use super::LogicalType;
 /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#union)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Union {
-    fields: BTreeMap<PathName, Id<LogicalType>>,
-    field_order: Vec<PathName>,
+    fields: InsertionOrderedMap<PathName, Id<LogicalType>>,
 }
 
 impl Union {
@@ -32,77 +32,41 @@ impl Union {
     /// duplicate names.
     pub fn try_new(
         parent_id: Option<PathName>,
-        union: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
+        union_fields: impl IntoIterator<Item = (impl TryResult<Name>, Id<LogicalType>)>,
     ) -> Result<Self> {
         let base_id = match parent_id {
             Some(id) => id,
             None => PathName::new_empty(),
         };
-        let mut fields = BTreeMap::new();
-        let mut field_order = vec![];
-        for (name, typ) in union
+        let mut fields = InsertionOrderedMap::new();
+        for (name, typ) in union_fields
             .into_iter()
             .map(|(name, typ)| Ok((name.try_result()?, typ)))
             .collect::<Result<Vec<_>>>()?
         {
             let path_name = base_id.with_child(name);
-            field_order.push(path_name.clone());
-            fields
-                .insert(path_name, typ)
-                .map(|_| -> Result<()> { Err(Error::UnexpectedDuplicate) })
-                .transpose()?;
+            fields.try_insert(path_name, typ)?;
         }
-        Ok(Union {
-            fields,
-            field_order,
-        })
+        Ok(Union { fields })
     }
 
     /// Create a new Union explicitly from a set of ordered fields with PathNames.
-    pub(crate) fn new(fields: IndexMap<PathName, Id<LogicalType>>) -> Self {
-        let mut map = BTreeMap::new();
-        let mut field_order = vec![];
-        for (name, id) in fields {
-            field_order.push(name.clone());
-            map.insert(name, id);
-        }
-        Union {
-            fields: map,
-            field_order,
-        }
+    pub(crate) fn new(fields: InsertionOrderedMap<PathName, Id<LogicalType>>) -> Self {
+        Union { fields }
     }
 
-    /// Returns the unordered fields of the Union.
-    pub fn fields(&self, db: &dyn Ir) -> Arc<BTreeMap<PathName, LogicalType>> {
-        Arc::new(
-            self.fields
-                .iter()
-                .map(|(name, id)| (name.clone(), id.get(db)))
-                .collect(),
-        )
-    }
-
-    /// Returns the fields in the order they were declared
-    pub fn ordered_fields(&self, db: &dyn Ir) -> Arc<IndexMap<PathName, LogicalType>> {
-        let mut map = IndexMap::new();
-        for name in &self.field_order {
-            map.insert(name.clone(), self.get_field(db, name).unwrap());
+    /// Returns the fields of the Union.
+    pub fn fields(&self, db: &dyn Ir) -> Arc<InsertionOrderedMap<PathName, LogicalType>> {
+        let mut result = InsertionOrderedMap::new();
+        for (name, id) in self.field_ids() {
+            result.insert_or_replace(name.clone(), id.get(db));
         }
-        Arc::new(map)
+        Arc::new(result)
     }
 
-    /// Returns the unordered fields of the Union with the logical types as IDs.
-    pub fn field_ids(&self) -> &BTreeMap<PathName, Id<LogicalType>> {
+    /// Returns the fields of the Union with the logical types as IDs.
+    pub fn field_ids(&self) -> &InsertionOrderedMap<PathName, Id<LogicalType>> {
         &self.fields
-    }
-
-    /// Returns the field IDs in the order they were declared
-    pub fn ordered_field_ids(&self) -> Arc<IndexMap<PathName, Id<LogicalType>>> {
-        let mut map = IndexMap::new();
-        for name in &self.field_order {
-            map.insert(name.clone(), self.get_field_id(name).unwrap());
-        }
-        Arc::new(map)
     }
 
     /// Gets the LogicalType of a field, if the field exists.
@@ -152,24 +116,18 @@ impl MoveDb<Id<LogicalType>> for Union {
         target_db: &dyn Ir,
         prefix: &Option<Name>,
     ) -> Result<Id<LogicalType>> {
-        let field_order = self.field_order.clone();
-        let fields = self
-            .fields
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
-            .collect::<Result<_>>()?;
-        Ok(LogicalType::from(Union {
-            fields,
-            field_order,
-        })
-        .intern(target_db))
+        let mut fields = InsertionOrderedMap::new();
+        for (name, id) in self.field_ids() {
+            fields.insert_or_replace(name.clone(), id.move_db(original_db, target_db, prefix)?);
+        }
+        Ok(LogicalType::from(Union { fields }).intern(target_db))
     }
 }
 
 impl fmt::Display for Union {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = self
-            .ordered_field_ids()
+            .field_ids()
             .iter()
             .map(|(name, id)| format!("{}: {}", name, id))
             .collect::<Vec<String>>()

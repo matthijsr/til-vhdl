@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use tydi_common::name::PathName;
+use tydi_common::{error::Result, name::PathName};
 
 use crate::{common::physical::fields::Fields, ir::Ir};
 
@@ -71,5 +71,5 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
 }
 
 pub trait SynthesizeLogicalStream<F: Clone + PartialEq, P: Clone + PartialEq> {
-    fn synthesize(&self, db: &dyn Ir) -> LogicalStream<F, P>;
+    fn synthesize(&self, db: &dyn Ir) -> Result<LogicalStream<F, P>>;
 }

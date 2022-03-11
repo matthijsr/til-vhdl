@@ -11,6 +11,40 @@ use log::SetLoggerError;
 /// [`Error`]: ./enum.Error.html
 pub type Result<T> = result::Result<T, Error>;
 
+pub trait WrapError<T> {
+    /// Wrap something into a standard Result
+    fn wrap_err(self, wrapping: Error) -> Result<T>;
+}
+
+impl<T> WrapError<T> for Result<T> {
+    fn wrap_err(self, mut wrapping: Error) -> Result<T> {
+        match self {
+            Ok(ok) => Ok(ok),
+            Err(err) => Err(match &mut wrapping {
+                Error::UnknownError => Error::UnknownError,
+                Error::UnexpectedDuplicate => Error::UnexpectedDuplicate,
+                Error::ImplParsingError(line_err) => {
+                    line_err.err.push_str(&format!("- {}", err));
+                    wrapping
+                }
+                Error::CLIError(msg)
+                | Error::InvalidArgument(msg)
+                | Error::FileIOError(msg)
+                | Error::ParsingError(msg)
+                | Error::InvalidTarget(msg)
+                | Error::BackEndError(msg)
+                | Error::InterfaceError(msg)
+                | Error::ProjectError(msg)
+                | Error::ComposerError(msg)
+                | Error::LibraryError(msg) => {
+                    msg.push_str(&format!("- {}", err));
+                    wrapping
+                }
+            }),
+        }
+    }
+}
+
 /// Error variants used in this crate.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Error {
