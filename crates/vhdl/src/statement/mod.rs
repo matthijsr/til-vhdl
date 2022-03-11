@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
-use indexmap::IndexMap;
-use tydi_common::error::{Error, Result, TryResult};
+use tydi_common::{
+    error::{Error, Result, TryResult},
+    insertion_ordered_map::InsertionOrderedMap,
+};
 use tydi_intern::Id;
 
 use crate::{
@@ -41,7 +43,7 @@ pub struct PortMapping {
     label: VhdlName,
     component_name: VhdlName,
     /// The ports, in the order they were declared on the component
-    ports: IndexMap<VhdlName, Id<ObjectDeclaration>>,
+    ports: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
     /// irrespective of the order they're mapped during generation.
     mappings: HashMap<VhdlName, AssignDeclaration>,
@@ -53,10 +55,10 @@ impl PortMapping {
         component: &Component,
         label: impl TryResult<VhdlName>,
     ) -> Result<PortMapping> {
-        let mut ports = IndexMap::new();
+        let mut ports = InsertionOrderedMap::new();
         for port in component.ports() {
             let obj = ObjectDeclaration::from_port(db, port, false);
-            ports.insert(port.vhdl_name().clone(), obj);
+            ports.try_insert(port.vhdl_name().clone(), obj)?;
         }
         Ok(PortMapping {
             label: label.try_result()?,
@@ -66,7 +68,7 @@ impl PortMapping {
         })
     }
 
-    pub fn ports(&self) -> &IndexMap<VhdlName, Id<ObjectDeclaration>> {
+    pub fn ports(&self) -> &InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
         &self.ports
     }
 
