@@ -306,6 +306,7 @@ impl Stream {
 impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
     fn synthesize(&self, db: &dyn Ir) -> Result<LogicalStream<BitCount, PhysicalStream>> {
         let split = self.split_streams(db)?;
+        // NOTE: Signals will currently always be empty, as it refers to user-defined signals.
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
         Ok(LogicalStream::new(
             signals,
