@@ -65,6 +65,8 @@ pub struct ElementActivityReference<F: Clone + PartialEq> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StreamReference<F: Clone + PartialEq> {
     pub physical_stream: PathName,
+    pub valid: F,
+    pub ready: F,
     pub direction: Direction,
     pub complexity: Complexity,
     pub dimensionality: NonNegative,
