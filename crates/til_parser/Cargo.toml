@@ -15,3 +15,12 @@ indexmap = "1.7.0"
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
 til-query = { path = "../til_query" }
+criterion = { version="0.3", optional=true }
+
+[features]
+benchmark=["criterion"]
+
+[[bench]]
+name = "parse_benchmark"
+harness = false
+required-features = ["benchmark"]
