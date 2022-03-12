@@ -13,3 +13,11 @@ log = "0.4.14"
 salsa = "0.16.1"
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
+
+[dev-dependencies]
+til-parser = {path = "../til_parser"}
+criterion = "0.3"
+
+[[bench]]
+name = "parse_benchmark"
+harness = false
