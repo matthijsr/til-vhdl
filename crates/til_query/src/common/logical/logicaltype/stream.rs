@@ -1,27 +1,26 @@
 use core::fmt;
-use std::convert::TryFrom;
-use std::hash::Hash;
-use std::ops::Mul;
-use std::str::FromStr;
+use std::{convert::TryFrom, hash::Hash, ops::Mul, str::FromStr};
 
-use tydi_common::error::{TryResult, WrapError};
-use tydi_common::insertion_ordered_map::InsertionOrderedMap;
-use tydi_common::name::{Name, PathName};
-use tydi_common::numbers::{BitCount, Positive};
-use tydi_common::traits::Reverse;
+use tydi_common::{
+    error::{Error, Result, TryResult},
+    name::Name,
+    numbers::{BitCount, NonNegative, Positive, PositiveReal},
+    traits::Reverse,
+};
 use tydi_intern::Id;
 
-use crate::common::logical::logical_stream::{LogicalStream, SynthesizeLogicalStream};
-use crate::common::logical::split_streams::SplitsStreams;
-use crate::common::physical::complexity::Complexity;
-use crate::common::physical::stream::PhysicalStream;
-use crate::ir::{
-    traits::{GetSelf, InternSelf, MoveDb},
-    Ir,
-};
-use tydi_common::{
-    error::{Error, Result},
-    numbers::{NonNegative, PositiveReal},
+use crate::{
+    common::{
+        logical::{
+            logical_stream::{LogicalStream, SynthesizeLogicalStream},
+            split_streams::SplitsStreams,
+        },
+        physical::{complexity::Complexity, stream::PhysicalStream},
+    },
+    ir::{
+        traits::{GetSelf, InternSelf, MoveDb},
+        Ir,
+    },
 };
 
 use super::{IsNull, LogicalType, SplitStreams};
@@ -319,49 +318,7 @@ impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
 
 impl SplitsStreams for Id<Stream> {
     fn split_streams(&self, db: &dyn Ir) -> Result<SplitStreams> {
-        let this_stream = self.get(db);
-        let split = this_stream.data.split_streams(db)?;
-        let mut streams = InsertionOrderedMap::new();
-        let (element, rest) = (split.signals(), split.streams());
-        if this_stream.keep() || !element.is_null(db) || !this_stream.user_id().is_null(db) {
-            streams.try_insert(
-                PathName::new_empty(),
-                Stream::new(
-                    element,
-                    this_stream.throughput(),
-                    this_stream.dimensionality(),
-                    this_stream.synchronicity(),
-                    this_stream.complexity().clone(),
-                    this_stream.direction(),
-                    this_stream.user_id(),
-                    this_stream.keep(),
-                )
-                .intern(db),
-            )?;
-        }
-
-        for (name, stream_id) in rest.into_iter() {
-            let mut stream = stream_id.get(db);
-            if this_stream.direction() == Direction::Reverse {
-                stream.reverse();
-            }
-            if this_stream.flattens() {
-                stream.set_synchronicity(Synchronicity::FlatDesync);
-            } else {
-                stream.set_dimensionality(stream.dimensionality() + this_stream.dimensionality());
-            }
-            stream.set_throughput(stream.throughput() * this_stream.throughput());
-
-            streams.try_insert(name.clone(), stream.intern(db)).wrap_err(Error::InvalidArgument(
-                r#"An error occurred during the SplitStreams function due to overlapping Stream names.
-This is usually because a Stream contains another Stream as its Data type, and the Streams cannot be flattened.
-You must ensure that only one Stream has a Keep and/or User property."#.to_string()))?;
-        }
-
-        Ok(SplitStreams::new(
-            db.intern_type(LogicalType::Null),
-            streams,
-        ))
+        db.stream_split_streams(*self)
     }
 }
 

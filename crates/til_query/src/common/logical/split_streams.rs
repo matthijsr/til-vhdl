@@ -1,4 +1,3 @@
-
 use tydi_common::{error::Result, insertion_ordered_map::InsertionOrderedMap, name::PathName};
 use tydi_intern::Id;
 
@@ -6,8 +5,8 @@ use crate::ir::Ir;
 
 use super::logicaltype::{stream::Stream, LogicalType};
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct SplitStreams {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SplitStreams {
     signals: Id<LogicalType>,
     streams: InsertionOrderedMap<PathName, Id<Stream>>,
 }

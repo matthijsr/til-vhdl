@@ -1,6 +1,26 @@
 use std::sync::Arc;
 
-use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
+use tydi_common::{
+    error::{Error, Result, WrapError},
+    insertion_ordered_map::InsertionOrderedMap,
+    name::PathName,
+    traits::Reverse,
+};
+
+use tydi_intern::Id;
+
+use crate::{
+    common::logical::{
+        logicaltype::{
+            group::Group,
+            stream::{Direction, Stream, Synchronicity},
+            union::Union,
+            IsNull, LogicalType,
+        },
+        split_streams::{SplitStreams, SplitsStreams},
+    },
+    ir::traits::InternSelf,
+};
 
 use self::{
     implementation::Implementation, interface::Interface, interner::Interner, project::Project,
@@ -29,6 +49,10 @@ pub trait Ir: Interner {
     fn project(&self) -> Arc<Project>;
 
     fn all_streamlets(&self) -> Arc<Vec<Streamlet>>;
+
+    fn logical_type_split_streams(&self, key: Id<LogicalType>) -> Result<SplitStreams>;
+
+    fn stream_split_streams(&self, key: Id<Stream>) -> Result<SplitStreams>;
 }
 
 fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Streamlet>> {
@@ -49,6 +73,93 @@ fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Streamlet>> {
             .flatten()
             .collect(),
     )
+}
+
+fn logical_type_split_streams(db: &dyn Ir, key: Id<LogicalType>) -> Result<SplitStreams> {
+    fn split_fields(
+        db: &dyn Ir,
+        fields: &InsertionOrderedMap<PathName, Id<LogicalType>>,
+    ) -> Result<(
+        InsertionOrderedMap<PathName, Id<LogicalType>>,
+        InsertionOrderedMap<PathName, Id<Stream>>,
+    )> {
+        let mut signals = InsertionOrderedMap::new();
+        for (name, id) in fields.iter() {
+            signals.try_insert(name.clone(), id.split_streams(db)?.signals())?;
+        }
+        let mut signals = InsertionOrderedMap::new();
+        let mut streams = InsertionOrderedMap::new();
+        for (name, id) in fields.iter() {
+            let field_split = id.split_streams(db)?;
+            signals.try_insert(name.clone(), field_split.signals())?;
+
+            for (stream_name, stream_id) in field_split.streams() {
+                streams.try_insert(name.with_children(stream_name.clone()), *stream_id)?;
+            }
+        }
+        Ok((signals, streams))
+    }
+
+    Ok(match key.get(db) {
+        LogicalType::Null | LogicalType::Bits(_) => {
+            SplitStreams::new(key.clone(), InsertionOrderedMap::new())
+        }
+        LogicalType::Group(group) => {
+            let (fields, streams) = split_fields(db, group.field_ids())?;
+            SplitStreams::new(LogicalType::from(Group::new(fields)).intern(db), streams)
+        }
+        LogicalType::Union(union) => {
+            let (fields, streams) = split_fields(db, union.field_ids())?;
+            SplitStreams::new(LogicalType::from(Union::new(fields)).intern(db), streams)
+        }
+        LogicalType::Stream(stream_id) => stream_id.split_streams(db)?,
+    })
+}
+
+fn stream_split_streams(db: &dyn Ir, key: Id<Stream>) -> Result<SplitStreams> {
+    let this_stream = key.get(db);
+    let split = this_stream.data_id().split_streams(db)?;
+    let mut streams = InsertionOrderedMap::new();
+    let (element, rest) = (split.signals(), split.streams());
+    if this_stream.keep() || !element.is_null(db) || !this_stream.user_id().is_null(db) {
+        streams.try_insert(
+            PathName::new_empty(),
+            Stream::new(
+                element,
+                this_stream.throughput(),
+                this_stream.dimensionality(),
+                this_stream.synchronicity(),
+                this_stream.complexity().clone(),
+                this_stream.direction(),
+                this_stream.user_id(),
+                this_stream.keep(),
+            )
+            .intern(db),
+        )?;
+    }
+
+    for (name, stream_id) in rest.into_iter() {
+        let mut stream = stream_id.get(db);
+        if this_stream.direction() == Direction::Reverse {
+            stream.reverse();
+        }
+        if this_stream.flattens() {
+            stream.set_synchronicity(Synchronicity::FlatDesync);
+        } else {
+            stream.set_dimensionality(stream.dimensionality() + this_stream.dimensionality());
+        }
+        stream.set_throughput(stream.throughput() * this_stream.throughput());
+
+        streams.try_insert(name.clone(), stream.intern(db)).wrap_err(Error::InvalidArgument(
+                r#"An error occurred during the SplitStreams function due to overlapping Stream names.
+This is usually because a Stream contains another Stream as its Data type, and the Streams cannot be flattened.
+You must ensure that only one Stream has a Keep and/or User property."#.to_string()))?;
+    }
+
+    Ok(SplitStreams::new(
+        db.intern_type(LogicalType::Null),
+        streams,
+    ))
 }
 
 #[cfg(test)]
