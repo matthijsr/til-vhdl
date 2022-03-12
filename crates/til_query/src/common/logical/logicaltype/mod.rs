@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{convert::TryFrom};
+use std::convert::TryFrom;
 
 use crate::{
     common::physical::fields::Fields,
@@ -12,7 +12,7 @@ use crate::{
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
-    numbers::{BitCount, NonNegative, Positive}, insertion_ordered_map::InsertionOrderedMap,
+    numbers::{BitCount, NonNegative, Positive},
 };
 
 pub mod bits;
@@ -240,44 +240,7 @@ impl LogicalType {
 
 impl SplitsStreams for Id<LogicalType> {
     fn split_streams(&self, db: &dyn Ir) -> Result<SplitStreams> {
-        fn split_fields(
-            db: &dyn Ir,
-            fields: &InsertionOrderedMap<PathName, Id<LogicalType>>,
-        ) -> Result<(
-            InsertionOrderedMap<PathName, Id<LogicalType>>,
-            InsertionOrderedMap<PathName, Id<Stream>>,
-        )> {
-            let mut signals = InsertionOrderedMap::new();
-            for (name, id) in fields.iter() {
-                signals.try_insert(name.clone(), id.split_streams(db)?.signals())?;
-            }
-            let mut signals = InsertionOrderedMap::new();
-            let mut streams = InsertionOrderedMap::new();
-            for (name, id) in fields.iter() {
-                let field_split = id.split_streams(db)?;
-                signals.try_insert(name.clone(), field_split.signals())?;
-
-                for (stream_name, stream_id) in field_split.streams() {
-                    streams.try_insert(name.with_children(stream_name.clone()), *stream_id)?;
-                }
-            }
-            Ok((signals, streams))
-        }
-
-        Ok(match self.get(db) {
-            LogicalType::Null | LogicalType::Bits(_) => {
-                SplitStreams::new(self.clone(), InsertionOrderedMap::new())
-            }
-            LogicalType::Group(group) => {
-                let (fields, streams) = split_fields(db, group.field_ids())?;
-                SplitStreams::new(LogicalType::from(Group::new(fields)).intern(db), streams)
-            }
-            LogicalType::Union(union) => {
-                let (fields, streams) = split_fields(db, union.field_ids())?;
-                SplitStreams::new(LogicalType::from(Union::new(fields)).intern(db), streams)
-            }
-            LogicalType::Stream(stream_id) => stream_id.split_streams(db)?,
-        })
+        db.logical_type_split_streams(*self)
     }
 }
 
