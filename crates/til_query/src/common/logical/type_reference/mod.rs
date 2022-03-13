@@ -58,7 +58,8 @@ impl<F: Clone + PartialEq> TypeReference<F> {
     /// Attempt to find the root Stream.
     /// Create a `ScopeStream` if it does not exist.
     ///
-    /// Returns None if there are no more Streams to iterate over.
+    /// Returns None if there are no more Streams to iterate over, or if there
+    /// are no Streams starting with this root name.
     pub fn collect_root<'a>(
         db: &dyn Ir,
         root_name: &PathName,
