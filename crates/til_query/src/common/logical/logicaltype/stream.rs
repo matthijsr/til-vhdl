@@ -3,7 +3,7 @@ use std::{convert::TryFrom, hash::Hash, ops::Mul, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::Name,
+    name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive, PositiveReal},
     traits::Reverse,
 };
@@ -12,8 +12,10 @@ use tydi_intern::Id;
 use crate::{
     common::{
         logical::{
-            logical_stream::{LogicalStream, SynthesizeLogicalStream, SynthesisResult},
-            split_streams::SplitsStreams, type_reference::{TypeReference, ElementManipulatingReference},
+            logical_stream::{LogicalStream, SynthesisResult, SynthesizeLogicalStream},
+            split_streams::SplitsStreams,
+            type_hierarchy::TypeHierarchy,
+            type_reference::TypeReference,
         },
         physical::{complexity::Complexity, stream::PhysicalStream},
     },
@@ -305,7 +307,7 @@ impl Stream {
 
 impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
     fn synthesize(&self, db: &dyn Ir) -> Result<SynthesisResult<BitCount, PhysicalStream>> {
-        let split = self.split_streams(db)?;
+        let split = &self.split_streams(db)?;
         // NOTE: Signals will currently always be empty, as it refers to user-defined signals.
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
         let logical_stream = LogicalStream::new(
@@ -314,7 +316,13 @@ impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
                 .map(|(path_name, stream)| (path_name.clone(), stream.get(db).physical(db)))
                 .collect(),
         );
-        let type_reference = TypeReference::ElementManipulating(ElementManipulatingReference::Null);
+        let hierarchy = TypeHierarchy::from_stream(db, *self)?;
+        let type_reference = TypeReference::collect_reference_from_split_streams(
+            db,
+            split,
+            &hierarchy,
+            &PathName::new_empty(),
+        )?;
         Ok(SynthesisResult::new(logical_stream, type_reference))
     }
 }
