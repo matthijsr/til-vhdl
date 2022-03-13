@@ -74,11 +74,11 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
 
 pub struct SynthesisResult<F: Clone + PartialEq, P: Clone + PartialEq> {
     logical_stream: LogicalStream<F, P>,
-    type_reference: TypeReference<F>,
+    type_reference: TypeReference,
 }
 
 impl<F: Clone + PartialEq, P: Clone + PartialEq> SynthesisResult<F, P> {
-    pub fn new(logical_stream: LogicalStream<F, P>, type_reference: TypeReference<F>) -> Self {
+    pub fn new(logical_stream: LogicalStream<F, P>, type_reference: TypeReference) -> Self {
         SynthesisResult {
             logical_stream,
             type_reference,
@@ -89,7 +89,7 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> SynthesisResult<F, P> {
         &self.logical_stream
     }
 
-    pub fn type_reference(&self) -> &TypeReference<F> {
+    pub fn type_reference(&self) -> &TypeReference {
         &self.type_reference
     }
 }

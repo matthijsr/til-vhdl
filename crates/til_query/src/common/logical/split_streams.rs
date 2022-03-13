@@ -23,6 +23,10 @@ impl SplitStreams {
         (&self.streams).into_iter()
     }
 
+    pub fn streams_map(&self) -> &InsertionOrderedMap<PathName, Id<Stream>> {
+        &self.streams
+    }
+
     pub fn signals(&self) -> Id<LogicalType> {
         self.signals
     }
