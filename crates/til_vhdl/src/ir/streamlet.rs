@@ -53,18 +53,20 @@ impl IntoVhdl<Component> for Streamlet {
         };
 
         for input in self.inputs(ir_db) {
-            ports.extend(logical_stream_to_ports(input.canonical(
-                ir_db,
-                arch_db,
-                prefix.clone(),
-            )?));
+            ports.extend(logical_stream_to_ports(
+                input
+                    .canonical(ir_db, arch_db, prefix.clone())?
+                    .logical_stream()
+                    .clone(),
+            ));
         }
         for output in self.outputs(ir_db) {
-            ports.extend(logical_stream_to_ports(output.canonical(
-                ir_db,
-                arch_db,
-                prefix.clone(),
-            )?));
+            ports.extend(logical_stream_to_ports(
+                output
+                    .canonical(ir_db, arch_db, prefix.clone())?
+                    .logical_stream()
+                    .clone(),
+            ));
         }
 
         let mut component = Component::try_new(n, vec![], ports, None)?;

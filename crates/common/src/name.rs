@@ -222,12 +222,22 @@ impl PathName {
         self.0.last()
     }
 
-    pub fn parent(&self) -> Option<PathName> {
+    pub fn take(&self, to_take: usize) -> Result<Option<PathName>> {
         if self.is_empty() {
-            None
+            Ok(None)
+        } else if self.len() < to_take {
+            Err(Error::InvalidArgument(format!(
+                "Number of names to take exceeds the PathName's length: {} > {}",
+                to_take,
+                self.len()
+            )))
         } else {
-            Some(PathName(self.0[..self.len() - 1].to_vec()))
+            Ok(Some(PathName(self.0[..to_take].to_vec())))
         }
+    }
+
+    pub fn parent(&self) -> Option<PathName> {
+        self.take(self.len() - 1).unwrap()
     }
 
     /// Returns all but the last part of the PathName
@@ -238,6 +248,22 @@ impl PathName {
             let mut names = self.0.clone();
             names.pop();
             PathName(names)
+        }
+    }
+
+    /// Test whether a PathName is equal to or starts with an other PathName
+    pub fn starts_with(&self, other: &PathName) -> bool {
+        if other.len() > self.len() {
+            false
+        } else {
+            let mut self_iter = self.into_iter();
+            let mut other_iter = other.into_iter();
+            while let (Some(self_part), Some(other_part)) = (self_iter.next(), other_iter.next()) {
+                if self_part != other_part {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }

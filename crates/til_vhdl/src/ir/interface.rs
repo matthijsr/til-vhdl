@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use til_query::{
     common::{
-        logical::logical_stream::{LogicalStream, SynthesizeLogicalStream},
+        logical::logical_stream::{LogicalStream, SynthesisResult, SynthesizeLogicalStream},
         physical::{fields::Fields, signal_list::SignalList},
     },
     ir::{physical_properties::InterfaceDirection, Ir},
@@ -22,13 +22,13 @@ use crate::IntoVhdl;
 
 pub(crate) type Interface = til_query::ir::interface::Interface;
 
-impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
+impl IntoVhdl<SynthesisResult<Port, SignalList<Port>>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
         prefix: impl TryOptional<VhdlName>,
-    ) -> Result<LogicalStream<Port, SignalList<Port>>> {
+    ) -> Result<SynthesisResult<Port, SignalList<Port>>> {
         let n: VhdlName = match prefix.try_optional()? {
             Some(some) => VhdlName::try_new(cat!(some, self.identifier()))?,
             None => self.name().clone().into(),
@@ -36,7 +36,7 @@ impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
 
         let synth = self.stream_id().synthesize(ir_db)?;
 
-        let fields = Fields::new(synth.fields_iter().map(|(path, width)| {
+        let fields = Fields::new(synth.logical_stream().fields_iter().map(|(path, width)| {
             let prefixed_path = format!("{}__{}", &n, path);
             (
                 path.clone(),
@@ -54,7 +54,7 @@ impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
 
         let mut first = false;
         let mut streams = IndexMap::new();
-        for (path, phys) in synth.streams_iter() {
+        for (path, phys) in synth.logical_stream().streams_iter() {
             let phys_name = if path.len() > 0 {
                 format!("{}__{}", &n, path)
             } else {
@@ -74,6 +74,9 @@ impl IntoVhdl<LogicalStream<Port, SignalList<Port>>> for Interface {
             streams.insert(path.clone(), signal_list.clone());
         }
 
-        Ok(LogicalStream::new(fields, streams))
+        Ok(SynthesisResult::new(
+            LogicalStream::new(fields, streams),
+            synth.type_reference().clone(),
+        ))
     }
 }

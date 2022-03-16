@@ -3,6 +3,8 @@ use tydi_common::{error::Result, name::PathName};
 
 use crate::{common::physical::fields::Fields, ir::Ir};
 
+use super::type_reference::TypeReference;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogicalStream<F: Clone + PartialEq, P: Clone + PartialEq> {
     /// User-defined fields
@@ -70,6 +72,28 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
     }
 }
 
+pub struct SynthesisResult<F: Clone + PartialEq, P: Clone + PartialEq> {
+    logical_stream: LogicalStream<F, P>,
+    type_reference: TypeReference,
+}
+
+impl<F: Clone + PartialEq, P: Clone + PartialEq> SynthesisResult<F, P> {
+    pub fn new(logical_stream: LogicalStream<F, P>, type_reference: TypeReference) -> Self {
+        SynthesisResult {
+            logical_stream,
+            type_reference,
+        }
+    }
+
+    pub fn logical_stream(&self) -> &LogicalStream<F, P> {
+        &self.logical_stream
+    }
+
+    pub fn type_reference(&self) -> &TypeReference {
+        &self.type_reference
+    }
+}
+
 pub trait SynthesizeLogicalStream<F: Clone + PartialEq, P: Clone + PartialEq> {
-    fn synthesize(&self, db: &dyn Ir) -> Result<LogicalStream<F, P>>;
+    fn synthesize(&self, db: &dyn Ir) -> Result<SynthesisResult<F, P>>;
 }

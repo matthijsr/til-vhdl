@@ -36,7 +36,8 @@ impl IntoVhdl<ArchitectureBody> for Structure {
             .ports(ir_db)
             .iter()
             .map(|port| {
-                let logical_stream = port.canonical(ir_db, arch_db, prefix.clone())?;
+                let synth = port.canonical(ir_db, arch_db, prefix.clone())?;
+                let logical_stream = synth.logical_stream();
                 let field_ports = logical_stream.fields().iter().map(|(_, p)| p);
                 let stream_ports = logical_stream
                     .streams()
@@ -86,7 +87,8 @@ impl IntoVhdl<ArchitectureBody> for Structure {
                 .port_ids()
                 .iter()
                 .map(|(name, id)| {
-                    let logical_stream = id.get(ir_db).canonical(ir_db, arch_db, prefix.clone())?;
+                    let synth = id.get(ir_db).canonical(ir_db, arch_db, prefix.clone())?;
+                    let logical_stream = synth.logical_stream();
                     let field_ports = logical_stream.fields().iter().map(|(_, p)| p);
                     let stream_ports = logical_stream
                         .streams()
