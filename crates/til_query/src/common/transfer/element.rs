@@ -21,39 +21,16 @@ pub struct Element<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative> 
 impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative>
     Element<ELEMENT_SIZE, MAX_DIMENSION>
 {
-    fn with_valid_last(mut self, last: Option<Range<NonNegative>>) -> Result<Self> {
-        match &last {
-            Some(range) => {
-                if range.end > MAX_DIMENSION {
-                    Err(Error::InvalidArgument(format!(
-                        "{} exceeds the maximum dimension of {} for this element.",
-                        range.end, MAX_DIMENSION
-                    )))
-                } else {
-                    if self.is_active() && range.start > 0 {
-                        Err(Error::InvalidArgument(format!(
-                            "Cannot assert this element as being the last of dimensions {}..{}. Elements with active data can only transferred as the innermost dimension (0).",
-                            range.start, range.end
-                        )))
-                    } else {
-                        self.last = last;
-                        Ok(self)
-                    }
-                }
-            }
-            None => {
-                self.last = last;
-                Ok(self)
-            }
-        }
-    }
-
     pub fn new(
         data: Option<[bool; ELEMENT_SIZE]>,
         last: Option<Range<NonNegative>>,
     ) -> Result<Self> {
         let result = Self { data, last: None };
-        result.with_valid_last(last)
+        if let Some(last) = last {
+            result.with_last(last)
+        } else {
+            Ok(result)
+        }
     }
 
     pub fn new_data(data: [bool; ELEMENT_SIZE]) -> Self {
@@ -70,8 +47,23 @@ impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative>
         }
     }
 
-    pub fn with_last(self, last: Range<NonNegative>) -> Result<Self> {
-        self.with_valid_last(Some(last))
+    pub fn with_last(mut self, last: Range<NonNegative>) -> Result<Self> {
+        if last.end > MAX_DIMENSION {
+            Err(Error::InvalidArgument(format!(
+                "{} exceeds the maximum dimension of {} for this element.",
+                last.end, MAX_DIMENSION
+            )))
+        } else {
+            if self.is_active() && last.start > 0 {
+                Err(Error::InvalidArgument(format!(
+                            "Cannot assert this element as being the last of dimensions {}..{}. Elements with active data can only transferred as the innermost dimension (0).",
+                            last.start, last.end
+                        )))
+            } else {
+                self.last = Some(last);
+                Ok(self)
+            }
+        }
     }
 
     pub fn data(&self) -> &Option<[bool; ELEMENT_SIZE]> {
