@@ -33,6 +33,36 @@ impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative>
         }
     }
 
+    fn data_from_str(data: &str) -> Result<[bool; ELEMENT_SIZE]> {
+        if data.len() != ELEMENT_SIZE {
+            Err(Error::InvalidArgument(format!(
+                "String with length {} exceeds element size {}",
+                data.len(),
+                ELEMENT_SIZE
+            )))
+        } else if data.chars().all(|x| x == '0' || x == '1') {
+            let mut data_result = [false; ELEMENT_SIZE];
+            // NOTE: Reversed left being LSB
+            for (idx, val) in data.char_indices().rev() {
+                if val == '1' {
+                    data_result[idx] = true;
+                }
+            }
+            Ok(data_result)
+        } else {
+            Err(Error::InvalidArgument(
+                "String must consist of '0' and '1' only".to_string(),
+            ))
+        }
+    }
+
+    pub fn new_data_from_str(data: &str) -> Result<Self> {
+        Ok(Self {
+            data: Some(Self::data_from_str(data)?),
+            last: None,
+        })
+    }
+
     pub fn new_data(data: [bool; ELEMENT_SIZE]) -> Self {
         Self {
             data: Some(data),
@@ -96,7 +126,7 @@ mod tests {
         let inactive = inactive.with_last(1..2)?;
         assert_eq!(inactive.last(), &Some(1..2));
 
-        let data: Element<3, 2> = Element::new_data([false, true, false]);
+        let data: Element<3, 2> = Element::new_data_from_str("101")?;
         assert!(data.is_active());
         assert_eq!(data.last(), &None);
 
