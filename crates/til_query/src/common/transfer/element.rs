@@ -52,9 +52,9 @@ impl Element {
         })
     }
 
-    /// Store an array of booleans as data on this element.
+    /// Store an iterator of booleans as data on this element.
     ///
-    /// Note that the LSB corresponds to index 0 of the array.
+    /// Note that the LSB corresponds to index 0 of the iterator.
     ///
     /// ```
     /// [true, false, true]
