@@ -105,6 +105,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use tydi_common::numbers::Positive;
+
     use super::*;
 
     #[test]
@@ -130,6 +132,61 @@ mod tests {
         let transfer_4 = (["1101", "0001"], "10").try_result()?;
 
         assert_eq!(transfer_3, transfer_4);
+
+        Ok(())
+    }
+
+    struct SomeContainer {
+        el_size: NonNegative,
+        user_size: NonNegative,
+        max_dim: NonNegative,
+        lanes: Positive,
+    }
+
+    impl SomeContainer {
+        fn new(
+            el_size: NonNegative,
+            user_size: NonNegative,
+            max_dim: NonNegative,
+            lanes: Positive,
+        ) -> Self {
+            Self {
+                el_size,
+
+                user_size,
+                max_dim,
+                lanes,
+            }
+        }
+
+        fn lanes(&self) -> &Positive {
+            &self.lanes
+        }
+
+        fn el_size(&self) -> NonNegative {
+            self.el_size
+        }
+
+        fn max_dim(&self) -> NonNegative {
+            self.max_dim
+        }
+
+        fn user_size(&self) -> NonNegative {
+            self.user_size
+        }
+    }
+
+    #[test]
+    fn validate_const_behaviour() -> Result<()> {
+        let container = SomeContainer::new(2, 2, 2, 2);
+
+        let el_size = container.el_size();
+        let user_size = container.user_size();
+        let max_dim = container.max_dim();
+        let lanes = container.lanes().get();
+
+        let transfer: Transfer<el_size, user_size, max_dim, lanes> =
+            (["11", "01"], "10").try_result()?;
 
         Ok(())
     }
