@@ -1,9 +1,11 @@
-use std::ops::Range;
+use std::{convert::TryFrom, ops::Range, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result},
     numbers::NonNegative,
 };
+
+use super::utils::bits_from_str;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Element<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative> {
@@ -33,36 +35,31 @@ impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative>
         }
     }
 
-    fn data_from_str(data: &str) -> Result<[bool; ELEMENT_SIZE]> {
-        if data.len() != ELEMENT_SIZE {
-            Err(Error::InvalidArgument(format!(
-                "String with length {} exceeds element size {}",
-                data.len(),
-                ELEMENT_SIZE
-            )))
-        } else if data.chars().all(|x| x == '0' || x == '1') {
-            let mut data_result = [false; ELEMENT_SIZE];
-            // NOTE: Reversed left being LSB
-            for (idx, val) in data.char_indices().rev() {
-                if val == '1' {
-                    data_result[idx] = true;
-                }
-            }
-            Ok(data_result)
-        } else {
-            Err(Error::InvalidArgument(
-                "String must consist of '0' and '1' only".to_string(),
-            ))
-        }
-    }
-
-    pub fn new_data_from_str(data: &str) -> Result<Self> {
+    /// Parses a string into data
+    ///
+    /// Note that the LSB is on the right side of the string.
+    ///
+    /// ```
+    /// "010101"
+    ///       ^
+    ///       LSB
+    /// ```
+    pub fn new_data_from_str<'a>(data: &'a str) -> Result<Self> {
         Ok(Self {
-            data: Some(Self::data_from_str(data)?),
+            data: Some(bits_from_str(data)?),
             last: None,
         })
     }
 
+    /// Store an array of booleans as data on this element.
+    ///
+    /// Note that the LSB corresponds to index 0 of the array.
+    ///
+    /// ```
+    /// [true, false, true]
+    ///  ^^^^
+    ///  LSB
+    /// ```
     pub fn new_data(data: [bool; ELEMENT_SIZE]) -> Self {
         Self {
             data: Some(data),
@@ -113,8 +110,61 @@ impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative>
     }
 }
 
+impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative> Default
+    for Element<ELEMENT_SIZE, MAX_DIMENSION>
+{
+    fn default() -> Self {
+        Self {
+            data: Default::default(),
+            last: Default::default(),
+        }
+    }
+}
+
+impl<'a, const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative> TryFrom<&'a str>
+    for Element<ELEMENT_SIZE, MAX_DIMENSION>
+{
+    type Error = Error;
+
+    fn try_from(value: &'a str) -> Result<Self> {
+        Element::new_data_from_str(value)
+    }
+}
+
+impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative> FromStr
+    for Element<ELEMENT_SIZE, MAX_DIMENSION>
+{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Element::try_from(s)
+    }
+}
+
+impl<'a, const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative>
+    TryFrom<(&'a str, Range<NonNegative>)> for Element<ELEMENT_SIZE, MAX_DIMENSION>
+{
+    type Error = Error;
+
+    fn try_from(value: (&'a str, Range<NonNegative>)) -> Result<Self> {
+        Element::new_data_from_str(value.0)?.with_last(value.1)
+    }
+}
+
+impl<const ELEMENT_SIZE: usize, const MAX_DIMENSION: NonNegative> TryFrom<Range<NonNegative>>
+    for Element<ELEMENT_SIZE, MAX_DIMENSION>
+{
+    type Error = Error;
+
+    fn try_from(value: Range<NonNegative>) -> Result<Self> {
+        Element::new_inactive().with_last(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use tydi_common::error::TryResult;
+
     use super::*;
 
     #[test]
@@ -126,12 +176,21 @@ mod tests {
         let inactive = inactive.with_last(1..2)?;
         assert_eq!(inactive.last(), &Some(1..2));
 
+        let inactive_2 = (1..2).try_result()?;
+        assert_eq!(inactive, inactive_2);
+
         let data: Element<3, 2> = Element::new_data_from_str("101")?;
         assert!(data.is_active());
         assert_eq!(data.last(), &None);
 
+        let data_2 = "101".try_result()?;
+        assert_eq!(data, data_2);
+
         let data = data.with_last(0..2)?;
         assert_eq!(data.last(), &Some(0..2));
+
+        let data_2 = ("101", 0..2).try_result()?;
+        assert_eq!(data, data_2);
 
         Ok(())
     }
