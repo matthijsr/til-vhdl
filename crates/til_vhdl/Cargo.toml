@@ -1,7 +1,7 @@
 [project]
 name = "til-vhdl"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 publish = false
 description = "A VHDL compiler for the Tydi Intermediate representation Language"
 
