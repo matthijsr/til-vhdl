@@ -78,6 +78,14 @@ impl Transfer {
     }
 }
 
+impl<E: TryResult<Element>> TryFrom<Vec<E>> for Transfer {
+    type Error = Error;
+
+    fn try_from(value: Vec<E>) -> Result<Self> {
+        Self::try_new_lanes(value)
+    }
+}
+
 impl<const SIZE: usize, E: TryResult<Element>> TryFrom<[E; SIZE]> for Transfer {
     type Error = Error;
 
