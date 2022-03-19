@@ -42,8 +42,8 @@ impl Element {
     ///
     /// ```
     /// "010101"
-    ///       ^
-    ///       LSB
+    ///  ^    ^
+    ///  MSB  LSB
     /// ```
     pub fn new_data_from_str<'a>(data: &'a str) -> Result<Self> {
         Ok(Self {
@@ -54,12 +54,12 @@ impl Element {
 
     /// Store an iterator of booleans as data on this element.
     ///
-    /// Note that the LSB corresponds to index 0 of the iterator.
+    /// Note that the MSB corresponds to index 0 of the iterator.
     ///
     /// ```
     /// [true, false, true]
-    ///  ^^^^
-    ///  LSB
+    ///  ^^^^         ^^^^
+    ///  MSB           LSB
     /// ```
     pub fn new_data(data: impl IntoIterator<Item = bool>) -> Self {
         Self {
