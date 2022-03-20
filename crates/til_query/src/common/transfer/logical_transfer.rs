@@ -1,21 +1,33 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, ops::Range};
 
-use tydi_common::error::{Error, Result, TryResult};
+use tydi_common::{
+    error::{Error, Result, TryResult},
+    numbers::NonNegative,
+};
 
 use crate::common::transfer::utils::bits_from_str;
 
 use super::element::Element;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// This is a Logical Transfer, representing the elements and user signal
-/// to be transferred over a physical stream in a single clock cycle.
-pub struct LogicalTransfer {
+pub enum LogicalData {
+    /// Indicates an empty sequence. Therefor, it _must_ contain dimension
+    /// information.
+    Empty(Range<NonNegative>),
     /// The lanes of the physical stream used in this transfer, consisting of
     /// a number of elements.
     ///
     /// The number of lanes must be equal to or less than the number of lanes on
     /// the physical stream.
-    lanes: Vec<Element>,
+    Elements(Vec<Element>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// This is a Logical Transfer, representing the elements and user signal
+/// to be transferred over a physical stream in a single clock cycle.
+pub struct LogicalTransfer {
+    /// The data carried by this Logical Transfer
+    data: LogicalData,
     /// The user signal.
     user: Vec<bool>,
 }
@@ -26,7 +38,23 @@ impl LogicalTransfer {
         user: impl IntoIterator<Item = bool>,
     ) -> Self {
         Self {
-            lanes: lanes.into_iter().collect(),
+            data: LogicalData::Elements(lanes.into_iter().collect()),
+            user: user.into_iter().collect(),
+        }
+    }
+
+    /// Create a new empty sequence without a user transfer.
+    pub fn new_empty(last: Range<NonNegative>) -> Self {
+        Self {
+            data: LogicalData::Empty(last),
+            user: vec![],
+        }
+    }
+
+    /// Create a new empty sequence with a user transfer
+    pub fn new_empty_user(last: Range<NonNegative>, user: impl IntoIterator<Item = bool>) -> Self {
+        Self {
+            data: LogicalData::Empty(last),
             user: user.into_iter().collect(),
         }
     }
@@ -36,17 +64,19 @@ impl LogicalTransfer {
         user: impl IntoIterator<Item = bool>,
     ) -> Result<Self> {
         Ok(Self {
-            lanes: lanes
-                .into_iter()
-                .map(|x| x.try_result())
-                .collect::<Result<Vec<Element>>>()?,
+            data: LogicalData::Elements(
+                lanes
+                    .into_iter()
+                    .map(|x| x.try_result())
+                    .collect::<Result<Vec<Element>>>()?,
+            ),
             user: user.into_iter().collect(),
         })
     }
 
     pub fn new_lanes(lanes: impl IntoIterator<Item = Element>) -> Self {
         Self {
-            lanes: lanes.into_iter().collect(),
+            data: LogicalData::Elements(lanes.into_iter().collect()),
             user: vec![],
         }
     }
@@ -69,12 +99,21 @@ impl LogicalTransfer {
         self
     }
 
-    pub fn lanes(&self) -> &Vec<Element> {
-        &self.lanes
+    pub fn data(&self) -> &LogicalData {
+        &self.data
     }
 
     pub fn user(&self) -> &Vec<bool> {
         &self.user
+    }
+}
+
+impl From<LogicalData> for LogicalTransfer {
+    fn from(value: LogicalData) -> Self {
+        Self {
+            data: value,
+            user: vec![],
+        }
     }
 }
 
@@ -106,6 +145,17 @@ where
     }
 }
 
+impl<'a> TryFrom<(LogicalData, &'a str)> for LogicalTransfer {
+    type Error = Error;
+
+    fn try_from(value: (LogicalData, &'a str)) -> Result<Self> {
+        Ok(Self {
+            data: value.0,
+            user: bits_from_str(value.1)?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +183,14 @@ mod tests {
         let transfer_4 = (["1011", "1000"], "01").try_result()?;
 
         assert_eq!(transfer_3, transfer_4);
+
+        let empty_transfer_1 = LogicalTransfer::new_empty(0..2);
+        let empty_transfer_2 = (LogicalData::Empty(0..2)).into();
+        assert_eq!(empty_transfer_1, empty_transfer_2);
+
+        let empty_transfer_3 = LogicalTransfer::new_empty_user(2..2, [false, true, false]);
+        let empty_transfer_4 = (LogicalData::Empty(2..2), "010").try_result()?;
+        assert_eq!(empty_transfer_3, empty_transfer_4);
 
         Ok(())
     }
