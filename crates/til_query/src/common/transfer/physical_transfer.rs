@@ -48,6 +48,8 @@ pub struct PhysicalTransfer {
     element_lanes: Positive,
     /// The maximum width of each element being transferred.
     max_element_size: NonNegative,
+    /// The data being transfered, organized by lane.
+    data: Vec<Vec<bool>>,
     /// The dimensionality supported by the physical stream.
     dimensionality: NonNegative,
     /// The `last` signalling for the transfer.
@@ -83,6 +85,7 @@ impl PhysicalTransfer {
     pub fn complexity(&self) -> &Complexity {
         &self.complexity
     }
+
     /// This transfer is of an empty sequence.
     ///
     /// When C < 4, transfers of non-empty sequences may not postpone `last`
@@ -91,6 +94,7 @@ impl PhysicalTransfer {
     pub fn is_empty_sequence(&self) -> bool {
         self.is_empty_sequence
     }
+
     /// Indicates whether this transfer allows for `valid` to be released.
     /// This depends on the Complexity of the stream.
     ///
@@ -99,23 +103,33 @@ impl PhysicalTransfer {
     pub fn holds_valid(&self) -> bool {
         self.holds_valid
     }
+
     /// The number of element lanes the physical stream has. Also referred to as
     /// N.
     pub fn element_lanes(&self) -> Positive {
         self.element_lanes
     }
+
     /// The maximum width of each element being transferred.
     pub fn max_element_size(&self) -> NonNegative {
         self.max_element_size
     }
+
+    /// The data being transfered, organized by lane.
+    pub fn data(&self) -> &Vec<Vec<bool>> {
+        &self.data
+    }
+
     /// The dimensionality supported by the physical stream.
     pub fn dimensionality(&self) -> NonNegative {
         self.dimensionality
     }
+
     /// The `last` signalling for the transfer.
     pub fn last_mode(&self) -> &LastMode {
         &self.last_mode
     }
+
     /// The index of the first active lane.
     ///
     /// May not be N or greater.
@@ -124,6 +138,7 @@ impl PhysicalTransfer {
     pub fn start_index(&self) -> NonNegative {
         self.start_index
     }
+
     /// The index of the last active lane.
     ///
     /// * May not be 0.
@@ -134,6 +149,7 @@ impl PhysicalTransfer {
     pub fn end_index(&self) -> Positive {
         self.end_index
     }
+
     /// The `strb` signal.
     ///
     /// At C < 8, this is used to indicate whether the transfer is empty.
@@ -141,10 +157,12 @@ impl PhysicalTransfer {
     pub fn strobe(&self) -> &StrobeMode {
         &self.strobe
     }
+
     /// The maximum width of the `user` signal being transferred.
     pub fn max_user_size(&self) -> NonNegative {
         self.max_user_size
     }
+
     /// The `user` signal
     pub fn user(&self) -> &Vec<bool> {
         &self.user
