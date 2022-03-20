@@ -13,13 +13,13 @@ use super::element::Element;
 pub enum LogicalData {
     /// Indicates an empty sequence. Therefor, it _must_ contain dimension
     /// information.
-    Empty(Range<NonNegative>),
+    EmptySequence(Range<NonNegative>),
     /// The lanes of the physical stream used in this transfer, consisting of
     /// a number of elements.
     ///
     /// The number of lanes must be equal to or less than the number of lanes on
     /// the physical stream.
-    Elements(Vec<Element>),
+    Lanes(Vec<Element>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,7 +38,7 @@ impl LogicalTransfer {
         user: impl IntoIterator<Item = bool>,
     ) -> Self {
         Self {
-            data: LogicalData::Elements(lanes.into_iter().collect()),
+            data: LogicalData::Lanes(lanes.into_iter().collect()),
             user: user.into_iter().collect(),
         }
     }
@@ -46,7 +46,7 @@ impl LogicalTransfer {
     /// Create a new empty sequence without a user transfer.
     pub fn new_empty(last: Range<NonNegative>) -> Self {
         Self {
-            data: LogicalData::Empty(last),
+            data: LogicalData::EmptySequence(last),
             user: vec![],
         }
     }
@@ -54,7 +54,7 @@ impl LogicalTransfer {
     /// Create a new empty sequence with a user transfer
     pub fn new_empty_user(last: Range<NonNegative>, user: impl IntoIterator<Item = bool>) -> Self {
         Self {
-            data: LogicalData::Empty(last),
+            data: LogicalData::EmptySequence(last),
             user: user.into_iter().collect(),
         }
     }
@@ -64,7 +64,7 @@ impl LogicalTransfer {
         user: impl IntoIterator<Item = bool>,
     ) -> Result<Self> {
         Ok(Self {
-            data: LogicalData::Elements(
+            data: LogicalData::Lanes(
                 lanes
                     .into_iter()
                     .map(|x| x.try_result())
@@ -76,7 +76,7 @@ impl LogicalTransfer {
 
     pub fn new_lanes(lanes: impl IntoIterator<Item = Element>) -> Self {
         Self {
-            data: LogicalData::Elements(lanes.into_iter().collect()),
+            data: LogicalData::Lanes(lanes.into_iter().collect()),
             user: vec![],
         }
     }
@@ -185,11 +185,11 @@ mod tests {
         assert_eq!(transfer_3, transfer_4);
 
         let empty_transfer_1 = LogicalTransfer::new_empty(0..2);
-        let empty_transfer_2 = (LogicalData::Empty(0..2)).into();
+        let empty_transfer_2 = (LogicalData::EmptySequence(0..2)).into();
         assert_eq!(empty_transfer_1, empty_transfer_2);
 
         let empty_transfer_3 = LogicalTransfer::new_empty_user(2..2, [false, true, false]);
-        let empty_transfer_4 = (LogicalData::Empty(2..2), "010").try_result()?;
+        let empty_transfer_4 = (LogicalData::EmptySequence(2..2), "010").try_result()?;
         assert_eq!(empty_transfer_3, empty_transfer_4);
 
         Ok(())
