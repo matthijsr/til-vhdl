@@ -77,12 +77,11 @@ pub struct PhysicalTransfer {
     ///
     /// Requires (C≥5∨D≥1)∧N>1
     ///
-    /// * May not be 0.
     /// * May not be N or greater.
     /// * May not be less than `start_index`.
     ///
     /// When C < 5, and `last` is zero, end index must be N-1.
-    end_index: Option<Positive>,
+    end_index: Option<NonNegative>,
     /// The `strb` signal.
     ///
     /// Requires: C≥7∨D≥1
@@ -137,7 +136,7 @@ impl PhysicalTransfer {
         let end_index = if element_lanes_gt_1
             && (dimensionality >= 1 || complexity >= Complexity::new_major(5))
         {
-            Positive::new(element_lanes.get() - 1)
+            Some(element_lanes.get() - 1)
         } else {
             None
         };
@@ -240,12 +239,11 @@ impl PhysicalTransfer {
     ///
     /// Requires (C≥5∨D≥1)∧N>1
     ///
-    /// * May not be 0.
     /// * May not be N or greater.
     /// * May not be less than `start_index`.
     ///
     /// When C < 5, and `last` is zero, end index must be N-1.
-    pub fn end_index(&self) -> &Option<Positive> {
+    pub fn end_index(&self) -> &Option<NonNegative> {
         &self.end_index
     }
 
