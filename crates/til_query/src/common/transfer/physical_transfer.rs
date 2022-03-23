@@ -250,7 +250,69 @@ impl PhysicalTransfer {
                     *endi = 0;
                 }
             }
-            LogicalData::Lanes(_) => todo!(),
+            LogicalData::Lanes(elements) => {
+                if elements.len() > self.element_lanes().get().try_into().unwrap() {
+                    return Err(Error::InvalidArgument(format!(
+                        "Cannot transfer {} elements. Physical stream has {} lanes.",
+                        elements.len(),
+                        self.element_lanes()
+                    )));
+                }
+
+                let (data_vec, last_vec): (Vec<_>, Vec<_>) = elements
+                    .iter()
+                    .map(|element| (element.data().clone(), element.last().clone()))
+                    .unzip();
+
+                match &mut self.last {
+                    LastMode::None => {
+                        if last_vec.iter().any(|x| x.is_some()) {
+                            return Err(Error::InvalidArgument("Attempted to assert last in a dimension, but physical stream has no dimensionality.".to_string()));
+                        }
+                    }
+                    LastMode::Transfer(transfer_last) => {
+                        let mut result = None;
+
+                        for last in last_vec {
+                            match last {
+                                Some(el_last) => {
+                                    if let Some(_) = &mut result {
+                                        return Err(Error::InvalidArgument(format!("Cannot assert dimensionality on more than one element lane. Physical stream has complexity {} (< 8).", self.complexity())));
+                                    } else {
+                                        result = Some(el_last);
+                                    }
+                                }
+                                None => (),
+                            }
+                        }
+
+                        if let Some(result_last) = &result {
+                            if result_last.end >= self.dimensionality {
+                                return Err(Error::InvalidArgument(
+                                    format!("Cannot assert an element or transfer as last in dimension {}, physical stream has dimensionality {}.", result_last.end, self.dimensionality),
+                                ));
+                            }
+                        }
+
+                        match &mut self.holds_valid {
+                            HoldValidRule::WholeSequence(holds_valid) => {
+                                if let Some(result_last) = &result {
+                                    *holds_valid = result_last.end == self.dimensionality - 1;
+                                } else {
+                                    *holds_valid = true;
+                                }
+                            }
+                            HoldValidRule::InnerSequence(holds_valid) => {
+                                *holds_valid = result.is_none();
+                            }
+                            HoldValidRule::None => (),
+                        }
+
+                        *transfer_last = result;
+                    }
+                    LastMode::Lane(_) => todo!(),
+                }
+            }
         }
 
         self.user = Some(transfer.user().clone());
