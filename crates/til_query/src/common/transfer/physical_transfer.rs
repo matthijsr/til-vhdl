@@ -10,6 +10,21 @@ use crate::common::physical::complexity::Complexity;
 use super::logical_transfer::{LogicalData, LogicalTransfer};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// At some complexities, the `valid` signal must be held '1' until parts or
+/// all of the sequence have been transferred. This effectively means that
+/// some transfers must occur over consecutive clock cycles.
+pub enum HoldValidRule {
+    /// Valid may be set '0' after every transfer.
+    None,
+    /// Valid may only be set '0' after the entire sequence has been
+    /// transferred, ending in a `last` which is all '1's.
+    WholeSequence(bool),
+    /// Valid may only be set '0' after an innermost sequence has been
+    /// been transferred, requiring a `last` for dimension 0.
+    InnerSequence(bool),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// The method by which `last` is transferred.
 pub enum LastMode {
     /// This stream has no Dimensionality, so does not assert `last`.
@@ -44,7 +59,7 @@ pub struct PhysicalTransfer {
     ///
     /// * C < 3: `valid` can only be released when lane N-1 has a non-zero `last`.
     /// * C < 2: `valid` can only be released when lane N-1 has a `last` of all 1s.
-    holds_valid: bool,
+    holds_valid: HoldValidRule,
     /// The number of element lanes the physical stream has. Also referred to as
     /// N.
     element_lanes: Positive,
@@ -148,9 +163,19 @@ impl PhysicalTransfer {
             StrobeMode::None
         };
 
+        let holds_valid = if complexity < Complexity::new_major(3) {
+            if complexity < Complexity::new_major(2) {
+                HoldValidRule::WholeSequence(false)
+            } else {
+                HoldValidRule::InnerSequence(false)
+            }
+        } else {
+            HoldValidRule::None
+        };
+
         Self {
             complexity,
-            holds_valid: false,
+            holds_valid,
             element_lanes,
             max_element_size,
             data: None,
@@ -169,11 +194,25 @@ impl PhysicalTransfer {
         transfer: impl TryResult<LogicalTransfer>,
     ) -> Result<Self> {
         let transfer: LogicalTransfer = transfer.try_result()?;
-        self.user = Some(transfer.user().clone());
+
         match transfer.data() {
             LogicalData::EmptySequence(last) => {
-                if last.end >= self.dimensionality() - 1 {
+                if last.end >= self.dimensionality() {
                     return Err(Error::InvalidArgument(format!("Cannot assert empty sequence as last in dimension {}, as this physical stream has a dimensionality of {}.", last.end, self.dimensionality())));
+                }
+
+                match &mut self.holds_valid {
+                    HoldValidRule::None => (),
+                    HoldValidRule::WholeSequence(holds_valid) => {
+                        *holds_valid = false;
+                    }
+                    HoldValidRule::InnerSequence(holds_valid) => {
+                        if last.end < self.dimensionality - 1 {
+                            *holds_valid = true;
+                        } else {
+                            *holds_valid = false;
+                        }
+                    }
                 }
 
                 self.data = Some(vec![]);
@@ -214,6 +253,8 @@ impl PhysicalTransfer {
             LogicalData::Lanes(_) => todo!(),
         }
 
+        self.user = Some(transfer.user().clone());
+
         Ok(self)
     }
 
@@ -229,7 +270,10 @@ impl PhysicalTransfer {
     /// * C < 3: `valid` can only be released when lane N-1 has a non-zero `last`.
     /// * C < 2: `valid` can only be released when lane N-1 has a `last` of all 1s.
     pub fn holds_valid(&self) -> bool {
-        self.holds_valid
+        match &self.holds_valid {
+            HoldValidRule::None => false,
+            HoldValidRule::WholeSequence(val) | HoldValidRule::InnerSequence(val) => *val,
+        }
     }
 
     /// The number of element lanes the physical stream has. Also referred to as
