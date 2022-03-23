@@ -1,8 +1,13 @@
 use std::ops::Range;
 
-use tydi_common::numbers::{NonNegative, Positive};
+use tydi_common::{
+    error::{Error, Result, TryResult},
+    numbers::{NonNegative, Positive},
+};
 
 use crate::common::physical::complexity::Complexity;
+
+use super::logical_transfer::{LogicalData, LogicalTransfer};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// The method by which `last` is transferred.
@@ -34,12 +39,6 @@ pub struct PhysicalTransfer {
     /// The Complexity this transfer adheres to. This value informs whether the
     /// logical transfer is valid.
     complexity: Complexity,
-    /// This transfer is of an empty sequence.
-    ///
-    /// When C < 4, transfers of non-empty sequences may not postpone `last`
-    /// signals. Meaning that they cannot assert a transfer being the `last`
-    /// within dimension 0 without containing data.
-    is_empty_sequence: bool,
     /// Indicates whether this transfer allows for `valid` to be released.
     /// This depends on the Complexity of the stream.
     ///
@@ -151,7 +150,6 @@ impl PhysicalTransfer {
 
         Self {
             complexity,
-            is_empty_sequence: false,
             holds_valid: false,
             element_lanes,
             max_element_size,
@@ -166,19 +164,63 @@ impl PhysicalTransfer {
         }
     }
 
+    pub fn with_logical_transfer(
+        mut self,
+        transfer: impl TryResult<LogicalTransfer>,
+    ) -> Result<Self> {
+        let transfer: LogicalTransfer = transfer.try_result()?;
+        self.user = Some(transfer.user().clone());
+        match transfer.data() {
+            LogicalData::EmptySequence(last) => {
+                if last.end >= self.dimensionality() - 1 {
+                    return Err(Error::InvalidArgument(format!("Cannot assert empty sequence as last in dimension {}, as this physical stream has a dimensionality of {}.", last.end, self.dimensionality())));
+                }
+
+                self.data = Some(vec![]);
+
+                match &mut self.last {
+                    LastMode::None => return Err(Error::InvalidArgument("Attempted to transfer an empty sequence, but physical stream has no dimensionality.".to_string())),
+                    LastMode::Transfer(transfer_last) => {
+                        *transfer_last = Some(last.clone());
+                    },
+                    LastMode::Lane(lanes_last) => {
+                        for lane_last in &mut lanes_last[1..] {
+                            *lane_last = None;
+                        }
+                        lanes_last[0] = Some(last.clone());
+                    },
+                }
+
+                match &mut self.strobe {
+                    StrobeMode::None => unreachable!(), // Already caught by `last` check.
+                    StrobeMode::Transfer(strb) => {
+                        *strb = false;
+                    }
+                    StrobeMode::Lane(strb) => {
+                        for lane_strb in strb {
+                            *lane_strb = false;
+                        }
+                    }
+                }
+
+                if let Some(stai) = &mut self.start_index {
+                    *stai = 0;
+                }
+
+                if let Some(endi) = &mut self.end_index {
+                    *endi = 0;
+                }
+            }
+            LogicalData::Lanes(_) => todo!(),
+        }
+
+        Ok(self)
+    }
+
     /// The Complexity this transfer adheres to. This value informs whether the
     /// logical transfer is valid.
     pub fn complexity(&self) -> &Complexity {
         &self.complexity
-    }
-
-    /// This transfer is of an empty sequence.
-    ///
-    /// When C < 4, transfers of non-empty sequences may not postpone `last`
-    /// signals. Meaning that they cannot assert a transfer being the `last`
-    /// within dimension 0 without containing data.
-    pub fn is_empty_sequence(&self) -> bool {
-        self.is_empty_sequence
     }
 
     /// Indicates whether this transfer allows for `valid` to be released.
