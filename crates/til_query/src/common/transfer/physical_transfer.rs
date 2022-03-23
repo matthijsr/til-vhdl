@@ -14,14 +14,14 @@ use super::logical_transfer::{LogicalData, LogicalTransfer};
 /// all of the sequence have been transferred. This effectively means that
 /// some transfers must occur over consecutive clock cycles.
 pub enum HoldValidRule {
-    /// Valid may be set '0' after every transfer.
-    None,
     /// Valid may only be set '0' after the entire sequence has been
     /// transferred, ending in a `last` which is all '1's.
     WholeSequence(bool),
     /// Valid may only be set '0' after an innermost sequence has been
     /// been transferred, requiring a `last` for dimension 0.
     InnerSequence(bool),
+    /// Valid may be set '0' after every transfer.
+    None,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -202,17 +202,17 @@ impl PhysicalTransfer {
                 }
 
                 match &mut self.holds_valid {
-                    HoldValidRule::None => (),
                     HoldValidRule::WholeSequence(holds_valid) => {
-                        *holds_valid = false;
-                    }
-                    HoldValidRule::InnerSequence(holds_valid) => {
                         if last.end < self.dimensionality - 1 {
                             *holds_valid = true;
                         } else {
                             *holds_valid = false;
                         }
                     }
+                    HoldValidRule::InnerSequence(holds_valid) => {
+                        *holds_valid = false;
+                    }
+                    HoldValidRule::None => (),
                 }
 
                 self.data = Some(vec![]);
@@ -356,5 +356,197 @@ impl PhysicalTransfer {
     /// When None, drive all '0's.
     pub fn user(&self) -> &Option<Vec<bool>> {
         &self.user
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_transfer() -> Result<()> {
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(1),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        );
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &None);
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
+        assert_eq!(physical_transfer.start_index(), &None);
+        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(true));
+        assert_eq!(physical_transfer.user(), &None);
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(5),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        );
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &None);
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
+        assert_eq!(physical_transfer.start_index(), &None);
+        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(true));
+        assert_eq!(physical_transfer.user(), &None);
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(6),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        );
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &None);
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
+        assert_eq!(physical_transfer.start_index(), &Some(0));
+        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(true));
+        assert_eq!(physical_transfer.user(), &None);
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(7),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        );
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &None);
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
+        assert_eq!(physical_transfer.start_index(), &Some(0));
+        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Lane(vec![true; 3]));
+        assert_eq!(physical_transfer.user(), &None);
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(8),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        );
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &None);
+        assert_eq!(
+            physical_transfer.last(),
+            &LastMode::Lane(vec![Some(0..2), Some(0..2), Some(0..2)])
+        );
+        assert_eq!(physical_transfer.start_index(), &Some(0));
+        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Lane(vec![true; 3]));
+        assert_eq!(physical_transfer.user(), &None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_empty_sequence() -> Result<()> {
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(1),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        )
+        .with_logical_transfer((LogicalData::EmptySequence(0..1), "101"))?;
+
+        assert_eq!(physical_transfer.holds_valid(), true);
+        assert_eq!(physical_transfer.data(), &Some(vec![]));
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
+        assert_eq!(physical_transfer.start_index(), &None);
+        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(false));
+        assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(2),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        )
+        .with_logical_transfer((LogicalData::EmptySequence(0..1), "101"))?;
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &Some(vec![]));
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
+        assert_eq!(physical_transfer.start_index(), &None);
+        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(false));
+        assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(6),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        )
+        .with_logical_transfer((LogicalData::EmptySequence(0..1), "101"))?;
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &Some(vec![]));
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
+        assert_eq!(physical_transfer.start_index(), &Some(0));
+        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(false));
+        assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(7),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        )
+        .with_logical_transfer((LogicalData::EmptySequence(0..1), "101"))?;
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &Some(vec![]));
+        assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
+        assert_eq!(physical_transfer.start_index(), &Some(0));
+        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(
+            physical_transfer.strobe(),
+            &StrobeMode::Lane(vec![false; 3])
+        );
+        assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
+
+        let physical_transfer = PhysicalTransfer::new(
+            Complexity::new_major(8),
+            Positive::new(3).unwrap(),
+            16,
+            3,
+            3,
+        )
+        .with_logical_transfer((LogicalData::EmptySequence(0..1), "101"))?;
+
+        assert_eq!(physical_transfer.holds_valid(), false);
+        assert_eq!(physical_transfer.data(), &Some(vec![]));
+        assert_eq!(
+            physical_transfer.last(),
+            &LastMode::Lane(vec![Some(0..1), None, None])
+        );
+        assert_eq!(physical_transfer.start_index(), &Some(0));
+        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(
+            physical_transfer.strobe(),
+            &StrobeMode::Lane(vec![false; 3])
+        );
+        assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
+
+        Ok(())
     }
 }
