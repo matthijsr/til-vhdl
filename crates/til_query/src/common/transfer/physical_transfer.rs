@@ -41,9 +41,9 @@ pub enum StrobeMode {
     /// This stream has no Dimensionality or Complexity >= 8,
     /// so does not require a strobe signal.
     None,
-    /// This stream has Complexity < 8, so asserts `strobe` per transfer.
+    /// This stream has Complexity < 7, so asserts `strobe` per transfer.
     Transfer(bool),
-    /// This stream has Complexity >= 8, so can assert `strobe` per element lane.
+    /// This stream has Complexity >= 7, so can assert `strobe` per element lane.
     Lane(Vec<bool>),
 }
 
@@ -242,6 +242,7 @@ impl PhysicalTransfer {
                     }
                 }
 
+                /// NOTE TO SELF: Stai and Endi are probably irrelevant for empty sequences?
                 if let Some(stai) = &mut self.start_index {
                     *stai = 0;
                 }
