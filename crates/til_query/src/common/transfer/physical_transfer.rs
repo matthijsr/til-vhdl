@@ -25,6 +25,34 @@ pub enum HoldValidRule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Indicates whether this index signal is supported, and whether its value
+/// is significant.
+pub enum IndexMode {
+    /// The physical stream does not support indices of this kind.
+    Unsupported,
+    /// The physical stream supports indices.
+    ///
+    /// When the index is `None`, its value is insignificant and does not need
+    /// to be driven.
+    Index(Option<NonNegative>),
+    /// The physical stream has indices, but does not make use of them.
+    ///
+    /// In this case, the functionality of the indices is replaced with the
+    /// `strb` signal.
+    Insignificant(NonNegative),
+}
+
+impl IndexMode {
+    pub fn make_insignificant(&mut self) {
+        match self {
+            IndexMode::Unsupported => (),
+            IndexMode::Index(val) => *self = IndexMode::Insignificant(val.unwrap()),
+            IndexMode::Insignificant(_) => (),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// The method by which `last` is transferred.
 pub enum LastMode {
     /// This stream has no Dimensionality, so does not assert `last`.
@@ -86,7 +114,7 @@ pub struct PhysicalTransfer {
     /// May not be N or greater.
     ///
     /// When C < 6, must always be 0.
-    start_index: Option<NonNegative>,
+    start_index: IndexMode,
     /// The index of the last active lane.
     ///
     /// Requires (C≥5∨D≥1)∧N>1
@@ -95,16 +123,13 @@ pub struct PhysicalTransfer {
     /// * May not be less than `start_index`.
     ///
     /// When C < 5, and `last` is zero, end index must be N-1.
-    end_index: Option<NonNegative>,
+    end_index: IndexMode,
     /// The `strb` signal.
     ///
     /// Requires: C≥7∨D≥1
     ///
     /// At C < 7, this is used to indicate whether the transfer is empty.
     /// At C >= 7, this indicates the activity of individual element lanes.
-    ///
-    /// NOTE: This is an assumption, the original spec claims the cut-off is
-    /// C >= 8. But this makes C=7 effectively useless.
     strobe: StrobeMode,
     /// The maximum width of the `user` signal being transferred.
     max_user_size: NonNegative,
@@ -141,21 +166,23 @@ impl PhysicalTransfer {
 
         let element_lanes_gt_1 = element_lanes > Positive::new(1).unwrap();
 
-        let start_index = if element_lanes_gt_1 && complexity >= Complexity::new_major(6) {
-            Some(0)
+        let mut start_index = if element_lanes_gt_1 && complexity >= Complexity::new_major(6) {
+            IndexMode::Index(Some(0))
         } else {
-            None
+            IndexMode::Unsupported
         };
 
-        let end_index = if element_lanes_gt_1
+        let mut end_index = if element_lanes_gt_1
             && (dimensionality >= 1 || complexity >= Complexity::new_major(5))
         {
-            Some(element_lanes.get() - 1)
+            IndexMode::Index(Some(element_lanes.get() - 1))
         } else {
-            None
+            IndexMode::Unsupported
         };
 
         let strobe = if complexity >= Complexity::new_major(7) {
+            start_index.make_insignificant();
+            end_index.make_insignificant();
             StrobeMode::Lane(vec![true; element_lanes.get().try_into().unwrap()])
         } else if dimensionality >= 1 {
             StrobeMode::Transfer(true)
@@ -242,13 +269,12 @@ impl PhysicalTransfer {
                     }
                 }
 
-                /// NOTE TO SELF: Stai and Endi are probably irrelevant for empty sequences?
-                if let Some(stai) = &mut self.start_index {
-                    *stai = 0;
+                if let IndexMode::Index(stai) = &mut self.start_index {
+                    *stai = None;
                 }
 
-                if let Some(endi) = &mut self.end_index {
-                    *endi = 0;
+                if let IndexMode::Index(endi) = &mut self.end_index {
+                    *endi = None;
                 }
             }
             LogicalData::Lanes(elements) => {
@@ -260,58 +286,133 @@ impl PhysicalTransfer {
                     )));
                 }
 
+                // NOTE TO SELF: Try to build transfer last, stai, endi and strb right away.
+                let mut transfer_last: Result<Option<Range<NonNegative>>> = Ok(None);
+
+                let mut pos_edge = 0;
+                let mut prev_neg = true;
+                let mut transfer_strobe = false;
+
+                let mut strobe: Vec<bool> = vec![];
+
+                let mut start_index: Option<usize> = None;
+                let mut end_index: usize = 0;
+
+                let mut errs: Vec<String> = vec![];
+
                 let (data_vec, last_vec): (Vec<_>, Vec<_>) = elements
                     .iter()
-                    .map(|element| (element.data().clone(), element.last().clone()))
+                    .enumerate()
+                    .map(|(idx, element)| {
+                        if element.data().is_some() {
+                            if let Ok(Some(_)) = &transfer_last {
+                                transfer_last = Err(Error::InvalidArgument("Logical transfer contains an element with active data after an element was asserted last in a sequence. The physical stream only supports dimension information per transfer.".to_string()));
+                            }
+
+                            if start_index.is_none() {
+                                start_index = Some(idx);
+                            }
+                            end_index = idx;
+
+                            if prev_neg {
+                                pos_edge += 1;
+                                prev_neg = false;
+                            }
+
+                            transfer_strobe = true;
+                            strobe.push(true);
+                        } else {
+                            prev_neg = true;
+
+                            strobe.push(false);
+                        }
+
+                        match element.last() {
+                            Some(last_range) => {
+                                if last_range.end >= self.dimensionality() {
+                                    errs.push(format!("Cannot assert an element or transfer as last in dimension {}, physical stream has dimensionality {}.", last_range.end, self.dimensionality));
+                                }
+
+                                match transfer_last {
+                                Ok(None) => {
+                                    transfer_last = Ok(Some(last_range.clone()));
+                                },
+                                Ok(Some(_)) => {
+                                    transfer_last = Err(Error::InvalidArgument(format!("Cannot assert dimensionality on more than one element lane. Physical stream has complexity {} (< 8).", self.complexity())))
+                                },
+                                Err(_) => (),
+                            }
+                            },
+                            None => (),
+                        }
+
+                        strobe.push(element.data().is_some());
+
+                        (element.data().clone(), element.last().clone())
+                    })
                     .unzip();
 
+                if errs.len() > 0 {
+                    return Err(Error::InvalidArgument(format!(
+                        "One or more errors in logical transfer:\n{}",
+                        errs.join("\n")
+                    )));
+                }
+
                 match &mut self.last {
-                    LastMode::None => {
-                        if last_vec.iter().any(|x| x.is_some()) {
-                            return Err(Error::InvalidArgument("Attempted to assert last in a dimension, but physical stream has no dimensionality.".to_string()));
-                        }
-                    }
-                    LastMode::Transfer(transfer_last) => {
-                        let mut result = None;
-
-                        for last in last_vec {
-                            match last {
-                                Some(el_last) => {
-                                    if let Some(_) = &mut result {
-                                        return Err(Error::InvalidArgument(format!("Cannot assert dimensionality on more than one element lane. Physical stream has complexity {} (< 8).", self.complexity())));
-                                    } else {
-                                        result = Some(el_last);
-                                    }
-                                }
-                                None => (),
-                            }
-                        }
-
-                        if let Some(result_last) = &result {
-                            if result_last.end >= self.dimensionality {
-                                return Err(Error::InvalidArgument(
-                                    format!("Cannot assert an element or transfer as last in dimension {}, physical stream has dimensionality {}.", result_last.end, self.dimensionality),
-                                ));
-                            }
-                        }
+                    LastMode::None => (),
+                    LastMode::Transfer(mut_transfer_last) => {
+                        *mut_transfer_last = transfer_last?;
 
                         match &mut self.holds_valid {
                             HoldValidRule::WholeSequence(holds_valid) => {
-                                if let Some(result_last) = &result {
+                                if let Some(result_last) = &mut_transfer_last {
                                     *holds_valid = result_last.end == self.dimensionality - 1;
                                 } else {
                                     *holds_valid = true;
                                 }
                             }
                             HoldValidRule::InnerSequence(holds_valid) => {
-                                *holds_valid = result.is_none();
+                                *holds_valid = mut_transfer_last.is_none();
                             }
                             HoldValidRule::None => (),
                         }
-
-                        *transfer_last = result;
                     }
-                    LastMode::Lane(_) => todo!(),
+                    LastMode::Lane(mut_last_vec) => {
+                        *mut_last_vec = last_vec;
+                        // Pad the difference with `None`s
+                        for _ in mut_last_vec.len()..self.element_lanes.get().try_into().unwrap() {
+                            mut_last_vec.push(None);
+                        }
+                    }
+                }
+
+                match &mut self.start_index {
+                    IndexMode::Unsupported => {
+                        if let Some(stai) = start_index {
+                            return Err(Error::InvalidArgument(format!("The physical stream requires that all transfers are aligned to lane 0, logical transfer has start index {}", stai)));
+                        }
+                    }
+                    IndexMode::Index(mut_stai) => {
+                        *mut_stai = start_index.map(|x| x.try_into().unwrap())
+                    }
+                    IndexMode::Insignificant(_) => (),
+                }
+
+                match &mut self.end_index {
+                    IndexMode::Unsupported => {
+                        // NOTE: Wait, this seems odd? Is a Stream with dimensionality 0 not allowed to have an end index when N > 1?
+                    }
+                    IndexMode::Index(mut_stai) => {
+                        *mut_stai = start_index.map(|x| x.try_into().unwrap())
+                    }
+                    IndexMode::Insignificant(_) => (),
+                }
+
+                match &mut self.strobe {
+                    StrobeMode::None => {}
+                    StrobeMode::Transfer(_) => todo!(),
+                    StrobeMode::Lane(_) => todo!(),
                 }
             }
         }
@@ -380,7 +481,7 @@ impl PhysicalTransfer {
     /// May not be N or greater.
     ///
     /// When C < 6, must always be 0.
-    pub fn start_index(&self) -> &Option<NonNegative> {
+    pub fn start_index(&self) -> &IndexMode {
         &self.start_index
     }
 
@@ -392,7 +493,7 @@ impl PhysicalTransfer {
     /// * May not be less than `start_index`.
     ///
     /// When C < 5, and `last` is zero, end index must be N-1.
-    pub fn end_index(&self) -> &Option<NonNegative> {
+    pub fn end_index(&self) -> &IndexMode {
         &self.end_index
     }
 
@@ -402,9 +503,6 @@ impl PhysicalTransfer {
     ///
     /// At C < 7, this is used to indicate whether the transfer is empty.
     /// At C >= 7, this indicates the activity of individual element lanes.
-    ///
-    /// NOTE: This is an assumption, the original spec claims the cut-off is
-    /// C >= 8. But this makes C=7 effectively useless.
     pub fn strobe(&self) -> &StrobeMode {
         &self.strobe
     }
@@ -439,8 +537,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &None);
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
-        assert_eq!(physical_transfer.start_index(), &None);
-        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Unsupported);
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(Some(2)));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(true));
         assert_eq!(physical_transfer.user(), &None);
 
@@ -455,8 +553,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &None);
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
-        assert_eq!(physical_transfer.start_index(), &None);
-        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Unsupported);
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(Some(2)));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(true));
         assert_eq!(physical_transfer.user(), &None);
 
@@ -471,8 +569,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &None);
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
-        assert_eq!(physical_transfer.start_index(), &Some(0));
-        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Index(Some(0)));
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(Some(2)));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(true));
         assert_eq!(physical_transfer.user(), &None);
 
@@ -487,8 +585,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &None);
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..2)));
-        assert_eq!(physical_transfer.start_index(), &Some(0));
-        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Index(Some(0)));
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(Some(2)));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Lane(vec![true; 3]));
         assert_eq!(physical_transfer.user(), &None);
 
@@ -506,8 +604,8 @@ mod tests {
             physical_transfer.last(),
             &LastMode::Lane(vec![Some(0..2), Some(0..2), Some(0..2)])
         );
-        assert_eq!(physical_transfer.start_index(), &Some(0));
-        assert_eq!(physical_transfer.end_index(), &Some(2));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Index(Some(0)));
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(Some(2)));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Lane(vec![true; 3]));
         assert_eq!(physical_transfer.user(), &None);
 
@@ -528,8 +626,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), true);
         assert_eq!(physical_transfer.data(), &Some(vec![]));
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
-        assert_eq!(physical_transfer.start_index(), &None);
-        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Unsupported);
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(None));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(false));
         assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
 
@@ -545,8 +643,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &Some(vec![]));
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
-        assert_eq!(physical_transfer.start_index(), &None);
-        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Unsupported);
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(None));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(false));
         assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
 
@@ -562,8 +660,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &Some(vec![]));
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
-        assert_eq!(physical_transfer.start_index(), &Some(0));
-        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Index(None));
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(None));
         assert_eq!(physical_transfer.strobe(), &StrobeMode::Transfer(false));
         assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
 
@@ -579,8 +677,8 @@ mod tests {
         assert_eq!(physical_transfer.holds_valid(), false);
         assert_eq!(physical_transfer.data(), &Some(vec![]));
         assert_eq!(physical_transfer.last(), &LastMode::Transfer(Some(0..1)));
-        assert_eq!(physical_transfer.start_index(), &Some(0));
-        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Index(None));
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(None));
         assert_eq!(
             physical_transfer.strobe(),
             &StrobeMode::Lane(vec![false; 3])
@@ -602,8 +700,8 @@ mod tests {
             physical_transfer.last(),
             &LastMode::Lane(vec![Some(0..1), None, None])
         );
-        assert_eq!(physical_transfer.start_index(), &Some(0));
-        assert_eq!(physical_transfer.end_index(), &Some(0));
+        assert_eq!(physical_transfer.start_index(), &IndexMode::Index(None));
+        assert_eq!(physical_transfer.end_index(), &IndexMode::Index(None));
         assert_eq!(
             physical_transfer.strobe(),
             &StrobeMode::Lane(vec![false; 3])
