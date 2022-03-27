@@ -102,7 +102,7 @@ pub struct PhysicalTransfer {
     ///
     /// When Some, and certain elements are shorter than the maximum element
     /// size, shift to align to the LSB and do not drive the unaddressed bits.
-    data: Option<Vec<Vec<bool>>>,
+    data: Option<Vec<Option<Vec<bool>>>>,
     /// The dimensionality supported by the physical stream.
     dimensionality: NonNegative,
     /// The `last` signalling for the transfer.
@@ -286,6 +286,8 @@ impl PhysicalTransfer {
                     )));
                 }
 
+                let supports_postponed_last = self.complexity() >= &Complexity::new_major(4);
+
                 // NOTE TO SELF: Try to build transfer last, stai, endi and strb right away.
                 let mut transfer_last: Result<Option<Range<NonNegative>>> = Ok(None);
 
@@ -333,15 +335,21 @@ impl PhysicalTransfer {
                                     errs.push(format!("Cannot assert an element or transfer as last in dimension {}, physical stream has dimensionality {}.", last_range.end, self.dimensionality));
                                 }
 
+                                if element.data().is_none() && !supports_postponed_last {
+                                    transfer_last = Err(Error::InvalidArgument(format!("Cannot assert dimensionality on inactive data (cannot postpone last signals).\n\
+                                    Physical stream has complexity {} (< 4).\n\
+                                    If this is an empty sequence, use the `EmptySequence` LogicalTransfer.", self.complexity())));
+                                }
+
                                 match transfer_last {
-                                Ok(None) => {
-                                    transfer_last = Ok(Some(last_range.clone()));
-                                },
-                                Ok(Some(_)) => {
-                                    transfer_last = Err(Error::InvalidArgument(format!("Cannot assert dimensionality on more than one element lane. Physical stream has complexity {} (< 8).", self.complexity())))
-                                },
-                                Err(_) => (),
-                            }
+                                    Ok(None) => {
+                                        transfer_last = Ok(Some(last_range.clone()));
+                                    },
+                                    Ok(Some(_)) => {
+                                        transfer_last = Err(Error::InvalidArgument(format!("Cannot assert dimensionality on more than one element lane. Physical stream has complexity {} (< 8).", self.complexity())))
+                                    },
+                                    Err(_) => (),
+                                }
                             },
                             None => (),
                         }
@@ -402,18 +410,38 @@ impl PhysicalTransfer {
                 match &mut self.end_index {
                     IndexMode::Unsupported => {
                         // NOTE: Wait, this seems odd? Is a Stream with dimensionality 0 not allowed to have an end index when N > 1?
+                        if end_index > 0 {
+                            return Err(Error::InvalidArgument("This physical stream does not support end indices. (Spec issue: https://github.com/abs-tudelft/tydi/issues/226)".to_string()));
+                        }
                     }
-                    IndexMode::Index(mut_stai) => {
-                        *mut_stai = start_index.map(|x| x.try_into().unwrap())
+                    IndexMode::Index(mut_endi) => {
+                        *mut_endi = Some(end_index.try_into().unwrap());
                     }
                     IndexMode::Insignificant(_) => (),
                 }
 
                 match &mut self.strobe {
                     StrobeMode::None => {}
-                    StrobeMode::Transfer(_) => todo!(),
-                    StrobeMode::Lane(_) => todo!(),
+                    StrobeMode::Transfer(mut_strb) => {
+                        if pos_edge < 2 {
+                            *mut_strb = transfer_strobe;
+                        } else {
+                            return Err(Error::InvalidArgument(
+                                "Physical stream does not support per-lane strobed data validity."
+                                    .to_string(),
+                            ));
+                        }
+                    }
+                    StrobeMode::Lane(mut_strb) => {
+                        *mut_strb = strobe;
+                        // Pad the difference with `false`s
+                        for _ in mut_strb.len()..self.element_lanes.get().try_into().unwrap() {
+                            mut_strb.push(false);
+                        }
+                    }
                 }
+
+                self.data = Some(data_vec);
             }
         }
 
@@ -460,7 +488,7 @@ impl PhysicalTransfer {
     ///
     /// When Some, and certain elements are shorter than the maximum element
     /// size, shift to align to the LSB and do not drive the unaddressed bits.
-    pub fn data(&self) -> &Option<Vec<Vec<bool>>> {
+    pub fn data(&self) -> &Option<Vec<Option<Vec<bool>>>> {
         &self.data
     }
 
