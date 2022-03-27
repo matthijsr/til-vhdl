@@ -247,6 +247,8 @@ impl PhysicalTransfer {
     ) -> Result<Self> {
         let transfer: LogicalTransfer = transfer.try_result()?;
 
+        // TODO: See if it isn't possible to reuse some logic between empty sequences and logical data.
+        // As it is, this might introduce some bugs by overlooking rules in one or the other.
         match transfer.data() {
             LogicalData::EmptySequence(last) => {
                 if last.end >= self.dimensionality() {
@@ -313,7 +315,6 @@ impl PhysicalTransfer {
 
                 let comp_lt_4 = self.complexity() < &Complexity::new_major(4);
 
-                // NOTE TO SELF: Try to build transfer last, stai, endi and strb right away.
                 let mut transfer_last: Result<Option<Range<NonNegative>>> = Ok(None);
 
                 let mut pos_edge = 0;
@@ -338,7 +339,8 @@ impl PhysicalTransfer {
                                 }
 
                                 if let Ok(Some(_)) = &transfer_last {
-                                    transfer_last = Err(Error::InvalidArgument("Logical transfer contains an element with active data after an element was asserted last in a sequence. The physical stream only supports dimension information per transfer.".to_string()));
+                                    transfer_last = Err(Error::InvalidArgument("Logical transfer contains an element with active data after an element was asserted last in a sequence.\n\
+                                    The physical stream only supports dimension information per transfer.".to_string()));
                                 }
 
                                 if start_index.is_none() {
@@ -787,14 +789,32 @@ mod tests {
     }
 
     #[test]
-    fn test_sequence() -> Result<()> {
-        let physical_transfer =
+    fn test_sequence_errs() -> Result<()> {
+        assert_eq!(
             PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
-                .with_logical_transfer(([("10", None), ("10", None), ("11", Some(0..2))], "101"))?;
+                .with_logical_transfer(([("10", None), ("11", Some(0..2)), ("10", None)], "101")),
+            Err(Error::InvalidArgument("Logical transfer contains an element with active data after an element was asserted last in a sequence.\nThe physical stream only supports dimension information per transfer.".to_string()))
+        );
 
-        let physical_transfer =
+        assert_eq!(
             PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
-                .with_logical_transfer(([("10", None), ("11", Some(0..2))], "101"))?;
+                .with_logical_transfer(([("10", None), ("11", None)], "101")),
+            Err(Error::InvalidArgument("Cannot leave element lanes empty, except when transferring the last element of an innermost sequence.\nPhysical stream has complexity 1 (< 4).".to_string()))
+        );
+
+        assert_eq!(
+            PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
+                .with_logical_transfer(([None, Some("11"), Some("11")], "101")),
+            Err(Error::InvalidArgument("The physical stream requires that all transfers are aligned to lane 0, logical transfer has start index 1".to_string()))
+        );
+
+        assert_eq!(
+            PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
+                .with_logical_transfer(([Some("11"), None, Some("11")], "101")),
+            Err(Error::InvalidArgument(
+                "Physical stream does not support per-lane strobed data validity.".to_string()
+            ))
+        );
 
         Ok(())
     }

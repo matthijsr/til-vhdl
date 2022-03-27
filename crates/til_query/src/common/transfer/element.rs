@@ -166,6 +166,35 @@ impl<'a> TryFrom<(&'a str, Option<Range<NonNegative>>)> for Element {
     }
 }
 
+impl<'a> TryFrom<Option<&'a str>> for Element {
+    type Error = Error;
+
+    fn try_from(value: Option<&'a str>) -> Result<Self> {
+        if let Some(data) = value {
+            Element::new_data_from_str(data)
+        } else {
+            Ok(Element::new_inactive())
+        }
+    }
+}
+
+impl<'a> TryFrom<(Option<&'a str>, Option<Range<NonNegative>>)> for Element {
+    type Error = Error;
+
+    fn try_from(value: (Option<&'a str>, Option<Range<NonNegative>>)) -> Result<Self> {
+        let el = if let Some(data) = value.0 {
+            Element::new_data_from_str(data)?
+        } else {
+            Element::new_inactive()
+        };
+        if let Some(range) = value.1 {
+            el.with_last(range)
+        } else {
+            Ok(el)
+        }
+    }
+}
+
 impl TryFrom<Range<NonNegative>> for Element {
     type Error = Error;
 
