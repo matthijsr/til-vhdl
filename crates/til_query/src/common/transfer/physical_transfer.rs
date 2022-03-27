@@ -286,7 +286,7 @@ impl PhysicalTransfer {
                     )));
                 }
 
-                let supports_postponed_last = self.complexity() >= &Complexity::new_major(4);
+                let comp_lt_4 = self.complexity() < &Complexity::new_major(4);
 
                 // NOTE TO SELF: Try to build transfer last, stai, endi and strb right away.
                 let mut transfer_last: Result<Option<Range<NonNegative>>> = Ok(None);
@@ -335,7 +335,7 @@ impl PhysicalTransfer {
                                     errs.push(format!("Cannot assert an element or transfer as last in dimension {}, physical stream has dimensionality {}.", last_range.end, self.dimensionality));
                                 }
 
-                                if element.data().is_none() && !supports_postponed_last {
+                                if element.data().is_none() && comp_lt_4 {
                                     transfer_last = Err(Error::InvalidArgument(format!("Cannot assert dimensionality on inactive data (cannot postpone last signals).\n\
                                     Physical stream has complexity {} (< 4).\n\
                                     If this is an empty sequence, use the `EmptySequence` LogicalTransfer.", self.complexity())));
@@ -398,7 +398,9 @@ impl PhysicalTransfer {
                 match &mut self.start_index {
                     IndexMode::Unsupported => {
                         if let Some(stai) = start_index {
-                            return Err(Error::InvalidArgument(format!("The physical stream requires that all transfers are aligned to lane 0, logical transfer has start index {}", stai)));
+                            if stai > 0 {
+                                return Err(Error::InvalidArgument(format!("The physical stream requires that all transfers are aligned to lane 0, logical transfer has start index {}", stai)));
+                            }
                         }
                     }
                     IndexMode::Index(mut_stai) => {
@@ -415,7 +417,12 @@ impl PhysicalTransfer {
                         }
                     }
                     IndexMode::Index(mut_endi) => {
-                        *mut_endi = Some(end_index.try_into().unwrap());
+                        let end_index = end_index.try_into().unwrap();
+                        *mut_endi = Some(end_index);
+
+                        if comp_lt_4 && end_index < self.element_lanes().get() - 1 {
+                            return Err(Error::InvalidArgument(format!("Cannot leave element lanes empty when transferring the innermost sequence. Physical stream has complexity {} (< 4).", self.complexity())));
+                        }
                     }
                     IndexMode::Insignificant(_) => (),
                 }
@@ -735,6 +742,15 @@ mod tests {
             &StrobeMode::Lane(vec![false; 3])
         );
         assert_eq!(physical_transfer.user(), &Some(vec![true, false, true]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sequence() -> Result<()> {
+        let physical_transfer =
+            PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
+                .with_logical_transfer(([("10", None), ("10", None), ("11", Some(0..2))], "101"))?;
 
         Ok(())
     }

@@ -154,6 +154,18 @@ impl<'a> TryFrom<(&'a str, Range<NonNegative>)> for Element {
     }
 }
 
+impl<'a> TryFrom<(&'a str, Option<Range<NonNegative>>)> for Element {
+    type Error = Error;
+
+    fn try_from(value: (&'a str, Option<Range<NonNegative>>)) -> Result<Self> {
+        if let Some(range) = value.1 {
+            Element::new_data_from_str(value.0)?.with_last(range)
+        } else {
+            Element::new_data_from_str(value.0)
+        }
+    }
+}
+
 impl TryFrom<Range<NonNegative>> for Element {
     type Error = Error;
 
