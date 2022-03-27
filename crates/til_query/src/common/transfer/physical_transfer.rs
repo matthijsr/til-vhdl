@@ -127,7 +127,7 @@ pub struct PhysicalTransfer {
     ///
     /// When Some, and certain elements are shorter than the maximum element
     /// size, shift to align to the LSB and do not drive the unaddressed bits.
-    data: Option<Vec<Option<Vec<bool>>>>,
+    data: Option<Vec<Vec<bool>>>,
     /// The dimensionality supported by the physical stream.
     dimensionality: NonNegative,
     /// The `last` signalling for the transfer.
@@ -331,28 +331,39 @@ impl PhysicalTransfer {
                     .iter()
                     .enumerate()
                     .map(|(idx, element)| {
-                        if element.data().is_some() {
-                            if let Ok(Some(_)) = &transfer_last {
-                                transfer_last = Err(Error::InvalidArgument("Logical transfer contains an element with active data after an element was asserted last in a sequence. The physical stream only supports dimension information per transfer.".to_string()));
-                            }
+                        let data = match element.data() {
+                            Some(data) => {
+                                if data.len() > self.max_element_size().try_into().unwrap() {
+                                    errs.push(format!("Logical transfer contains an element with size {}, exceeding the maximum element size {}.", data.len(), self.max_element_size()));
+                                }
 
-                            if start_index.is_none() {
-                                start_index = Some(idx);
-                            }
-                            end_index = idx;
+                                if let Ok(Some(_)) = &transfer_last {
+                                    transfer_last = Err(Error::InvalidArgument("Logical transfer contains an element with active data after an element was asserted last in a sequence. The physical stream only supports dimension information per transfer.".to_string()));
+                                }
 
-                            if prev_neg {
-                                pos_edge += 1;
-                                prev_neg = false;
-                            }
+                                if start_index.is_none() {
+                                    start_index = Some(idx);
+                                }
+                                end_index = idx;
 
-                            transfer_strobe = true;
-                            strobe.push(true);
-                        } else {
-                            prev_neg = true;
+                                if prev_neg {
+                                    pos_edge += 1;
+                                    prev_neg = false;
+                                }
 
-                            strobe.push(false);
-                        }
+                                transfer_strobe = true;
+                                strobe.push(true);
+
+                                data.clone()
+                            },
+                            None => {
+                                prev_neg = true;
+
+                                strobe.push(false);
+
+                                vec![]
+                            },
+                        };
 
                         match element.last() {
                             Some(last_range) => {
@@ -381,7 +392,7 @@ impl PhysicalTransfer {
 
                         strobe.push(element.data().is_some());
 
-                        (element.data().clone(), element.last().clone())
+                        (data, element.last().clone())
                     })
                     .unzip();
 
@@ -524,7 +535,7 @@ impl PhysicalTransfer {
     ///
     /// When Some, and certain elements are shorter than the maximum element
     /// size, shift to align to the LSB and do not drive the unaddressed bits.
-    pub fn data(&self) -> &Option<Vec<Option<Vec<bool>>>> {
+    pub fn data(&self) -> &Option<Vec<Vec<bool>>> {
         &self.data
     }
 
