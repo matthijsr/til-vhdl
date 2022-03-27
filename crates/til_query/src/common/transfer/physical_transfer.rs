@@ -63,6 +63,31 @@ pub enum LastMode {
     Lane(Vec<Option<Range<NonNegative>>>),
 }
 
+impl LastMode {
+    /// Determines whether this transfers the last of an inner sequence.
+    ///
+    /// Always returns `true` when LastMode is `None`
+    pub fn last_inner(&self) -> bool {
+        match self {
+            LastMode::None => true,
+            LastMode::Transfer(last_range) => {
+                if let Some(last_range) = last_range {
+                    last_range.start == 0
+                } else {
+                    false
+                }
+            }
+            LastMode::Lane(last_lanes) => {
+                if let Some(Some(last_range)) = last_lanes.last() {
+                    last_range.start == 0
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// The method by which `last` is transferred.
 pub enum StrobeMode {
@@ -420,8 +445,12 @@ impl PhysicalTransfer {
                         let end_index = end_index.try_into().unwrap();
                         *mut_endi = Some(end_index);
 
-                        if comp_lt_4 && end_index < self.element_lanes().get() - 1 {
-                            return Err(Error::InvalidArgument(format!("Cannot leave element lanes empty when transferring the innermost sequence. Physical stream has complexity {} (< 4).", self.complexity())));
+                        if comp_lt_4
+                            && end_index < self.element_lanes().get() - 1
+                            && !self.last().last_inner()
+                        {
+                            return Err(Error::InvalidArgument(format!("Cannot leave element lanes empty, except when transferring the last element of an innermost sequence.\n\
+                            Physical stream has complexity {} (< 4).", self.complexity())));
                         }
                     }
                     IndexMode::Insignificant(_) => (),
@@ -751,6 +780,10 @@ mod tests {
         let physical_transfer =
             PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
                 .with_logical_transfer(([("10", None), ("10", None), ("11", Some(0..2))], "101"))?;
+
+        let physical_transfer =
+            PhysicalTransfer::new(Complexity::new_major(1), Positive::new(3).unwrap(), 2, 3, 3)
+                .with_logical_transfer(([("10", None), ("11", Some(0..2))], "101"))?;
 
         Ok(())
     }
