@@ -52,7 +52,7 @@ impl IntoVhdl<SynthesisResult<Port, SignalList<Port>>> for Interface {
             )
         }))?;
 
-        let mut first = false;
+        let mut first = true;
         let mut streams = IndexMap::new();
         for (path, phys) in synth.logical_stream().streams_iter() {
             let phys_name = if path.len() > 0 {

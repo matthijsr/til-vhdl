@@ -292,6 +292,64 @@ end component;"#,
 }
 
 #[test]
+fn component_and_port_documentation() -> Result<()> {
+    let db = into_query_storage(
+        "
+namespace my::test::space {
+    type stream1 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+
+    #\
+    streamlet documentation \
+    is multi-line but can act as a split string\
+    #
+    streamlet doc_streamlet = (
+      #interface documentation
+is also
+multiline#
+      x: in stream1
+    );
+}
+    ",
+    )?;
+
+    let proj = db.project();
+    let streamlet = proj
+        .namespaces()
+        .get(&("my::test::space".try_into()?))
+        .unwrap()
+        .get(&db)
+        .get_streamlet(&db, "doc_streamlet")?;
+
+    let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+
+    let comp: Component = streamlet.canonical(&db, &mut arch_db, None)?;
+    assert_eq!(
+        r#"-- streamlet documentation is multi-line but can act as a split string
+component my__test__space__doc_streamlet_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    -- interface documentation
+    -- is also
+    -- multiline
+    x_valid : in std_logic;
+    x_ready : out std_logic;
+    x_data : in std_logic_vector(7 downto 0)
+  );
+end component;"#,
+        comp.declare(&arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
 fn playground() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
