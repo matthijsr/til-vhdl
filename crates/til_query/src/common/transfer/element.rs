@@ -5,14 +5,14 @@ use tydi_common::{
     numbers::NonNegative,
 };
 
-use super::utils::bits_from_str;
+use super::element_type::ElementType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Element {
     /// The data transfered on the Element.
     ///
     /// If None, the data on this Element is considered inactive.
-    data: Option<Vec<bool>>,
+    data: Option<ElementType>,
     /// Indicates whether this is the last element for a dimension or set of
     /// dimensions.
     ///
@@ -22,11 +22,11 @@ pub struct Element {
 
 impl Element {
     pub fn new(
-        data: Option<impl IntoIterator<Item = bool>>,
+        data: Option<impl Into<ElementType>>,
         last: Option<Range<NonNegative>>,
     ) -> Result<Self> {
         let result = Self {
-            data: data.map(|x| x.into_iter().collect()),
+            data: data.map(|x| x.into()),
             last: None,
         };
         if let Some(last) = last {
@@ -36,34 +36,28 @@ impl Element {
         }
     }
 
-    /// Parses a string into data
+    /// Attempts to set the data field based on a string.
     ///
-    /// Note that the LSB is on the right side of the string.
+    /// "-" and "inactive" (case-insensitive) represent inactive data.
     ///
-    /// ```
-    /// "010101"
-    ///  ^    ^
-    ///  MSB  LSB
-    /// ```
+    /// "" and "null" (case-insenstive) represent Null.
+    ///
+    /// "010" and other sets of bits represent Bits.
     pub fn new_data_from_str<'a>(data: &'a str) -> Result<Self> {
+        let data = if data == "-" || data.to_lowercase() == "inactive" {
+            None
+        } else {
+            Some(ElementType::from_str(data)?)
+        };
         Ok(Self {
-            data: Some(bits_from_str(data)?),
+            data: data,
             last: None,
         })
     }
 
-    /// Store an iterator of booleans as data on this element.
-    ///
-    /// Note that the MSB corresponds to index 0 of the iterator.
-    ///
-    /// ```
-    /// [true, false, true]
-    ///  ^^^^         ^^^^
-    ///  MSB           LSB
-    /// ```
-    pub fn new_data(data: impl IntoIterator<Item = bool>) -> Self {
+    pub fn new_data(data: impl Into<ElementType>) -> Self {
         Self {
-            data: Some(data.into_iter().collect()),
+            data: Some(data.into()),
             last: None,
         }
     }
@@ -87,7 +81,7 @@ impl Element {
         }
     }
 
-    pub fn data(&self) -> &Option<Vec<bool>> {
+    pub fn data(&self) -> &Option<ElementType> {
         &self.data
     }
 
@@ -130,6 +124,12 @@ impl Default for Element {
     }
 }
 
+impl<T: Into<ElementType>> From<T> for Element {
+    fn from(value: T) -> Self {
+        Element::new_data(value.into())
+    }
+}
+
 impl<'a> TryFrom<&'a str> for Element {
     type Error = Error;
 
@@ -146,11 +146,31 @@ impl FromStr for Element {
     }
 }
 
+impl<T: Into<ElementType>> TryFrom<(T, Range<NonNegative>)> for Element {
+    type Error = Error;
+
+    fn try_from(value: (T, Range<NonNegative>)) -> Result<Self> {
+        Element::new_data(value.0).with_last(value.1)
+    }
+}
+
 impl<'a> TryFrom<(&'a str, Range<NonNegative>)> for Element {
     type Error = Error;
 
     fn try_from(value: (&'a str, Range<NonNegative>)) -> Result<Self> {
         Element::new_data_from_str(value.0)?.with_last(value.1)
+    }
+}
+
+impl<T: Into<ElementType>> TryFrom<(T, Option<Range<NonNegative>>)> for Element {
+    type Error = Error;
+
+    fn try_from(value: (T, Option<Range<NonNegative>>)) -> Result<Self> {
+        if let Some(range) = value.1 {
+            Element::new_data(value.0).with_last(range)
+        } else {
+            Ok(Element::new_data(value.0))
+        }
     }
 }
 
@@ -174,6 +194,23 @@ impl<'a> TryFrom<Option<&'a str>> for Element {
             Element::new_data_from_str(data)
         } else {
             Ok(Element::new_inactive())
+        }
+    }
+}
+
+impl<T: Into<ElementType>> TryFrom<(Option<T>, Option<Range<NonNegative>>)> for Element {
+    type Error = Error;
+
+    fn try_from(value: (Option<T>, Option<Range<NonNegative>>)) -> Result<Self> {
+        let el = if let Some(data) = value.0 {
+            Element::new_data(data)
+        } else {
+            Element::new_inactive()
+        };
+        if let Some(range) = value.1 {
+            el.with_last(range)
+        } else {
+            Ok(el)
         }
     }
 }
@@ -207,6 +244,8 @@ impl TryFrom<Range<NonNegative>> for Element {
 mod tests {
     use tydi_common::error::TryResult;
 
+    use bitvec::prelude::*;
+
     use super::*;
 
     #[test]
@@ -221,6 +260,12 @@ mod tests {
         let inactive_2 = (1..2).try_result()?;
         assert_eq!(inactive, inactive_2);
 
+        let inactive_3 = ("-", 1..2).try_result()?;
+        assert_eq!(inactive, inactive_3);
+
+        let inactive_4 = ("inactive", 1..2).try_result()?;
+        assert_eq!(inactive, inactive_4);
+
         let data: Element = Element::new_data_from_str("101")?;
         assert!(data.is_active());
         assert_eq!(data.last(), &None);
@@ -234,12 +279,21 @@ mod tests {
         let data_2 = ("101", 0..2).try_result()?;
         assert_eq!(data, data_2);
 
+        let null_data = Element::new_data(ElementType::Null);
+        assert!(null_data.is_active());
+
+        let null_data2 = "".try_result()?;
+        assert_eq!(null_data, null_data2);
+
+        let null_data3 = "null".try_result()?;
+        assert_eq!(null_data, null_data3);
+
         Ok(())
     }
 
     #[test]
     fn invalid_new() -> Result<()> {
-        let data: Element = Element::new_data([false, true, false]);
+        let data = Element::new_data(bitvec![0, 1, 0]);
 
         let data_result = data.with_last(1..2);
         assert_eq!(

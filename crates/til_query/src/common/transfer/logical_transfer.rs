@@ -160,6 +160,8 @@ impl<'a> TryFrom<(LogicalData, &'a str)> for LogicalTransfer {
 mod tests {
     use super::*;
 
+    use bitvec::prelude::*;
+
     #[test]
     fn try_result_compare() -> Result<()> {
         let transfer_1: LogicalTransfer = LogicalTransfer::new(
