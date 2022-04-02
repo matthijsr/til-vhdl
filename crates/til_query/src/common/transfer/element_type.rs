@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use bitvec::prelude::*;
 use tydi_common::{
     error::{Error, Result},
@@ -121,6 +123,31 @@ impl UnionElement {
     }
 }
 
+impl FromStr for ElementType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        if s == "" || s.to_lowercase() == "null" {
+            Ok(ElementType::Null)
+        } else {
+            let mut result = BitVec::new();
+            for c in s.chars() {
+                if c == '1' {
+                    result.push(true);
+                } else if c == '0' {
+                    result.push(false);
+                } else {
+                    return Err(Error::InvalidArgument(format!(
+                        "ElementType cannot be parsed from string \"{}\"",
+                        s
+                    )));
+                }
+            }
+            Ok(ElementType::Bits(result))
+        }
+    }
+}
+
 impl From<BitVec> for ElementType {
     fn from(bits: BitVec) -> Self {
         ElementType::Bits(bits)
@@ -170,6 +197,20 @@ mod tests {
             )?
             .flatten(),
             bitvec![1, 0, 0, 0, 1, 0]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn from_str_element_type() -> Result<()> {
+        assert_eq!(ElementType::from_str("")?, ElementType::Null);
+        assert_eq!(ElementType::from_str("null")?, ElementType::Null);
+        assert_eq!(ElementType::from_str("Null")?, ElementType::Null);
+        assert_eq!(ElementType::from_str("nULL")?, ElementType::Null);
+        assert_eq!(
+            ElementType::from_str("0100")?,
+            ElementType::Bits(bitvec![0, 1, 0, 0])
         );
 
         Ok(())
