@@ -1,13 +1,11 @@
-use std::{convert::TryFrom, ops::Range};
+use std::{convert::TryFrom, ops::Range, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
     numbers::NonNegative,
 };
 
-use crate::common::transfer::utils::bits_from_str;
-
-use super::element::Element;
+use super::{element::Element, element_type::ElementType};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogicalData {
@@ -29,17 +27,19 @@ pub struct LogicalTransfer {
     /// The data carried by this Logical Transfer
     data: LogicalData,
     /// The user signal.
-    user: Vec<bool>,
+    ///
+    /// If None, this Transfer does not address the user signal.
+    user: Option<ElementType>,
 }
 
 impl LogicalTransfer {
     pub fn new(
         lanes: impl IntoIterator<Item = Element>,
-        user: impl IntoIterator<Item = bool>,
+        user: Option<impl Into<ElementType>>,
     ) -> Self {
         Self {
             data: LogicalData::Lanes(lanes.into_iter().collect()),
-            user: user.into_iter().collect(),
+            user: user.map(|x| x.into()),
         }
     }
 
@@ -47,22 +47,27 @@ impl LogicalTransfer {
     pub fn new_empty(last: Range<NonNegative>) -> Self {
         Self {
             data: LogicalData::EmptySequence(last),
-            user: vec![],
+            user: None,
         }
     }
 
     /// Create a new empty sequence with a user transfer
-    pub fn new_empty_user(last: Range<NonNegative>, user: impl IntoIterator<Item = bool>) -> Self {
+    pub fn new_empty_user(last: Range<NonNegative>, user: impl Into<ElementType>) -> Self {
         Self {
             data: LogicalData::EmptySequence(last),
-            user: user.into_iter().collect(),
+            user: Some(user.into()),
         }
     }
 
     pub fn try_new(
         lanes: impl IntoIterator<Item = impl TryResult<Element>>,
-        user: impl IntoIterator<Item = bool>,
+        user: Option<impl TryResult<ElementType>>,
     ) -> Result<Self> {
+        let user = if let Some(user) = user {
+            Some(user.try_result()?)
+        } else {
+            None
+        };
         Ok(Self {
             data: LogicalData::Lanes(
                 lanes
@@ -70,14 +75,14 @@ impl LogicalTransfer {
                     .map(|x| x.try_result())
                     .collect::<Result<Vec<Element>>>()?,
             ),
-            user: user.into_iter().collect(),
+            user: user,
         })
     }
 
     pub fn new_lanes(lanes: impl IntoIterator<Item = Element>) -> Self {
         Self {
             data: LogicalData::Lanes(lanes.into_iter().collect()),
-            user: vec![],
+            user: None,
         }
     }
 
@@ -90,12 +95,12 @@ impl LogicalTransfer {
         ))
     }
 
-    pub fn set_user(&mut self, user: impl IntoIterator<Item = bool>) {
-        self.user = user.into_iter().collect();
+    pub fn set_user(&mut self, user: impl Into<ElementType>) {
+        self.user = Some(user.into());
     }
 
-    pub fn with_user(mut self, user: impl IntoIterator<Item = bool>) -> Self {
-        self.user = user.into_iter().collect();
+    pub fn with_user(mut self, user: impl Into<ElementType>) -> Self {
+        self.user = Some(user.into());
         self
     }
 
@@ -103,7 +108,7 @@ impl LogicalTransfer {
         &self.data
     }
 
-    pub fn user(&self) -> &Vec<bool> {
+    pub fn user(&self) -> &Option<ElementType> {
         &self.user
     }
 }
@@ -112,7 +117,7 @@ impl From<LogicalData> for LogicalTransfer {
     fn from(value: LogicalData) -> Self {
         Self {
             data: value,
-            user: vec![],
+            user: None,
         }
     }
 }
@@ -141,7 +146,13 @@ where
     type Error = Error;
 
     fn try_from(value: (I, &'a str)) -> Result<Self> {
-        Self::try_new(value.0, bits_from_str(value.1)?)
+        let user = if value.1 == "-" || value.1.to_lowercase() == "inactive" {
+            None
+        } else {
+            Some(ElementType::from_str(value.1)?)
+        };
+
+        Self::try_new(value.0, user)
     }
 }
 
@@ -149,9 +160,15 @@ impl<'a> TryFrom<(LogicalData, &'a str)> for LogicalTransfer {
     type Error = Error;
 
     fn try_from(value: (LogicalData, &'a str)) -> Result<Self> {
+        let user = if value.1 == "-" || value.1.to_lowercase() == "inactive" {
+            None
+        } else {
+            Some(ElementType::from_str(value.1)?)
+        };
+
         Ok(Self {
             data: value.0,
-            user: bits_from_str(value.1)?,
+            user,
         })
     }
 }
@@ -166,10 +183,10 @@ mod tests {
     fn try_result_compare() -> Result<()> {
         let transfer_1: LogicalTransfer = LogicalTransfer::new(
             [
-                Element::new_data([true, false, true, true]),
-                Element::new_data([true, false, false, false]),
+                Element::new_data(bitvec![1, 0, 1, 1]),
+                Element::new_data(bitvec![1, 0, 0, 0]),
             ],
-            [],
+            None::<ElementType>,
         );
         let transfer_2 = ["1011", "1000"].try_result()?;
 
@@ -177,10 +194,10 @@ mod tests {
 
         let transfer_3: LogicalTransfer = LogicalTransfer::new(
             [
-                Element::new_data([true, false, true, true]),
-                Element::new_data([true, false, false, false]),
+                Element::new_data(bitvec![1, 0, 1, 1]),
+                Element::new_data(bitvec![1, 0, 0, 0]),
             ],
-            [false, true],
+            Some(bitvec![0, 1]),
         );
         let transfer_4 = (["1011", "1000"], "01").try_result()?;
 
@@ -190,7 +207,7 @@ mod tests {
         let empty_transfer_2 = (LogicalData::EmptySequence(0..2)).into();
         assert_eq!(empty_transfer_1, empty_transfer_2);
 
-        let empty_transfer_3 = LogicalTransfer::new_empty_user(2..2, [false, true, false]);
+        let empty_transfer_3 = LogicalTransfer::new_empty_user(2..2, bitvec![0, 1, 0]);
         let empty_transfer_4 = (LogicalData::EmptySequence(2..2), "010").try_result()?;
         assert_eq!(empty_transfer_3, empty_transfer_4);
 
