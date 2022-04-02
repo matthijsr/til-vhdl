@@ -69,6 +69,15 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         (&self).into_iter()
     }
+
+    /// Get the index of a given key.
+    ///
+    /// Returns None if no such key exists.
+    pub fn key_index(&self, key: &K) -> Option<usize> {
+        self.keys
+            .iter()
+            .find_map(|(idx, k)| if k == key { Some(*idx) } else { None })
+    }
 }
 
 pub struct InsertionOrderedMapIter<'a, K: Ord + Clone, V: Clone> {
