@@ -1,6 +1,5 @@
 use core::fmt;
-use std::{sync::Arc};
-
+use std::sync::Arc;
 
 use tydi_intern::Id;
 
