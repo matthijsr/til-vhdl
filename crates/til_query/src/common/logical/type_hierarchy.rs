@@ -1,5 +1,5 @@
 use tydi_common::{
-    error::Result, insertion_ordered_map::InsertionOrderedMap, name::PathName, numbers::Positive,
+    error::Result, map::InsertionOrderedMap, name::PathName, numbers::Positive,
 };
 use tydi_intern::Id;
 

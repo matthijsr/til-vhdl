@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tydi_common::{
     error::{Error, Result, WrapError},
-    insertion_ordered_map::InsertionOrderedMap,
+    map::InsertionOrderedMap,
     name::PathName,
     traits::Reverse,
 };

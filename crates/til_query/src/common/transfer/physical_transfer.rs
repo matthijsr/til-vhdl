@@ -200,13 +200,13 @@ impl PhysicalTransfer {
 
         let element_lanes_gt_1 = element_lanes > Positive::new(1).unwrap();
 
-        let mut start_index = if element_lanes_gt_1 && complexity >= Complexity::new_major(6) {
+        let start_index = if element_lanes_gt_1 && complexity >= Complexity::new_major(6) {
             IndexMode::Index(Some(0))
         } else {
             IndexMode::Unsupported
         };
 
-        let mut end_index = if element_lanes_gt_1
+        let end_index = if element_lanes_gt_1
             && (dimensionality >= 1 || complexity >= Complexity::new_major(5))
         {
             IndexMode::Index(Some(element_lanes.get() - 1))

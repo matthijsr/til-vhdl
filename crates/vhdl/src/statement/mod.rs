@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    insertion_ordered_map::InsertionOrderedMap,
+    map::InsertionOrderedMap,
 };
 use tydi_intern::Id;
 

@@ -9,7 +9,7 @@ use crate::ir::{
 };
 use tydi_common::{
     error::{Result, TryResult},
-    insertion_ordered_map::InsertionOrderedMap,
+    map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::{BitCount, NonNegative},
     util::log2_ceil,
