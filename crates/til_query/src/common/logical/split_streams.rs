@@ -1,4 +1,4 @@
-use tydi_common::{error::Result, insertion_ordered_map::InsertionOrderedMap, name::PathName};
+use tydi_common::{error::Result, map::InsertionOrderedMap, name::PathName};
 use tydi_intern::Id;
 
 use crate::ir::Ir;

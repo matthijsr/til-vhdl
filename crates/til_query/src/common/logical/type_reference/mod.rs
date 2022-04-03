@@ -1,6 +1,6 @@
 use tydi_common::{
     error::{Error, Result},
-    insertion_ordered_map::InsertionOrderedMap,
+    map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::Positive,
 };

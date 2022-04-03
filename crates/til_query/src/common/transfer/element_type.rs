@@ -3,7 +3,7 @@ use std::str::FromStr;
 use bitvec::prelude::*;
 use tydi_common::{
     error::{Error, Result},
-    insertion_ordered_map::InsertionOrderedMap,
+    map::InsertionOrderedMap,
     name::Name,
 };
 
