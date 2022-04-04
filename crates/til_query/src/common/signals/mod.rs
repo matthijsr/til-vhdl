@@ -233,10 +233,14 @@ pub trait PhysicalTransfers {
     ///
     /// `test_staggered` intentionally closes the transfer whenever possible.
     /// (Only applies when driving a Sink.)
+    ///
+    /// `context` refers to the context of the physical stream, such as its
+    /// interface name.
     fn transfer(
         &mut self,
         transfer: impl TryResult<PhysicalTransfer>,
         test_staggered: bool,
+        context: &str,
         message: &str,
     ) -> Result<()>;
 }
@@ -254,14 +258,17 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
         &mut self,
         transfer: impl TryResult<PhysicalTransfer>,
         test_staggered: bool,
+        context: &str,
         message: &str,
     ) -> Result<()> {
         let transfer: PhysicalTransfer = transfer.try_result()?;
 
-        self.comment(&format!("Test: {}", message));
+        self.comment(message);
 
         // TODO: Use type knowledge to address (subsections of) data with
         // comments for additional context.
+
+        // TODO: Add a display function to ElementType
 
         if let Some(data) = transfer.data() {
             for (lane, data) in data.iter().enumerate() {
@@ -271,7 +278,7 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
                     self.auto_data(
                         lane * transfer.element_size(),
                         data.flatten(),
-                        &format!("Lane {}", lane),
+                        &format!("Lane {} - {}: {:?}", lane, context, data),
                         message,
                     )?;
                 } else {
@@ -296,8 +303,13 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
 
         match transfer.user() {
             Some(Some(ElementType::Null)) => (),
-            Some(Some(user)) => self.auto_user(0, user.flatten(), "", message)?,
-            Some(None) => self.comment("User inactive"),
+            Some(Some(user)) => self.auto_user(
+                0,
+                user.flatten(),
+                &format!("{}: {:?}", context, user),
+                message,
+            )?,
+            Some(None) => self.comment(&format!("{}: User inactive", context)),
             None => self.auto_user_default(message)?,
         }
 
