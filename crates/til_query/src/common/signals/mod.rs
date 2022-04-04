@@ -274,15 +274,17 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
             for (lane, data) in data.iter().enumerate() {
                 let lane = NonNegative::try_from(lane)
                     .map_err(|err| Error::BackEndError(err.to_string()))?;
-                if let Some(data) = data {
-                    self.auto_data(
-                        lane * transfer.element_size(),
-                        data.flatten(),
-                        &format!("Lane {} - {}: {:?}", lane, context, data),
-                        message,
-                    )?;
-                } else {
-                    self.comment(&format!("Lane {} inactive", lane));
+                match data {
+                    Some(ElementType::Null) => (),
+                    Some(data) => {
+                        self.auto_data(
+                            lane * transfer.element_size(),
+                            data.flatten(),
+                            &format!("Lane {} - {}: {:?}", lane, context, data),
+                            message,
+                        )?;
+                    }
+                    None => self.comment(&format!("Lane {} inactive", lane)),
                 }
             }
         } else {
