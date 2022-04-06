@@ -1,3 +1,4 @@
+use core::fmt;
 use std::str::FromStr;
 
 use bitvec::prelude::*;
@@ -40,6 +41,31 @@ impl ElementType {
             ElementType::Bits(bits) => bits.clone(),
             ElementType::Group(group) => group.iter().flat_map(|(_, typ)| typ.flatten()).collect(),
             ElementType::Union(union) => union.flatten(),
+        }
+    }
+}
+
+impl fmt::Display for ElementType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ElementType::Null => write!(f, "Null"),
+            ElementType::Bits(bits) => write!(f, "Bits({})", bits),
+            ElementType::Group(group) => write!(
+                f,
+                "Group({})",
+                group
+                    .iter()
+                    .map(|(n, x)| format!("{}: {}", n, x))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            ElementType::Union(union) => write!(
+                f,
+                "Union(tag: {} ({}), union: {})",
+                union.tag(),
+                union.union().0,
+                union.union_el()
+            ),
         }
     }
 }

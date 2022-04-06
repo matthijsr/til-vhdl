@@ -8,7 +8,7 @@ use crate::common::transfer::element_type::ElementType;
 
 use super::transfer::physical_transfer::{IndexMode, LastMode, PhysicalTransfer, StrobeMode};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PhysicalStreamDirection {
     Source,
     Sink,
@@ -280,7 +280,7 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
                         self.auto_data(
                             lane * transfer.element_size(),
                             data.flatten(),
-                            &format!("Lane {} - {}: {:?}", lane, context, data),
+                            &format!("Lane {} - {}: {}", lane, context, data),
                             message,
                         )?;
                     }
@@ -308,7 +308,7 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
             Some(Some(user)) => self.auto_user(
                 0,
                 user.flatten(),
-                &format!("{}: {:?}", context, user),
+                &format!("{}: {}", context, user),
                 message,
             )?,
             Some(None) => self.comment(&format!("{}: User inactive", context)),
@@ -343,6 +343,197 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
             }
         }
 
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tydi_common::numbers::Positive;
+
+    use crate::common::physical::complexity::Complexity;
+
+    use super::*;
+
+    pub struct TestSignaller {
+        dir: PhysicalStreamDirection,
+        result: String,
+    }
+
+    impl TestSignaller {
+        pub fn sink() -> Self {
+            Self {
+                dir: PhysicalStreamDirection::Sink,
+                result: String::new(),
+            }
+        }
+
+        pub fn source() -> Self {
+            Self {
+                dir: PhysicalStreamDirection::Source,
+                result: String::new(),
+            }
+        }
+
+        pub fn result(&self) -> &str {
+            &self.result
+        }
+    }
+
+    impl PhysicalSignals for TestSignaller {
+        fn direction(&self) -> PhysicalStreamDirection {
+            self.dir
+        }
+
+        fn comment(&mut self, comment: &str) {
+            self.result.push_str(&format!("// {}\n", comment))
+        }
+
+        fn act_data_default(&mut self) -> Result<()> {
+            self.result.push_str("act_data_default\n");
+            Ok(())
+        }
+
+        fn assert_data_default(&mut self, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_data_default: {}\n", message));
+            Ok(())
+        }
+
+        fn act_data(&mut self, lsb_index: NonNegative, data: BitVec, comment: &str) -> Result<()> {
+            self.result.push_str(&format!(
+                "act_data({}, {}) // {}\n",
+                lsb_index, data, comment
+            ));
+            Ok(())
+        }
+
+        fn assert_data(
+            &mut self,
+            lsb_index: NonNegative,
+            data: BitVec,
+            comment: &str,
+            message: &str,
+        ) -> Result<()> {
+            self.result.push_str(&format!(
+                "assert_data({}, {}): {} // {}\n",
+                lsb_index, data, message, comment
+            ));
+            Ok(())
+        }
+
+        fn act_user_default(&mut self) -> Result<()> {
+            self.result.push_str("act_user_default\n");
+            Ok(())
+        }
+
+        fn assert_user_default(&mut self, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_user_default: {}\n", message));
+            Ok(())
+        }
+
+        fn act_user(&mut self, lsb_index: NonNegative, user: BitVec, comment: &str) -> Result<()> {
+            self.result.push_str(&format!(
+                "act_user({}, {}) // {}\n",
+                lsb_index, user, comment
+            ));
+            Ok(())
+        }
+
+        fn assert_user(
+            &mut self,
+            lsb_index: NonNegative,
+            user: BitVec,
+            comment: &str,
+            message: &str,
+        ) -> Result<()> {
+            self.result.push_str(&format!(
+                "assert_user({}, {}): {} // {}\n",
+                lsb_index, user, message, comment
+            ));
+            Ok(())
+        }
+
+        fn act_stai(&mut self, stai: NonNegative) -> Result<()> {
+            self.result.push_str(&format!("act_stai({})\n", stai));
+            Ok(())
+        }
+
+        fn assert_stai(&mut self, stai: NonNegative, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_stai({}): {}\n", stai, message));
+            Ok(())
+        }
+
+        fn act_endi(&mut self, endi: NonNegative) -> Result<()> {
+            self.result.push_str(&format!("act_endi({})\n", endi));
+            Ok(())
+        }
+
+        fn assert_endi(&mut self, endi: NonNegative, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_endi({}): {}\n", endi, message));
+            Ok(())
+        }
+
+        fn act_strb(&mut self, strb: StrobeMode) -> Result<()> {
+            self.result.push_str(&format!("act_strb({})\n", strb));
+            Ok(())
+        }
+
+        fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_strb({}): {}\n", strb, message));
+            Ok(())
+        }
+
+        fn act_last(&mut self, last: LastMode) -> Result<()> {
+            self.result.push_str(&format!("act_last({})\n", last));
+            Ok(())
+        }
+
+        fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_last({}): {}\n", last, message));
+            Ok(())
+        }
+
+        fn handshake(&mut self) -> Result<()> {
+            self.result.push_str("handshake\n");
+            Ok(())
+        }
+
+        fn handshake_continue(&mut self, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("handshake_continue: {}\n", message));
+            Ok(())
+        }
+
+        fn handshake_start(&mut self) -> Result<()> {
+            self.result.push_str("handshake_start\n");
+            Ok(())
+        }
+
+        fn handshake_end(&mut self) -> Result<()> {
+            self.result.push_str("handshake_end\n");
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_transfer() -> Result<()> {
+        let mut sink = TestSignaller::sink();
+        sink.open_transfer()?;
+        sink.transfer(
+            PhysicalTransfer::new(Complexity::new_major(8), Positive::new(3).unwrap(), 2, 3, 3)
+                .with_logical_transfer(([Some("11"), None, Some("11")], "101"))?,
+            false,
+            "ctx",
+            "test message",
+        )?;
+        sink.close_transfer()?;
+        println!("{}", sink.result());
         Ok(())
     }
 }
