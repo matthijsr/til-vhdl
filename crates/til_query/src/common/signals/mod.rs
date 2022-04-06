@@ -268,8 +268,6 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
         // TODO: Use type knowledge to address (subsections of) data with
         // comments for additional context.
 
-        // TODO: Add a display function to ElementType
-
         if let Some(data) = transfer.data() {
             for (lane, data) in data.iter().enumerate() {
                 let lane = NonNegative::try_from(lane)
@@ -523,17 +521,50 @@ mod tests {
 
     #[test]
     fn test_transfer() -> Result<()> {
+        let transfer =
+            PhysicalTransfer::new(Complexity::new_major(8), Positive::new(3).unwrap(), 2, 3, 3)
+                .with_logical_transfer(([Some("11"), None, Some("11")], "101"))?;
+
         let mut sink = TestSignaller::sink();
         sink.open_transfer()?;
-        sink.transfer(
-            PhysicalTransfer::new(Complexity::new_major(8), Positive::new(3).unwrap(), 2, 3, 3)
-                .with_logical_transfer(([Some("11"), None, Some("11")], "101"))?,
-            false,
-            "ctx",
-            "test message",
-        )?;
+        sink.transfer(transfer.clone(), false, "ctx", "test message")?;
         sink.close_transfer()?;
-        println!("{}", sink.result());
+
+        assert_eq!(
+            r#"handshake_start
+// test message
+act_data(0, [1, 1]) // Lane 0 - ctx: Bits([1, 1])
+// Lane 1 inactive
+act_data(4, [1, 1]) // Lane 2 - ctx: Bits([1, 1])
+act_last(Lane(None, None, None))
+act_strb(Lane("101"))
+act_user(0, [1, 0, 1]) // ctx: Bits([1, 0, 1])
+handshake_continue: test message
+handshake_end
+"#,
+            sink.result()
+        );
+
+        let mut source = TestSignaller::source();
+        source.open_transfer()?;
+        source.transfer(transfer.clone(), false, "ctx", "test message")?;
+        source.close_transfer()?;
+
+        assert_eq!(
+            r#"handshake_start
+// test message
+assert_data(0, [1, 1]): test message // Lane 0 - ctx: Bits([1, 1])
+// Lane 1 inactive
+assert_data(4, [1, 1]): test message // Lane 2 - ctx: Bits([1, 1])
+assert_last(Lane(None, None, None)): test message
+assert_strb(Lane("101")): test message
+assert_user(0, [1, 0, 1]): test message // ctx: Bits([1, 0, 1])
+handshake
+handshake_end
+"#,
+            source.result()
+        );
+
         Ok(())
     }
 }

@@ -137,7 +137,7 @@ impl fmt::Display for StrobeMode {
             StrobeMode::Transfer(transfer) => write!(f, "Transfer({})", transfer),
             StrobeMode::Lane(lanes) => write!(
                 f,
-                "Lane({})",
+                "Lane({:?})",
                 lanes
                     .iter()
                     .map(|x| if *x { '1' } else { '0' })
@@ -440,8 +440,6 @@ impl PhysicalTransfer {
                             },
                             None => (),
                         }
-
-                        strobe.push(element.data().is_some());
 
                         (data, element.last().clone())
                     })
