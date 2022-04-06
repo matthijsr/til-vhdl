@@ -1,4 +1,3 @@
-use bitvec::prelude::BitVec;
 use tydi_common::{
     error::{Error, Result, TryResult},
     numbers::NonNegative,
@@ -41,36 +40,26 @@ pub trait PhysicalSignals {
         }
     }
 
-    /// Drive the `data` signal starting at the given index (relative to the
-    /// Least-Significant Bit).
-    ///
-    /// The `comment` can optionally be implemented by the backend to provide
-    /// further context on what this (segment of) the `data` signal relates to.
-    fn act_data(&mut self, lsb_index: NonNegative, data: BitVec, comment: &str) -> Result<()>;
+    /// Drive the `data` signal starting at the given element lane
+    fn act_data(&mut self, element_lane: NonNegative, data: &ElementType) -> Result<()>;
 
-    /// Assert the value of the `data` signal starting at the given index
-    /// (relative to the Least-Significant Bit).
-    ///
-    /// The `comment` can optionally be implemented by the backend to provide
-    /// further context on what this (segment of) the `data` signal relates to.
+    /// Assert the value of the `data` signal starting at the given element lane
     fn assert_data(
         &mut self,
-        lsb_index: NonNegative,
-        data: BitVec,
-        comment: &str,
+        element_lane: NonNegative,
+        data: &ElementType,
         message: &str,
     ) -> Result<()>;
 
     fn auto_data(
         &mut self,
-        lsb_index: NonNegative,
-        data: BitVec,
-        comment: &str,
+        element_lane: NonNegative,
+        data: &ElementType,
         message: &str,
     ) -> Result<()> {
         match self.direction() {
-            PhysicalStreamDirection::Source => self.assert_data(lsb_index, data, comment, message),
-            PhysicalStreamDirection::Sink => self.act_data(lsb_index, data, comment),
+            PhysicalStreamDirection::Source => self.assert_data(element_lane, data, message),
+            PhysicalStreamDirection::Sink => self.act_data(element_lane, data),
         }
     }
 
@@ -87,36 +76,16 @@ pub trait PhysicalSignals {
         }
     }
 
-    /// Drive the `user` signal starting at the given index (relative to the
-    /// Least-Significant Bit).
-    ///
-    /// The `comment` can optionally be implemented by the backend to provide
-    /// further context on what this (segment of) the `user` signal relates to.
-    fn act_user(&mut self, lsb_index: NonNegative, user: BitVec, comment: &str) -> Result<()>;
+    /// Drive the `user` signal
+    fn act_user(&mut self, user: &ElementType) -> Result<()>;
 
-    /// Assert the value of the `user` signal starting at the given index
-    /// (relative to the Least-Significant Bit).
-    ///
-    /// The `comment` can optionally be implemented by the backend to provide
-    /// further context on what this (segment of) the `user` signal relates to.
-    fn assert_user(
-        &mut self,
-        lsb_index: NonNegative,
-        user: BitVec,
-        comment: &str,
-        message: &str,
-    ) -> Result<()>;
+    /// Assert the value of the `user` signal
+    fn assert_user(&mut self, user: &ElementType, message: &str) -> Result<()>;
 
-    fn auto_user(
-        &mut self,
-        lsb_index: NonNegative,
-        user: BitVec,
-        comment: &str,
-        message: &str,
-    ) -> Result<()> {
+    fn auto_user(&mut self, user: &ElementType, message: &str) -> Result<()> {
         match self.direction() {
-            PhysicalStreamDirection::Source => self.assert_user(lsb_index, user, comment, message),
-            PhysicalStreamDirection::Sink => self.act_user(lsb_index, user, comment),
+            PhysicalStreamDirection::Source => self.assert_user(user, message),
+            PhysicalStreamDirection::Sink => self.act_user(user),
         }
     }
 
@@ -240,7 +209,6 @@ pub trait PhysicalTransfers {
         &mut self,
         transfer: impl TryResult<PhysicalTransfer>,
         test_staggered: bool,
-        context: &str,
         message: &str,
     ) -> Result<()>;
 }
@@ -258,29 +226,19 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
         &mut self,
         transfer: impl TryResult<PhysicalTransfer>,
         test_staggered: bool,
-        context: &str,
         message: &str,
     ) -> Result<()> {
         let transfer: PhysicalTransfer = transfer.try_result()?;
 
         self.comment(message);
 
-        // TODO: Use type knowledge to address (subsections of) data with
-        // comments for additional context.
-
         if let Some(data) = transfer.data() {
             for (lane, data) in data.iter().enumerate() {
                 let lane = NonNegative::try_from(lane)
                     .map_err(|err| Error::BackEndError(err.to_string()))?;
                 match data {
-                    Some(ElementType::Null) => (),
                     Some(data) => {
-                        self.auto_data(
-                            lane * transfer.element_size(),
-                            data.flatten(),
-                            &format!("Lane {} - {}: {}", lane, context, data),
-                            message,
-                        )?;
+                        self.auto_data(lane, data, message)?;
                     }
                     None => self.comment(&format!("Lane {} inactive", lane)),
                 }
@@ -302,14 +260,8 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
         }
 
         match transfer.user() {
-            Some(Some(ElementType::Null)) => (),
-            Some(Some(user)) => self.auto_user(
-                0,
-                user.flatten(),
-                &format!("{}: {}", context, user),
-                message,
-            )?,
-            Some(None) => self.comment(&format!("{}: User inactive", context)),
+            Some(Some(user)) => self.auto_user(user, message)?,
+            Some(None) => self.comment("User inactive"),
             None => self.auto_user_default(message)?,
         }
 
@@ -398,24 +350,21 @@ mod tests {
             Ok(())
         }
 
-        fn act_data(&mut self, lsb_index: NonNegative, data: BitVec, comment: &str) -> Result<()> {
-            self.result.push_str(&format!(
-                "act_data({}, {}) // {}\n",
-                lsb_index, data, comment
-            ));
+        fn act_data(&mut self, element_lane: NonNegative, data: &ElementType) -> Result<()> {
+            self.result
+                .push_str(&format!("act_data({}, {})\n", element_lane, data));
             Ok(())
         }
 
         fn assert_data(
             &mut self,
-            lsb_index: NonNegative,
-            data: BitVec,
-            comment: &str,
+            element_lane: NonNegative,
+            data: &ElementType,
             message: &str,
         ) -> Result<()> {
             self.result.push_str(&format!(
-                "assert_data({}, {}): {} // {}\n",
-                lsb_index, data, message, comment
+                "assert_data({}, {}): {}\n",
+                element_lane, data, message
             ));
             Ok(())
         }
@@ -431,25 +380,14 @@ mod tests {
             Ok(())
         }
 
-        fn act_user(&mut self, lsb_index: NonNegative, user: BitVec, comment: &str) -> Result<()> {
-            self.result.push_str(&format!(
-                "act_user({}, {}) // {}\n",
-                lsb_index, user, comment
-            ));
+        fn act_user(&mut self, user: &ElementType) -> Result<()> {
+            self.result.push_str(&format!("act_user({})\n", user));
             Ok(())
         }
 
-        fn assert_user(
-            &mut self,
-            lsb_index: NonNegative,
-            user: BitVec,
-            comment: &str,
-            message: &str,
-        ) -> Result<()> {
-            self.result.push_str(&format!(
-                "assert_user({}, {}): {} // {}\n",
-                lsb_index, user, message, comment
-            ));
+        fn assert_user(&mut self, user: &ElementType, message: &str) -> Result<()> {
+            self.result
+                .push_str(&format!("assert_user({}): {}\n", user, message));
             Ok(())
         }
 
@@ -527,18 +465,18 @@ mod tests {
 
         let mut sink = TestSignaller::sink();
         sink.open_transfer()?;
-        sink.transfer(transfer.clone(), false, "ctx", "test message")?;
+        sink.transfer(transfer.clone(), false, "test message")?;
         sink.close_transfer()?;
 
         assert_eq!(
             r#"handshake_start
 // test message
-act_data(0, [1, 1]) // Lane 0 - ctx: Bits([1, 1])
+act_data(0, Bits([1, 1]))
 // Lane 1 inactive
-act_data(4, [1, 1]) // Lane 2 - ctx: Bits([1, 1])
+act_data(2, Bits([1, 1]))
 act_last(Lane(None, None, None))
 act_strb(Lane("101"))
-act_user(0, [1, 0, 1]) // ctx: Bits([1, 0, 1])
+act_user(Bits([1, 0, 1]))
 handshake_continue: test message
 handshake_end
 "#,
@@ -547,18 +485,18 @@ handshake_end
 
         let mut source = TestSignaller::source();
         source.open_transfer()?;
-        source.transfer(transfer.clone(), false, "ctx", "test message")?;
+        source.transfer(transfer.clone(), false, "test message")?;
         source.close_transfer()?;
 
         assert_eq!(
             r#"handshake_start
 // test message
-assert_data(0, [1, 1]): test message // Lane 0 - ctx: Bits([1, 1])
+assert_data(0, Bits([1, 1])): test message
 // Lane 1 inactive
-assert_data(4, [1, 1]): test message // Lane 2 - ctx: Bits([1, 1])
+assert_data(2, Bits([1, 1])): test message
 assert_last(Lane(None, None, None)): test message
 assert_strb(Lane("101")): test message
-assert_user(0, [1, 0, 1]): test message // ctx: Bits([1, 0, 1])
+assert_user(Bits([1, 0, 1])): test message
 handshake
 handshake_end
 "#,
