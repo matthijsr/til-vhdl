@@ -1,3 +1,4 @@
+use core::fmt;
 use std::str::FromStr;
 
 use bitvec::prelude::*;
@@ -5,6 +6,7 @@ use tydi_common::{
     error::{Error, Result},
     map::InsertionOrderedMap,
     name::Name,
+    numbers::NonNegative,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -16,9 +18,15 @@ pub enum ElementType {
 }
 
 impl ElementType {
-    pub fn union(tag: BitVec, name: Name, union: ElementType, max_len: usize) -> Result<Self> {
+    pub fn union(
+        tag: NonNegative,
+        no_fields: NonNegative,
+        name: Name,
+        union: ElementType,
+        max_len: usize,
+    ) -> Result<Self> {
         Ok(ElementType::Union(UnionElement::new(
-            tag, name, union, max_len,
+            tag, no_fields, name, union, max_len,
         )?))
     }
 
@@ -44,16 +52,57 @@ impl ElementType {
     }
 }
 
+impl fmt::Display for ElementType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ElementType::Null => write!(f, "Null"),
+            ElementType::Bits(bits) => write!(f, "Bits({})", bits),
+            ElementType::Group(group) => write!(
+                f,
+                "Group({})",
+                group
+                    .iter()
+                    .map(|(n, x)| format!("{}: {}", n, x))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            ElementType::Union(union) => write!(
+                f,
+                "Union(tag: {} ({}), union: {})",
+                union.tag(),
+                union.field_name(),
+                union.union_el()
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnionElement {
-    tag: BitVec,
+    tag: NonNegative,
+    no_fields: NonNegative,
     union: (Name, Box<ElementType>),
     max_len: usize,
 }
 
 impl UnionElement {
-    pub fn new(tag: BitVec, name: Name, union: ElementType, max_len: usize) -> Result<Self> {
-        if union.len() > max_len {
+    pub fn new(
+        tag: NonNegative,
+        no_fields: NonNegative,
+        name: Name,
+        union: ElementType,
+        max_len: usize,
+    ) -> Result<Self> {
+        if no_fields == 0 {
+            Err(Error::InvalidArgument(
+                "The number of fields in a union can't be 0".to_string(),
+            ))
+        } else if tag > no_fields {
+            Err(Error::InvalidArgument(format!(
+                "tag > no_fields, {} > {}",
+                tag, no_fields
+            )))
+        } else if union.len() > max_len {
             Err(Error::InvalidArgument(format!(
                 "Union size exceeds max_len: {} > {}",
                 union.len(),
@@ -62,39 +111,38 @@ impl UnionElement {
         } else {
             Ok(Self {
                 tag,
+                no_fields,
                 union: (name, Box::new(union)),
                 max_len,
             })
         }
     }
 
-    /// Creates a tag for a Union based on the number of fields in the Union
-    /// type and the index of the selected field.
-    pub fn new_tag(fields: usize, field_no: usize) -> Result<BitVec> {
-        if fields == 0 {
-            Err(Error::InvalidArgument(
-                "The number of fields in a union can't be 0".to_string(),
-            ))
-        } else if field_no > fields {
-            Err(Error::InvalidArgument(format!(
-                "field_no > fields, {} > {}",
-                field_no, fields
-            )))
-        } else {
-            let tag = field_no.view_bits::<Lsb0>().to_bitvec();
-            Ok(match (fields - 1).view_bits::<Lsb0>().last_one() {
-                Some(last_one) => tag[0..=last_one].to_bitvec(),
-                None => tag[0..=0].to_bitvec(),
-            })
-        }
+    pub fn tag(&self) -> NonNegative {
+        self.tag
     }
 
-    pub fn tag(&self) -> &BitVec {
-        &self.tag
+    pub fn no_fields(&self) -> NonNegative {
+        self.no_fields
+    }
+
+    pub fn flat_tag(&self) -> BitVec {
+        let tag = usize::try_from(self.tag())
+            .unwrap()
+            .view_bits::<Lsb0>()
+            .to_bitvec();
+        match (self.no_fields() - 1).view_bits::<Lsb0>().last_one() {
+            Some(last_one) => tag[0..=last_one].to_bitvec(),
+            None => tag[0..=0].to_bitvec(),
+        }
     }
 
     pub fn union(&self) -> &(Name, Box<ElementType>) {
         &self.union
+    }
+
+    pub fn field_name(&self) -> &Name {
+        &self.union().0
     }
 
     pub fn union_el(&self) -> &ElementType {
@@ -109,11 +157,11 @@ impl UnionElement {
     /// Returns the flat length of this Union element, based on the tag size
     /// and the maximum length of a field in the Union.
     pub fn len(&self) -> usize {
-        self.tag().len() + self.max_len()
+        self.flat_tag().len() + self.max_len()
     }
 
     pub fn flatten(&self) -> BitVec {
-        let mut result = self.tag().clone();
+        let mut result = self.flat_tag();
         let len_diff = self.max_len() - self.union_el().len();
         result.extend(self.union_el().flatten());
         if len_diff > 0 {
@@ -165,16 +213,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn union_tag() -> Result<()> {
-        assert_eq!(UnionElement::new_tag(5, 0)?, bitvec![0, 0, 0]);
-        assert_eq!(UnionElement::new_tag(5, 1)?, bitvec![1, 0, 0]);
-        assert_eq!(UnionElement::new_tag(1, 0)?, bitvec![0]);
-        assert_eq!(UnionElement::new_tag(1, 1)?, bitvec![1]);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_flatten() -> Result<()> {
         assert_eq!(ElementType::Null.flatten(), bitvec![]);
         assert_eq!(
@@ -190,7 +228,8 @@ mod tests {
         );
         assert_eq!(
             ElementType::union(
-                bitvec![1, 0],
+                1,
+                3,
                 Name::try_new("a")?,
                 ElementType::Bits(bitvec![0, 0, 1]),
                 4

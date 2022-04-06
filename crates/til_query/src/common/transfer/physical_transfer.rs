@@ -1,3 +1,4 @@
+use core::fmt;
 use std::ops::Range;
 
 use tydi_common::{
@@ -78,6 +79,30 @@ impl LastMode {
     }
 }
 
+impl fmt::Display for LastMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn opt_range_to_str(opt_range: &Option<Range<NonNegative>>) -> String {
+            opt_range
+                .as_ref()
+                .map_or("None".to_string(), |r| format!("{}..{}", r.start, r.end))
+        }
+
+        match self {
+            LastMode::None => write!(f, "None"),
+            LastMode::Transfer(transfer) => write!(f, "Transfer({})", opt_range_to_str(transfer)),
+            LastMode::Lane(lanes) => write!(
+                f,
+                "Lane({})",
+                lanes
+                    .iter()
+                    .map(opt_range_to_str)
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// The method by which `last` is transferred.
 pub enum StrobeMode {
@@ -101,6 +126,23 @@ impl StrobeMode {
             StrobeMode::None => true,
             StrobeMode::Transfer(transfer) => *transfer,
             StrobeMode::Lane(lanes) => !lanes.iter().any(|x| !x),
+        }
+    }
+}
+
+impl fmt::Display for StrobeMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StrobeMode::None => write!(f, "None"),
+            StrobeMode::Transfer(transfer) => write!(f, "Transfer({})", transfer),
+            StrobeMode::Lane(lanes) => write!(
+                f,
+                "Lane({:?})",
+                lanes
+                    .iter()
+                    .map(|x| if *x { '1' } else { '0' })
+                    .collect::<String>()
+            ),
         }
     }
 }
@@ -398,8 +440,6 @@ impl PhysicalTransfer {
                             },
                             None => (),
                         }
-
-                        strobe.push(element.data().is_some());
 
                         (data, element.last().clone())
                     })
