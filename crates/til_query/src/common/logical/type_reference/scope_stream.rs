@@ -1,5 +1,6 @@
 use core::fmt;
 
+use textwrap::indent;
 use tydi_common::name::PathName;
 
 use super::TypeReference;
@@ -27,12 +28,16 @@ impl fmt::Display for ScopeStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            r#"Scope (
-  name:  {},
-  child: {}
-)"#,
-            self.name(),
-            self.child().as_ref()
+            "Scope (\n{}\n)",
+            indent(
+                &format!(
+                    r#"name:  {},
+child: {}"#,
+                    self.name(),
+                    self.child().as_ref()
+                ),
+                "  "
+            )
         )
     }
 }

@@ -5,9 +5,12 @@ use std::{
 
 use til_parser::query::into_query_storage;
 use til_query::{
-    common::logical::logicaltype::{
-        stream::{Direction, Stream, Synchronicity},
-        LogicalType,
+    common::logical::{
+        logical_stream::SynthesizeLogicalStream,
+        logicaltype::{
+            stream::{Direction, Stream, Synchronicity},
+            LogicalType,
+        },
     },
     ir::{
         db::Database,
@@ -286,6 +289,89 @@ namespace my::test::space {
   );
 end component;"#,
         comp.declare(&arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn type_reference() -> Result<()> {
+    let db = into_query_storage(
+        "
+namespace my::test::space {
+    type stream_base1 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+    type stream_base2 = Stream(
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Reverse,
+    );
+    type multi_stream_group = Group(a: stream_base1, b: stream_base1, c: stream_base2);
+    type multi_stream = Stream(
+        data: multi_stream_group,
+        throughput: 3.0,
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+    );
+}
+    ",
+    )?;
+
+    let proj = db.project();
+    let stream = proj
+        .namespaces()
+        .get(&("my::test::space".try_into()?))
+        .unwrap()
+        .get(&db)
+        .get_stream_id(&db, "multi_stream")?;
+
+    let result = stream.synthesize(&db)?;
+    assert_eq!(
+        r#"Scope (
+  name:  ,
+  child: Group (
+    a: Stream (
+      physical_stream: a,
+      data: Bits(8),
+      direction: Forward,
+      complexity: 4,
+      dimensionality: 0,
+      transfer_scope: Sync(),
+      element_lanes: 3,
+      user: Null
+    )
+    b: Stream (
+      physical_stream: b,
+      data: Bits(8),
+      direction: Forward,
+      complexity: 4,
+      dimensionality: 0,
+      transfer_scope: Sync(),
+      element_lanes: 3,
+      user: Null
+    )
+    c: Stream (
+      physical_stream: c,
+      data: Bits(8),
+      direction: Reverse,
+      complexity: 4,
+      dimensionality: 0,
+      transfer_scope: Sync(),
+      element_lanes: 3,
+      user: Null
+    )
+  )
+)"#,
+        result.type_reference().to_string()
     );
 
     Ok(())

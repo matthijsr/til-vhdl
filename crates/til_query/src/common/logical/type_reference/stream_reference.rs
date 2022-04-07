@@ -1,5 +1,6 @@
 use core::fmt;
 
+use textwrap::indent;
 use tydi_common::{
     error::Result,
     name::PathName,
@@ -106,24 +107,28 @@ impl fmt::Display for StreamReference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            r#"Stream(
-  physical_stream: {},
-  data: {},
-  direction: {},
-  complexity: {},
-  dimensionality: {},
-  transfer_scope: {},
-  element_lanes: {},
-  user: {}
-        )"#,
-            self.physical_stream(),
-            self.data(),
-            self.direction(),
-            self.complexity(),
-            self.dimensionality(),
-            self.transfer_scope(),
-            self.element_lanes(),
-            self.user()
+            "Stream (\n{}\n)",
+            indent(
+                &format!(
+                    r#"physical_stream: {},
+data: {},
+direction: {},
+complexity: {},
+dimensionality: {},
+transfer_scope: {},
+element_lanes: {},
+user: {}"#,
+                    self.physical_stream(),
+                    self.data(),
+                    self.direction(),
+                    self.complexity(),
+                    self.dimensionality(),
+                    self.transfer_scope(),
+                    self.element_lanes(),
+                    self.user()
+                ),
+                "  "
+            )
         )
     }
 }

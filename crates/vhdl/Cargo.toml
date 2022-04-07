@@ -11,5 +11,5 @@ indexmap = "1.7.0"
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
 itertools = "0.10.3"
-textwrap = "0.14.2"
+textwrap = "0.15.0"
 salsa = "0.16.1"

@@ -1,5 +1,6 @@
 use core::fmt;
 
+use textwrap::indent;
 use tydi_common::{
     error::{Error, Result},
     map::InsertionOrderedMap,
@@ -79,19 +80,25 @@ impl fmt::Display for ElementManipulatingReference {
             ElementManipulatingReference::Bits(b) => write!(f, "Bits({})", b),
             ElementManipulatingReference::Group(g) => write!(
                 f,
-                "Group(\n{})",
-                g.iter()
-                    .map(|(n, t)| format!("  {}: {}\n", n, t))
-                    .collect::<Vec<String>>()
-                    .join("")
+                "Group (\n{})",
+                indent(
+                    &g.iter()
+                        .map(|(n, t)| format!("{}: {}\n", n, t))
+                        .collect::<Vec<String>>()
+                        .join(""),
+                    "  "
+                )
             ),
             ElementManipulatingReference::Union(u) => write!(
                 f,
-                "Union(\n{})",
-                u.iter()
-                    .map(|(n, t)| format!("  {}: {}\n", n, t))
-                    .collect::<Vec<String>>()
-                    .join("")
+                "Union (\n{})",
+                indent(
+                    &u.iter()
+                        .map(|(n, t)| format!("{}: {}\n", n, t))
+                        .collect::<Vec<String>>()
+                        .join(""),
+                    "  "
+                )
             ),
         }
     }
