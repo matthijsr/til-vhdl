@@ -12,7 +12,7 @@ use tydi_intern::Id;
 use crate::{
     common::{
         logical::{
-            logical_stream::{LogicalStream, SynthesisResult, SynthesizeLogicalStream},
+            logical_stream::{LogicalStream, TypedStream, SynthesizeLogicalStream},
             split_streams::SplitsStreams,
             type_hierarchy::TypeHierarchy,
             type_reference::TypeReference,
@@ -306,7 +306,7 @@ impl Stream {
 }
 
 impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
-    fn synthesize(&self, db: &dyn Ir) -> Result<SynthesisResult<BitCount, PhysicalStream>> {
+    fn synthesize(&self, db: &dyn Ir) -> Result<TypedStream<BitCount, PhysicalStream>> {
         let split = &self.split_streams(db)?;
         // NOTE: Signals will currently always be empty, as it refers to user-defined signals.
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
@@ -323,7 +323,7 @@ impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
             &hierarchy,
             &PathName::new_empty(),
         )?;
-        Ok(SynthesisResult::new(logical_stream, type_reference))
+        Ok(TypedStream::new(logical_stream, type_reference))
     }
 }
 
