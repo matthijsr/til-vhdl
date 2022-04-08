@@ -35,13 +35,33 @@ pub(crate) type Interface = til_query::ir::interface::Interface;
 /// which are themselves made of ports.
 pub struct VhdlInterface {
     name: Name,
+    user_fields: InsertionOrderedMap<PathName, Port>,
     physical_streams: InsertionOrderedMap<PathName, VhdlPhysicalStream>,
     type_reference: TypeReference,
     physical_properties: PhysicalProperties,
     doc: Option<String>,
 }
 
-impl VhdlInterface {}
+impl VhdlInterface {
+    pub fn name(&self) -> &Name {
+        &self.name
+    }
+    pub fn user_fields(&self) -> &InsertionOrderedMap<PathName, Port> {
+        &self.user_fields
+    }
+    pub fn physical_streams(&self) -> &InsertionOrderedMap<PathName, VhdlPhysicalStream> {
+        &self.physical_streams
+    }
+    pub fn type_reference(&self) -> &TypeReference {
+        &self.type_reference
+    }
+    pub fn physical_properties(&self) -> &PhysicalProperties {
+        &self.physical_properties
+    }
+    pub fn doc(&self) -> &Option<String> {
+        &self.doc
+    }
+}
 
 impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
     fn canonical(

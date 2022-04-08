@@ -146,6 +146,7 @@ mod tests {
             3,
             8,
             Fields::new(vec![])?,
+            false,
         );
         let mut signal_list = physical_stream.canonical(
             ir_db,

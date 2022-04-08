@@ -28,6 +28,9 @@ pub struct PhysicalStream {
     complexity: Complexity,
     /// User-defined transfer content.
     user: Fields<BitCount>,
+    /// Indicates whether the physical stream is reversed relative to its parent
+    /// interface.
+    is_reversed: bool,
 }
 
 impl PhysicalStream {
@@ -37,6 +40,7 @@ impl PhysicalStream {
         dimensionality: usize,
         complexity: impl Into<Complexity>,
         user: T,
+        is_reversed: bool,
     ) -> Result<Self>
     where
         T: IntoIterator<Item = (U, usize)>,
@@ -87,6 +91,7 @@ impl PhysicalStream {
             dimensionality,
             complexity,
             user,
+            is_reversed,
         ))
     }
     /// Constructs a new PhysicalStream using provided arguments. Returns an
@@ -97,6 +102,7 @@ impl PhysicalStream {
         dimensionality: NonNegative,
         complexity: impl Into<Complexity>,
         user: impl Into<Fields<BitCount>>,
+        is_reversed: bool,
     ) -> Self {
         PhysicalStream {
             element_fields: element_fields.into(),
@@ -104,6 +110,7 @@ impl PhysicalStream {
             dimensionality,
             complexity: complexity.into(),
             user: user.into(),
+            is_reversed,
         }
     }
 
@@ -182,6 +189,12 @@ impl PhysicalStream {
     /// Returns the bit count of the user fields in this physical stream.
     pub fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
+    }
+
+    /// Indicates whether the physical stream is reversed relative to its parent
+    /// interface.
+    pub fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 

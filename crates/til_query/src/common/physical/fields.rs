@@ -5,6 +5,8 @@ use tydi_common::{
     name::PathName,
 };
 
+// TODO: Can probably replace this with InsertionOrderedMap
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fields<T: Clone + PartialEq>(IndexMap<PathName, T>);
 

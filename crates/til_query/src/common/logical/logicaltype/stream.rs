@@ -12,7 +12,7 @@ use tydi_intern::Id;
 use crate::{
     common::{
         logical::{
-            logical_stream::{LogicalStream, TypedStream, SynthesizeLogicalStream},
+            logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
             split_streams::SplitsStreams,
             type_hierarchy::TypeHierarchy,
             type_reference::TypeReference,
@@ -286,6 +286,7 @@ impl Stream {
             self.dimensionality(),
             self.complexity(),
             self.user(db).fields(db),
+            self.direction() == Direction::Reverse,
         )
     }
 
