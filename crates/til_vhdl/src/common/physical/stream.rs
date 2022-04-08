@@ -1,4 +1,5 @@
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
+use til_query::common::stream_direction::StreamDirection;
 use til_query::ir::physical_properties::InterfaceDirection;
 use til_query::ir::Ir;
 use tydi_common::error::TryOptional;
@@ -33,10 +34,9 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             Some(n) => n.to_string(),
             None => "".to_string(),
         };
-        let mode = if self.is_reversed() {
-            Mode::Out
-        } else {
-            Mode::In
+        let mode = match self.stream_direction() {
+            StreamDirection::Forward => Mode::In,
+            StreamDirection::Reverse => Mode::Out,
         };
 
         let signal_list: SignalList<Positive> = self.into();
@@ -52,7 +52,7 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             self.dimensionality(),
             self.complexity().clone(),
             InterfaceDirection::In,
-            self.is_reversed(),
+            self.stream_direction(),
         ))
     }
 }
@@ -68,9 +68,11 @@ pub struct VhdlPhysicalStream {
     complexity: Complexity,
     /// Direction of the parent interface.
     interface_direction: InterfaceDirection,
-    /// Indicates whether the physical stream is reversed relative to its
-    /// parent interface.
-    is_reversed: bool,
+    /// The (logical) Stream's direction.
+    ///
+    /// This property is not affected by the `reverse` function, as it is
+    /// a quality of the type.
+    stream_direction: StreamDirection,
 }
 
 impl VhdlPhysicalStream {
@@ -80,7 +82,7 @@ impl VhdlPhysicalStream {
         dimensionality: NonNegative,
         complexity: Complexity,
         interface_direction: InterfaceDirection,
-        is_reversed: bool,
+        stream_direction: StreamDirection,
     ) -> Self {
         VhdlPhysicalStream {
             signal_list,
@@ -88,7 +90,7 @@ impl VhdlPhysicalStream {
             dimensionality,
             complexity,
             interface_direction,
-            is_reversed,
+            stream_direction,
         }
     }
 
@@ -120,14 +122,12 @@ impl VhdlPhysicalStream {
         self
     }
 
-    /// Indicates whether the physical stream is reversed relative to its
-    /// parent interface.
+    /// The (logical) Stream's direction.
     ///
-    /// Somewhat counterintuitively, this property is not affected by the
-    /// `reverse` operation, as it is a property of the original Stream "type"
-    /// this physical stream carries.
-    pub fn is_reversed(&self) -> bool {
-        self.is_reversed
+    /// This property is not affected by the `reverse` function, as it is
+    /// a quality of the type.
+    pub fn stream_direction(&self) -> StreamDirection {
+        self.stream_direction
     }
 }
 
@@ -168,7 +168,7 @@ mod tests {
             3,
             8,
             Fields::new(vec![])?,
-            false,
+            StreamDirection::Forward,
         );
         let mut signal_list = physical_stream.canonical(
             ir_db,
@@ -239,7 +239,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             0,
             Complexity::new_major(1),
             InterfaceDirection::Out,
-            false,
+            StreamDirection::Forward,
         );
 
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
@@ -318,7 +318,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             0,
             Complexity::new_major(1),
             InterfaceDirection::In,
-            false,
+            StreamDirection::Forward,
         );
 
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");

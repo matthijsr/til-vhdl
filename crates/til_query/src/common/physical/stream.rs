@@ -7,6 +7,8 @@ use tydi_common::{
     util::log2_ceil,
 };
 
+use crate::common::stream_direction::StreamDirection;
+
 use super::{complexity::Complexity, fields::Fields, signal_list::SignalList};
 
 /// Physical stream.
@@ -28,9 +30,8 @@ pub struct PhysicalStream {
     complexity: Complexity,
     /// User-defined transfer content.
     user: Fields<BitCount>,
-    /// Indicates whether the physical stream is reversed relative to its parent
-    /// interface.
-    is_reversed: bool,
+    /// The Stream's direction.
+    stream_direction: StreamDirection,
 }
 
 impl PhysicalStream {
@@ -40,7 +41,7 @@ impl PhysicalStream {
         dimensionality: usize,
         complexity: impl Into<Complexity>,
         user: T,
-        is_reversed: bool,
+        stream_direction: StreamDirection,
     ) -> Result<Self>
     where
         T: IntoIterator<Item = (U, usize)>,
@@ -91,7 +92,7 @@ impl PhysicalStream {
             dimensionality,
             complexity,
             user,
-            is_reversed,
+            stream_direction,
         ))
     }
     /// Constructs a new PhysicalStream using provided arguments. Returns an
@@ -102,7 +103,7 @@ impl PhysicalStream {
         dimensionality: NonNegative,
         complexity: impl Into<Complexity>,
         user: impl Into<Fields<BitCount>>,
-        is_reversed: bool,
+        stream_direction: StreamDirection,
     ) -> Self {
         PhysicalStream {
             element_fields: element_fields.into(),
@@ -110,7 +111,7 @@ impl PhysicalStream {
             dimensionality,
             complexity: complexity.into(),
             user: user.into(),
-            is_reversed,
+            stream_direction,
         }
     }
 
@@ -191,10 +192,9 @@ impl PhysicalStream {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
     }
 
-    /// Indicates whether the physical stream is reversed relative to its parent
-    /// interface.
-    pub fn is_reversed(&self) -> bool {
-        self.is_reversed
+    /// The Stream's direction.
+    pub fn stream_direction(&self) -> StreamDirection {
+        self.stream_direction
     }
 }
 

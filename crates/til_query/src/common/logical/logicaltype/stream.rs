@@ -17,7 +17,8 @@ use crate::{
             type_hierarchy::TypeHierarchy,
             type_reference::TypeReference,
         },
-        physical::{complexity::Complexity, stream::PhysicalStream}, stream_direction::StreamDirection,
+        physical::{complexity::Complexity, stream::PhysicalStream},
+        stream_direction::StreamDirection,
     },
     ir::{
         traits::{GetSelf, InternSelf, MoveDb},
@@ -286,7 +287,7 @@ impl Stream {
             self.dimensionality(),
             self.complexity(),
             self.user(db).fields(db),
-            self.direction() == StreamDirection::Reverse,
+            self.direction(),
         )
     }
 
