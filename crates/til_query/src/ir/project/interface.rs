@@ -21,6 +21,7 @@ use crate::ir::{
     Ir,
 };
 
+// TODO: Can probably replace this with an InsertionOrderedMap
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InterfaceCollection {
     ports: BTreeMap<Name, Id<Interface>>,

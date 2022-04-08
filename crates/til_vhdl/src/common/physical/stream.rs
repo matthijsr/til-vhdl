@@ -1,30 +1,31 @@
-use til_query::common::physical::signal_list::SignalList;
-use til_query::ir::Ir;
+use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::ir::physical_properties::InterfaceDirection;
+use til_query::ir::Ir;
+use tydi_common::error::TryOptional;
+use tydi_common::numbers::Positive;
 use tydi_common::{
     cat,
     error::Result,
+    numbers::NonNegative,
     traits::{Reverse, Reversed},
 };
-use tydi_common::error::TryOptional;
-use tydi_common::numbers::Positive;
+use tydi_vhdl::architecture::arch_storage::Arch;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
     port::{Mode, Port},
 };
-use tydi_vhdl::architecture::arch_storage::Arch;
 
 use crate::IntoVhdl;
 
 pub(crate) type PhysicalStream = til_query::common::physical::stream::PhysicalStream;
 
-impl IntoVhdl<PortList> for PhysicalStream {
+impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
     fn canonical(
         &self,
         _ir_db: &dyn Ir,
         _arch_db: &mut dyn Arch,
         prefix: impl TryOptional<VhdlName>,
-    ) -> Result<PortList> {
+    ) -> Result<VhdlPhysicalStream> {
         let prefix = match prefix.try_optional()? {
             Some(n) => n.to_string(),
             None => "".to_string(),
@@ -38,25 +39,65 @@ impl IntoVhdl<PortList> for PhysicalStream {
 
         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
-        Ok(PortList::new(signal_list, InterfaceDirection::In))
+        Ok(VhdlPhysicalStream::new(
+            signal_list,
+            self.element_lanes().clone(),
+            self.dimensionality(),
+            self.complexity().clone(),
+            InterfaceDirection::In,
+        ))
     }
 }
 
-pub struct PortList {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VhdlPhysicalStream {
     signal_list: SignalList<Port>,
+    /// Number of element lanes.
+    element_lanes: Positive,
+    /// Dimensionality.
+    dimensionality: NonNegative,
+    /// Complexity.
+    complexity: Complexity,
+    /// Overall direction. (Note that the ready/valid signals are necessarily in
+    /// reverse.)
     direction: InterfaceDirection,
 }
 
-impl PortList {
-    pub fn new(signal_list: SignalList<Port>, direction: InterfaceDirection) -> Self {
-        PortList {
+impl VhdlPhysicalStream {
+    pub fn new(
+        signal_list: SignalList<Port>,
+        element_lanes: Positive,
+        dimensionality: NonNegative,
+        complexity: Complexity,
+        direction: InterfaceDirection,
+    ) -> Self {
+        VhdlPhysicalStream {
             signal_list,
+            element_lanes,
+            dimensionality,
+            complexity,
             direction,
         }
     }
 
     pub fn signal_list(&self) -> &SignalList<Port> {
         &self.signal_list
+    }
+
+    pub fn element_lanes(&self) -> &Positive {
+        &self.element_lanes
+    }
+
+    pub fn dimensionality(&self) -> NonNegative {
+        self.dimensionality
+    }
+
+    pub fn complexity(&self) -> &Complexity {
+        &self.complexity
+    }
+
+    pub fn direction(&self) -> InterfaceDirection {
+        self.direction
     }
 
     pub fn with_direction(&mut self, direction: InterfaceDirection) -> &mut Self {
@@ -68,7 +109,7 @@ impl PortList {
     }
 }
 
-impl Reverse for PortList {
+impl Reverse for VhdlPhysicalStream {
     fn reverse(&mut self) {
         match &self.direction {
             InterfaceDirection::Out => self.with_direction(InterfaceDirection::In),
@@ -160,7 +201,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
 
     #[test]
     fn reverse_all_signal_list() -> Result<()> {
-        let mut port_list = PortList::new(
+        let mut port_list = VhdlPhysicalStream::new(
             SignalList::try_new(
                 Some(Port::try_new("valid", Mode::Out, ObjectType::Bit)?),
                 Some(Port::try_new("ready", Mode::Out, ObjectType::Bit)?),
@@ -171,6 +212,9 @@ a_strb : out std_logic_vector(1 downto 0)"#,
                 None,
                 None,
             )?,
+            Positive::new(1).unwrap(),
+            0,
+            Complexity::new_major(1),
             InterfaceDirection::Out,
         );
 
@@ -235,7 +279,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
     #[test]
     fn true_reverse_signal_list() -> Result<()> {
         // Verify whether ports are reversed properly, not just assigned a single mode.
-        let mut port_list = PortList::new(
+        let mut port_list = VhdlPhysicalStream::new(
             SignalList::try_new(
                 Some(Port::try_new("valid", Mode::In, ObjectType::Bit)?),
                 Some(Port::try_new("ready", Mode::Out, ObjectType::Bit)?),
@@ -246,6 +290,9 @@ a_strb : out std_logic_vector(1 downto 0)"#,
                 None,
                 None,
             )?,
+            Positive::new(1).unwrap(),
+            0,
+            Complexity::new_major(1),
             InterfaceDirection::In,
         );
 

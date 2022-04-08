@@ -3,7 +3,7 @@ use tydi_common::{
     name::Name,
 };
 
-#[derive(Debug, Clone, Hash, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SignalList<T> {
     valid: Option<T>,
     ready: Option<T>,

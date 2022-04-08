@@ -1,14 +1,22 @@
 use indexmap::IndexMap;
 use til_query::{
     common::{
-        logical::logical_stream::{LogicalStream, TypedStream, SynthesizeLogicalStream},
+        logical::{
+            logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
+            type_reference::TypeReference,
+        },
         physical::{fields::Fields, signal_list::SignalList},
     },
-    ir::{physical_properties::InterfaceDirection, Ir},
+    ir::{
+        physical_properties::{InterfaceDirection, PhysicalProperties},
+        Ir,
+    },
 };
 use tydi_common::{
     cat,
     error::{Result, TryOptional},
+    map::InsertionOrderedMap,
+    name::{Name, PathName},
     traits::{Document, Identify},
 };
 
@@ -18,9 +26,22 @@ use tydi_vhdl::{
     port::{Mode, Port},
 };
 
-use crate::IntoVhdl;
+use crate::{common::physical::stream::VhdlPhysicalStream, IntoVhdl};
 
 pub(crate) type Interface = til_query::ir::interface::Interface;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// The VHDL representation of a Tydi interface, consisting of physical streams
+/// which are themselves made of ports.
+pub struct VhdlInterface {
+    name: Name,
+    physical_streams: InsertionOrderedMap<PathName, VhdlPhysicalStream>,
+    type_reference: TypeReference,
+    physical_properties: PhysicalProperties,
+    doc: Option<String>,
+}
+
+impl VhdlInterface {}
 
 impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
     fn canonical(

@@ -7,7 +7,8 @@ use til_query::{
 use tydi_common::{
     cat,
     error::{Error, Result, TryOptional},
-    name::PathNameSelf,
+    map::InsertionOrderedMap,
+    name::{Name, PathName, PathNameSelf},
     traits::{Document, Identify},
 };
 
@@ -21,9 +22,16 @@ use tydi_vhdl::{
 
 use crate::IntoVhdl;
 
+use super::interface::VhdlInterface;
+
 pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
 
-
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VhdlStreamlet {
+    name: PathName,
+    interface: InsertionOrderedMap<Name, VhdlInterface>,
+    doc: Option<String>,
+}
 
 impl IntoVhdl<Component> for Streamlet {
     fn canonical(
