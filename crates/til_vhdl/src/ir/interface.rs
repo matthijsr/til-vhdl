@@ -1,9 +1,6 @@
 use til_query::{
     common::{
-        logical::{
-            logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
-            type_reference::TypeReference,
-        },
+        logical::logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
         physical::signal_list::SignalList,
     },
     ir::{
@@ -15,7 +12,7 @@ use tydi_common::{
     cat,
     error::{Result, TryOptional},
     map::InsertionOrderedMap,
-    name::{Name, PathName},
+    name::Name,
     traits::{Document, Identify},
 };
 
@@ -34,9 +31,7 @@ pub(crate) type Interface = til_query::ir::interface::Interface;
 /// which are themselves made of ports.
 pub struct VhdlInterface {
     name: Name,
-    user_fields: InsertionOrderedMap<PathName, Port>,
-    physical_streams: InsertionOrderedMap<PathName, VhdlPhysicalStream>,
-    type_reference: TypeReference,
+    typed_stream: TypedStream<Port, VhdlPhysicalStream>,
     physical_properties: PhysicalProperties,
     doc: Option<String>,
 }
@@ -45,14 +40,8 @@ impl VhdlInterface {
     pub fn name(&self) -> &Name {
         &self.name
     }
-    pub fn user_fields(&self) -> &InsertionOrderedMap<PathName, Port> {
-        &self.user_fields
-    }
-    pub fn physical_streams(&self) -> &InsertionOrderedMap<PathName, VhdlPhysicalStream> {
-        &self.physical_streams
-    }
-    pub fn type_reference(&self) -> &TypeReference {
-        &self.type_reference
+    pub fn typed_stream(&self) -> &TypedStream<Port, VhdlPhysicalStream> {
+        &self.typed_stream
     }
     pub fn physical_properties(&self) -> &PhysicalProperties {
         &self.physical_properties

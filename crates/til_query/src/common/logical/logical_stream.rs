@@ -4,7 +4,7 @@ use crate::ir::Ir;
 
 use super::type_reference::TypeReference;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LogicalStream<F: Clone + PartialEq, P: Clone + PartialEq> {
     /// User-defined fields
     fields: InsertionOrderedMap<PathName, F>,
@@ -67,6 +67,7 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedStream<F: Clone + PartialEq, P: Clone + PartialEq> {
     logical_stream: LogicalStream<F, P>,
     type_reference: TypeReference,
