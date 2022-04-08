@@ -103,7 +103,7 @@ impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
             };
             let mut signal_list = phys
                 .canonical(ir_db, arch_db, phys_name.as_str())?
-                .with_direction(self.physical_properties().direction())
+                .with_interface_direction(self.physical_properties().direction())
                 .signal_list()
                 .clone();
             if first && (&signal_list).into_iter().len() > 0 {

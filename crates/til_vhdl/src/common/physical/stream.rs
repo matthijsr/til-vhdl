@@ -67,7 +67,7 @@ pub struct VhdlPhysicalStream {
     /// Complexity.
     complexity: Complexity,
     /// Direction of the parent interface.
-    direction: InterfaceDirection,
+    interface_direction: InterfaceDirection,
     /// Indicates whether the physical stream is reversed relative to its
     /// parent interface.
     is_reversed: bool,
@@ -79,7 +79,7 @@ impl VhdlPhysicalStream {
         element_lanes: Positive,
         dimensionality: NonNegative,
         complexity: Complexity,
-        direction: InterfaceDirection,
+        interface_direction: InterfaceDirection,
         is_reversed: bool,
     ) -> Self {
         VhdlPhysicalStream {
@@ -87,7 +87,7 @@ impl VhdlPhysicalStream {
             element_lanes,
             dimensionality,
             complexity,
-            direction,
+            interface_direction,
             is_reversed,
         }
     }
@@ -108,18 +108,24 @@ impl VhdlPhysicalStream {
         &self.complexity
     }
 
-    pub fn direction(&self) -> InterfaceDirection {
-        self.direction
+    pub fn interface_direction(&self) -> InterfaceDirection {
+        self.interface_direction
     }
 
-    pub fn with_direction(&mut self, direction: InterfaceDirection) -> &mut Self {
-        if direction != self.direction {
+    pub fn with_interface_direction(&mut self, direction: InterfaceDirection) -> &mut Self {
+        if direction != self.interface_direction {
             self.signal_list.apply(|x| x.reverse());
-            self.direction = direction;
+            self.interface_direction = direction;
         }
         self
     }
 
+    /// Indicates whether the physical stream is reversed relative to its
+    /// parent interface.
+    ///
+    /// Somewhat counterintuitively, this property is not affected by the
+    /// `reverse` operation, as it is a property of the original Stream "type"
+    /// this physical stream carries.
     pub fn is_reversed(&self) -> bool {
         self.is_reversed
     }
@@ -127,9 +133,9 @@ impl VhdlPhysicalStream {
 
 impl Reverse for VhdlPhysicalStream {
     fn reverse(&mut self) {
-        match &self.direction {
-            InterfaceDirection::Out => self.with_direction(InterfaceDirection::In),
-            InterfaceDirection::In => self.with_direction(InterfaceDirection::Out),
+        match &self.interface_direction {
+            InterfaceDirection::Out => self.with_interface_direction(InterfaceDirection::In),
+            InterfaceDirection::In => self.with_interface_direction(InterfaceDirection::Out),
         };
     }
 }
@@ -175,7 +181,7 @@ mod tests {
             .as_str(),
         )?;
         let ports = signal_list
-            .with_direction(InterfaceDirection::Out)
+            .with_interface_direction(InterfaceDirection::Out)
             .signal_list();
         let result = ports
             .into_iter()
@@ -195,7 +201,7 @@ a_test__sub_strb : out std_logic_vector(1 downto 0)"#,
         );
         let mut signal_list = physical_stream.canonical(ir_db, arch_db, "a")?;
         let ports = signal_list
-            .with_direction(InterfaceDirection::Out)
+            .with_interface_direction(InterfaceDirection::Out)
             .signal_list();
         let result = ports
             .into_iter()
@@ -239,7 +245,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
         assert_eq!(
             InterfaceDirection::Out,
-            port_list.direction,
+            port_list.interface_direction,
             "signal list has direction Out"
         );
         for port in port_list.signal_list().into_iter() {
@@ -250,7 +256,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
         assert_eq!(
             InterfaceDirection::In,
-            port_list.direction,
+            port_list.interface_direction,
             "signal list has direction In"
         );
         for port in port_list.signal_list().into_iter() {
@@ -261,7 +267,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             );
         }
 
-        let mut signal_list_rev = port_list.with_direction(InterfaceDirection::In);
+        let mut signal_list_rev = port_list.with_interface_direction(InterfaceDirection::In);
         assert_eq!(
             3,
             signal_list_rev.signal_list().into_iter().len(),
@@ -269,14 +275,14 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         );
         assert_eq!(
             InterfaceDirection::In,
-            signal_list_rev.direction,
+            signal_list_rev.interface_direction,
             "signal list still has direction In"
         );
         for port in signal_list_rev.signal_list().into_iter() {
             assert_eq!(Mode::In, port.mode(), "Each Port still has Mode::In");
         }
 
-        signal_list_rev = signal_list_rev.with_direction(InterfaceDirection::Out);
+        signal_list_rev = signal_list_rev.with_interface_direction(InterfaceDirection::Out);
         assert_eq!(
             3,
             signal_list_rev.signal_list().into_iter().len(),
@@ -284,7 +290,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         );
         assert_eq!(
             InterfaceDirection::Out,
-            signal_list_rev.direction,
+            signal_list_rev.interface_direction,
             "signal list now has direction Out"
         );
         for port in signal_list_rev.signal_list().into_iter() {
@@ -318,7 +324,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
         assert_eq!(
             InterfaceDirection::In,
-            port_list.direction,
+            port_list.interface_direction,
             "signal list has direction In"
         );
         assert_eq!(
@@ -338,7 +344,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
         assert_eq!(
             InterfaceDirection::Out,
-            port_list.direction,
+            port_list.interface_direction,
             "signal list has direction Out"
         );
         assert_eq!(
