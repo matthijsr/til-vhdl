@@ -78,6 +78,17 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
             .iter()
             .find_map(|(idx, k)| if k == key { Some(*idx) } else { None })
     }
+
+    /// Use a function to convert the map's values from `V` to `R`
+    pub fn map_convert<F, R: Clone + PartialEq>(self, mut f: F) -> InsertionOrderedMap<K, R>
+    where
+        F: FnMut(V) -> R,
+    {
+        let len = self.len();
+        let keys = self.keys;
+        let items = self.items.into_iter().map(|(n, x)| (n, f(x))).collect();
+        InsertionOrderedMap::<K, R> { len, keys, items }
+    }
 }
 
 pub struct InsertionOrderedMapIter<'a, K: Ord + Clone, V: Clone> {
