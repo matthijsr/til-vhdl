@@ -24,6 +24,14 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
         }
     }
 
+    pub fn try_new(from: impl IntoIterator<Item = (K, V)>) -> Result<Self> {
+        let mut result = Self::new();
+        for (k, v) in from.into_iter() {
+            result.try_insert(k, v)?;
+        }
+        Ok(result)
+    }
+
     /// Tries to insert a key and value in to the map.
     ///
     /// If an item with the given key already exists in the map, this function
@@ -88,6 +96,10 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
         let keys = self.keys;
         let items = self.items.into_iter().map(|(n, x)| (n, f(x))).collect();
         InsertionOrderedMap::<K, R> { len, keys, items }
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &V> {
+        self.iter().map(|(_, v)| v)
     }
 }
 

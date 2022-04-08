@@ -1,11 +1,10 @@
-use indexmap::IndexMap;
 use til_query::{
     common::{
         logical::{
             logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
             type_reference::TypeReference,
         },
-        physical::{fields::Fields, signal_list::SignalList},
+        physical::signal_list::SignalList,
     },
     ir::{
         physical_properties::{InterfaceDirection, PhysicalProperties},
@@ -77,9 +76,10 @@ impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
 
         let synth = self.stream_id().synthesize(ir_db)?;
 
-        let fields = Fields::new(synth.logical_stream().fields_iter().map(|(path, width)| {
+        let mut fields = InsertionOrderedMap::new();
+        for (path, width) in synth.logical_stream().fields_iter() {
             let prefixed_path = format!("{}__{}", &n, path);
-            (
+            fields.try_insert(
                 path.clone(),
                 Port::try_new(
                     prefixed_path,
@@ -88,13 +88,12 @@ impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
                         InterfaceDirection::In => Mode::In,
                     },
                     width.clone(),
-                )
-                .unwrap(),
-            )
-        }))?;
+                )?,
+            )?;
+        }
 
         let mut first = true;
-        let mut streams = IndexMap::new();
+        let mut streams = InsertionOrderedMap::new();
         for (path, phys) in synth.logical_stream().streams_iter() {
             let phys_name = if path.len() > 0 {
                 format!("{}__{}", &n, path)
@@ -112,7 +111,7 @@ impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
                 }
                 first = false;
             }
-            streams.insert(path.clone(), signal_list.clone());
+            streams.try_insert(path.clone(), signal_list.clone())?;
         }
 
         Ok(TypedStream::new(

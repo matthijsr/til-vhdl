@@ -144,8 +144,9 @@ impl Reverse for VhdlPhysicalStream {
 mod tests {
     use std::convert::TryInto;
 
-    use til_query::{common::physical::fields::Fields, ir::db::Database};
+    use til_query::ir::db::Database;
     use tydi_common::{
+        map::InsertionOrderedMap,
         name::{Name, PathName},
         numbers::{BitCount, Positive},
     };
@@ -160,14 +161,14 @@ mod tests {
         let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
         let arch_db = &mut _arch_db;
         let physical_stream = PhysicalStream::new(
-            Fields::new(vec![
+            InsertionOrderedMap::try_new(vec![
                 ("a".try_into()?, BitCount::new(3).unwrap()),
                 ("b".try_into()?, BitCount::new(2).unwrap()),
             ])?,
             Positive::new(2).unwrap(),
             3,
             8,
-            Fields::new(vec![])?,
+            InsertionOrderedMap::new(),
             StreamDirection::Forward,
         );
         let mut signal_list = physical_stream.canonical(

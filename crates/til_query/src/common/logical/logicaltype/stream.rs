@@ -3,6 +3,7 @@ use std::{convert::TryFrom, hash::Hash, ops::Mul, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive, PositiveReal},
     traits::Reverse,
@@ -312,12 +313,11 @@ impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
         let split = &self.split_streams(db)?;
         // NOTE: Signals will currently always be empty, as it refers to user-defined signals.
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
-        let logical_stream = LogicalStream::new(
-            signals,
-            rest.into_iter()
-                .map(|(path_name, stream)| (path_name.clone(), stream.get(db).physical(db)))
-                .collect(),
-        );
+        let mut streams = InsertionOrderedMap::new();
+        for (path_name, stream) in rest.into_iter() {
+            streams.try_insert(path_name.clone(), stream.get(db).physical(db))?;
+        }
+        let logical_stream = LogicalStream::new(signals, streams);
         let hierarchy = TypeHierarchy::from_stream(db, *self)?;
         let type_reference = TypeReference::collect_reference_from_split_streams(
             db,

@@ -2,7 +2,6 @@ use core::fmt;
 use std::convert::TryFrom;
 
 use crate::{
-    common::physical::fields::Fields,
     ir::{
         traits::{GetSelf, InternSelf, MoveDb},
         Ir,
@@ -12,7 +11,7 @@ use crate::{
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName},
-    numbers::{BitCount, NonNegative, Positive},
+    numbers::{BitCount, NonNegative, Positive}, map::InsertionOrderedMap,
 };
 
 pub mod bits;
@@ -188,19 +187,19 @@ impl LogicalType {
     /// [Reference](https://abs-tudelft.github.io/tydi/specification/logical.html#field-conversion-function)
     ///
     /// [`Fields`]: ./struct.Fields.html
-    pub(crate) fn fields(&self, db: &dyn Ir) -> Fields<BitCount> {
-        let mut fields = Fields::new_empty();
+    pub(crate) fn fields(&self, db: &dyn Ir) -> InsertionOrderedMap<PathName, BitCount> {
+        let mut fields = InsertionOrderedMap::new();
         match self {
             LogicalType::Null | LogicalType::Stream(_) => fields,
             LogicalType::Bits(b) => {
-                fields.insert(PathName::new_empty(), *b).unwrap();
+                fields.try_insert(PathName::new_empty(), *b).unwrap();
                 fields
             }
             LogicalType::Group(group) => {
                 for (name, typ) in group.fields(db).iter() {
                     typ.fields(db).iter().for_each(|(path_name, bit_count)| {
                         fields
-                            .insert(path_name.with_parents(name.clone()), *bit_count)
+                            .try_insert(path_name.with_parents(name.clone()), *bit_count)
                             .unwrap();
                     })
                 }
@@ -209,7 +208,7 @@ impl LogicalType {
             LogicalType::Union(union) => {
                 if let Some(tag) = union.tag() {
                     fields
-                        .insert(PathName::try_new(vec!["tag"]).unwrap(), tag)
+                        .try_insert(PathName::try_new(vec!["tag"]).unwrap(), tag)
                         .unwrap();
                 }
                 let b = union.field_ids().iter().fold(0, |acc, (_, id)| {
@@ -222,7 +221,7 @@ impl LogicalType {
                 });
                 if b > 0 {
                     fields
-                        .insert(
+                        .try_insert(
                             PathName::try_new(vec!["union"]).unwrap(),
                             BitCount::new(b).unwrap(),
                         )
