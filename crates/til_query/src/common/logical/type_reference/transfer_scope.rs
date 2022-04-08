@@ -1,3 +1,5 @@
+use core::fmt;
+
 use tydi_common::name::PathName;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -23,4 +25,13 @@ pub enum TransferScope {
     /// parent to further child Streams. As a result, it also defines its own
     /// transfer scope.
     Sync(PathName),
+}
+
+impl fmt::Display for TransferScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TransferScope::Root => write!(f, "Root"),
+            TransferScope::Sync(p) => write!(f, "Sync({})", p),
+        }
+    }
 }

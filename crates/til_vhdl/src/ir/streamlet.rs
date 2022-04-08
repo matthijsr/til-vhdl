@@ -23,6 +23,8 @@ use crate::IntoVhdl;
 
 pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
 
+
+
 impl IntoVhdl<Component> for Streamlet {
     fn canonical(
         &self,

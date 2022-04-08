@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use til_query::{
     common::{
-        logical::logical_stream::{LogicalStream, SynthesisResult, SynthesizeLogicalStream},
+        logical::logical_stream::{LogicalStream, TypedStream, SynthesizeLogicalStream},
         physical::{fields::Fields, signal_list::SignalList},
     },
     ir::{physical_properties::InterfaceDirection, Ir},
@@ -22,13 +22,13 @@ use crate::IntoVhdl;
 
 pub(crate) type Interface = til_query::ir::interface::Interface;
 
-impl IntoVhdl<SynthesisResult<Port, SignalList<Port>>> for Interface {
+impl IntoVhdl<TypedStream<Port, SignalList<Port>>> for Interface {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
         prefix: impl TryOptional<VhdlName>,
-    ) -> Result<SynthesisResult<Port, SignalList<Port>>> {
+    ) -> Result<TypedStream<Port, SignalList<Port>>> {
         let n: VhdlName = match prefix.try_optional()? {
             Some(some) => VhdlName::try_new(cat!(some, self.identifier()))?,
             None => self.name().clone().into(),
@@ -74,7 +74,7 @@ impl IntoVhdl<SynthesisResult<Port, SignalList<Port>>> for Interface {
             streams.insert(path.clone(), signal_list.clone());
         }
 
-        Ok(SynthesisResult::new(
+        Ok(TypedStream::new(
             LogicalStream::new(fields, streams),
             synth.type_reference().clone(),
         ))
