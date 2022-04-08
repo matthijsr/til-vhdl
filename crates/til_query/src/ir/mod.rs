@@ -10,14 +10,17 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::{
-    common::logical::{
-        logicaltype::{
-            group::Group,
-            stream::{Direction, Stream, Synchronicity},
-            union::Union,
-            IsNull, LogicalType,
+    common::{
+        logical::{
+            logicaltype::{
+                group::Group,
+                stream::{Stream, Synchronicity},
+                union::Union,
+                IsNull, LogicalType,
+            },
+            split_streams::{SplitStreams, SplitsStreams},
         },
-        split_streams::{SplitStreams, SplitsStreams},
+        stream_direction::StreamDirection,
     },
     ir::traits::InternSelf,
 };
@@ -140,7 +143,7 @@ fn stream_split_streams(db: &dyn Ir, key: Id<Stream>) -> Result<SplitStreams> {
 
     for (name, stream_id) in rest.into_iter() {
         let mut stream = stream_id.get(db);
-        if this_stream.direction() == Direction::Reverse {
+        if this_stream.direction() == StreamDirection::Reverse {
             stream.reverse();
         }
         if this_stream.flattens() {
@@ -164,7 +167,7 @@ You must ensure that only one Stream has a Keep and/or User property."#.to_strin
 
 #[cfg(test)]
 mod tests {
-    use crate::common::logical::logicaltype::stream::{Direction, Synchronicity};
+    use crate::common::logical::logicaltype::stream::Synchronicity;
     use crate::ir::db::Database;
 
     use super::physical_properties::InterfaceDirection;
@@ -201,7 +204,7 @@ mod tests {
                 1,
                 Synchronicity::Sync,
                 4,
-                Direction::Forward,
+                StreamDirection::Forward,
                 namespace.get_type_id("null")?,
                 false,
             )?,

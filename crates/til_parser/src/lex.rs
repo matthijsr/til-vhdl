@@ -3,7 +3,7 @@ use super::Span;
 use chumsky::prelude::*;
 use std::fmt;
 use til_query::{
-    common::logical::logicaltype::stream::{Direction, Synchronicity},
+    common::{logical::logicaltype::stream::Synchronicity, stream_direction::StreamDirection},
     ir::physical_properties::InterfaceDirection,
 };
 
@@ -113,7 +113,7 @@ pub enum Token {
     /// Synchronicity keywords: `Sync`, `Flatten`, `Desync`, `FlatDesync`
     Synchronicity(Synchronicity),
     /// Direction keywords: `Forward`, `Reverse`
-    Direction(Direction),
+    Direction(StreamDirection),
     /// Words that precede declarations (e.g., `namespace`, `impl`)
     Decl(DeclKeyword),
     /// Operators `=` `.` `--` `::` `*`
@@ -206,8 +206,8 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "Flatten" => Token::Synchronicity(Synchronicity::Flatten),
         "Desync" => Token::Synchronicity(Synchronicity::Desync),
         "FlatDesync" => Token::Synchronicity(Synchronicity::FlatDesync),
-        "Forward" => Token::Direction(Direction::Forward),
-        "Reverse" => Token::Direction(Direction::Reverse),
+        "Forward" => Token::Direction(StreamDirection::Forward),
+        "Reverse" => Token::Direction(StreamDirection::Reverse),
         "streamlet" => Token::Decl(DeclKeyword::Streamlet),
         "impl" => Token::Decl(DeclKeyword::Implementation),
         "type" => Token::Decl(DeclKeyword::LogicalType),

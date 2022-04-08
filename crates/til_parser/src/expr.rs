@@ -2,8 +2,9 @@ use chumsky::prelude::*;
 use std::{fmt, hash::Hash};
 use til_query::{
     common::{
-        logical::logicaltype::stream::{Direction, Synchronicity, Throughput},
+        logical::logicaltype::stream::{Synchronicity, Throughput},
         physical::complexity::Complexity,
+        stream_direction::StreamDirection,
     },
     ir::physical_properties::InterfaceDirection,
 };
@@ -63,7 +64,7 @@ impl fmt::Display for HashablePositiveReal {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
     Synchronicity(Synchronicity),
-    Direction(Direction),
+    Direction(StreamDirection),
     Int(NonNegative),
     Float(HashablePositiveReal),
     Version(String),
@@ -140,7 +141,7 @@ pub struct StreamType {
     dimensionality: Spanned<NonNegative>,
     synchronicity: Spanned<Synchronicity>,
     complexity: Spanned<Complexity>,
-    direction: Spanned<Direction>,
+    direction: Spanned<StreamDirection>,
     user: Box<Spanned<Expr>>,
     keep: Spanned<bool>,
 }

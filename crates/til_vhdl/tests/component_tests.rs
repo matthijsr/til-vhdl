@@ -5,12 +5,15 @@ use std::{
 
 use til_parser::query::into_query_storage;
 use til_query::{
-    common::logical::{
-        logical_stream::SynthesizeLogicalStream,
-        logicaltype::{
-            stream::{Direction, Stream, Synchronicity},
-            LogicalType,
+    common::{
+        logical::{
+            logical_stream::SynthesizeLogicalStream,
+            logicaltype::{
+                stream::{Stream, Synchronicity},
+                LogicalType,
+            },
         },
+        stream_direction::StreamDirection,
     },
     ir::{
         db::Database,
@@ -510,7 +513,7 @@ fn playground() -> Result<()> {
         1,
         Synchronicity::Sync,
         4,
-        Direction::Forward,
+        StreamDirection::Forward,
         null_type,
         false,
     )?;

@@ -2,9 +2,12 @@ use std::{convert::TryInto, path::Path, sync::Arc};
 
 use til_parser::query::into_query_storage;
 use til_query::{
-    common::logical::logicaltype::{
-        stream::{Direction, Stream, Synchronicity},
-        LogicalType,
+    common::{
+        logical::logicaltype::{
+            stream::{Stream, Synchronicity},
+            LogicalType,
+        },
+        stream_direction::StreamDirection,
     },
     ir::{
         db::Database,
@@ -55,7 +58,7 @@ fn playground() -> Result<()> {
             1,
             Synchronicity::Sync,
             4,
-            Direction::Forward,
+            StreamDirection::Forward,
             namespace.get_type_id("null")?,
             false,
         )?,
