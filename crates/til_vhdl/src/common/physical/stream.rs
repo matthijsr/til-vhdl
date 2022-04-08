@@ -30,7 +30,11 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             Some(n) => n.to_string(),
             None => "".to_string(),
         };
-        let mode = Mode::In;
+        let mode = if self.is_reversed() {
+            Mode::Out
+        } else {
+            Mode::In
+        };
 
         let signal_list: SignalList<Positive> = self.into();
         let mut signal_list = signal_list.map_named(|n, x| {

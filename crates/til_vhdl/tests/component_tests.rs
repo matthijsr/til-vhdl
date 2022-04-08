@@ -274,18 +274,18 @@ namespace my::test::space {
     x__b_valid : in std_logic;
     x__b_ready : out std_logic;
     x__b_data : in std_logic_vector(23 downto 0);
-    x__c_valid : in std_logic;
-    x__c_ready : out std_logic;
-    x__c_data : in std_logic_vector(23 downto 0);
+    x__c_valid : out std_logic;
+    x__c_ready : in std_logic;
+    x__c_data : out std_logic_vector(23 downto 0);
     y__a_valid : out std_logic;
     y__a_ready : in std_logic;
     y__a_data : out std_logic_vector(23 downto 0);
     y__b_valid : out std_logic;
     y__b_ready : in std_logic;
     y__b_data : out std_logic_vector(23 downto 0);
-    y__c_valid : out std_logic;
-    y__c_ready : in std_logic;
-    y__c_data : out std_logic_vector(23 downto 0)
+    y__c_valid : in std_logic;
+    y__c_ready : out std_logic;
+    y__c_data : in std_logic_vector(23 downto 0)
   );
 end component;"#,
         comp.declare(&arch_db)?
