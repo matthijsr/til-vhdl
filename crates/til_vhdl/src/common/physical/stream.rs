@@ -52,6 +52,7 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             self.dimensionality(),
             self.complexity().clone(),
             InterfaceDirection::In,
+            self.is_reversed(),
         ))
     }
 }
@@ -67,6 +68,9 @@ pub struct VhdlPhysicalStream {
     complexity: Complexity,
     /// Direction of the parent interface.
     direction: InterfaceDirection,
+    /// Indicates whether the physical stream is reversed relative to its
+    /// parent interface.
+    is_reversed: bool,
 }
 
 impl VhdlPhysicalStream {
@@ -76,6 +80,7 @@ impl VhdlPhysicalStream {
         dimensionality: NonNegative,
         complexity: Complexity,
         direction: InterfaceDirection,
+        is_reversed: bool,
     ) -> Self {
         VhdlPhysicalStream {
             signal_list,
@@ -83,6 +88,7 @@ impl VhdlPhysicalStream {
             dimensionality,
             complexity,
             direction,
+            is_reversed,
         }
     }
 
@@ -112,6 +118,10 @@ impl VhdlPhysicalStream {
             self.direction = direction;
         }
         self
+    }
+
+    pub fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 
@@ -223,6 +233,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             0,
             Complexity::new_major(1),
             InterfaceDirection::Out,
+            false,
         );
 
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
@@ -301,6 +312,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             0,
             Complexity::new_major(1),
             InterfaceDirection::In,
+            false,
         );
 
         assert_eq!(3, port_list.signal_list().into_iter().len(), "3 signals");
