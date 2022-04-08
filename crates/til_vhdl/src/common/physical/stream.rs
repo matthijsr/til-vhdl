@@ -26,6 +26,9 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
         _arch_db: &mut dyn Arch,
         prefix: impl TryOptional<VhdlName>,
     ) -> Result<VhdlPhysicalStream> {
+        // The VhdlPhysicalStream initially assumes it is part of an
+        // "In" interface.
+
         let prefix = match prefix.try_optional()? {
             Some(n) => n.to_string(),
             None => "".to_string(),
@@ -62,8 +65,7 @@ pub struct VhdlPhysicalStream {
     dimensionality: NonNegative,
     /// Complexity.
     complexity: Complexity,
-    /// Overall direction. (Note that the ready/valid signals are necessarily in
-    /// reverse.)
+    /// Direction of the parent interface.
     direction: InterfaceDirection,
 }
 
