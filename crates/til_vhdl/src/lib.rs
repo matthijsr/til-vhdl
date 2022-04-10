@@ -50,7 +50,7 @@ pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
 
     for streamlet in streamlets.iter() {
         let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-        let component: Arc<Component> = Arc::new(streamlet.canonical(db, &mut arch_db, "")?);
+        let component = Arc::new(streamlet.canonical(db, &mut arch_db, "")?.to_component());
         streamlet_component_names.push((streamlet, component.vhdl_name().clone()));
         package.add_component(component);
     }

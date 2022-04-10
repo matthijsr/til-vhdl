@@ -114,7 +114,15 @@ impl VhdlPhysicalStream {
         self.interface_direction
     }
 
-    pub fn with_interface_direction(&mut self, direction: InterfaceDirection) -> &mut Self {
+    pub fn with_interface_direction(mut self, direction: InterfaceDirection) -> Self {
+        if direction != self.interface_direction {
+            self.signal_list.apply(|x| x.reverse());
+            self.interface_direction = direction;
+        }
+        self
+    }
+
+    pub fn mut_with_interface_direction(&mut self, direction: InterfaceDirection) -> &mut Self {
         if direction != self.interface_direction {
             self.signal_list.apply(|x| x.reverse());
             self.interface_direction = direction;
@@ -134,8 +142,8 @@ impl VhdlPhysicalStream {
 impl Reverse for VhdlPhysicalStream {
     fn reverse(&mut self) {
         match &self.interface_direction {
-            InterfaceDirection::Out => self.with_interface_direction(InterfaceDirection::In),
-            InterfaceDirection::In => self.with_interface_direction(InterfaceDirection::Out),
+            InterfaceDirection::Out => self.mut_with_interface_direction(InterfaceDirection::In),
+            InterfaceDirection::In => self.mut_with_interface_direction(InterfaceDirection::Out),
         };
     }
 }
@@ -182,7 +190,7 @@ mod tests {
             .as_str(),
         )?;
         let ports = signal_list
-            .with_interface_direction(InterfaceDirection::Out)
+            .mut_with_interface_direction(InterfaceDirection::Out)
             .signal_list();
         let result = ports
             .into_iter()
@@ -202,7 +210,7 @@ a_test__sub_strb : out std_logic_vector(1 downto 0)"#,
         );
         let mut signal_list = physical_stream.canonical(ir_db, arch_db, "a")?;
         let ports = signal_list
-            .with_interface_direction(InterfaceDirection::Out)
+            .mut_with_interface_direction(InterfaceDirection::Out)
             .signal_list();
         let result = ports
             .into_iter()
@@ -268,7 +276,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             );
         }
 
-        let mut signal_list_rev = port_list.with_interface_direction(InterfaceDirection::In);
+        let mut signal_list_rev = port_list.mut_with_interface_direction(InterfaceDirection::In);
         assert_eq!(
             3,
             signal_list_rev.signal_list().into_iter().len(),
@@ -283,7 +291,7 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             assert_eq!(Mode::In, port.mode(), "Each Port still has Mode::In");
         }
 
-        signal_list_rev = signal_list_rev.with_interface_direction(InterfaceDirection::Out);
+        signal_list_rev = signal_list_rev.mut_with_interface_direction(InterfaceDirection::Out);
         assert_eq!(
             3,
             signal_list_rev.signal_list().into_iter().len(),
