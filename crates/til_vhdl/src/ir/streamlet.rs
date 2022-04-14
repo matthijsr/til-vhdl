@@ -272,11 +272,11 @@ impl VhdlStreamlet {
             };
 
             let component = streamlet.to_component();
-            let port_mapping =
-                &mut PortMapping::from_component(arch_db, &component, instance_name.clone())?;
+            let mut port_mapping =
+                PortMapping::from_component(arch_db, &component, instance_name.clone())?;
 
             for (name, port) in streamlet.interface() {
-                let try_signal_decl = |p: Port| {
+                let mut try_signal_decl = |p: Port| {
                     let signal = ObjectDeclaration::signal(
                         arch_db,
                         format!("{}__{}", instance_name, port.identifier()),
@@ -299,26 +299,13 @@ impl VhdlStreamlet {
                     port.typed_stream()
                         .logical_stream()
                         .clone()
-                        .try_map_fields(try_signal_decl)?
+                        .try_map_fields(&mut try_signal_decl)?
                         .try_map_streams(|stream| {
                             Ok(PhysicalStreamObject {
-                                signal_list: stream.signal_list().clone().try_map(|p: Port| {
-                                    let signal = ObjectDeclaration::signal(
-                                        arch_db,
-                                        format!("{}__{}", instance_name, port.identifier()),
-                                        p.typ().clone(),
-                                        None,
-                                    )?;
-                                    wrap_portmap_err(port_mapping.map_port(
-                                        arch_db,
-                                        p.vhdl_name().clone(),
-                                        &signal,
-                                    ))?;
-
-                                    architecture.add_declaration(arch_db, signal)?;
-
-                                    Ok(signal)
-                                })?,
+                                signal_list: stream
+                                    .signal_list()
+                                    .clone()
+                                    .try_map(&mut try_signal_decl)?,
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),
                                 complexity: stream.complexity().clone(),
@@ -329,8 +316,8 @@ impl VhdlStreamlet {
 
                 wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
                 wrap_portmap_err(port_mapping.map_port(arch_db, "rst", &rst))?;
-                architecture.add_statement(arch_db, port_mapping.clone().finish()?)?;
             }
+            architecture.add_statement(arch_db, port_mapping.finish()?)?;
         }
 
         for connection in structure.connections() {
