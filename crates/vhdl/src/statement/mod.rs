@@ -100,9 +100,11 @@ impl PortMapping {
             Ok(self)
         } else {
             Err(Error::BackEndError(format!(
-                "The number of mappings ({}) does not match the number of ports ({})",
+                "The number of mappings ({}) does not match the number of ports ({}).\nExpected: {}\nActual: {}",
                 self.mappings().len(),
-                self.ports().len()
+                self.ports().len(),
+                self.ports().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
+                self.mappings().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
             )))
         }
     }

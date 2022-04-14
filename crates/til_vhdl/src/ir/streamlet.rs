@@ -295,7 +295,7 @@ impl VhdlStreamlet {
                 };
 
                 ports.try_insert(
-                    InterfaceReference::new(None, name.clone()),
+                    InterfaceReference::new(Some(instance_name.clone()), name.clone()),
                     port.typed_stream()
                         .logical_stream()
                         .clone()
