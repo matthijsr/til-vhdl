@@ -1,8 +1,5 @@
 use til_query::{
-    common::{
-        logical::logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
-        physical::signal_list::SignalList,
-    },
+    common::logical::logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
     ir::{
         physical_properties::{InterfaceDirection, PhysicalProperties},
         Ir,

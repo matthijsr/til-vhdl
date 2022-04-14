@@ -11,7 +11,6 @@ use tydi_common::{
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
-    component::Component,
     declaration::Declare,
     package::Package,
 };

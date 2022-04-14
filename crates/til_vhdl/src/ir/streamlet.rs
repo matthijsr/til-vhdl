@@ -2,14 +2,12 @@ use std::{fs, sync::Arc};
 
 use til_query::{
     common::{
-        logical::logical_stream::LogicalStream,
         physical::{complexity::Complexity, signal_list::SignalList},
         stream_direction::StreamDirection,
     },
     ir::{
         connection::InterfaceReference,
         implementation::{structure::Structure, Implementation, ImplementationKind},
-        physical_properties::InterfaceDirection,
         Ir,
     },
 };
@@ -274,8 +272,8 @@ impl VhdlStreamlet {
             };
 
             let component = streamlet.to_component();
-            let port_mapping = &mut
-                PortMapping::from_component(arch_db, &component, instance_name.clone())?;
+            let port_mapping =
+                &mut PortMapping::from_component(arch_db, &component, instance_name.clone())?;
 
             for (name, port) in streamlet.interface() {
                 let try_signal_decl = |p: Port| {
@@ -285,7 +283,11 @@ impl VhdlStreamlet {
                         p.typ().clone(),
                         None,
                     )?;
-                    wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), &signal))?;
+                    wrap_portmap_err(port_mapping.map_port(
+                        arch_db,
+                        p.vhdl_name().clone(),
+                        &signal,
+                    ))?;
 
                     architecture.add_declaration(arch_db, signal)?;
 

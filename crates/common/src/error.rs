@@ -22,12 +22,12 @@ impl<T> WrapError<T> for Result<T> {
             Ok(ok) => Ok(ok),
             Err(err) => Err(match &mut wrapping {
                 Error::UnknownError => Error::UnknownError,
-                Error::UnexpectedDuplicate => Error::UnexpectedDuplicate,
                 Error::ImplParsingError(line_err) => {
                     line_err.err.push_str(&format!("- {}", err));
                     wrapping
                 }
-                Error::CLIError(msg)
+                Error::UnexpectedDuplicate(msg)
+                | Error::CLIError(msg)
                 | Error::InvalidArgument(msg)
                 | Error::FileIOError(msg)
                 | Error::ParsingError(msg)
@@ -55,7 +55,7 @@ pub enum Error {
     /// Indicates an invalid argument is provided.
     InvalidArgument(String),
     /// Indicates an unexpected duplicate is provided.
-    UnexpectedDuplicate,
+    UnexpectedDuplicate(String),
     /// File I/O error.
     FileIOError(String),
     /// Parsing error.
@@ -105,7 +105,7 @@ impl fmt::Display for Error {
         match self {
             Error::CLIError(ref msg) => write!(f, "CLI Error: {}", msg),
             Error::InvalidArgument(ref msg) => write!(f, "Invalid argument: {}", msg),
-            Error::UnexpectedDuplicate => write!(f, "Unexpected duplicate"),
+            Error::UnexpectedDuplicate(ref msg) => write!(f, "Unexpected duplicate: {}", msg),
             Error::UnknownError => write!(f, "Unknown error"),
             Error::FileIOError(ref msg) => write!(f, "File I/O error: {}", msg),
             Error::ParsingError(ref msg) => write!(f, "Parsing error: {}", msg),
@@ -218,8 +218,8 @@ mod tests {
     #[test]
     fn error() {
         let a = Error::InvalidArgument("test".to_string());
-        let b = Error::UnexpectedDuplicate;
+        let b = Error::UnexpectedDuplicate("other test".to_string());
         assert_eq!(a.to_string(), "Invalid argument: test");
-        assert_eq!(b.to_string(), "Unexpected duplicate");
+        assert_eq!(b.to_string(), "Unexpected duplicate: other test");
     }
 }

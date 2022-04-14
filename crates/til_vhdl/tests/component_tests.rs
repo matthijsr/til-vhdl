@@ -30,7 +30,6 @@ use tydi_common::{error::Result, name::Name, numbers::NonNegative};
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
     common::vhdl_name::VhdlNameSelf,
-    component::Component,
     declaration::Declare,
     package::Package,
 };

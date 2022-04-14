@@ -15,7 +15,7 @@ pub struct InsertionOrderedMap<K: Ord + Clone, V: Clone> {
     items: BTreeMap<K, V>,
 }
 
-impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
+impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
     pub fn new() -> Self {
         InsertionOrderedMap {
             len: 0,
@@ -38,7 +38,7 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
     /// will return an `Error::UnexpectedDuplicate`.
     pub fn try_insert(&mut self, key: K, value: V) -> Result<()> {
         match self.items.insert(key.clone(), value) {
-            Some(_) => Err(Error::UnexpectedDuplicate),
+            Some(_) => Err(Error::UnexpectedDuplicate(key.to_string())),
             None => {
                 self.keys.insert(self.len, key);
                 self.len += 1;
@@ -113,6 +113,10 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
             items.insert(n, f(x)?);
         }
         Ok(InsertionOrderedMap::<K, R> { len, keys, items })
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        self.iter().map(|(k, _)| k)
     }
 
     pub fn values(&self) -> impl Iterator<Item = &V> {
