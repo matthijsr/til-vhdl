@@ -2,12 +2,14 @@ use std::{fs, sync::Arc};
 
 use til_query::{
     common::{
+        logical::logical_stream::LogicalStream,
         physical::{complexity::Complexity, signal_list::SignalList},
         stream_direction::StreamDirection,
     },
     ir::{
         connection::InterfaceReference,
         implementation::{structure::Structure, Implementation, ImplementationKind},
+        physical_properties::InterfaceDirection,
         Ir,
     },
 };
@@ -23,6 +25,7 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
+    assignment::Assign,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, ObjectDeclaration},
@@ -35,6 +38,36 @@ use crate::IntoVhdl;
 use super::interface::VhdlInterface;
 
 pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PortObject {
+    logical_stream: LogicalStream<Id<ObjectDeclaration>, PhysicalStreamObject>,
+    interface_direction: InterfaceDirection,
+    is_local: bool,
+}
+
+impl PortObject {
+    pub fn logical_stream(&self) -> &LogicalStream<Id<ObjectDeclaration>, PhysicalStreamObject> {
+        &self.logical_stream
+    }
+    pub fn interface_direction(&self) -> &InterfaceDirection {
+        &self.interface_direction
+    }
+    pub fn is_local(&self) -> bool {
+        self.is_local
+    }
+
+    pub fn is_sink(&self) -> bool {
+        match self.interface_direction() {
+            InterfaceDirection::Out => self.is_local(),
+            InterfaceDirection::In => !self.is_local(),
+        }
+    }
+
+    pub fn is_source(&self) -> bool {
+        !self.is_sink()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhysicalStreamObject {
@@ -220,7 +253,6 @@ impl VhdlStreamlet {
         arch_db: &mut dyn Arch,
         implementation: &Implementation,
     ) -> Result<String> {
-        //let arch_body = structure.canonical(ir_db, arch_db, self.prefix().clone())?;
         structure.validate_connections(ir_db)?;
 
         let name = implementation.path_name();
@@ -229,29 +261,30 @@ impl VhdlStreamlet {
         } else {
             Architecture::from_database(arch_db, "Behaviour")
         }?;
-        //architecture.add_body(arch_db, &arch_body)?;
 
         if let Some(doc) = implementation.doc() {
             architecture.set_doc(doc);
         }
-
-        // body goes here
 
         let mut ports = InsertionOrderedMap::new();
         let entity_port_obj = |p| ObjectDeclaration::from_port(arch_db, &p, true);
         for (name, port) in self.interface() {
             ports.try_insert(
                 InterfaceReference::new(None, name.clone()),
-                port.typed_stream()
-                    .logical_stream()
-                    .clone()
-                    .map(entity_port_obj, |stream| PhysicalStreamObject {
-                        signal_list: stream.signal_list().clone().map(entity_port_obj),
-                        element_lanes: stream.element_lanes().clone(),
-                        dimensionality: stream.dimensionality(),
-                        complexity: stream.complexity().clone(),
-                        stream_direction: stream.stream_direction(),
-                    }),
+                PortObject {
+                    interface_direction: port.physical_properties().direction(),
+                    logical_stream: port.typed_stream().logical_stream().clone().map(
+                        entity_port_obj,
+                        |stream| PhysicalStreamObject {
+                            signal_list: stream.signal_list().clone().map(entity_port_obj),
+                            element_lanes: stream.element_lanes().clone(),
+                            dimensionality: stream.dimensionality(),
+                            complexity: stream.complexity().clone(),
+                            stream_direction: stream.stream_direction(),
+                        },
+                    ),
+                    is_local: true,
+                },
             )?;
         }
 
@@ -279,7 +312,7 @@ impl VhdlStreamlet {
                 let mut try_signal_decl = |p: Port| {
                     let signal = ObjectDeclaration::signal(
                         arch_db,
-                        format!("{}__{}", instance_name, port.identifier()),
+                        format!("{}__{}", instance_name, p.identifier()),
                         p.typ().clone(),
                         None,
                     )?;
@@ -296,22 +329,27 @@ impl VhdlStreamlet {
 
                 ports.try_insert(
                     InterfaceReference::new(Some(instance_name.clone()), name.clone()),
-                    port.typed_stream()
-                        .logical_stream()
-                        .clone()
-                        .try_map_fields(&mut try_signal_decl)?
-                        .try_map_streams(|stream| {
-                            Ok(PhysicalStreamObject {
-                                signal_list: stream
-                                    .signal_list()
-                                    .clone()
-                                    .try_map(&mut try_signal_decl)?,
-                                element_lanes: stream.element_lanes().clone(),
-                                dimensionality: stream.dimensionality(),
-                                complexity: stream.complexity().clone(),
-                                stream_direction: stream.stream_direction(),
-                            })
-                        })?,
+                    PortObject {
+                        interface_direction: port.physical_properties().direction(),
+                        logical_stream: port
+                            .typed_stream()
+                            .logical_stream()
+                            .clone()
+                            .try_map_fields(&mut try_signal_decl)?
+                            .try_map_streams(|stream| {
+                                Ok(PhysicalStreamObject {
+                                    signal_list: stream
+                                        .signal_list()
+                                        .clone()
+                                        .try_map(&mut try_signal_decl)?,
+                                    element_lanes: stream.element_lanes().clone(),
+                                    dimensionality: stream.dimensionality(),
+                                    complexity: stream.complexity().clone(),
+                                    stream_direction: stream.stream_direction(),
+                                })
+                            })?,
+                        is_local: false,
+                    },
                 )?;
 
                 wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
@@ -321,10 +359,94 @@ impl VhdlStreamlet {
         }
 
         for connection in structure.connections() {
-            // TODO
-        }
+            let sink = ports
+                .get(connection.sink())
+                .ok_or(Error::ProjectError(format!(
+                    "Port {} does not exist, cannot connect {}.",
+                    connection.sink(),
+                    connection,
+                )))?;
+            let source = ports
+                .get(connection.source())
+                .ok_or(Error::ProjectError(format!(
+                    "Port {} does not exist, cannot connect {}.",
+                    connection.source(),
+                    connection,
+                )))?;
+            if sink.is_sink() && source.is_sink() || sink.is_source() && source.is_source() {
+                todo!()
+            }
+            let (sink, source) = if sink.is_sink() {
+                (sink, source)
+            } else {
+                (source, sink)
+            };
 
-        // body goes here
+            for (name, field) in sink.logical_stream().fields() {
+                architecture.add_statement(
+                    arch_db,
+                    field.assign(arch_db, source.logical_stream().fields().try_get(name)?)?,
+                )?;
+            }
+
+            let mut assign = |left: &Option<Id<ObjectDeclaration>>,
+                              right: &Option<Id<ObjectDeclaration>>|
+             -> Result<()> {
+                match (left, right) {
+                    (Some(left), Some(right)) => {
+                        architecture.add_statement(arch_db, left.assign(arch_db, right)?)
+                    }
+                    (None, None) => Ok(()),
+                    _ => todo!(),
+                }
+            };
+
+            for (name, sink_obj) in sink.logical_stream().streams() {
+                let source_obj = source.logical_stream().streams().try_get(name)?;
+                if sink_obj.stream_direction() == source_obj.stream_direction() {
+                    let (sink_obj, source_obj) =
+                        if sink_obj.stream_direction() == StreamDirection::Reverse {
+                            (source_obj, sink_obj)
+                        } else {
+                            (sink_obj, source_obj)
+                        };
+                    assign(
+                        sink_obj.signal_list().valid(),
+                        source_obj.signal_list().valid(),
+                    )?;
+                    assign(
+                        source_obj.signal_list().ready(),
+                        sink_obj.signal_list().ready(),
+                    )?;
+                    assign(
+                        sink_obj.signal_list().data(),
+                        source_obj.signal_list().data(),
+                    )?;
+                    assign(
+                        sink_obj.signal_list().last(),
+                        source_obj.signal_list().last(),
+                    )?;
+                    assign(
+                        sink_obj.signal_list().stai(),
+                        source_obj.signal_list().stai(),
+                    )?;
+                    assign(
+                        sink_obj.signal_list().endi(),
+                        source_obj.signal_list().endi(),
+                    )?;
+                    assign(
+                        sink_obj.signal_list().strb(),
+                        source_obj.signal_list().strb(),
+                    )?;
+                    assign(
+                        sink_obj.signal_list().user(),
+                        source_obj.signal_list().user(),
+                    )?;
+                } else {
+                    todo!()
+                }
+            }
+        }
 
         let result_string = architecture.declare(arch_db)?;
         arch_db.set_architecture(architecture);

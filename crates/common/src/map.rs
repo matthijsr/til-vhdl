@@ -70,6 +70,17 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         self.items.get(key)
     }
 
+    pub fn try_get(&self, key: &K) -> Result<&V> {
+        if let Some(v) = self.get(key) {
+            Ok(v)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "Key {} does not exist in this map.",
+                key.to_string()
+            )))
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.len
     }
