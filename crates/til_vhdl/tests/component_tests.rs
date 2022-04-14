@@ -47,7 +47,7 @@ fn streamlet_to_vhdl() -> Result<()> {
     let streamlet = Streamlet::new()
         .try_with_name("test")?
         .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
-    let component = Arc::new(streamlet.canonical(db, arch_db, "")?);
+    let component = streamlet.canonical(db, arch_db, "")?.to_component();
     let mut package = Package::new_default_empty();
     package.add_component(component);
 
@@ -115,7 +115,7 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
             let streamlet = Streamlet::new()
                 .try_with_name("test")?
                 .with_ports(db, vec![("a", stream, InterfaceDirection::In)])?;
-            let component: Component = streamlet.canonical(db, arch_db, "")?;
+            let component = streamlet.canonical(db, arch_db, "")?.to_component();
             component.declare(arch_db)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -265,7 +265,7 @@ namespace my::test::space {
 
     let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
 
-    let comp: Component = streamlet.canonical(&db, &mut arch_db, None)?;
+    let comp = streamlet.canonical(&db, &mut arch_db, None)?.to_component();
     assert_eq!(
         r#"component my__test__space__multi_streamlet_com
   port (
@@ -474,7 +474,7 @@ multiline#
 
     let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
 
-    let comp: Component = streamlet.canonical(&db, &mut arch_db, None)?;
+    let comp = streamlet.canonical(&db, &mut arch_db, None)?.to_component();
     assert_eq!(
         r#"-- streamlet documentation is multi-line but can act as a split string
 component my__test__space__doc_streamlet_com
@@ -534,14 +534,15 @@ fn playground() -> Result<()> {
     let streamlet = streamlet.with_implementation(Some(implementation));
 
     let mut package = Package::new_default_empty();
-    let component: Arc<Component> = Arc::new(streamlet.canonical(db, arch_db, "")?);
+    let mut streamlet = streamlet.canonical(db, arch_db, None)?;
+    let component = streamlet.to_component();
     arch_db.set_subject_component_name(Arc::new(component.vhdl_name().clone()));
     package.add_component(component);
     let package = Arc::new(package);
 
     arch_db.set_default_package(package);
 
-    let declaration: String = streamlet.canonical(db, arch_db, "")?;
+    let declaration = streamlet.to_architecture(db, arch_db)?;
 
     println!("{}", arch_db.default_package().declare(arch_db)?);
 

@@ -98,6 +98,23 @@ impl<K: Ord + Clone, V: Clone> InsertionOrderedMap<K, V> {
         InsertionOrderedMap::<K, R> { len, keys, items }
     }
 
+    /// Use a function to try to convert the map's values from `V` to `R`
+    pub fn try_map_convert<F, R: Clone + PartialEq>(
+        self,
+        mut f: F,
+    ) -> Result<InsertionOrderedMap<K, R>>
+    where
+        F: FnMut(V) -> Result<R>,
+    {
+        let len = self.len();
+        let keys = self.keys;
+        let mut items = BTreeMap::new();
+        for (n, x) in self.items.into_iter() {
+            items.insert(n, f(x)?);
+        }
+        Ok(InsertionOrderedMap::<K, R> { len, keys, items })
+    }
+
     pub fn values(&self) -> impl Iterator<Item = &V> {
         self.iter().map(|(_, v)| v)
     }

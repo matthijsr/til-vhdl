@@ -44,12 +44,34 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
         LogicalStream::new(self.fields.clone().map_convert(f), self.streams.clone())
     }
 
+    /// Try to create a new LogicalStreams with just the fields mapped to a new type
+    pub fn try_map_fields<M, R: Clone + PartialEq>(&self, f: M) -> Result<LogicalStream<R, P>>
+    where
+        M: FnMut(F) -> Result<R>,
+    {
+        Ok(LogicalStream::new(
+            self.fields.clone().try_map_convert(f)?,
+            self.streams.clone(),
+        ))
+    }
+
     /// Create a new LogicalStreams with just the streams mapped to a new type
     pub fn map_streams<M, R: Clone + PartialEq>(&self, f: M) -> LogicalStream<F, R>
     where
         M: FnMut(P) -> R,
     {
         LogicalStream::new(self.fields.clone(), self.streams.clone().map_convert(f))
+    }
+
+    /// Try to create a new LogicalStreams with just the streams mapped to a new type
+    pub fn try_map_streams<M, R: Clone + PartialEq>(&self, f: M) -> Result<LogicalStream<F, R>>
+    where
+        M: FnMut(P) -> Result<R>,
+    {
+        Ok(LogicalStream::new(
+            self.fields.clone(),
+            self.streams.clone().try_map_convert(f)?,
+        ))
     }
 
     pub fn map<MF, MP, RF: Clone + PartialEq, RP: Clone + PartialEq>(
@@ -64,6 +86,20 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
         let fields = self.fields.map_convert(mf);
         let streams = self.streams.map_convert(mp);
         LogicalStream::new(fields, streams)
+    }
+
+    pub fn try_map<MF, MP, RF: Clone + PartialEq, RP: Clone + PartialEq>(
+        self,
+        mf: MF,
+        mp: MP,
+    ) -> Result<LogicalStream<RF, RP>>
+    where
+        MF: FnMut(F) -> Result<RF>,
+        MP: FnMut(P) -> Result<RP>,
+    {
+        let fields = self.fields.try_map_convert(mf)?;
+        let streams = self.streams.try_map_convert(mp)?;
+        Ok(LogicalStream::new(fields, streams))
     }
 }
 
