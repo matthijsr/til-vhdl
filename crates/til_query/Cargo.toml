@@ -10,7 +10,6 @@ description = "A query storage for the Tydi Intermediate representation Language
 [dependencies]
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
-indexmap = "1.7.0"
 log = "0.4.14"
 salsa = "0.16.1"
 bitvec = "1.0.0"
