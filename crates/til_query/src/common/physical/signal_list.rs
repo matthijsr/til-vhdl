@@ -3,7 +3,7 @@ use tydi_common::{
     name::Name,
 };
 
-#[derive(Debug, Clone, Hash, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SignalList<T> {
     valid: Option<T>,
     ready: Option<T>,
@@ -178,6 +178,23 @@ impl<T> SignalList<T> {
             strb: self.strb.map(|x| f(x)),
             user: self.user.map(|x| f(x)),
         }
+    }
+
+    /// Use a function to try to convert the SignalList's fields from `T` to `R`
+    pub fn try_map<F, R>(self, mut f: F) -> Result<SignalList<R>>
+    where
+        F: FnMut(T) -> Result<R>,
+    {
+        Ok(SignalList {
+            valid: self.valid.map(|x| f(x)).transpose()?,
+            ready: self.ready.map(|x| f(x)).transpose()?,
+            data: self.data.map(|x| f(x)).transpose()?,
+            last: self.last.map(|x| f(x)).transpose()?,
+            stai: self.stai.map(|x| f(x)).transpose()?,
+            endi: self.endi.map(|x| f(x)).transpose()?,
+            strb: self.strb.map(|x| f(x)).transpose()?,
+            user: self.user.map(|x| f(x)).transpose()?,
+        })
     }
 
     /// Use a function to convert the SignalList's fields from `T` to `R`, inserts the canonical name of each signal into the function

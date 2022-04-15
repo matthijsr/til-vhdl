@@ -1,7 +1,7 @@
 use tydi_common::traits::Reversed;
 
 use crate::{
-    common::logical::logicaltype::stream::Direction, ir::physical_properties::InterfaceDirection,
+    common::stream_direction::StreamDirection, ir::physical_properties::InterfaceDirection,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,8 +35,8 @@ impl TransferMode {
 
     /// The transfer mode is reversed relative to its interface or parent
     /// depending on its `direction` property.
-    pub fn for_direction(&self, direction: Direction) -> Self {
-        if direction == Direction::Reverse {
+    pub fn for_direction(&self, direction: StreamDirection) -> Self {
+        if direction == StreamDirection::Reverse {
             self.reversed()
         } else {
             *self

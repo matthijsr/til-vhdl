@@ -11,7 +11,6 @@ use tydi_common::{
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
-    component::Component,
     declaration::Declare,
     package::Package,
 };
@@ -19,6 +18,8 @@ use tydi_vhdl::{
 pub mod common;
 pub mod ir;
 
+// TODO: To improve performance, it might make sense to put these
+// implementations on a database trait, instead.
 pub trait IntoVhdl<T> {
     fn canonical(
         &self,
@@ -50,7 +51,8 @@ pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
 
     for streamlet in streamlets.iter() {
         let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-        let component: Arc<Component> = Arc::new(streamlet.canonical(db, &mut arch_db, "")?);
+        let mut streamlet = streamlet.canonical(db, &mut arch_db, "")?;
+        let component = streamlet.to_component();
         streamlet_component_names.push((streamlet, component.vhdl_name().clone()));
         package.add_component(component);
     }
@@ -68,7 +70,7 @@ pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
 
     for (streamlet, component_name) in streamlet_component_names.into_iter() {
         arch_db.set_subject_component_name(Arc::new(component_name));
-        let streamlet_arch: String = streamlet.canonical(db, &mut arch_db, None)?;
+        let streamlet_arch: String = streamlet.to_architecture(db, &mut arch_db)?;
 
         let mut arch = dir.clone();
         arch.push(streamlet.identifier());

@@ -1,12 +1,9 @@
 use core::fmt;
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-};
+use std::convert::{TryFrom, TryInto};
 
-use indexmap::IndexMap;
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::InsertionOrderedMap,
     name::Name,
     traits::Identify,
 };
@@ -21,67 +18,42 @@ use crate::ir::{
     Ir,
 };
 
+// TODO: Can probably replace this with an InsertionOrderedMap
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InterfaceCollection {
-    ports: BTreeMap<Name, Id<Interface>>,
-    port_order: Vec<Name>,
+    ports: InsertionOrderedMap<Name, Id<Interface>>,
 }
 
 impl InterfaceCollection {
     pub fn new_empty() -> Self {
         InterfaceCollection {
-            ports: BTreeMap::new(),
-            port_order: vec![],
+            ports: InsertionOrderedMap::new(),
         }
     }
 
     pub fn new(db: &dyn Ir, ports: Vec<impl TryResult<Interface>>) -> Result<Self> {
-        let mut port_order = vec![];
-        let mut port_map = BTreeMap::new();
+        let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
-            port_order.push(port.name().clone());
-            if port_map.insert(port.name().clone(), port.intern(db)) != None {
-                return Err(Error::UnexpectedDuplicate);
-            }
+            port_map.try_insert(port.name().clone(), port.intern(db))?
         }
 
-        Ok(InterfaceCollection {
-            ports: port_map,
-            port_order,
-        })
+        Ok(InterfaceCollection { ports: port_map })
     }
 
     pub fn push(&mut self, db: &dyn Ir, port: impl TryResult<Interface>) -> Result<()> {
         let port = port.try_result()?;
-        let port_name = port.name().clone();
-        if let Some(_) = self.ports.insert(port.name().clone(), port.intern(db)) {
-            Err(Error::InvalidArgument(format!(
-                "A port with name {} already exists on this interface.",
-                port_name
-            )))
-        } else {
-            self.port_order.push(port_name);
-            Ok(())
-        }
+        self.ports.try_insert(port.name().clone(), port.intern(db))
     }
 
-    pub fn port_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
+    pub fn port_ids(&self) -> &InsertionOrderedMap<Name, Id<Interface>> {
         &self.ports
-    }
-
-    pub fn ordered_port_ids(&self) -> IndexMap<Name, Id<Interface>> {
-        let mut result = IndexMap::new();
-        for name in self.port_order.iter() {
-            result.insert(name.clone(), self.port_ids().get(name).unwrap().clone());
-        }
-        result
     }
 
     pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
         let mut result = vec![];
-        for name in &self.port_order {
-            result.push(self.port_ids().get(name).unwrap().get(db));
+        for (_, port) in &self.ports {
+            result.push(port.get(db));
         }
         result
     }
@@ -111,12 +83,6 @@ impl InterfaceCollection {
     }
 }
 
-impl Into<BTreeMap<Name, Id<Interface>>> for InterfaceCollection {
-    fn into(self) -> BTreeMap<Name, Id<Interface>> {
-        self.ports
-    }
-}
-
 impl MoveDb<Id<InterfaceCollection>> for InterfaceCollection {
     fn move_db(
         &self,
@@ -124,13 +90,11 @@ impl MoveDb<Id<InterfaceCollection>> for InterfaceCollection {
         target_db: &dyn Ir,
         prefix: &Option<Name>,
     ) -> Result<Id<InterfaceCollection>> {
-        let port_order = self.port_order.clone();
-        let ports = self
-            .ports
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
-            .collect::<Result<_>>()?;
-        Ok(InterfaceCollection { ports, port_order }.intern(target_db))
+        let mut ports = InsertionOrderedMap::new();
+        for (name, port) in self.port_ids() {
+            ports.try_insert(name.clone(), port.move_db(original_db, target_db, prefix)?)?;
+        }
+        Ok(InterfaceCollection { ports }.intern(target_db))
     }
 }
 
@@ -172,7 +136,7 @@ impl TryFrom<&Streamlet> for Id<InterfaceCollection> {
 impl fmt::Display for InterfaceCollection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = self
-            .ordered_port_ids()
+            .port_ids()
             .iter()
             .map(|(name, id)| format!("{}: Id({})", name, id))
             .collect::<Vec<String>>()

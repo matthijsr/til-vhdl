@@ -75,6 +75,10 @@ impl Streamlet {
         self
     }
 
+    pub fn implementation_id(&self) -> Option<Id<Implementation>> {
+        self.implementation
+    }
+
     pub fn implementation(&self, db: &dyn Ir) -> Option<Implementation> {
         if let Some(id) = self.implementation {
             Some(db.lookup_intern_implementation(id))

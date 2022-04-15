@@ -12,7 +12,7 @@ use tydi_common::{
 /// References a specific interface (port) within a `Structure`,
 /// the streamlet_instance may be left blank to refer to the structure's own
 /// ports, rather than that of a specific streamlet instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceReference {
     streamlet_instance: Option<Name>,
     port: Name,

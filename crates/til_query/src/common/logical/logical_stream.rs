@@ -1,24 +1,26 @@
-use indexmap::IndexMap;
-use tydi_common::{error::Result, name::PathName};
+use tydi_common::{error::Result, map::InsertionOrderedMap, name::PathName};
 
-use crate::{common::physical::fields::Fields, ir::Ir};
+use crate::ir::Ir;
 
 use super::type_reference::TypeReference;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LogicalStream<F: Clone + PartialEq, P: Clone + PartialEq> {
     /// User-defined fields
-    fields: Fields<F>,
+    fields: InsertionOrderedMap<PathName, F>,
     /// Streams adhering to the Tydi specification
-    streams: IndexMap<PathName, P>,
+    streams: InsertionOrderedMap<PathName, P>,
 }
 
 impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
-    pub fn new(fields: Fields<F>, streams: IndexMap<PathName, P>) -> Self {
+    pub fn new(
+        fields: InsertionOrderedMap<PathName, F>,
+        streams: InsertionOrderedMap<PathName, P>,
+    ) -> Self {
         LogicalStream { fields, streams }
     }
 
-    pub fn fields(&self) -> &Fields<F> {
+    pub fn fields(&self) -> &InsertionOrderedMap<PathName, F> {
         &self.fields
     }
 
@@ -26,7 +28,7 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
         self.fields.iter()
     }
 
-    pub fn streams(&self) -> &IndexMap<PathName, P> {
+    pub fn streams(&self) -> &InsertionOrderedMap<PathName, P> {
         &self.streams
     }
 
@@ -39,39 +41,69 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> LogicalStream<F, P> {
     where
         M: FnMut(F) -> R,
     {
-        LogicalStream::new(self.fields.clone().map(f), self.streams.clone())
+        LogicalStream::new(self.fields.clone().map_convert(f), self.streams.clone())
+    }
+
+    /// Try to create a new LogicalStreams with just the fields mapped to a new type
+    pub fn try_map_fields<M, R: Clone + PartialEq>(&self, f: M) -> Result<LogicalStream<R, P>>
+    where
+        M: FnMut(F) -> Result<R>,
+    {
+        Ok(LogicalStream::new(
+            self.fields.clone().try_map_convert(f)?,
+            self.streams.clone(),
+        ))
     }
 
     /// Create a new LogicalStreams with just the streams mapped to a new type
-    pub fn map_streams<M, R: Clone + PartialEq>(&self, mut f: M) -> LogicalStream<F, R>
+    pub fn map_streams<M, R: Clone + PartialEq>(&self, f: M) -> LogicalStream<F, R>
     where
         M: FnMut(P) -> R,
     {
-        LogicalStream::new(
+        LogicalStream::new(self.fields.clone(), self.streams.clone().map_convert(f))
+    }
+
+    /// Try to create a new LogicalStreams with just the streams mapped to a new type
+    pub fn try_map_streams<M, R: Clone + PartialEq>(&self, f: M) -> Result<LogicalStream<F, R>>
+    where
+        M: FnMut(P) -> Result<R>,
+    {
+        Ok(LogicalStream::new(
             self.fields.clone(),
-            self.streams
-                .clone()
-                .into_iter()
-                .map(|(n, p)| (n, f(p)))
-                .collect(),
-        )
+            self.streams.clone().try_map_convert(f)?,
+        ))
     }
 
     pub fn map<MF, MP, RF: Clone + PartialEq, RP: Clone + PartialEq>(
         self,
         mf: MF,
-        mut mp: MP,
+        mp: MP,
     ) -> LogicalStream<RF, RP>
     where
         MF: FnMut(F) -> RF,
         MP: FnMut(P) -> RP,
     {
-        let fields = self.fields.map(mf);
-        let streams = self.streams.into_iter().map(|(n, p)| (n, mp(p))).collect();
+        let fields = self.fields.map_convert(mf);
+        let streams = self.streams.map_convert(mp);
         LogicalStream::new(fields, streams)
+    }
+
+    pub fn try_map<MF, MP, RF: Clone + PartialEq, RP: Clone + PartialEq>(
+        self,
+        mf: MF,
+        mp: MP,
+    ) -> Result<LogicalStream<RF, RP>>
+    where
+        MF: FnMut(F) -> Result<RF>,
+        MP: FnMut(P) -> Result<RP>,
+    {
+        let fields = self.fields.try_map_convert(mf)?;
+        let streams = self.streams.try_map_convert(mp)?;
+        Ok(LogicalStream::new(fields, streams))
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedStream<F: Clone + PartialEq, P: Clone + PartialEq> {
     logical_stream: LogicalStream<F, P>,
     type_reference: TypeReference,
@@ -91,6 +123,32 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> TypedStream<F, P> {
 
     pub fn type_reference(&self) -> &TypeReference {
         &self.type_reference
+    }
+
+    pub fn map_logical_stream<M, F2: Clone + PartialEq, P2: Clone + PartialEq>(
+        &self,
+        mut m: M,
+    ) -> TypedStream<F2, P2>
+    where
+        M: FnMut(&LogicalStream<F, P>) -> LogicalStream<F2, P2>,
+    {
+        TypedStream {
+            logical_stream: m(self.logical_stream()),
+            type_reference: self.type_reference().clone(),
+        }
+    }
+
+    pub fn try_map_logical_stream<M, F2: Clone + PartialEq, P2: Clone + PartialEq>(
+        &self,
+        mut m: M,
+    ) -> Result<TypedStream<F2, P2>>
+    where
+        M: FnMut(&LogicalStream<F, P>) -> Result<LogicalStream<F2, P2>>,
+    {
+        Ok(TypedStream {
+            logical_stream: m(self.logical_stream())?,
+            type_reference: self.type_reference().clone(),
+        })
     }
 }
 

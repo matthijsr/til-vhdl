@@ -318,7 +318,7 @@ impl ObjectDeclaration {
         db.get_object(self.object_key().clone())
     }
 
-    pub fn from_port(db: &mut dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
+    pub fn from_port(db: &dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
         if is_entity {
             ObjectDeclaration::entity_port(
                 db,

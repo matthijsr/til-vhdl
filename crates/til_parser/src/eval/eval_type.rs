@@ -7,10 +7,11 @@ use std::{
 use til_query::{
     common::{
         logical::logicaltype::{
-            stream::{Direction, Stream, Synchronicity, Throughput},
+            stream::{Stream, Synchronicity, Throughput},
             LogicalType,
         },
         physical::complexity::Complexity,
+        stream_direction::StreamDirection,
     },
     ir::{traits::InternSelf, Ir},
 };
@@ -34,7 +35,7 @@ pub struct StreamTypeDef {
     dimensionality: Option<NonNegative>,
     synchronicity: Option<Synchronicity>,
     complexity: Option<Complexity>,
-    direction: Option<Direction>,
+    direction: Option<StreamDirection>,
     user: Option<Id<LogicalType>>,
     keep: Option<bool>,
 }

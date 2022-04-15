@@ -2,12 +2,15 @@ use std::convert::TryInto;
 
 use tydi_common::{
     error::{Error, Result},
+    map::InsertionOrderedMap,
     name::PathName,
     numbers::{BitCount, NonNegative, Positive},
     util::log2_ceil,
 };
 
-use super::{complexity::Complexity, fields::Fields, signal_list::SignalList};
+use crate::common::stream_direction::StreamDirection;
+
+use super::{complexity::Complexity, signal_list::SignalList};
 
 /// Physical stream.
 ///
@@ -19,7 +22,7 @@ use super::{complexity::Complexity, fields::Fields, signal_list::SignalList};
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhysicalStream {
     /// Element content.
-    element_fields: Fields<BitCount>,
+    element_fields: InsertionOrderedMap<PathName, BitCount>,
     /// Number of element lanes.
     element_lanes: Positive,
     /// Dimensionality.
@@ -27,7 +30,9 @@ pub struct PhysicalStream {
     /// Complexity.
     complexity: Complexity,
     /// User-defined transfer content.
-    user: Fields<BitCount>,
+    user: InsertionOrderedMap<PathName, BitCount>,
+    /// The Stream's direction.
+    stream_direction: StreamDirection,
 }
 
 impl PhysicalStream {
@@ -37,66 +42,58 @@ impl PhysicalStream {
         dimensionality: usize,
         complexity: impl Into<Complexity>,
         user: T,
+        stream_direction: StreamDirection,
     ) -> Result<Self>
     where
         T: IntoIterator<Item = (U, usize)>,
         U: TryInto<PathName, Error = Error>,
     {
-        let element_fields = Fields::new(
-            element_fields
-                .into_iter()
-                .map(|(path_name, bit_count)| {
-                    (
-                        path_name.try_into(),
-                        Positive::new(bit_count as NonNegative),
-                    )
-                })
-                .map(|(path_name, bit_count)| match (path_name, bit_count) {
-                    (Ok(path_name), Some(bit_count)) => Ok((path_name, bit_count)),
-                    (Err(e), _) => Err(e),
-                    (_, None) => Err(Error::InvalidArgument(
+        let mut element_fields_result = InsertionOrderedMap::new();
+        for (path_name, bit_count) in element_fields.into_iter() {
+            let path_name = path_name.try_into()?;
+            match Positive::new(bit_count as NonNegative) {
+                Some(bit_count) => element_fields_result.try_insert(path_name, bit_count)?,
+                None => {
+                    return Err(Error::InvalidArgument(
                         "element lanes cannot be zero".to_string(),
-                    )),
-                })
-                .collect::<Result<Vec<_>>>()?,
-        )?;
+                    ));
+                }
+            }
+        }
         let element_lanes = Positive::new(element_lanes as NonNegative)
             .ok_or_else(|| Error::InvalidArgument("element lanes cannot be zero".to_string()))?;
         let dimensionality = dimensionality as NonNegative;
         let complexity = complexity.into();
-        let user = Fields::new(
-            user.into_iter()
-                .map(|(path_name, bit_count)| {
-                    (
-                        path_name.try_into(),
-                        Positive::new(bit_count as NonNegative),
-                    )
-                })
-                .map(|(path_name, bit_count)| match (path_name, bit_count) {
-                    (Ok(path_name), Some(bit_count)) => Ok((path_name, bit_count)),
-                    (Err(e), _) => Err(e),
-                    (_, None) => Err(Error::InvalidArgument(
+        let mut user_result = InsertionOrderedMap::new();
+        for (path_name, bit_count) in user.into_iter() {
+            let path_name = path_name.try_into()?;
+            match Positive::new(bit_count as NonNegative) {
+                Some(bit_count) => user_result.try_insert(path_name, bit_count)?,
+                None => {
+                    return Err(Error::InvalidArgument(
                         "element lanes cannot be zero".to_string(),
-                    )),
-                })
-                .collect::<Result<Vec<_>>>()?,
-        )?;
+                    ));
+                }
+            }
+        }
         Ok(PhysicalStream::new(
-            element_fields,
+            element_fields_result,
             element_lanes,
             dimensionality,
             complexity,
-            user,
+            user_result,
+            stream_direction,
         ))
     }
     /// Constructs a new PhysicalStream using provided arguments. Returns an
     /// error when provided argument are not valid.
     pub fn new(
-        element_fields: impl Into<Fields<BitCount>>,
+        element_fields: impl Into<InsertionOrderedMap<PathName, BitCount>>,
         element_lanes: Positive,
         dimensionality: NonNegative,
         complexity: impl Into<Complexity>,
-        user: impl Into<Fields<BitCount>>,
+        user: impl Into<InsertionOrderedMap<PathName, BitCount>>,
+        stream_direction: StreamDirection,
     ) -> Self {
         PhysicalStream {
             element_fields: element_fields.into(),
@@ -104,11 +101,12 @@ impl PhysicalStream {
             dimensionality,
             complexity: complexity.into(),
             user: user.into(),
+            stream_direction,
         }
     }
 
     /// Returns the element fields in this physical stream.
-    pub fn element_fields(&self) -> &Fields<BitCount> {
+    pub fn element_fields(&self) -> &InsertionOrderedMap<PathName, BitCount> {
         &self.element_fields
     }
 
@@ -128,7 +126,7 @@ impl PhysicalStream {
     }
 
     /// Returns the user fields in this physical stream.
-    pub fn user(&self) -> &Fields<BitCount> {
+    pub fn user(&self) -> &InsertionOrderedMap<PathName, BitCount> {
         &self.user
     }
 
@@ -182,6 +180,11 @@ impl PhysicalStream {
     /// Returns the bit count of the user fields in this physical stream.
     pub fn user_bit_count(&self) -> NonNegative {
         self.user.values().map(|b| b.get()).sum::<NonNegative>()
+    }
+
+    /// The Stream's direction.
+    pub fn stream_direction(&self) -> StreamDirection {
+        self.stream_direction
     }
 }
 

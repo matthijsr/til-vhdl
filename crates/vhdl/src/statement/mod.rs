@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use tydi_common::{
     error::{Error, Result, TryResult},
     map::InsertionOrderedMap,
@@ -38,7 +36,7 @@ impl From<PortMapping> for Statement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortMapping {
     label: VhdlName,
     component_name: VhdlName,
@@ -46,7 +44,7 @@ pub struct PortMapping {
     ports: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
     /// irrespective of the order they're mapped during generation.
-    mappings: HashMap<VhdlName, AssignDeclaration>,
+    mappings: InsertionOrderedMap<VhdlName, AssignDeclaration>,
 }
 
 impl PortMapping {
@@ -64,7 +62,7 @@ impl PortMapping {
             label: label.try_result()?,
             component_name: component.vhdl_name().clone(),
             ports,
-            mappings: HashMap::new(),
+            mappings: InsertionOrderedMap::new(),
         })
     }
 
@@ -72,7 +70,7 @@ impl PortMapping {
         &self.ports
     }
 
-    pub fn mappings(&self) -> &HashMap<VhdlName, AssignDeclaration> {
+    pub fn mappings(&self) -> &InsertionOrderedMap<VhdlName, AssignDeclaration> {
         &self.mappings
     }
 
@@ -91,7 +89,7 @@ impl PortMapping {
                 identifier
             )))?;
         let assigned = port.assign(db, assignment)?;
-        self.mappings.insert(identifier, assigned);
+        self.mappings.try_insert(identifier, assigned)?;
         Ok(())
     }
 
@@ -100,9 +98,11 @@ impl PortMapping {
             Ok(self)
         } else {
             Err(Error::BackEndError(format!(
-                "The number of mappings ({}) does not match the number of ports ({})",
+                "The number of mappings ({}) does not match the number of ports ({}).\nExpected: {}\nActual: {}",
                 self.mappings().len(),
-                self.ports().len()
+                self.ports().len(),
+                self.ports().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
+                self.mappings().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
             )))
         }
     }

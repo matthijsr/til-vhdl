@@ -3,6 +3,7 @@ use std::{convert::TryFrom, hash::Hash, ops::Mul, str::FromStr};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive, PositiveReal},
     traits::Reverse,
@@ -12,12 +13,13 @@ use tydi_intern::Id;
 use crate::{
     common::{
         logical::{
-            logical_stream::{LogicalStream, TypedStream, SynthesizeLogicalStream},
+            logical_stream::{LogicalStream, SynthesizeLogicalStream, TypedStream},
             split_streams::SplitsStreams,
             type_hierarchy::TypeHierarchy,
             type_reference::TypeReference,
         },
         physical::{complexity::Complexity, stream::PhysicalStream},
+        stream_direction::StreamDirection,
     },
     ir::{
         traits::{GetSelf, InternSelf, MoveDb},
@@ -155,7 +157,7 @@ pub struct Stream {
     /// The direction of the stream. If there is no parent stream, this
     /// specifies the direction with respect to the natural direction of
     /// the stream (source to sink).
-    direction: Direction,
+    direction: StreamDirection,
     /// Logical stream type of (optional) user data carried by this stream.
     ///
     /// An optional logical stream type consisting of only
@@ -182,7 +184,7 @@ impl Stream {
         dimensionality: NonNegative,
         synchronicity: Synchronicity,
         complexity: impl TryResult<Complexity>,
-        direction: Direction,
+        direction: StreamDirection,
         user: Id<LogicalType>,
         keep: bool,
     ) -> Result<Id<Self>> {
@@ -210,7 +212,7 @@ impl Stream {
         dimensionality: NonNegative,
         synchronicity: Synchronicity,
         complexity: impl Into<Complexity>,
-        direction: Direction,
+        direction: StreamDirection,
         user: Id<LogicalType>,
         keep: bool,
     ) -> Self {
@@ -243,7 +245,7 @@ impl Stream {
     }
 
     /// Returns the direction of this stream.
-    pub fn direction(&self) -> Direction {
+    pub fn direction(&self) -> StreamDirection {
         self.direction
     }
 
@@ -286,6 +288,7 @@ impl Stream {
             self.dimensionality(),
             self.complexity(),
             self.user(db).fields(db),
+            self.direction(),
         )
     }
 
@@ -310,12 +313,11 @@ impl SynthesizeLogicalStream<BitCount, PhysicalStream> for Id<Stream> {
         let split = &self.split_streams(db)?;
         // NOTE: Signals will currently always be empty, as it refers to user-defined signals.
         let (signals, rest) = (split.signals().get(db).fields(db), split.streams());
-        let logical_stream = LogicalStream::new(
-            signals,
-            rest.into_iter()
-                .map(|(path_name, stream)| (path_name.clone(), stream.get(db).physical(db)))
-                .collect(),
-        );
+        let mut streams = InsertionOrderedMap::new();
+        for (path_name, stream) in rest.into_iter() {
+            streams.try_insert(path_name.clone(), stream.get(db).physical(db))?;
+        }
+        let logical_stream = LogicalStream::new(signals, streams);
         let hierarchy = TypeHierarchy::from_stream(db, *self)?;
         let type_reference = TypeReference::collect_reference_from_split_streams(
             db,
@@ -360,8 +362,8 @@ impl From<Id<Stream>> for LogicalType {
 impl Reverse for Stream {
     fn reverse(&mut self) {
         match self.direction() {
-            Direction::Forward => self.direction = Direction::Reverse,
-            Direction::Reverse => self.direction = Direction::Forward,
+            StreamDirection::Forward => self.direction = StreamDirection::Reverse,
+            StreamDirection::Reverse => self.direction = StreamDirection::Forward,
         }
     }
 }
@@ -422,56 +424,6 @@ impl fmt::Display for Synchronicity {
     }
 }
 
-/// Direction of a stream.
-///
-/// [Reference]
-///
-/// [Reference]: https://abs-tudelft.github.io/tydi/specification/logical.html#stream
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Direction {
-    /// Forward indicates that the child stream flows in the same direction as
-    /// its parent, complementing the data of its parent in some way.
-    Forward,
-    /// Reverse indicates that the child stream acts as a response channel for
-    /// the parent stream. If there is no parent stream, Forward indicates that
-    /// the stream flows in the natural source to sink direction of the logical
-    /// stream, while Reverse indicates a control channel in the opposite
-    /// direction. The latter may occur for instance when doing random read
-    /// access to a memory; the first stream carrying the read commands then
-    /// flows in the sink to source direction.
-    Reverse,
-}
-
-impl Default for Direction {
-    fn default() -> Self {
-        Direction::Forward
-    }
-}
-
-impl FromStr for Direction {
-    type Err = Error;
-
-    fn from_str(input: &str) -> Result<Self> {
-        match input {
-            "Forward" => Ok(Direction::Forward),
-            "Reverse" => Ok(Direction::Reverse),
-            _ => Err(Error::InvalidArgument(format!(
-                "{} is not a valid Direction",
-                input
-            ))),
-        }
-    }
-}
-
-impl fmt::Display for Direction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Direction::Forward => write!(f, "Forward"),
-            Direction::Reverse => write!(f, "Reverse"),
-        }
-    }
-}
-
 impl MoveDb<Id<Stream>> for Stream {
     fn move_db(
         &self,
@@ -510,7 +462,7 @@ mod tests {
             1,
             Synchronicity::Sync,
             4,
-            Direction::Forward,
+            StreamDirection::Forward,
             LogicalType::null_id(db),
             false,
         )?
@@ -522,7 +474,7 @@ mod tests {
             1,
             Synchronicity::Sync,
             4,
-            Direction::Forward,
+            StreamDirection::Forward,
             stream1,
             false,
         );
