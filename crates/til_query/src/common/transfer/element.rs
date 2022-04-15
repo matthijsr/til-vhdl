@@ -100,7 +100,7 @@ impl Element {
     pub fn element_size(&self) -> Option<usize> {
         match self.data() {
             Some(data) => Some(data.len()),
-            None => todo!(),
+            None => None,
         }
     }
 

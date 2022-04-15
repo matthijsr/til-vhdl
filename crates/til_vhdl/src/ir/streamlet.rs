@@ -328,9 +328,8 @@ impl VhdlStreamlet {
     ) -> Result<String> {
         structure.validate_connections(ir_db)?;
 
-        let name = implementation.path_name();
-        let mut architecture = if name.len() > 0 {
-            Architecture::from_database(arch_db, name)
+        let mut architecture = if implementation.path_name().len() > 0 {
+            Architecture::from_database(arch_db, implementation.path_name())
         } else {
             Architecture::from_database(arch_db, "Behaviour")
         }?;
@@ -391,7 +390,11 @@ impl VhdlStreamlet {
                     connection,
                 )))?;
             if sink.is_sink() && source.is_sink() || sink.is_source() && source.is_source() {
-                todo!()
+                return Err(Error::ProjectError(format!(
+                    "Something went wrong with connection {}: Both ports are a {}.",
+                    connection,
+                    if sink.is_sink() { "sink" } else { "source" }
+                )));
             }
             let (sink, source) = if sink.is_sink() {
                 (sink, source)
@@ -399,7 +402,7 @@ impl VhdlStreamlet {
                 (source, sink)
             };
 
-            for (name, field) in sink.typed_stream().logical_stream().fields() {
+            for (field_name, field) in sink.typed_stream().logical_stream().fields() {
                 architecture.add_statement(
                     arch_db,
                     field.assign(
@@ -408,29 +411,39 @@ impl VhdlStreamlet {
                             .typed_stream()
                             .logical_stream()
                             .fields()
-                            .try_get(name)?,
+                            .try_get(field_name)?,
                     )?,
                 )?;
             }
 
             let mut assign = |left: &Option<Id<ObjectDeclaration>>,
-                              right: &Option<Id<ObjectDeclaration>>|
+                              right: &Option<Id<ObjectDeclaration>>,
+                              sig_name: &str|
              -> Result<()> {
                 match (left, right) {
                     (Some(left), Some(right)) => {
                         architecture.add_statement(arch_db, left.assign(arch_db, right)?)
                     }
                     (None, None) => Ok(()),
-                    _ => todo!(),
+                    (Some(_), None) => Err(Error::ProjectError(format!(
+                        "Something went wrong with connection {}: Signal {} does not exist on the source.",
+                        connection,
+                        sig_name,
+                    ))),
+                    (None, Some(_)) => Err(Error::ProjectError(format!(
+                        "Something went wrong with connection {}: Signal {} does not exist on the sink.",
+                        connection,
+                        sig_name,
+                    ))),
                 }
             };
 
-            for (name, sink_obj) in sink.typed_stream().logical_stream().streams() {
+            for (stream_name, sink_obj) in sink.typed_stream().logical_stream().streams() {
                 let source_obj = source
                     .typed_stream()
                     .logical_stream()
                     .streams()
-                    .try_get(name)?;
+                    .try_get(stream_name)?;
                 if sink_obj.stream_direction() == source_obj.stream_direction() {
                     let (sink_obj, source_obj) =
                         if sink_obj.stream_direction() == StreamDirection::Reverse {
@@ -441,37 +454,45 @@ impl VhdlStreamlet {
                     assign(
                         sink_obj.signal_list().valid(),
                         source_obj.signal_list().valid(),
+                        "valid",
                     )?;
                     assign(
                         source_obj.signal_list().ready(),
                         sink_obj.signal_list().ready(),
+                        "ready",
                     )?;
                     assign(
                         sink_obj.signal_list().data(),
                         source_obj.signal_list().data(),
+                        "data",
                     )?;
                     assign(
                         sink_obj.signal_list().last(),
                         source_obj.signal_list().last(),
+                        "last",
                     )?;
                     assign(
                         sink_obj.signal_list().stai(),
                         source_obj.signal_list().stai(),
+                        "stai",
                     )?;
                     assign(
                         sink_obj.signal_list().endi(),
                         source_obj.signal_list().endi(),
+                        "endi",
                     )?;
                     assign(
                         sink_obj.signal_list().strb(),
                         source_obj.signal_list().strb(),
+                        "strb",
                     )?;
                     assign(
                         sink_obj.signal_list().user(),
                         source_obj.signal_list().user(),
+                        "user",
                     )?;
                 } else {
-                    todo!()
+                    return Err(Error::ProjectError(format!("Something went wrong with connection {}: The stream {} has an opposite direction on these ports.", connection, stream_name)));
                 }
             }
         }
