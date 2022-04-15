@@ -32,6 +32,30 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         Ok(result)
     }
 
+    /// Tries to append the keys and values from another `InsertionOrderedMap`
+    /// to this one.
+    pub fn try_append(&mut self, other: Self) -> Result<()> {
+        for (k, v) in other.into_iter() {
+            self.try_insert(k, v)?;
+        }
+        Ok(())
+    }
+
+    /// Tries to append the keys and values from another `InsertionOrderedMap`
+    /// to this one, and replaces duplicate keys with the values from `other`.
+    ///
+    /// Returns a vector with all values that were replaced.
+    pub fn append_or_replace(&mut self, other: Self) -> Vec<V> {
+        let mut replaced_vals = vec![];
+        for (k, v) in other.into_iter() {
+            match self.insert_or_replace(k, v) {
+                Some(replaced) => replaced_vals.push(replaced),
+                None => (),
+            }
+        }
+        replaced_vals
+    }
+
     /// Tries to insert a key and value in to the map.
     ///
     /// If an item with the given key already exists in the map, this function
@@ -135,13 +159,33 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
     }
 }
 
-pub struct InsertionOrderedMapIter<'a, K: Ord + Clone, V: Clone> {
+pub struct InsertionOrderedMapIter<K: Ord + Clone, V: Clone> {
+    len: usize,
+    index: usize,
+    insertion_ordered_map: InsertionOrderedMap<K, V>,
+}
+
+pub struct InsertionOrderedMapRefIter<'a, K: Ord + Clone, V: Clone> {
     len: usize,
     index: usize,
     insertion_ordered_map: &'a InsertionOrderedMap<K, V>,
 }
 
-impl<'a, K: Ord + Clone, V: Clone> Iterator for InsertionOrderedMapIter<'a, K, V> {
+impl<K: Ord + Clone, V: Clone> Iterator for InsertionOrderedMapIter<K, V> {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.insertion_ordered_map.keys.get(&self.index) {
+            Some(key) => {
+                self.index += 1;
+                self.insertion_ordered_map.items.remove_entry(key)
+            }
+            None => None,
+        }
+    }
+}
+
+impl<'a, K: Ord + Clone, V: Clone> Iterator for InsertionOrderedMapRefIter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -155,19 +199,39 @@ impl<'a, K: Ord + Clone, V: Clone> Iterator for InsertionOrderedMapIter<'a, K, V
     }
 }
 
-impl<'a, K: Ord + Clone, V: Clone> ExactSizeIterator for InsertionOrderedMapIter<'a, K, V> {
+impl<K: Ord + Clone, V: Clone> ExactSizeIterator for InsertionOrderedMapIter<K, V> {
     fn len(&self) -> usize {
         self.len
+    }
+}
+
+impl<'a, K: Ord + Clone, V: Clone> ExactSizeIterator for InsertionOrderedMapRefIter<'a, K, V> {
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> IntoIterator for InsertionOrderedMap<K, V> {
+    type Item = (K, V);
+
+    type IntoIter = InsertionOrderedMapIter<K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        InsertionOrderedMapIter {
+            len: self.len,
+            index: 0,
+            insertion_ordered_map: self,
+        }
     }
 }
 
 impl<'a, K: Ord + Clone, V: Clone> IntoIterator for &'a InsertionOrderedMap<K, V> {
     type Item = (&'a K, &'a V);
 
-    type IntoIter = InsertionOrderedMapIter<'a, K, V>;
+    type IntoIter = InsertionOrderedMapRefIter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
-        InsertionOrderedMapIter {
+        InsertionOrderedMapRefIter {
             len: self.len,
             index: 0,
             insertion_ordered_map: self,

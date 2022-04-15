@@ -8,7 +8,7 @@ use til_query::{
     },
     ir::{
         connection::InterfaceReference,
-        implementation::{structure::Structure, Implementation, ImplementationKind},
+        implementation::{link::Link, structure::Structure, Implementation, ImplementationKind},
         physical_properties::InterfaceDirection,
         Ir,
     },
@@ -207,7 +207,7 @@ impl VhdlStreamlet {
 
     fn link_arch(
         &self,
-        link: &til_query::ir::implementation::link::Link,
+        link: &Link,
         implementation: &Implementation,
         arch_db: &mut dyn Arch,
     ) -> Result<String> {
@@ -244,6 +244,79 @@ impl VhdlStreamlet {
 
             Ok(result_string)
         }
+    }
+
+    /// Creates a port-mapping for this Streamlet and returns a map of signals
+    /// for its interfaces
+    pub fn to_instance(
+        &mut self,
+        arch_db: &mut dyn Arch,
+        instance_name: Name,
+        architecture: &mut Architecture,
+        clk: Id<ObjectDeclaration>,
+        rst: Id<ObjectDeclaration>,
+    ) -> Result<InsertionOrderedMap<InterfaceReference, PortObject>> {
+        let identifier = self.identifier();
+        let wrap_portmap_err = |result: Result<()>| -> Result<()> {
+            match result {
+                        Ok(result) => Ok(result),
+                        Err(err) => Err(Error::BackEndError(format!(
+                    "Something went wrong trying to generate port mappings for streamlet instance {} (type: {}):\n\t{}",
+                    &instance_name, identifier, err
+                ))),
+                    }
+        };
+
+        let component = self.to_component();
+        let mut port_mapping =
+            PortMapping::from_component(arch_db, &component, instance_name.clone())?;
+
+        let mut signals = InsertionOrderedMap::new();
+
+        for (name, port) in self.interface() {
+            let mut try_signal_decl = |p: Port| {
+                let signal = ObjectDeclaration::signal(
+                    arch_db,
+                    format!("{}__{}", instance_name, p.identifier()),
+                    p.typ().clone(),
+                    None,
+                )?;
+                wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), &signal))?;
+
+                architecture.add_declaration(arch_db, signal)?;
+
+                Ok(signal)
+            };
+
+            signals.try_insert(
+                InterfaceReference::new(Some(instance_name.clone()), name.clone()),
+                PortObject {
+                    interface_direction: port.physical_properties().direction(),
+                    typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
+                        ls.clone()
+                            .try_map_fields(&mut try_signal_decl)?
+                            .try_map_streams(|stream| {
+                                Ok(PhysicalStreamObject {
+                                    signal_list: stream
+                                        .signal_list()
+                                        .clone()
+                                        .try_map(&mut try_signal_decl)?,
+                                    element_lanes: stream.element_lanes().clone(),
+                                    dimensionality: stream.dimensionality(),
+                                    complexity: stream.complexity().clone(),
+                                    stream_direction: stream.stream_direction(),
+                                })
+                            })
+                    })?,
+                    is_local: false,
+                },
+            )?;
+        }
+        wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
+        wrap_portmap_err(port_mapping.map_port(arch_db, "rst", &rst))?;
+        architecture.add_statement(arch_db, port_mapping.finish()?)?;
+
+        Ok(signals)
     }
 
     fn structural_arch(
@@ -293,68 +366,13 @@ impl VhdlStreamlet {
 
         for (instance_name, streamlet) in structure.streamlet_instances(ir_db) {
             let mut streamlet = streamlet.canonical(ir_db, arch_db, self.prefix().clone())?;
-            let identifier = streamlet.identifier();
-            let wrap_portmap_err = |result: Result<()>| -> Result<()> {
-                match result {
-                        Ok(result) => Ok(result),
-                        Err(err) => Err(Error::BackEndError(format!(
-                    "Something went wrong trying to generate port mappings for streamlet instance {} (type: {}):\n\t{}",
-                    &instance_name, identifier, err
-                ))),
-                    }
-            };
-
-            let component = streamlet.to_component();
-            let mut port_mapping =
-                PortMapping::from_component(arch_db, &component, instance_name.clone())?;
-
-            for (name, port) in streamlet.interface() {
-                let mut try_signal_decl = |p: Port| {
-                    let signal = ObjectDeclaration::signal(
-                        arch_db,
-                        format!("{}__{}", instance_name, p.identifier()),
-                        p.typ().clone(),
-                        None,
-                    )?;
-                    wrap_portmap_err(port_mapping.map_port(
-                        arch_db,
-                        p.vhdl_name().clone(),
-                        &signal,
-                    ))?;
-
-                    architecture.add_declaration(arch_db, signal)?;
-
-                    Ok(signal)
-                };
-
-                ports.try_insert(
-                    InterfaceReference::new(Some(instance_name.clone()), name.clone()),
-                    PortObject {
-                        interface_direction: port.physical_properties().direction(),
-                        typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
-                            ls.clone()
-                                .try_map_fields(&mut try_signal_decl)?
-                                .try_map_streams(|stream| {
-                                    Ok(PhysicalStreamObject {
-                                        signal_list: stream
-                                            .signal_list()
-                                            .clone()
-                                            .try_map(&mut try_signal_decl)?,
-                                        element_lanes: stream.element_lanes().clone(),
-                                        dimensionality: stream.dimensionality(),
-                                        complexity: stream.complexity().clone(),
-                                        stream_direction: stream.stream_direction(),
-                                    })
-                                })
-                        })?,
-                        is_local: false,
-                    },
-                )?;
-
-                wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
-                wrap_portmap_err(port_mapping.map_port(arch_db, "rst", &rst))?;
-            }
-            architecture.add_statement(arch_db, port_mapping.finish()?)?;
+            ports.try_append(streamlet.to_instance(
+                arch_db,
+                instance_name,
+                &mut architecture,
+                clk,
+                rst,
+            )?)?;
         }
 
         for connection in structure.connections() {
