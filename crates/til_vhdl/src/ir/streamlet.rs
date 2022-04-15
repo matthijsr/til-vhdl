@@ -2,7 +2,7 @@ use std::{fs, sync::Arc};
 
 use til_query::{
     common::{
-        logical::logical_stream::LogicalStream,
+        logical::logical_stream::TypedStream,
         physical::{complexity::Complexity, signal_list::SignalList},
         stream_direction::StreamDirection,
     },
@@ -41,14 +41,14 @@ pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortObject {
-    logical_stream: LogicalStream<Id<ObjectDeclaration>, PhysicalStreamObject>,
+    typed_stream: TypedStream<Id<ObjectDeclaration>, PhysicalStreamObject>,
     interface_direction: InterfaceDirection,
     is_local: bool,
 }
 
 impl PortObject {
-    pub fn logical_stream(&self) -> &LogicalStream<Id<ObjectDeclaration>, PhysicalStreamObject> {
-        &self.logical_stream
+    pub fn typed_stream(&self) -> &TypedStream<Id<ObjectDeclaration>, PhysicalStreamObject> {
+        &self.typed_stream
     }
     pub fn interface_direction(&self) -> &InterfaceDirection {
         &self.interface_direction
@@ -273,16 +273,16 @@ impl VhdlStreamlet {
                 InterfaceReference::new(None, name.clone()),
                 PortObject {
                     interface_direction: port.physical_properties().direction(),
-                    logical_stream: port.typed_stream().logical_stream().clone().map(
-                        entity_port_obj,
-                        |stream| PhysicalStreamObject {
-                            signal_list: stream.signal_list().clone().map(entity_port_obj),
-                            element_lanes: stream.element_lanes().clone(),
-                            dimensionality: stream.dimensionality(),
-                            complexity: stream.complexity().clone(),
-                            stream_direction: stream.stream_direction(),
-                        },
-                    ),
+                    typed_stream: port.typed_stream().map_logical_stream(|ls| {
+                        ls.clone()
+                            .map(entity_port_obj, |stream| PhysicalStreamObject {
+                                signal_list: stream.signal_list().clone().map(entity_port_obj),
+                                element_lanes: stream.element_lanes().clone(),
+                                dimensionality: stream.dimensionality(),
+                                complexity: stream.complexity().clone(),
+                                stream_direction: stream.stream_direction(),
+                            })
+                    }),
                     is_local: true,
                 },
             )?;
@@ -331,23 +331,22 @@ impl VhdlStreamlet {
                     InterfaceReference::new(Some(instance_name.clone()), name.clone()),
                     PortObject {
                         interface_direction: port.physical_properties().direction(),
-                        logical_stream: port
-                            .typed_stream()
-                            .logical_stream()
-                            .clone()
-                            .try_map_fields(&mut try_signal_decl)?
-                            .try_map_streams(|stream| {
-                                Ok(PhysicalStreamObject {
-                                    signal_list: stream
-                                        .signal_list()
-                                        .clone()
-                                        .try_map(&mut try_signal_decl)?,
-                                    element_lanes: stream.element_lanes().clone(),
-                                    dimensionality: stream.dimensionality(),
-                                    complexity: stream.complexity().clone(),
-                                    stream_direction: stream.stream_direction(),
+                        typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
+                            ls.clone()
+                                .try_map_fields(&mut try_signal_decl)?
+                                .try_map_streams(|stream| {
+                                    Ok(PhysicalStreamObject {
+                                        signal_list: stream
+                                            .signal_list()
+                                            .clone()
+                                            .try_map(&mut try_signal_decl)?,
+                                        element_lanes: stream.element_lanes().clone(),
+                                        dimensionality: stream.dimensionality(),
+                                        complexity: stream.complexity().clone(),
+                                        stream_direction: stream.stream_direction(),
+                                    })
                                 })
-                            })?,
+                        })?,
                         is_local: false,
                     },
                 )?;
@@ -382,10 +381,17 @@ impl VhdlStreamlet {
                 (source, sink)
             };
 
-            for (name, field) in sink.logical_stream().fields() {
+            for (name, field) in sink.typed_stream().logical_stream().fields() {
                 architecture.add_statement(
                     arch_db,
-                    field.assign(arch_db, source.logical_stream().fields().try_get(name)?)?,
+                    field.assign(
+                        arch_db,
+                        source
+                            .typed_stream()
+                            .logical_stream()
+                            .fields()
+                            .try_get(name)?,
+                    )?,
                 )?;
             }
 
@@ -401,8 +407,12 @@ impl VhdlStreamlet {
                 }
             };
 
-            for (name, sink_obj) in sink.logical_stream().streams() {
-                let source_obj = source.logical_stream().streams().try_get(name)?;
+            for (name, sink_obj) in sink.typed_stream().logical_stream().streams() {
+                let source_obj = source
+                    .typed_stream()
+                    .logical_stream()
+                    .streams()
+                    .try_get(name)?;
                 if sink_obj.stream_direction() == source_obj.stream_direction() {
                     let (sink_obj, source_obj) =
                         if sink_obj.stream_direction() == StreamDirection::Reverse {

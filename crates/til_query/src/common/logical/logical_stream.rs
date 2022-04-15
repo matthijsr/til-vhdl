@@ -124,6 +124,32 @@ impl<F: Clone + PartialEq, P: Clone + PartialEq> TypedStream<F, P> {
     pub fn type_reference(&self) -> &TypeReference {
         &self.type_reference
     }
+
+    pub fn map_logical_stream<M, F2: Clone + PartialEq, P2: Clone + PartialEq>(
+        &self,
+        mut m: M,
+    ) -> TypedStream<F2, P2>
+    where
+        M: FnMut(&LogicalStream<F, P>) -> LogicalStream<F2, P2>,
+    {
+        TypedStream {
+            logical_stream: m(self.logical_stream()),
+            type_reference: self.type_reference().clone(),
+        }
+    }
+
+    pub fn try_map_logical_stream<M, F2: Clone + PartialEq, P2: Clone + PartialEq>(
+        &self,
+        mut m: M,
+    ) -> Result<TypedStream<F2, P2>>
+    where
+        M: FnMut(&LogicalStream<F, P>) -> Result<LogicalStream<F2, P2>>,
+    {
+        Ok(TypedStream {
+            logical_stream: m(self.logical_stream())?,
+            type_reference: self.type_reference().clone(),
+        })
+    }
 }
 
 pub trait SynthesizeLogicalStream<F: Clone + PartialEq, P: Clone + PartialEq> {
