@@ -1,4 +1,3 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Condition {
-    Constant(bool),
-}
+use crate::object::object_type::boolean::BooleanValue;
+
+pub type Condition = BooleanValue;

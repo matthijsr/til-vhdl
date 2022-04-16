@@ -21,6 +21,7 @@ use crate::{
 use self::object_queries::object_key::ObjectKey;
 
 pub mod db;
+pub mod get_name;
 pub mod get_self;
 pub mod intern_self;
 pub mod interner;

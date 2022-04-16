@@ -17,6 +17,7 @@ use super::{
 };
 
 pub mod declare;
+pub mod logical_expression;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {

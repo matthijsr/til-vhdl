@@ -8,7 +8,7 @@ pub mod wait;
 use crate::{assignment::AssignDeclaration, common::vhdl_name::VhdlName};
 
 use self::{
-    case::Case, ifelse::IfElse, loop_statement::LoopStatement, test_statement::TestStatement,
+    case::Case, ifelse::IfElse, loop_statement::{LoopStatement, Exit}, test_statement::TestStatement,
     wait::Wait,
 };
 
@@ -20,7 +20,10 @@ pub enum ControlFlow {
     Case(Case),
     Loop(LoopStatement),
     Wait(Wait),
+    Exit(Exit),
 }
+
+// REFER TO: https://insights.sigasi.com/tech/vhdl2008.ebnf/
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SequentialStatementKind {
@@ -31,6 +34,6 @@ pub enum SequentialStatementKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SequentialStatement {
-    label: VhdlName,
+    label: Option<VhdlName>,
     kind: SequentialStatementKind,
 }
