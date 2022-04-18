@@ -9,6 +9,7 @@ use crate::{
     assignment::Assign,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
+    process::Process,
 };
 
 use self::label::Label;
@@ -26,6 +27,7 @@ pub mod logical_expression;
 pub enum Statement {
     Assignment(AssignDeclaration),
     PortMapping(PortMapping),
+    Process(Process),
 }
 
 impl Label for Statement {
@@ -33,6 +35,7 @@ impl Label for Statement {
         match self {
             Statement::Assignment(a) => a.label(),
             Statement::PortMapping(p) => p.label(),
+            Statement::Process(p) => p.label(),
         }
     }
 
@@ -40,6 +43,7 @@ impl Label for Statement {
         match self {
             Statement::Assignment(a) => a.set_label(label),
             Statement::PortMapping(p) => p.set_label(label),
+            Statement::Process(p) => p.set_label(label),
         }
     }
 }

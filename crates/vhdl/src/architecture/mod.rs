@@ -166,6 +166,7 @@ impl Architecture {
                         .combine(&db.lookup_intern_object_declaration(*object).list_usings()?);
                 }
             }
+            Statement::Process(process) => self.usings.combine(&process.list_usings()?),
         }
         self.statement.push(statement);
         Ok(())

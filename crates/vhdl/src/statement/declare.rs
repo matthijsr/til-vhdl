@@ -1,7 +1,10 @@
 use textwrap::indent;
 use tydi_common::error::{Error, Result};
 
-use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
+use crate::{
+    architecture::{arch_storage::Arch, ArchitectureDeclare},
+    declaration::DeclareWithIndent,
+};
 
 use super::{label::Label, PortMapping, Statement};
 
@@ -33,6 +36,7 @@ impl ArchitectureDeclare for Statement {
             Statement::PortMapping(portmapping) => {
                 portmapping.declare_with_indent(db, indent_style)
             }
+            Statement::Process(process) => process.declare_with_indent(db, indent_style),
         };
         if let Some(label) = self.label() {
             Ok(format!("{}: {}", label, result?))

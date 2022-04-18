@@ -16,7 +16,7 @@ pub enum TimeExpression {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A `wait` statement, with optional clauses.
-/// 
+///
 /// Hence, this will declare as `wait`, by default.
 pub struct Wait {
     /// `... on [sensitivity list]`
@@ -25,4 +25,19 @@ pub struct Wait {
     condition: Option<Condition>,
     /// `... until [timeout]`
     timeout: Option<TimeExpression>,
+}
+
+impl Wait {
+    /// `... on [sensitivity list]`
+    pub fn sensitivity(&self) -> &InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
+        &self.sensitivity
+    }
+    /// `... for [condition]`
+    pub fn condition(&self) -> &Option<Condition> {
+        &self.condition
+    }
+    /// `... until [timeout]`
+    pub fn timeout(&self) -> &Option<TimeExpression> {
+        &self.timeout
+    }
 }
