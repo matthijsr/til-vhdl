@@ -11,18 +11,37 @@ use crate::{
     component::Component,
 };
 
+use self::label::Label;
+
 use super::{
     assignment::{AssignDeclaration, Assignment},
     declaration::ObjectDeclaration,
 };
 
 pub mod declare;
+pub mod label;
 pub mod logical_expression;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Assignment(AssignDeclaration),
     PortMapping(PortMapping),
+}
+
+impl Label for Statement {
+    fn label(&self) -> Option<&VhdlName> {
+        match self {
+            Statement::Assignment(a) => a.label(),
+            Statement::PortMapping(p) => p.label(),
+        }
+    }
+
+    fn set_label(&mut self, label: impl Into<VhdlName>) {
+        match self {
+            Statement::Assignment(a) => a.set_label(label),
+            Statement::PortMapping(p) => p.set_label(label),
+        }
+    }
 }
 
 impl From<AssignDeclaration> for Statement {
@@ -108,12 +127,18 @@ impl PortMapping {
         }
     }
 
-    pub fn label(&self) -> &VhdlName {
-        &self.label
-    }
-
     pub fn component_name(&self) -> &VhdlName {
         &self.component_name
+    }
+}
+
+impl Label for PortMapping {
+    fn label(&self) -> Option<&VhdlName> {
+        Some(&self.label)
+    }
+
+    fn set_label(&mut self, label: impl Into<VhdlName>) {
+        self.label = label.into()
     }
 }
 

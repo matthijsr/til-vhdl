@@ -1,4 +1,7 @@
-use crate::object::object_type::severity::SeverityLevel;
+use crate::{
+    common::vhdl_name::VhdlName, object::object_type::severity::SeverityLevel,
+    statement::label::Label,
+};
 
 use super::condition::Condition;
 
@@ -25,8 +28,24 @@ pub struct AssertReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TestStatement {
+pub enum TestStatementKind {
     Assert(Assert),
     Report(Report),
     AssertReport(AssertReport),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TestStatement {
+    label: Option<VhdlName>,
+    kind: TestStatementKind,
+}
+
+impl Label for TestStatement {
+    fn set_label(&mut self, label: impl Into<VhdlName>) {
+        self.label = Some(label.into())
+    }
+
+    fn label(&self) -> Option<&VhdlName> {
+        self.label.as_ref()
+    }
 }

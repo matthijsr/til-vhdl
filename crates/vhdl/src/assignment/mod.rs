@@ -15,6 +15,7 @@ use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::VhdlName;
 use crate::declaration::Declare;
 use crate::properties::Width;
+use crate::statement::label::Label;
 
 use super::declaration::ObjectDeclaration;
 
@@ -39,6 +40,7 @@ pub trait Assign {
 /// Describing the declaration of an assignment
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssignDeclaration {
+    label: Option<VhdlName>,
     /// The declared object being assigned
     object: Id<ObjectDeclaration>,
     /// The assignment to the declared object
@@ -49,6 +51,7 @@ pub struct AssignDeclaration {
 impl AssignDeclaration {
     pub fn new(object: Id<ObjectDeclaration>, assignment: Assignment) -> AssignDeclaration {
         AssignDeclaration {
+            label: None,
             object,
             assignment,
             doc: None,
@@ -146,6 +149,16 @@ impl AssignDeclaration {
                 "Cannot reverse a direct assignment.".to_string(),
             )),
         }
+    }
+}
+
+impl Label for AssignDeclaration {
+    fn label(&self) -> Option<&VhdlName> {
+        self.label.as_ref()
+    }
+
+    fn set_label(&mut self, label: impl Into<VhdlName>) {
+        self.label = Some(label.into())
     }
 }
 
