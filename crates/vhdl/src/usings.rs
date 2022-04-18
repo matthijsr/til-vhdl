@@ -1,17 +1,19 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
-use indexmap::IndexMap;
-use tydi_common::error::{Result, TryResult};
+use tydi_common::{
+    error::{Result, TryResult},
+    map::InsertionOrderedMap,
+};
 
 use crate::common::vhdl_name::{VhdlName, VhdlPathName};
 
 /// A list of VHDL usings, indexed by library
-#[derive(Debug, Clone)]
-pub struct Usings(IndexMap<VhdlName, HashSet<VhdlPathName>>);
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Usings(InsertionOrderedMap<VhdlName, BTreeSet<VhdlPathName>>);
 
 impl Usings {
     pub fn new_empty() -> Usings {
-        Usings(IndexMap::new())
+        Usings(InsertionOrderedMap::new())
     }
 
     /// If the set did not have this value present, `true` is returned.
@@ -24,19 +26,20 @@ impl Usings {
     ) -> Result<bool> {
         Ok(self
             .0
-            .entry(library.try_result()?)
-            .or_insert(HashSet::new())
+            .get_or_insert(&library.try_result()?, BTreeSet::new())
             .insert(using.try_result()?))
     }
 
-    pub fn usings(&self) -> &IndexMap<VhdlName, HashSet<VhdlPathName>> {
+    pub fn usings(&self) -> &InsertionOrderedMap<VhdlName, BTreeSet<VhdlPathName>> {
         &self.0
     }
 
     /// Combine two usings
     pub fn combine(&mut self, other: &Usings) {
         for (library, using) in other.usings() {
-            self.0.insert(library.clone(), using.clone());
+            if let Some(existing) = self.0.insert_or_replace(library.clone(), using.clone()) {
+                self.0.get_mut(library).unwrap().extend(existing);
+            }
         }
     }
 }

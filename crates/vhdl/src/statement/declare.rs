@@ -1,14 +1,11 @@
 use textwrap::indent;
 use tydi_common::error::{Error, Result};
 
-use crate::{
-    architecture::{arch_storage::Arch, ArchitectureDeclare},
-    declaration::DeclareWithIndent,
-};
+use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
 
 use super::{label::Label, PortMapping, Statement};
 
-impl ArchitectureDeclare for PortMapping {
+impl DeclareWithIndent for PortMapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(&format!("{} port map(\n", self.component_name()));
@@ -29,7 +26,7 @@ impl ArchitectureDeclare for PortMapping {
     }
 }
 
-impl ArchitectureDeclare for Statement {
+impl DeclareWithIndent for Statement {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let result = match self {
             Statement::Assignment(assignment) => assignment.declare_with_indent(db, indent_style),

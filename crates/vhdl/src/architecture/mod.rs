@@ -72,13 +72,6 @@ pub struct Architecture {
     statement: Vec<Statement>,
 }
 
-pub trait ArchitectureDeclare {
-    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String>;
-    fn declare(&self, db: &dyn Arch) -> Result<String> {
-        self.declare_with_indent(db, "  ")
-    }
-}
-
 impl Architecture {
     /// Create the architecture based on a component contained within a package, assuming the library (project) is "work" and the architecture's identifier is "Behavioral"
     pub fn new_default(

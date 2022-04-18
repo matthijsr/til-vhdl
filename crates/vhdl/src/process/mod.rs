@@ -1,5 +1,7 @@
 pub mod statement;
 
+use itertools::Itertools;
+use textwrap::indent;
 use tydi_common::{error::Result, map::InsertionOrderedMap};
 use tydi_intern::Id;
 
@@ -32,6 +34,29 @@ pub struct Process {
     variable_declarations: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
     /// The process's statements.
     statements: Vec<SequentialStatement>,
+    /// Any usings accumulated from declarations
+    usings: Usings,
+}
+
+impl Process {
+    /// The sensitivity list of this process, indexed by the names of the
+    /// objects.
+    #[must_use]
+    pub fn sensitivity_list(&self) -> &InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
+        &self.sensitivity_list
+    }
+
+    /// Get a reference to the process's variable declarations.
+    #[must_use]
+    pub fn variable_declarations(&self) -> &InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
+        &self.variable_declarations
+    }
+
+    /// Get a reference to the process's statements.
+    #[must_use]
+    pub fn statements(&self) -> &[SequentialStatement] {
+        self.statements.as_ref()
+    }
 }
 
 impl Label for Process {
@@ -52,6 +77,34 @@ impl ListUsings for Process {
 
 impl DeclareWithIndent for Process {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
-        todo!()
+        let mut result = if self.sensitivity_list().len() > 0 {
+            format!("process({})\n", self.sensitivity_list().keys().join(", "))
+        } else {
+            "process\n".to_string()
+        };
+
+        let mut declarations = String::new();
+        for declaration in self.variable_declarations().values() {
+            declarations.push_str(&format!(
+                "{};\n",
+                declaration.declare_with_indent(db, indent_style)?
+            ));
+        }
+        result.push_str(&indent(&declarations, indent_style));
+
+        result.push_str("begin\n");
+
+        let mut statements = String::new();
+        for statement in self.statements() {
+            statements.push_str(&format!(
+                "{};\n",
+                statement.declare_with_indent(db, indent_style)?
+            ));
+        }
+        result.push_str(&indent(&statements, indent_style));
+
+        result.push_str(&format!("end process {};", &self.label));
+
+        Ok(result)
     }
 }

@@ -1,14 +1,11 @@
 use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
-use crate::{
-    architecture::{arch_storage::Arch, ArchitectureDeclare},
-    object::object_type::DeclarationTypeName,
-};
+use crate::{architecture::arch_storage::Arch, object::object_type::DeclarationTypeName};
 
-use super::{ArchitectureDeclaration, ObjectDeclaration, ObjectKind};
+use super::{ArchitectureDeclaration, DeclareWithIndent, ObjectDeclaration, ObjectKind};
 
-impl ArchitectureDeclare for ArchitectureDeclaration {
+impl DeclareWithIndent for ArchitectureDeclaration {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
             ArchitectureDeclaration::Type(_) => todo!(),
@@ -22,7 +19,7 @@ impl ArchitectureDeclare for ArchitectureDeclaration {
     }
 }
 
-impl ArchitectureDeclare for ObjectDeclaration {
+impl DeclareWithIndent for ObjectDeclaration {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let default_string = if let Some(default) = self.default() {
             format!(
@@ -79,7 +76,7 @@ impl ArchitectureDeclare for ObjectDeclaration {
     }
 }
 
-impl ArchitectureDeclare for Id<ObjectDeclaration> {
+impl DeclareWithIndent for Id<ObjectDeclaration> {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         db.lookup_intern_object_declaration(*self)
             .declare_with_indent(db, indent_style)
@@ -88,6 +85,7 @@ impl ArchitectureDeclare for Id<ObjectDeclaration> {
 
 #[cfg(test)]
 mod tests {
+    use crate::declaration::Declare;
     use crate::object::object_type::ObjectType;
     use crate::{architecture::arch_storage::db::Database, assignment::StdLogicValue};
 
