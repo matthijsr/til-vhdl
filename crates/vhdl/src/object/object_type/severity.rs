@@ -19,3 +19,7 @@ impl fmt::Display for SeverityLevel {
         }
     }
 }
+
+pub trait HasSeverity {
+    fn severity(&self) -> Option<&SeverityLevel>;
+}

@@ -1,6 +1,11 @@
+use tydi_common::error::Result;
 use tydi_intern::Id;
 
-use crate::{assignment::ValueAssignment, declaration::ObjectDeclaration};
+use crate::{
+    architecture::arch_storage::{interner::GetName, Arch},
+    assignment::ValueAssignment,
+    declaration::{DeclareWithIndent, ObjectDeclaration},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogicalOperator {
@@ -42,4 +47,15 @@ pub enum Relation {
     Object(Id<ObjectDeclaration>),
     Combination(RelationalCombination),
     LogicalExpression(LogicalExpression),
+}
+
+impl DeclareWithIndent for Relation {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        match self {
+            Relation::Value(_) => todo!(),
+            Relation::Object(obj) => Ok(obj.get_name(db).to_string()),
+            Relation::Combination(_) => todo!(),
+            Relation::LogicalExpression(_) => todo!(),
+        }
+    }
 }

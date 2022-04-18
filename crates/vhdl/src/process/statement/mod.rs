@@ -35,10 +35,36 @@ pub enum ControlFlowKind {
     Exit(Exit),
 }
 
+impl DeclareWithIndent for ControlFlowKind {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        match self {
+            ControlFlowKind::IfElse(_) => todo!(),
+            ControlFlowKind::Case(_) => todo!(),
+            ControlFlowKind::Loop(_) => todo!(),
+            ControlFlowKind::Wait(_) => todo!(),
+            ControlFlowKind::Exit(_) => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ControlFlow {
     label: Option<VhdlName>,
     kind: ControlFlowKind,
+}
+
+impl ControlFlow {
+    /// Get a reference to the control flow's kind.
+    #[must_use]
+    pub fn kind(&self) -> &ControlFlowKind {
+        &self.kind
+    }
+}
+
+impl DeclareWithIndent for ControlFlow {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        self.kind().declare_with_indent(db, indent_style)
+    }
 }
 
 impl Label for ControlFlow {
@@ -91,7 +117,7 @@ impl DeclareWithIndent for SequentialStatement {
                 assignment.declare_with_indent(db, indent_style)
             }
             SequentialStatement::Control(_) => todo!(),
-            SequentialStatement::Test(_) => todo!(),
+            SequentialStatement::Test(t) => t.declare_with_indent(db, indent_style),
         };
         if let Some(label) = self.label() {
             Ok(format!("{}: {}", label, result?))
