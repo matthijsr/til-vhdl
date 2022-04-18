@@ -1,6 +1,6 @@
 use textwrap::indent;
 use tydi_common::error::Result;
-use tydi_common::traits::{Document, Identify};
+use tydi_common::traits::{Document, Documents, Identify};
 
 use crate::declaration::DeclareWithIndent;
 use crate::traits::VhdlDocument;
@@ -102,6 +102,12 @@ impl Identify for Architecture {
 impl Document for Architecture {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
+    }
+}
+
+impl Documents for Architecture {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 

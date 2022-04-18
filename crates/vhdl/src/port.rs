@@ -2,16 +2,17 @@ use std::fmt::Display;
 
 use tydi_common::{
     error::{Result, TryResult},
-    traits::{Document, Identify, Reverse, Reversed},
+    traits::{Document, Documents, Identify, Reverse, Reversed},
 };
 
+use crate::object::object_type::ObjectType;
 use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::Declare,
-    traits::VhdlDocument, object::object_type::DeclarationTypeName,
+    object::object_type::DeclarationTypeName,
+    traits::VhdlDocument,
 };
-use crate::object::object_type::ObjectType;
 
 /// A port.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -106,17 +107,6 @@ impl Port {
     // pub fn has_reversed(&self) -> bool {
     //     self.typ.has_reversed()
     // }
-
-    /// Return this port with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this port.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
 }
 
 impl Identify for Port {
@@ -134,6 +124,12 @@ impl VhdlNameSelf for Port {
 impl Document for Port {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
+    }
+}
+
+impl Documents for Port {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 

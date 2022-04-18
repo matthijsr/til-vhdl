@@ -3,18 +3,19 @@ use textwrap::indent;
 
 use tydi_common::{
     error::{Result, TryResult},
-    traits::{Document, Identify},
+    traits::{Document, Documents, Identify},
 };
 
+use crate::object::object_type::ObjectType;
 use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{Declare, DeclareWithIndent},
+    object::object_type::DeclarationTypeName,
     port::{Parameter, Port},
     properties::Analyze,
-    traits::VhdlDocument, object::object_type::DeclarationTypeName,
+    traits::VhdlDocument,
 };
-use crate::object::object_type::ObjectType;
 
 /// A component.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -55,17 +56,6 @@ impl Component {
         &self.parameters
     }
 
-    /// Return this component with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this component.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
-
     pub fn name(&self) -> &VhdlName {
         &self.identifier
     }
@@ -89,13 +79,22 @@ impl Document for Component {
     }
 }
 
+impl Documents for Component {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
+    }
+}
+
 impl Analyze for Component {
     fn list_nested_types(&self) -> Vec<ObjectType> {
         let mut result: Vec<ObjectType> = vec![];
         for p in self.ports().iter() {
             result.append(&mut p.typ().list_nested_types())
         }
-        result.into_iter().unique_by(|x| x.declaration_type_name()).collect()
+        result
+            .into_iter()
+            .unique_by(|x| x.declaration_type_name())
+            .collect()
     }
 }
 

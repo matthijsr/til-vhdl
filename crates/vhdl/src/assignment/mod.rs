@@ -6,7 +6,7 @@ use indexmap::map::IndexMap;
 use array_assignment::ArrayAssignment;
 use textwrap::indent;
 use tydi_common::error::{Error, Result, TryResult};
-use tydi_common::traits::{Document, Identify};
+use tydi_common::traits::{Document, Documents, Identify};
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
@@ -76,17 +76,6 @@ impl AssignDeclaration {
             result.push_str(&field.to_string());
         }
         result
-    }
-
-    /// Return this assignment declaration with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this assignment declaration.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
     }
 
     /// If this is an object to object assignment, return the object being assigned from
@@ -165,6 +154,12 @@ impl Label for AssignDeclaration {
 impl Document for AssignDeclaration {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
+    }
+}
+
+impl Documents for AssignDeclaration {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 

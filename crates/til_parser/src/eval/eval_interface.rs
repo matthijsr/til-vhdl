@@ -14,7 +14,7 @@ use til_query::{
 };
 use tydi_common::{
     error::TryResult,
-    name::{Name, PathName},
+    name::{Name, PathName}, traits::Documents,
 };
 use tydi_intern::Id;
 

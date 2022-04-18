@@ -11,7 +11,7 @@ use til_query::{
         Ir,
     },
 };
-use tydi_common::name::{Name, PathName};
+use tydi_common::{name::{Name, PathName}, traits::Documents};
 use tydi_intern::Id;
 
 use crate::{

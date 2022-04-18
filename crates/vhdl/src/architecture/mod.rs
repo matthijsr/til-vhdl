@@ -134,17 +134,6 @@ impl Architecture {
         self.usings.add_using(library, using)
     }
 
-    /// Return this architecture with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this architecture.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
-
     pub fn add_declaration(
         &mut self,
         db: &dyn Arch,

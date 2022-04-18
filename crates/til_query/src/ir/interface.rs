@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::Name,
-    traits::{Document, Identify},
+    traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
 
@@ -36,15 +36,6 @@ impl Interface {
             physical_properties,
             doc: None,
         })
-    }
-
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into());
     }
 
     pub fn name(&self) -> &Name {
@@ -112,5 +103,11 @@ impl MoveDb<Id<Interface>> for Interface {
 impl Document for Interface {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
+    }
+}
+
+impl Documents for Interface {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }

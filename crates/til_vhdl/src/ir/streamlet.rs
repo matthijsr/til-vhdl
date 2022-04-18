@@ -19,7 +19,7 @@ use tydi_common::{
     map::InsertionOrderedMap,
     name::{Name, PathName, PathNameSelf},
     numbers::{NonNegative, Positive},
-    traits::{Document, Identify},
+    traits::{Document, Documents, Identify},
 };
 
 use tydi_intern::Id;

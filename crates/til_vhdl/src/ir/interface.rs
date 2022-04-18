@@ -40,9 +40,6 @@ impl VhdlInterface {
     pub fn physical_properties(&self) -> &PhysicalProperties {
         &self.physical_properties
     }
-    pub fn doc(&self) -> &Option<String> {
-        &self.doc
-    }
 }
 
 impl Identify for VhdlInterface {

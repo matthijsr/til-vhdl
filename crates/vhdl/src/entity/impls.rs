@@ -1,6 +1,6 @@
 use textwrap::indent;
 use tydi_common::error::{Result, TryResult};
-use tydi_common::traits::{Document, Identify};
+use tydi_common::traits::{Document, Documents, Identify};
 
 use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
@@ -48,6 +48,12 @@ impl Document for Entity {
     }
 }
 
+impl Documents for Entity {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
+    }
+}
+
 impl Entity {
     /// Create a new entity.
     pub fn try_new(
@@ -72,17 +78,6 @@ impl Entity {
     /// Return a reference to the parameters of this entity.
     pub fn parameters(&self) -> &Vec<Parameter> {
         &self.parameters
-    }
-
-    /// Return this entity with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this entity.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
     }
 }
 
