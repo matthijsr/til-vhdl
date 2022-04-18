@@ -108,7 +108,7 @@ impl DeclareWithIndent for TestStatementKind {
                 format!("report \"{}\"", r.message())
             }
             TestStatementKind::AssertReport(ar) => format!(
-                "assert {} report {}",
+                "assert {} report \"{}\"",
                 ar.condition().declare_with_indent(db, indent_style)?,
                 ar.message(),
             ),
