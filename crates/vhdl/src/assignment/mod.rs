@@ -163,8 +163,8 @@ impl Label for AssignDeclaration {
 }
 
 impl Document for AssignDeclaration {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 

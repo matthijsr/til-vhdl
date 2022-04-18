@@ -43,8 +43,8 @@ impl Identify for Entity {
 }
 
 impl Document for Entity {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 
@@ -92,7 +92,7 @@ impl From<&Component> for Entity {
             identifier: comp.vhdl_name().clone(),
             parameters: comp.parameters().to_vec(),
             ports: comp.ports().to_vec(),
-            doc: comp.doc(),
+            doc: comp.doc().cloned(),
         }
     }
 }

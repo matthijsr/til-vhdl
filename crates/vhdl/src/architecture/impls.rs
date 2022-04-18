@@ -100,8 +100,8 @@ impl Identify for Architecture {
 }
 
 impl Document for Architecture {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 

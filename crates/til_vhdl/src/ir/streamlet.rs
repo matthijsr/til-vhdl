@@ -516,8 +516,8 @@ impl PathNameSelf for VhdlStreamlet {
 }
 
 impl Document for VhdlStreamlet {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 
@@ -543,7 +543,7 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
             name: self.path_name().clone(),
             implementation: self.implementation_id(),
             interface,
-            doc: self.doc(),
+            doc: self.doc().cloned(),
             component: None,
         })
     }

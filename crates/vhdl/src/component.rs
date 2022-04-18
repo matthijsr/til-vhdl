@@ -84,8 +84,8 @@ impl VhdlNameSelf for Component {
 }
 
 impl Document for Component {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 

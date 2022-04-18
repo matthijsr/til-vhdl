@@ -132,8 +132,8 @@ impl VhdlNameSelf for Port {
 }
 
 impl Document for Port {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 

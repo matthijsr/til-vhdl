@@ -58,8 +58,8 @@ impl NameSelf for VhdlInterface {
 }
 
 impl Document for VhdlInterface {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 
@@ -116,7 +116,7 @@ impl IntoVhdl<VhdlInterface> for Interface {
             name: self.name().clone(),
             typed_stream,
             physical_properties: self.physical_properties().clone(),
-            doc: self.doc().clone(),
+            doc: self.doc().cloned(),
         })
     }
 }

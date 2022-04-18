@@ -138,8 +138,8 @@ impl Identify for Streamlet {
 }
 
 impl Document for Streamlet {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 

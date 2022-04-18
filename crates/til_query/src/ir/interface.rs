@@ -110,7 +110,7 @@ impl MoveDb<Id<Interface>> for Interface {
 }
 
 impl Document for Interface {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }

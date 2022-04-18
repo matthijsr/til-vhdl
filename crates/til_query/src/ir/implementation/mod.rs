@@ -96,8 +96,8 @@ impl Identify for Implementation {
 }
 
 impl Document for Implementation {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
     }
 }
 
