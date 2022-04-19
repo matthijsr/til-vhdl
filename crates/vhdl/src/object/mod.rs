@@ -121,4 +121,8 @@ impl Object {
     pub fn typ(&self, db: &dyn Arch) -> ObjectType {
         db.lookup_intern_object_type(self.typ)
     }
+
+    pub fn typ_id(&self) -> Id<ObjectType> {
+        self.typ
+    }
 }

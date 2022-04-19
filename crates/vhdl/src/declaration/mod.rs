@@ -318,6 +318,10 @@ impl ObjectDeclaration {
         db.get_object(self.object_key().clone())
     }
 
+    pub fn typ(&self, db: &dyn Arch) -> Result<ObjectType> {
+        Ok(self.object(db)?.typ(db))
+    }
+
     pub fn from_port(db: &dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {
         if is_entity {
             ObjectDeclaration::entity_port(

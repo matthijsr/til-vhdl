@@ -1,7 +1,12 @@
+use std::sync::Arc;
+
 use tydi_common::error::Result;
 use tydi_intern::Id;
 
-use crate::object::{object_type::ObjectType, Object};
+use crate::{
+    declaration::ObjectDeclaration,
+    object::{object_type::ObjectType, Object},
+};
 
 use self::object_key::ObjectKey;
 
@@ -19,6 +24,27 @@ pub trait ObjectQueries: Interner {
 
     /// Get an object based on its key
     fn get_object(&self, key: ObjectKey) -> Result<Object>;
+
+    fn get_object_type(&self, key: ObjectKey) -> Result<Arc<ObjectType>>;
+
+    fn get_object_declaration_type(&self, key: Id<ObjectDeclaration>) -> Result<Arc<ObjectType>>;
+}
+
+fn get_object_type(db: &dyn ObjectQueries, key: ObjectKey) -> Result<Arc<ObjectType>> {
+    Ok(Arc::new(
+        db.lookup_intern_object_type(db.get_object(key)?.typ_id()),
+    ))
+}
+
+fn get_object_declaration_type(
+    db: &dyn ObjectQueries,
+    key: Id<ObjectDeclaration>,
+) -> Result<Arc<ObjectType>> {
+    db.get_object_type(
+        db.lookup_intern_object_declaration(key)
+            .object_key()
+            .clone(),
+    )
 }
 
 fn assignable_types(

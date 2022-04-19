@@ -1,12 +1,15 @@
 use itertools::Itertools;
-use tydi_common::{error::Result, map::InsertionOrderedMap};
+use tydi_common::{
+    error::{Error, Result},
+    map::InsertionOrderedMap,
+};
 use tydi_intern::Id;
 
 use crate::{
     architecture::arch_storage::{interner::GetName, Arch},
     common::vhdl_name::VhdlName,
     declaration::{DeclareWithIndent, ObjectDeclaration},
-    object::object_type::time::TimeValue,
+    object::object_type::{time::TimeValue, ObjectType},
 };
 
 use super::condition::Condition;
@@ -15,6 +18,31 @@ use super::condition::Condition;
 pub enum TimeExpression {
     Constant(TimeValue),
     Variable(Id<ObjectDeclaration>),
+}
+
+impl TimeExpression {
+    pub fn variable(db: &dyn Arch, obj: Id<ObjectDeclaration>) -> Result<Self> {
+        let typ = db.get_object_declaration_type(obj)?;
+        match typ.as_ref() {
+            ObjectType::Time => Ok(Self::Variable(obj)),
+            ObjectType::Bit | ObjectType::Array(_) | ObjectType::Record(_) => {
+                Err(Error::InvalidArgument(format!(
+                    "Object with type {} cannot be used for a Time expression.",
+                    typ
+                )))
+            }
+        }
+    }
+
+    pub fn constant(val: impl Into<TimeValue>) -> Self {
+        TimeExpression::Constant(val.into())
+    }
+}
+
+impl From<TimeValue> for TimeExpression {
+    fn from(val: TimeValue) -> Self {
+        TimeExpression::Constant(val)
+    }
 }
 
 impl DeclareWithIndent for TimeExpression {
