@@ -154,7 +154,7 @@ impl<T: TryResult<Relation>> CreateLogicalExpression for T {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RelationalOperator {
     Eq,
-    NotEq,
+    NEq,
     Lt,
     LtEq,
     Gt,
@@ -165,11 +165,11 @@ impl fmt::Display for RelationalOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RelationalOperator::Eq => write!(f, "="),
-            RelationalOperator::NotEq => write!(f, "/="),
+            RelationalOperator::NEq => write!(f, "/="),
             RelationalOperator::Lt => write!(f, "<"),
-            RelationalOperator::LtEq => write!(f, "=<"),
+            RelationalOperator::LtEq => write!(f, "<="),
             RelationalOperator::Gt => write!(f, ">"),
-            RelationalOperator::GtEq => write!(f, "=>"),
+            RelationalOperator::GtEq => write!(f, ">="),
         }
     }
 }
@@ -225,17 +225,11 @@ pub trait CombineRelation: Sized {
     }
 
     fn eq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn not_eq(
-        self,
-        db: &dyn Arch,
-        right: impl TryResult<Relation>,
-    ) -> Result<RelationalCombination>;
+    fn neq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
     fn lt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn lt_eq(self, db: &dyn Arch, right: impl TryResult<Relation>)
-        -> Result<RelationalCombination>;
+    fn lteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
     fn gt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn gt_eq(self, db: &dyn Arch, right: impl TryResult<Relation>)
-        -> Result<RelationalCombination>;
+    fn gteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
 }
 
 impl<T: TryResult<Relation>> CombineRelation for T {
@@ -248,16 +242,12 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn not_eq(
-        self,
-        db: &dyn Arch,
-        right: impl TryResult<Relation>,
-    ) -> Result<RelationalCombination> {
+    fn neq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
             right,
-            operator: RelationalOperator::NotEq,
+            operator: RelationalOperator::NEq,
         })
     }
 
@@ -270,11 +260,7 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn lt_eq(
-        self,
-        db: &dyn Arch,
-        right: impl TryResult<Relation>,
-    ) -> Result<RelationalCombination> {
+    fn lteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -292,11 +278,7 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn gt_eq(
-        self,
-        db: &dyn Arch,
-        right: impl TryResult<Relation>,
-    ) -> Result<RelationalCombination> {
+    fn gteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -312,6 +294,30 @@ pub enum Relation {
     Object(Id<ObjectDeclaration>),
     Combination(RelationalCombination),
     LogicalExpression(LogicalExpression),
+}
+
+impl From<ValueAssignment> for Relation {
+    fn from(val: ValueAssignment) -> Self {
+        Self::Value(Box::new(val))
+    }
+}
+
+impl From<Id<ObjectDeclaration>> for Relation {
+    fn from(val: Id<ObjectDeclaration>) -> Self {
+        Self::Object(val)
+    }
+}
+
+impl From<RelationalCombination> for Relation {
+    fn from(val: RelationalCombination) -> Self {
+        Self::Combination(val)
+    }
+}
+
+impl From<LogicalExpression> for Relation {
+    fn from(val: LogicalExpression) -> Self {
+        Self::LogicalExpression(val)
+    }
 }
 
 impl Relation {
@@ -383,5 +389,40 @@ impl DeclareWithIndent for Relation {
             Relation::Combination(c) => c.declare_with_indent(db, indent_style),
             Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{architecture::arch_storage::db::Database, declaration::Declare};
+
+    use super::*;
+
+    #[test]
+    fn test_declare() -> Result<()> {
+        let _db = Database::default();
+        let db = &_db;
+        let lex = ValueAssignment::Boolean(true)
+            .and(db, ValueAssignment::Boolean(true))?
+            .or(db, ValueAssignment::Boolean(true))?
+            .xor(db, ValueAssignment::Boolean(false))?
+            .nand(db, ValueAssignment::Boolean(false))?
+            .nor(db, ValueAssignment::Boolean(false))?
+            .xnor(db, ValueAssignment::Boolean(true))?;
+        assert_eq!(
+            "true and true or true xor false nand false nor false xnor true",
+            lex.declare(db)?
+        );
+        let comb = lex
+            .clone()
+            .eq(db, lex)?
+            .neq(db, ValueAssignment::Boolean(false))?
+            .lt(db, ValueAssignment::Boolean(false))?
+            .lteq(db, ValueAssignment::Boolean(false))?
+            .gt(db, ValueAssignment::Boolean(false))?
+            .gteq(db, ValueAssignment::Boolean(false))?;
+        assert_eq!("true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false", comb.declare(db)?);
+
+        Ok(())
     }
 }
