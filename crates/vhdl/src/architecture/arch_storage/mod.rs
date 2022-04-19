@@ -61,9 +61,13 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(_) => match to_typ {
                         ObjectType::Bit => Ok(()),
-                        ObjectType::Array(_) | ObjectType::Record(_) | ObjectType::Time => Err(
-                            Error::InvalidTarget(format!("Cannot assign Bit to {}", to_typ)),
-                        ),
+                        ObjectType::Array(_)
+                        | ObjectType::Record(_)
+                        | ObjectType::Time
+                        | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                            "Cannot assign Bit to {}",
+                            to_typ
+                        ))),
                     },
                     ValueAssignment::BitVec(bitvec) => match to_typ {
                         ObjectType::Array(array) if array.is_bitvector() => {
@@ -72,16 +76,31 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                         ObjectType::Array(_)
                         | ObjectType::Bit
                         | ObjectType::Record(_)
-                        | ObjectType::Time => Err(Error::InvalidTarget(format!(
+                        | ObjectType::Time
+                        | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
                             "Cannot assign Bit Vector to {}",
                             to_typ
                         ))),
                     },
                     ValueAssignment::Time(_) => match to_typ {
-                        ObjectType::Bit | ObjectType::Record(_) | ObjectType::Array(_) => Err(
-                            Error::InvalidTarget(format!("Cannot assign Time to {}", to_typ)),
-                        ),
                         ObjectType::Time => Ok(()),
+                        ObjectType::Bit
+                        | ObjectType::Record(_)
+                        | ObjectType::Array(_)
+                        | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                            "Cannot assign Time to {}",
+                            to_typ
+                        ))),
+                    },
+                    ValueAssignment::Boolean(_) => match to_typ {
+                        ObjectType::Boolean => Ok(()),
+                        ObjectType::Bit
+                        | ObjectType::Record(_)
+                        | ObjectType::Array(_)
+                        | ObjectType::Time => Err(Error::InvalidTarget(format!(
+                            "Cannot assign boolean to {}",
+                            to_typ
+                        ))),
                     },
                 },
                 DirectAssignment::FullRecord(record) => {

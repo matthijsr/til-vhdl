@@ -1,4 +1,3 @@
-pub mod boolean;
 pub mod severity;
 pub mod time;
 
@@ -42,6 +41,8 @@ pub enum ObjectType {
     //
     // I'm not sure adhering to these strict categories will really make things easier, however.
     // They might make sense for a "Custom" type, instead.
+    /// A boolean object
+    Boolean,
     /// A time object
     Time,
     /// An std_logic bit object, can not contain further fields
@@ -76,6 +77,7 @@ impl fmt::Display for ObjectType {
                 )
             }
             ObjectType::Time => write!(f, "Time"),
+            ObjectType::Boolean => write!(f, "Boolean"),
         }
     }
 }
@@ -133,6 +135,9 @@ impl ObjectType {
             },
             ObjectType::Time => Err(Error::InvalidTarget(
                 "Cannot select a field on a Time".to_string(),
+            )),
+            ObjectType::Boolean => Err(Error::InvalidTarget(
+                "Cannot select a field on a Boolean".to_string(),
             )),
         }
     }
@@ -229,6 +234,16 @@ impl ObjectType {
                     )))
                 }
             }
+            ObjectType::Boolean => {
+                if let ObjectType::Boolean = typ {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidTarget(format!(
+                        "Cannot assign {} to Boolean",
+                        typ
+                    )))
+                }
+            }
         }
     }
 
@@ -249,6 +264,7 @@ impl DeclarationTypeName for ObjectType {
             ObjectType::Array(array) => array.declaration_type_name(),
             ObjectType::Record(record) => record.declaration_type_name(),
             ObjectType::Time => "time".to_string(),
+            ObjectType::Boolean => "boolean".to_string(),
         }
     }
 }
@@ -275,6 +291,7 @@ impl Analyze for ObjectType {
                 result
             }
             ObjectType::Time => vec![],
+            ObjectType::Boolean => vec![],
         }
     }
 }
@@ -289,6 +306,9 @@ impl DeclareWithIndent for ObjectType {
             ObjectType::Record(_) => todo!(),
             ObjectType::Time => Err(Error::BackEndError(
                 "Invalid type, Time (time) cannot be declared.".to_string(),
+            )),
+            ObjectType::Boolean => Err(Error::BackEndError(
+                "Invalid type, Boolean (boolean) cannot be declared.".to_string(),
             )),
         }
     }

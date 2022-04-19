@@ -363,6 +363,7 @@ impl AssignmentKind {
                     ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
                     ValueAssignment::BitVec(bitvec) => bitvec.declare_for(object_identifier),
                     ValueAssignment::Time(t) => t.declare(),
+                    ValueAssignment::Boolean(b) => Ok(b.to_string()),
                 },
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
@@ -586,6 +587,8 @@ impl Identify for FieldAssignment {
 /// Directly assigning a value or an entire Record, corresponds to the Types defined in `tydi::generator::common::Type`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValueAssignment {
+    /// Assigning a boolean to something
+    Boolean(bool),
     /// Assigning an amount of time to something
     Time(TimeValue),
     /// Assigning a value to a single bit
@@ -600,6 +603,7 @@ impl ValueAssignment {
             ValueAssignment::Bit(b) => Ok(format!("'{}'", b)),
             ValueAssignment::BitVec(bv) => bv.declare(),
             ValueAssignment::Time(t) => t.declare(),
+            ValueAssignment::Boolean(b) => Ok(b.to_string()),
         }
     }
 }

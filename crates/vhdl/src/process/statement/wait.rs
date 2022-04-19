@@ -25,12 +25,13 @@ impl TimeExpression {
         let typ = db.get_object_declaration_type(obj)?;
         match typ.as_ref() {
             ObjectType::Time => Ok(Self::Variable(obj)),
-            ObjectType::Bit | ObjectType::Array(_) | ObjectType::Record(_) => {
-                Err(Error::InvalidArgument(format!(
-                    "Object with type {} cannot be used for a Time expression.",
-                    typ
-                )))
-            }
+            ObjectType::Bit
+            | ObjectType::Array(_)
+            | ObjectType::Record(_)
+            | ObjectType::Boolean => Err(Error::InvalidArgument(format!(
+                "Object with type {} cannot be used for a Time expression.",
+                typ
+            ))),
         }
     }
 

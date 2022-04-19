@@ -26,6 +26,7 @@ impl ListUsings for AssignmentKind {
                         }
                     },
                     ValueAssignment::Time(_) => (),
+                    ValueAssignment::Boolean(_) => (),
                 },
                 DirectAssignment::FullRecord(rec) => {
                     for fa in rec {

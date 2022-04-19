@@ -43,7 +43,7 @@ pub struct RelationalCombination {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
-    Value(ValueAssignment),
+    Value(Box<ValueAssignment>),
     Object(Id<ObjectDeclaration>),
     Combination(RelationalCombination),
     LogicalExpression(LogicalExpression),
