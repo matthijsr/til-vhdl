@@ -13,7 +13,7 @@ use std::convert::TryInto;
 use crate::{
     assignment::{
         array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
-        FieldSelection, RangeConstraint, ValueAssignment,
+        FieldSelection, RangeConstraint,
     },
     object::object_type::ObjectType,
 };
@@ -58,51 +58,7 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
         AssignmentKind::Direct(direct) => {
             let to_typ = db.lookup_intern_object_type(to.typ);
             match direct {
-                DirectAssignment::Value(value) => match value {
-                    ValueAssignment::Bit(_) => match to_typ {
-                        ObjectType::Bit => Ok(()),
-                        ObjectType::Array(_)
-                        | ObjectType::Record(_)
-                        | ObjectType::Time
-                        | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
-                            "Cannot assign Bit to {}",
-                            to_typ
-                        ))),
-                    },
-                    ValueAssignment::BitVec(bitvec) => match to_typ {
-                        ObjectType::Array(array) if array.is_bitvector() => {
-                            bitvec.validate_width(array.width())
-                        }
-                        ObjectType::Array(_)
-                        | ObjectType::Bit
-                        | ObjectType::Record(_)
-                        | ObjectType::Time
-                        | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
-                            "Cannot assign Bit Vector to {}",
-                            to_typ
-                        ))),
-                    },
-                    ValueAssignment::Time(_) => match to_typ {
-                        ObjectType::Time => Ok(()),
-                        ObjectType::Bit
-                        | ObjectType::Record(_)
-                        | ObjectType::Array(_)
-                        | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
-                            "Cannot assign Time to {}",
-                            to_typ
-                        ))),
-                    },
-                    ValueAssignment::Boolean(_) => match to_typ {
-                        ObjectType::Boolean => Ok(()),
-                        ObjectType::Bit
-                        | ObjectType::Record(_)
-                        | ObjectType::Array(_)
-                        | ObjectType::Time => Err(Error::InvalidTarget(format!(
-                            "Cannot assign boolean to {}",
-                            to_typ
-                        ))),
-                    },
-                },
+                DirectAssignment::Value(value) => value.can_assign(&to_typ),
                 DirectAssignment::FullRecord(record) => {
                     if let ObjectType::Record(to_record) = &to_typ {
                         if to_record.fields().len() == record.len() {

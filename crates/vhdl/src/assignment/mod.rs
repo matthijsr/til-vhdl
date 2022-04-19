@@ -15,6 +15,7 @@ use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::VhdlName;
 use crate::declaration::Declare;
 use crate::object::object_type::time::TimeValue;
+use crate::object::object_type::ObjectType;
 use crate::properties::Width;
 use crate::statement::label::Label;
 
@@ -604,6 +605,75 @@ impl ValueAssignment {
             ValueAssignment::BitVec(bv) => bv.declare(),
             ValueAssignment::Time(t) => t.declare(),
             ValueAssignment::Boolean(b) => Ok(b.to_string()),
+        }
+    }
+
+    pub fn matching_value(&self, other: &ValueAssignment) -> bool {
+        match self {
+            ValueAssignment::Boolean(_) => match other {
+                ValueAssignment::Boolean(_) => true,
+                _ => false,
+            },
+            ValueAssignment::Time(_) => match other {
+                ValueAssignment::Time(_) => true,
+                _ => false,
+            },
+            ValueAssignment::Bit(_) => match other {
+                ValueAssignment::Bit(_) => true,
+                _ => false,
+            },
+            ValueAssignment::BitVec(bv) => match other {
+                ValueAssignment::BitVec(obv) => bv.matching_bitvec(obv),
+                _ => false,
+            },
+        }
+    }
+
+    pub fn can_assign(&self, to_typ: &ObjectType) -> Result<()> {
+        match self {
+            ValueAssignment::Bit(_) => match to_typ {
+                ObjectType::Bit => Ok(()),
+                ObjectType::Array(_)
+                | ObjectType::Record(_)
+                | ObjectType::Time
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                    "Cannot assign Bit to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::BitVec(bitvec) => match to_typ {
+                ObjectType::Array(array) if array.is_bitvector() => {
+                    bitvec.validate_width(array.width())
+                }
+                ObjectType::Array(_)
+                | ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Time
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                    "Cannot assign Bit Vector to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::Time(_) => match to_typ {
+                ObjectType::Time => Ok(()),
+                ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Array(_)
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                    "Cannot assign Time to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::Boolean(_) => match to_typ {
+                ObjectType::Boolean => Ok(()),
+                ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Array(_)
+                | ObjectType::Time => Err(Error::InvalidTarget(format!(
+                    "Cannot assign boolean to {}",
+                    to_typ
+                ))),
+            },
         }
     }
 }
