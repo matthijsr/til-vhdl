@@ -590,6 +590,15 @@ pub enum ValueAssignment {
     BitVec(BitVecValue),
 }
 
+impl ValueAssignment {
+    pub fn declare(&self) -> Result<String> {
+        match self {
+            ValueAssignment::Bit(b) => Ok(format!("'{}'", b)),
+            ValueAssignment::BitVec(bv) => bv.declare(),
+        }
+    }
+}
+
 /// A VHDL assignment constraint
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FieldSelection {

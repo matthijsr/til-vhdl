@@ -52,7 +52,7 @@ pub enum Relation {
 impl DeclareWithIndent for Relation {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
-            Relation::Value(_) => todo!(),
+            Relation::Value(v) => v.declare(),
             Relation::Object(obj) => Ok(obj.get_name(db).to_string()),
             Relation::Combination(_) => todo!(),
             Relation::LogicalExpression(_) => todo!(),
