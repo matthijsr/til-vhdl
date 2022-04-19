@@ -3,17 +3,17 @@ pub mod statement;
 use itertools::Itertools;
 use textwrap::indent;
 use tydi_common::{
-    error::{Result, TryResult},
+    error::{Error, Result, TryResult},
     map::InsertionOrderedMap,
 };
 use tydi_intern::Id;
 
 use crate::{
     architecture::arch_storage::Arch,
-    common::vhdl_name::VhdlName,
-    declaration::{DeclareWithIndent, ObjectDeclaration},
+    common::vhdl_name::{VhdlName, VhdlNameSelf},
+    declaration::{DeclareWithIndent, ObjectDeclaration, ObjectKind},
     statement::label::Label,
-    usings::{ListUsings, Usings, ListUsingsDb},
+    usings::{ListUsings, ListUsingsDb, Usings},
 };
 
 use self::statement::SequentialStatement;
@@ -61,6 +61,10 @@ impl Process {
         self.statements.as_ref()
     }
 
+    pub fn usings(&self) -> &Usings {
+        &self.usings
+    }
+
     pub fn try_new(label: impl TryResult<VhdlName>) -> Result<Self> {
         Ok(Self::new(label.try_result()?))
     }
@@ -75,11 +79,35 @@ impl Process {
         }
     }
 
-    pub fn add_statement(&mut self, db: &dyn Arch, statement: impl TryResult<SequentialStatement>) -> Result<()> {
+    pub fn add_statement(
+        &mut self,
+        db: &dyn Arch,
+        statement: impl TryResult<SequentialStatement>,
+    ) -> Result<()> {
         let statement = statement.try_result()?;
         self.usings.combine(&statement.list_usings_db(db)?);
         self.statements.push(statement);
         Ok(())
+    }
+
+    pub fn add_variable_declaration(
+        &mut self,
+        db: &dyn Arch,
+        variable: impl TryResult<ObjectDeclaration>,
+    ) -> Result<Id<ObjectDeclaration>> {
+        let variable: ObjectDeclaration = variable.try_result()?;
+        if let ObjectKind::Variable = variable.kind() {
+            let var_name = variable.vhdl_name().clone();
+            self.usings.combine(&variable.list_usings()?);
+            let var_id = db.intern_object_declaration(variable);
+            self.variable_declarations.try_insert(var_name, var_id)?;
+            Ok(var_id)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "Cannot declare a {} on a process.",
+                variable.kind()
+            )))
+        }
     }
 }
 
@@ -95,16 +123,19 @@ impl Label for Process {
 
 impl ListUsings for Process {
     fn list_usings(&self) -> Result<Usings> {
-        todo!()
+        Ok(self.usings().clone())
     }
 }
 
 impl DeclareWithIndent for Process {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = if self.sensitivity_list().len() > 0 {
-            format!("process({})\n", self.sensitivity_list().keys().join(", "))
+            format!(
+                "process({}) is\n",
+                self.sensitivity_list().keys().join(", ")
+            )
         } else {
-            "process\n".to_string()
+            "process is\n".to_string()
         };
 
         let mut declarations = String::new();

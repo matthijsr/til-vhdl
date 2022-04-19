@@ -77,6 +77,18 @@ impl Label for ControlFlow {
     }
 }
 
+impl ListUsingsDb for ControlFlow {
+    fn list_usings_db(&self, _db: &dyn Arch) -> Result<Usings> {
+        match self.kind() {
+            ControlFlowKind::IfElse(_) => todo!(),
+            ControlFlowKind::Case(_) => todo!(),
+            ControlFlowKind::Loop(_) => todo!(),
+            ControlFlowKind::Wait(_) => Ok(Usings::new_empty()),
+            ControlFlowKind::Exit(_) => todo!(),
+        }
+    }
+}
+
 // REFER TO: https://insights.sigasi.com/tech/vhdl2008.ebnf/
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -106,7 +118,11 @@ impl Label for SequentialStatement {
 
 impl ListUsingsDb for SequentialStatement {
     fn list_usings_db(&self, db: &dyn Arch) -> Result<Usings> {
-        todo!()
+        match self {
+            SequentialStatement::Assignment(a) => a.list_usings_db(db),
+            SequentialStatement::Control(c) => c.list_usings_db(db),
+            SequentialStatement::Test(_) => Ok(Usings::new_empty()),
+        }
     }
 }
 
@@ -116,7 +132,7 @@ impl DeclareWithIndent for SequentialStatement {
             SequentialStatement::Assignment(assignment) => {
                 assignment.declare_with_indent(db, indent_style)
             }
-            SequentialStatement::Control(_) => todo!(),
+            SequentialStatement::Control(c) => c.declare_with_indent(db, indent_style),
             SequentialStatement::Test(t) => t.declare_with_indent(db, indent_style),
         };
         if let Some(label) = self.label() {
