@@ -74,6 +74,13 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                             to_typ
                         ))),
                     },
+                    ValueAssignment::Time(_) => match to_typ {
+                        // TODO: Add Time object when exists.
+                        _ => Err(Error::InvalidTarget(format!(
+                            "Cannot assign Time to {}",
+                            to_typ
+                        ))),
+                    },
                 },
                 DirectAssignment::FullRecord(record) => {
                     if let ObjectType::Record(to_record) = &to_typ {

@@ -1,6 +1,5 @@
 use tydi_common::error::Result;
 
-
 use crate::{
     common::vhdl_name::VhdlName,
     usings::{ListUsings, Usings},
@@ -26,6 +25,7 @@ impl ListUsings for AssignmentKind {
                             usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all")?;
                         }
                     },
+                    ValueAssignment::Time(_) => (),
                 },
                 DirectAssignment::FullRecord(rec) => {
                     for fa in rec {

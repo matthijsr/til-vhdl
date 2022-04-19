@@ -36,7 +36,7 @@ pub struct TimeValue {
 }
 
 impl TimeValue {
-    pub fn try_string(&self) -> Result<String> {
+    pub fn declare(&self) -> Result<String> {
         if let Some(_represent_as) = self.represent_as() {
             todo!()
         } else {

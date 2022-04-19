@@ -20,7 +20,7 @@ pub enum TimeExpression {
 impl DeclareWithIndent for TimeExpression {
     fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
         match self {
-            TimeExpression::Constant(t) => t.try_string(),
+            TimeExpression::Constant(t) => t.declare(),
             TimeExpression::Variable(v) => Ok(v.get_name(db).to_string()),
         }
     }

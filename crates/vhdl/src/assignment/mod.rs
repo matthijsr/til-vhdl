@@ -14,6 +14,7 @@ use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
 use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::VhdlName;
 use crate::declaration::Declare;
+use crate::object::object_type::time::TimeValue;
 use crate::properties::Width;
 use crate::statement::label::Label;
 
@@ -361,6 +362,7 @@ impl AssignmentKind {
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
                     ValueAssignment::BitVec(bitvec) => bitvec.declare_for(object_identifier),
+                    ValueAssignment::Time(t) => t.declare(),
                 },
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
@@ -584,6 +586,8 @@ impl Identify for FieldAssignment {
 /// Directly assigning a value or an entire Record, corresponds to the Types defined in `tydi::generator::common::Type`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValueAssignment {
+    /// Assigning an amount of time to something
+    Time(TimeValue),
     /// Assigning a value to a single bit
     Bit(StdLogicValue),
     /// Assigning a value to a (part of) a bit vector
@@ -595,6 +599,7 @@ impl ValueAssignment {
         match self {
             ValueAssignment::Bit(b) => Ok(format!("'{}'", b)),
             ValueAssignment::BitVec(bv) => bv.declare(),
+            ValueAssignment::Time(t) => t.declare(),
         }
     }
 }
