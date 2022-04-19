@@ -2,7 +2,10 @@ pub mod statement;
 
 use itertools::Itertools;
 use textwrap::indent;
-use tydi_common::{error::Result, map::InsertionOrderedMap};
+use tydi_common::{
+    error::{Result, TryResult},
+    map::InsertionOrderedMap,
+};
 use tydi_intern::Id;
 
 use crate::{
@@ -10,7 +13,7 @@ use crate::{
     common::vhdl_name::VhdlName,
     declaration::{DeclareWithIndent, ObjectDeclaration},
     statement::label::Label,
-    usings::{ListUsings, Usings},
+    usings::{ListUsings, Usings, ListUsingsDb},
 };
 
 use self::statement::SequentialStatement;
@@ -56,6 +59,27 @@ impl Process {
     #[must_use]
     pub fn statements(&self) -> &[SequentialStatement] {
         self.statements.as_ref()
+    }
+
+    pub fn try_new(label: impl TryResult<VhdlName>) -> Result<Self> {
+        Ok(Self::new(label.try_result()?))
+    }
+
+    pub fn new(label: impl Into<VhdlName>) -> Self {
+        Self {
+            label: label.into(),
+            sensitivity_list: InsertionOrderedMap::new(),
+            variable_declarations: InsertionOrderedMap::new(),
+            statements: vec![],
+            usings: Usings::new_empty(),
+        }
+    }
+
+    pub fn add_statement(&mut self, db: &dyn Arch, statement: impl TryResult<SequentialStatement>) -> Result<()> {
+        let statement = statement.try_result()?;
+        self.usings.combine(&statement.list_usings_db(db)?);
+        self.statements.push(statement);
+        Ok(())
     }
 }
 

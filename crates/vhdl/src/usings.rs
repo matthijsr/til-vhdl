@@ -5,7 +5,10 @@ use tydi_common::{
     map::InsertionOrderedMap,
 };
 
-use crate::common::vhdl_name::{VhdlName, VhdlPathName};
+use crate::{
+    architecture::arch_storage::Arch,
+    common::vhdl_name::{VhdlName, VhdlPathName},
+};
 
 /// A list of VHDL usings, indexed by library
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,8 +51,22 @@ pub trait ListUsings {
     fn list_usings(&self) -> Result<Usings>;
 }
 
+pub trait ListUsingsDb {
+    fn list_usings_db(&self, db: &dyn Arch) -> Result<Usings>;
+}
+
+impl<T: ListUsings> ListUsingsDb for T {
+    fn list_usings_db(&self, _db: &dyn Arch) -> Result<Usings> {
+        self.list_usings()
+    }
+}
+
 pub trait DeclareUsings {
     fn declare_usings(&self) -> Result<String>;
+}
+
+pub trait DeclareUsingsDb {
+    fn declare_usings_db(&self, db: &dyn Arch) -> Result<String>;
 }
 
 /// Generate supertrait for VHDL with usings declarations. (E.g. use ieee.std_logic_1164.all;)
@@ -58,6 +75,23 @@ impl<T: ListUsings> DeclareUsings for T {
         let mut result = String::new();
 
         for (lib, usings) in self.list_usings()?.0 {
+            result.push_str(format!("library {};\n", lib).as_str());
+            for using in usings {
+                result.push_str(format!("use {}.{};\n", lib, using).as_str());
+            }
+            result.push_str("\n");
+        }
+
+        Ok(result)
+    }
+}
+
+/// Generate supertrait for VHDL with usings declarations. (E.g. use ieee.std_logic_1164.all;)
+impl<T: ListUsingsDb> DeclareUsingsDb for T {
+    fn declare_usings_db(&self, db: &dyn Arch) -> Result<String> {
+        let mut result = String::new();
+
+        for (lib, usings) in self.list_usings_db(db)?.0 {
             result.push_str(format!("library {};\n", lib).as_str());
             for using in usings {
                 result.push_str(format!("use {}.{};\n", lib, using).as_str());

@@ -13,7 +13,7 @@ use crate::{
     common::vhdl_name::VhdlName,
     declaration::DeclareWithIndent,
     statement::label::Label,
-    usings::{ListUsings, Usings},
+    usings::{ListUsingsDb, Usings},
 };
 
 use self::{
@@ -104,8 +104,8 @@ impl Label for SequentialStatement {
     }
 }
 
-impl ListUsings for SequentialStatement {
-    fn list_usings(&self) -> Result<Usings> {
+impl ListUsingsDb for SequentialStatement {
+    fn list_usings_db(&self, db: &dyn Arch) -> Result<Usings> {
         todo!()
     }
 }

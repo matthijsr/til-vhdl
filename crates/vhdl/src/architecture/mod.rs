@@ -11,7 +11,7 @@ use crate::{
     entity::Entity,
     package::Package,
     statement::Statement,
-    usings::{ListUsings, Usings},
+    usings::{ListUsings, ListUsingsDb, Usings},
 };
 
 use self::arch_storage::Arch;
@@ -151,16 +151,7 @@ impl Architecture {
 
     pub fn add_statement(&mut self, db: &dyn Arch, statement: impl Into<Statement>) -> Result<()> {
         let statement = statement.into();
-        match &statement {
-            Statement::Assignment(assignment) => self.usings.combine(&assignment.list_usings()?),
-            Statement::PortMapping(pm) => {
-                for (_, object) in pm.ports() {
-                    self.usings
-                        .combine(&db.lookup_intern_object_declaration(*object).list_usings()?);
-                }
-            }
-            Statement::Process(process) => self.usings.combine(&process.list_usings()?),
-        }
+        self.usings.combine(&statement.list_usings_db(db)?);
         self.statement.push(statement);
         Ok(())
     }

@@ -10,6 +10,7 @@ use crate::{
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     process::Process,
+    usings::{ListUsingsDb, Usings},
 };
 
 use self::label::Label;
@@ -28,6 +29,16 @@ pub enum Statement {
     Assignment(AssignDeclaration),
     PortMapping(PortMapping),
     Process(Process),
+}
+
+impl ListUsingsDb for Statement {
+    fn list_usings_db(&self, db: &dyn Arch) -> Result<crate::usings::Usings> {
+        match self {
+            Statement::Assignment(a) => a.list_usings_db(db),
+            Statement::PortMapping(pm) => pm.list_usings_db(db),
+            Statement::Process(p) => p.list_usings_db(db),
+        }
+    }
 }
 
 impl Label for Statement {
@@ -149,5 +160,15 @@ impl Label for PortMapping {
 impl VhdlNameSelf for PortMapping {
     fn vhdl_name(&self) -> &VhdlName {
         &self.label
+    }
+}
+
+impl ListUsingsDb for PortMapping {
+    fn list_usings_db(&self, db: &dyn Arch) -> Result<crate::usings::Usings> {
+        let mut usings = Usings::new_empty();
+        for (_, object) in self.ports() {
+            usings.combine(&object.list_usings_db(db)?);
+        }
+        Ok(usings)
     }
 }
