@@ -42,6 +42,8 @@ pub enum ObjectType {
     //
     // I'm not sure adhering to these strict categories will really make things easier, however.
     // They might make sense for a "Custom" type, instead.
+    /// A time object
+    Time,
     /// An std_logic bit object, can not contain further fields
     Bit,
     /// An array of fields, covers both conventional arrays, as well as bit vectors
@@ -73,6 +75,7 @@ impl fmt::Display for ObjectType {
                     fields
                 )
             }
+            ObjectType::Time => write!(f, "Time"),
         }
     }
 }
@@ -128,6 +131,9 @@ impl ObjectType {
                 )),
                 FieldSelection::Name(name) => Ok(record.get_field(name)?.clone()),
             },
+            ObjectType::Time => Err(Error::InvalidTarget(
+                "Cannot select a field on a Time".to_string(),
+            )),
         }
     }
 
@@ -213,6 +219,16 @@ impl ObjectType {
                     )))
                 }
             }
+            ObjectType::Time => {
+                if let ObjectType::Time = typ {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidTarget(format!(
+                        "Cannot assign {} to Time",
+                        typ
+                    )))
+                }
+            }
         }
     }
 
@@ -232,6 +248,7 @@ impl DeclarationTypeName for ObjectType {
             ObjectType::Bit => "std_logic".to_string(),
             ObjectType::Array(array) => array.declaration_type_name(),
             ObjectType::Record(record) => record.declaration_type_name(),
+            ObjectType::Time => "time".to_string(),
         }
     }
 }
@@ -257,6 +274,7 @@ impl Analyze for ObjectType {
                 result.push(self.clone());
                 result
             }
+            ObjectType::Time => vec![],
         }
     }
 }
@@ -269,6 +287,9 @@ impl DeclareWithIndent for ObjectType {
             )),
             ObjectType::Array(array_object) => array_object.declare(db),
             ObjectType::Record(_) => todo!(),
+            ObjectType::Time => Err(Error::BackEndError(
+                "Invalid type, Time (time) cannot be declared.".to_string(),
+            )),
         }
     }
 }

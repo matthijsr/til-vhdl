@@ -61,25 +61,27 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(_) => match to_typ {
                         ObjectType::Bit => Ok(()),
-                        ObjectType::Array(_) | ObjectType::Record(_) => Err(Error::InvalidTarget(
-                            format!("Cannot assign Bit to {}", to_typ),
-                        )),
+                        ObjectType::Array(_) | ObjectType::Record(_) | ObjectType::Time => Err(
+                            Error::InvalidTarget(format!("Cannot assign Bit to {}", to_typ)),
+                        ),
                     },
                     ValueAssignment::BitVec(bitvec) => match to_typ {
                         ObjectType::Array(array) if array.is_bitvector() => {
                             bitvec.validate_width(array.width())
                         }
-                        _ => Err(Error::InvalidTarget(format!(
+                        ObjectType::Array(_)
+                        | ObjectType::Bit
+                        | ObjectType::Record(_)
+                        | ObjectType::Time => Err(Error::InvalidTarget(format!(
                             "Cannot assign Bit Vector to {}",
                             to_typ
                         ))),
                     },
                     ValueAssignment::Time(_) => match to_typ {
-                        // TODO: Add Time object when exists.
-                        _ => Err(Error::InvalidTarget(format!(
-                            "Cannot assign Time to {}",
-                            to_typ
-                        ))),
+                        ObjectType::Bit | ObjectType::Record(_) | ObjectType::Array(_) => Err(
+                            Error::InvalidTarget(format!("Cannot assign Time to {}", to_typ)),
+                        ),
+                        ObjectType::Time => Ok(()),
                     },
                 },
                 DirectAssignment::FullRecord(record) => {

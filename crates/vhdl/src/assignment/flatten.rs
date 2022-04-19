@@ -56,6 +56,7 @@ impl FlatLength for ObjectType {
                 }
                 total
             }
+            ObjectType::Time => todo!(),
         })
     }
 
@@ -228,6 +229,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                             preceding_length += field_length;
                         }
                     }
+                    ObjectType::Time => todo!(),
                 }
                 Ok(result)
             }
