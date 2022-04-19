@@ -1,3 +1,5 @@
+use core::fmt;
+
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_intern::Id;
 
@@ -16,6 +18,19 @@ pub enum LogicalOperator {
     Nand,
     Nor,
     Xnor,
+}
+
+impl fmt::Display for LogicalOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogicalOperator::And => write!(f, "and"),
+            LogicalOperator::Or => write!(f, "or"),
+            LogicalOperator::Xor => write!(f, "xor"),
+            LogicalOperator::Nand => write!(f, "nand"),
+            LogicalOperator::Nor => write!(f, "nor"),
+            LogicalOperator::Xnor => write!(f, "xnor"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -46,6 +61,17 @@ impl LogicalExpression {
 
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         self.left().can_assign(db, to_typ)
+    }
+}
+
+impl DeclareWithIndent for LogicalExpression {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        Ok(format!(
+            "{} {} {}",
+            self.left().declare_with_indent(db, indent_style)?,
+            self.operator(),
+            self.right().declare_with_indent(db, indent_style)?
+        ))
     }
 }
 
@@ -135,11 +161,55 @@ pub enum RelationalOperator {
     GtEq,
 }
 
+impl fmt::Display for RelationalOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RelationalOperator::Eq => write!(f, "="),
+            RelationalOperator::NotEq => write!(f, "/="),
+            RelationalOperator::Lt => write!(f, "<"),
+            RelationalOperator::LtEq => write!(f, "=<"),
+            RelationalOperator::Gt => write!(f, ">"),
+            RelationalOperator::GtEq => write!(f, "=>"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RelationalCombination {
     left: Box<Relation>,
     right: Box<Relation>,
     operator: RelationalOperator,
+}
+
+impl RelationalCombination {
+    /// Get a reference to the relational combination's left.
+    #[must_use]
+    pub fn left(&self) -> &Relation {
+        self.left.as_ref()
+    }
+
+    /// Get a reference to the relational combination's right.
+    #[must_use]
+    pub fn right(&self) -> &Relation {
+        self.right.as_ref()
+    }
+
+    /// Get a reference to the relational combination's operator.
+    #[must_use]
+    pub fn operator(&self) -> &RelationalOperator {
+        &self.operator
+    }
+}
+
+impl DeclareWithIndent for RelationalCombination {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        Ok(format!(
+            "{} {} {}",
+            self.left().declare_with_indent(db, indent_style)?,
+            self.operator(),
+            self.right().declare_with_indent(db, indent_style)?
+        ))
+    }
 }
 
 pub trait CombineRelation: Sized {
@@ -310,8 +380,8 @@ impl DeclareWithIndent for Relation {
         match self {
             Relation::Value(v) => v.declare(),
             Relation::Object(obj) => Ok(obj.get_name(db).to_string()),
-            Relation::Combination(_) => todo!(),
-            Relation::LogicalExpression(_) => todo!(),
+            Relation::Combination(c) => c.declare_with_indent(db, indent_style),
+            Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
         }
     }
 }
