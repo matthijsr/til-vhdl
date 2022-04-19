@@ -41,7 +41,7 @@ impl DeclareWithIndent for ControlFlowKind {
             ControlFlowKind::IfElse(_) => todo!(),
             ControlFlowKind::Case(_) => todo!(),
             ControlFlowKind::Loop(_) => todo!(),
-            ControlFlowKind::Wait(_) => todo!(),
+            ControlFlowKind::Wait(w) => w.declare_with_indent(db, indent_style),
             ControlFlowKind::Exit(_) => todo!(),
         }
     }

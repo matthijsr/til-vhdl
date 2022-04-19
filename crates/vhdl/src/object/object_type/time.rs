@@ -1,4 +1,5 @@
 use core::fmt;
+use tydi_common::error::Result;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TimeUnit {
@@ -32,4 +33,32 @@ pub struct TimeValue {
     value: i32,
     unit: TimeUnit,
     represent_as: Option<TimeUnit>,
+}
+
+impl TimeValue {
+    pub fn try_string(&self) -> Result<String> {
+        if let Some(represent_as) = self.represent_as() {
+            todo!()
+        } else {
+            Ok(format!("{} {}", self.value(), self.unit()))
+        }
+    }
+
+    /// Get the time value's value.
+    #[must_use]
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+
+    /// Get the time value's unit.
+    #[must_use]
+    pub fn unit(&self) -> TimeUnit {
+        self.unit
+    }
+
+    /// Get the time value's represent as.
+    #[must_use]
+    pub fn represent_as(&self) -> Option<TimeUnit> {
+        self.represent_as
+    }
 }
