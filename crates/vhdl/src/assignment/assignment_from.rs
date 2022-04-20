@@ -4,7 +4,7 @@ use crate::declaration::ObjectDeclaration;
 
 use super::{
     array_assignment::ArrayAssignment, bitvec::BitVecValue, Assignment, AssignmentKind,
-    DirectAssignment, ObjectAssignment, StdLogicValue, ValueAssignment,
+    DirectAssignment, ObjectSelection, StdLogicValue, ValueAssignment,
 };
 
 // I feel like there should be some way for Rust to recognize these connections automatically but unfortunately we can't just string "T: Into<...>"s together,
@@ -22,8 +22,8 @@ where
     }
 }
 
-impl From<ObjectAssignment> for AssignmentKind {
-    fn from(assignment: ObjectAssignment) -> Self {
+impl From<ObjectSelection> for AssignmentKind {
+    fn from(assignment: ObjectSelection) -> Self {
         AssignmentKind::Object(assignment)
     }
 }
@@ -44,12 +44,12 @@ where
     }
 }
 
-impl<T> From<T> for ObjectAssignment
+impl<T> From<T> for ObjectSelection
 where
     T: Into<Id<ObjectDeclaration>>,
 {
     fn from(object: T) -> Self {
-        ObjectAssignment {
+        ObjectSelection {
             object: object.into(),
             from_field: vec![],
         }

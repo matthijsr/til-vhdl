@@ -9,7 +9,7 @@ use tydi_intern::Id;
 use crate::object::{object_type::ObjectType, Object};
 use crate::{
     architecture::arch_storage::Arch,
-    assignment::{Assign, ObjectAssignment, RangeConstraint},
+    assignment::{Assign, ObjectSelection, RangeConstraint},
     declaration::ObjectDeclaration,
 };
 
@@ -171,7 +171,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                         flat_id.assign(
                             db,
                             &Assignment::from(
-                                ObjectAssignment::from(self.clone()).assign_from(&new_from),
+                                ObjectSelection::from(self.clone()).assign_from(&new_from),
                             )
                             .to_nested(&new_to),
                         )?,

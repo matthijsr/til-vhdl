@@ -3,7 +3,7 @@ use core::fmt;
 use tydi_common::error::{Error, Result, TryResult};
 
 use crate::{
-    architecture::arch_storage::Arch, assignment::ObjectAssignment, declaration::DeclareWithIndent,
+    architecture::arch_storage::Arch, assignment::ObjectSelection, declaration::DeclareWithIndent,
     object::object_type::ObjectType,
 };
 
@@ -24,14 +24,14 @@ impl fmt::Display for EdgeKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Edge {
-    subject: ObjectAssignment,
+    subject: ObjectSelection,
     kind: EdgeKind,
 }
 
 impl Edge {
     /// Get the edge's subject.
     #[must_use]
-    pub fn subject(&self) -> &ObjectAssignment {
+    pub fn subject(&self) -> &ObjectSelection {
         &self.subject
     }
 
@@ -43,7 +43,7 @@ impl Edge {
 
     fn try_new(
         db: &dyn Arch,
-        subject: impl TryResult<ObjectAssignment>,
+        subject: impl TryResult<ObjectSelection>,
         kind: EdgeKind,
     ) -> Result<Self> {
         let subject = subject.try_result()?;
@@ -58,11 +58,11 @@ impl Edge {
         }
     }
 
-    pub fn rising_edge(db: &dyn Arch, subject: impl TryResult<ObjectAssignment>) -> Result<Self> {
+    pub fn rising_edge(db: &dyn Arch, subject: impl TryResult<ObjectSelection>) -> Result<Self> {
         Self::try_new(db, subject, EdgeKind::Rising)
     }
 
-    pub fn falling_edge(db: &dyn Arch, subject: impl TryResult<ObjectAssignment>) -> Result<Self> {
+    pub fn falling_edge(db: &dyn Arch, subject: impl TryResult<ObjectSelection>) -> Result<Self> {
         Self::try_new(db, subject, EdgeKind::Falling)
     }
 }

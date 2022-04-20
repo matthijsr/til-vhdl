@@ -1,12 +1,11 @@
 use core::fmt;
 
 use tydi_common::error::{Error, Result, TryResult};
-use tydi_intern::Id;
 
 use crate::{
-    architecture::arch_storage::{interner::GetName, Arch},
-    assignment::ValueAssignment,
-    declaration::{DeclareWithIndent, ObjectDeclaration},
+    architecture::arch_storage::Arch,
+    assignment::{ObjectSelection, ValueAssignment},
+    declaration::DeclareWithIndent,
     object::object_type::ObjectType,
 };
 
@@ -295,7 +294,7 @@ impl<T: TryResult<Relation>> CombineRelation for T {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
     Value(Box<ValueAssignment>),
-    Object(Id<ObjectDeclaration>),
+    Object(ObjectSelection),
     Combination(RelationalCombination),
     Edge(Edge),
     LogicalExpression(LogicalExpression),
@@ -307,8 +306,8 @@ impl From<ValueAssignment> for Relation {
     }
 }
 
-impl From<Id<ObjectDeclaration>> for Relation {
-    fn from(val: Id<ObjectDeclaration>) -> Self {
+impl From<ObjectSelection> for Relation {
+    fn from(val: ObjectSelection) -> Self {
         Self::Object(val)
     }
 }
@@ -335,7 +334,9 @@ impl Relation {
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
             Relation::Value(v) => v.can_assign(to_typ),
-            Relation::Object(o) => db.get_object_declaration_type(*o)?.can_assign_type(to_typ),
+            Relation::Object(o) => db
+                .get_object_type(o.as_object_key(db))?
+                .can_assign_type(to_typ),
             Relation::Combination(_) => ObjectType::Boolean.can_assign_type(to_typ),
             Relation::LogicalExpression(_) => todo!(),
             Relation::Edge(_) => todo!(),
@@ -356,7 +357,9 @@ impl Relation {
                         )))
                     }
                 }
-                Relation::Object(o) => v.can_assign(db.get_object_declaration_type(*o)?.as_ref()),
+                Relation::Object(o) => {
+                    v.can_assign(db.get_object_type(o.as_object_key(db))?.as_ref())
+                }
                 Relation::Combination(_) | Relation::Edge(_) => match v.as_ref() {
                     ValueAssignment::Boolean(_) => Ok(()),
                     _ => Err(Error::InvalidArgument(format!(
@@ -367,12 +370,14 @@ impl Relation {
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
             },
             Relation::Object(o) => match other {
-                Relation::Value(v) => v.can_assign(db.get_object_declaration_type(*o)?.as_ref()),
+                Relation::Value(v) => {
+                    v.can_assign(db.get_object_type(o.as_object_key(db))?.as_ref())
+                }
                 Relation::Object(oo) => db
-                    .get_object_declaration_type(*o)?
-                    .can_assign_type(db.get_object_declaration_type(*oo)?.as_ref()),
+                    .get_object_type(o.as_object_key(db))?
+                    .can_assign_type(db.get_object_type(oo.as_object_key(db))?.as_ref()),
                 Relation::Combination(_) | Relation::Edge(_) => ValueAssignment::Boolean(false)
-                    .can_assign(db.get_object_declaration_type(*o)?.as_ref()),
+                    .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
             },
             Relation::Combination(_) | Relation::Edge(_) => match other {
@@ -384,7 +389,7 @@ impl Relation {
                     ))),
                 },
                 Relation::Object(o) => ValueAssignment::Boolean(false)
-                    .can_assign(db.get_object_declaration_type(*o)?.as_ref()),
+                    .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::Combination(_) | Relation::Edge(_) => Ok(()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
             },
@@ -397,7 +402,7 @@ impl DeclareWithIndent for Relation {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
             Relation::Value(v) => v.declare(),
-            Relation::Object(obj) => Ok(obj.get_name(db).to_string()),
+            Relation::Object(obj) => obj.declare_with_indent(db, indent_style),
             Relation::Combination(c) => c.declare_with_indent(db, indent_style),
             Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
             Relation::Edge(e) => e.declare_with_indent(db, indent_style),
@@ -407,7 +412,11 @@ impl DeclareWithIndent for Relation {
 
 #[cfg(test)]
 mod tests {
-    use crate::{architecture::arch_storage::db::Database, declaration::Declare};
+    use crate::{
+        architecture::arch_storage::db::Database,
+        assignment::SelectObject,
+        declaration::{Declare, ObjectDeclaration},
+    };
 
     use super::*;
 
@@ -438,11 +447,13 @@ mod tests {
             "true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false",
             comb.declare(db)?
         );
-        let obj = ObjectDeclaration::signal(db, "test_sig", ObjectType::Bit, None)?;
-        let rising_edge = Edge::rising_edge(db, obj)?;
-        let falling_edge = Edge::falling_edge(db, obj)?;
+        let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
+        let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
+            .select([0])?;
+        let rising_edge = Edge::rising_edge(db, obj1)?;
+        let falling_edge = Edge::falling_edge(db, obj2)?;
         assert_eq!(
-            "rising_edge(test_sig) nand falling_edge(test_sig)",
+            "rising_edge(test_sig1) nand falling_edge(test_sig2(0))",
             rising_edge.nand(db, falling_edge)?.declare(db)?
         );
 

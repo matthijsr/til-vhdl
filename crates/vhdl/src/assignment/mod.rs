@@ -132,7 +132,7 @@ impl AssignDeclaration {
             AssignmentKind::Object(object) => object.object().assign(
                 db,
                 &Assignment::from(
-                    ObjectAssignment::from(self.object()).assign_from(self.assignment().to_field()),
+                    ObjectSelection::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
             ),
@@ -241,7 +241,7 @@ impl Assignment {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssignmentKind {
     /// An object is assigned from or driven by another object
-    Object(ObjectAssignment),
+    Object(ObjectSelection),
     /// An object is assigned a value, or all fields are assigned/driven at once
     Direct(DirectAssignment),
 }
@@ -440,14 +440,14 @@ impl AssignmentKind {
 
 /// An object can be assigned a value or another object
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ObjectAssignment {
+pub struct ObjectSelection {
     /// The object being assigned from
     object: Id<ObjectDeclaration>,
     /// Optional selections on the object being assigned from, representing nested selections
     from_field: Vec<FieldSelection>,
 }
 
-impl ObjectAssignment {
+impl ObjectSelection {
     /// Returns a reference to the object being assigned from
     pub fn object(&self) -> Id<ObjectDeclaration> {
         self.object
@@ -472,7 +472,29 @@ impl ObjectAssignment {
     }
 }
 
-impl DeclareWithIndent for ObjectAssignment {
+pub trait SelectObject: Sized {
+    fn select(
+        self,
+        fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
+    ) -> Result<ObjectSelection>;
+}
+
+impl<T: TryResult<ObjectSelection>> SelectObject for T {
+    fn select(
+        self,
+        fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
+    ) -> Result<ObjectSelection> {
+        let mut selection = self.try_result()?;
+        let mut fields_result = vec![];
+        for field in fields {
+            fields_result.push(field.try_result()?);
+        }
+        selection.from_field.append(&mut fields_result);
+        Ok(selection)
+    }
+}
+
+impl DeclareWithIndent for ObjectSelection {
     fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
@@ -721,6 +743,26 @@ impl FieldSelection {
 
     pub fn name(name: impl Into<VhdlName>) -> FieldSelection {
         FieldSelection::Name(name.into())
+    }
+}
+
+impl TryFrom<&str> for FieldSelection {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        FieldSelection::try_name(value)
+    }
+}
+
+impl From<VhdlName> for FieldSelection {
+    fn from(name: VhdlName) -> Self {
+        FieldSelection::Name(name)
+    }
+}
+
+impl From<i32> for FieldSelection {
+    fn from(i: i32) -> Self {
+        FieldSelection::index(i)
     }
 }
 
