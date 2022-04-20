@@ -306,9 +306,9 @@ impl From<ValueAssignment> for Relation {
     }
 }
 
-impl From<ObjectSelection> for Relation {
-    fn from(val: ObjectSelection) -> Self {
-        Self::Object(val)
+impl<T: Into<ObjectSelection>> From<T> for Relation {
+    fn from(val: T) -> Self {
+        Self::Object(val.into())
     }
 }
 
@@ -334,9 +334,11 @@ impl Relation {
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
             Relation::Value(v) => v.can_assign(to_typ),
-            Relation::Object(o) => db
-                .get_object_type(o.as_object_key(db))?
-                .can_assign_type(to_typ),
+            Relation::Object(o) => {
+                let obj = db.get_object(o.as_object_key(db))?;
+                obj.assignable.from_or_err()?;
+                obj.typ(db).can_assign_type(to_typ)
+            }
             Relation::Combination(_) => ObjectType::Boolean.can_assign_type(to_typ),
             Relation::LogicalExpression(_) => todo!(),
             Relation::Edge(_) => todo!(),

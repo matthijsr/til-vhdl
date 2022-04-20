@@ -1,6 +1,6 @@
 use tydi_intern::Id;
 
-use crate::declaration::ObjectDeclaration;
+use crate::{declaration::ObjectDeclaration, statement::relation::Relation};
 
 use super::{
     array_assignment::ArrayAssignment, bitvec::BitVecValue, Assignment, AssignmentKind,
@@ -22,15 +22,21 @@ where
     }
 }
 
+impl From<Relation> for AssignmentKind {
+    fn from(relation: Relation) -> Self {
+        AssignmentKind::Relation(relation)
+    }
+}
+
 impl From<ObjectSelection> for AssignmentKind {
     fn from(assignment: ObjectSelection) -> Self {
-        AssignmentKind::Object(assignment)
+        AssignmentKind::Relation(Relation::from(assignment))
     }
 }
 
 impl From<Id<ObjectDeclaration>> for AssignmentKind {
     fn from(assignment: Id<ObjectDeclaration>) -> Self {
-        AssignmentKind::Object(assignment.into())
+        AssignmentKind::Relation(assignment.into())
     }
 }
 

@@ -18,6 +18,7 @@ use crate::object::object_type::time::TimeValue;
 use crate::object::object_type::ObjectType;
 use crate::properties::Width;
 use crate::statement::label::Label;
+use crate::statement::relation::Relation;
 
 use super::declaration::ObjectDeclaration;
 
@@ -82,7 +83,7 @@ impl AssignDeclaration {
 
     /// If this is an object to object assignment, return the object being assigned from
     pub fn from(&self) -> Option<Id<ObjectDeclaration>> {
-        if let AssignmentKind::Object(o) = self.assignment().kind() {
+        if let AssignmentKind::Relation(Relation::Object(o)) = self.assignment().kind() {
             Some(o.object())
         } else {
             None
@@ -129,15 +130,15 @@ impl AssignDeclaration {
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
     pub fn reverse(&self, db: &dyn Arch) -> Result<AssignDeclaration> {
         match self.assignment().kind() {
-            AssignmentKind::Object(object) => object.object().assign(
+            AssignmentKind::Relation(Relation::Object(object)) => object.object().assign(
                 db,
                 &Assignment::from(
                     ObjectSelection::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
             ),
-            AssignmentKind::Direct(_) => Err(Error::InvalidTarget(
-                "Cannot reverse a direct assignment.".to_string(),
+            _ => Err(Error::InvalidTarget(
+                "Cannot reverse an assignment that's not between objects.".to_string(),
             )),
         }
     }
@@ -240,8 +241,8 @@ impl Assignment {
 /// An object can be assigned a value or from another object
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssignmentKind {
-    /// An object is assigned from or driven by another object
-    Object(ObjectSelection),
+    /// An object is assigned from or driven by a relation
+    Relation(Relation),
     /// An object is assigned a value, or all fields are assigned/driven at once
     Direct(DirectAssignment),
 }
@@ -358,7 +359,7 @@ impl AssignmentKind {
     ) -> Result<String> {
         let object_identifier = object_identifier.try_result()?;
         match self {
-            AssignmentKind::Object(object) => object.declare_with_indent(db, indent_style),
+            AssignmentKind::Relation(object) => object.declare_with_indent(db, indent_style),
             AssignmentKind::Direct(direct) => match direct {
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),

@@ -51,12 +51,11 @@ fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
 fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()> {
     let to_key = to.with_nested(assignment.to_field().clone());
     let to = db.get_object(to_key.clone())?;
+    to.assignable.to_or_err()?;
+    let to_typ = db.lookup_intern_object_type(to.typ);
     match assignment.kind() {
-        AssignmentKind::Object(object_assignment) => {
-            db.assignable_objects(to_key, object_assignment.as_object_key(db))
-        }
+        AssignmentKind::Relation(relation) => relation.can_assign(db, &to_typ),
         AssignmentKind::Direct(direct) => {
-            let to_typ = db.lookup_intern_object_type(to.typ);
             match direct {
                 DirectAssignment::Value(value) => value.can_assign(&to_typ),
                 DirectAssignment::FullRecord(record) => {
