@@ -65,9 +65,9 @@ impl DeclareWithIndent for TimeExpression {
 pub struct Wait {
     /// `... on [sensitivity list]`
     sensitivity: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
-    /// `... for [condition]`
+    /// `... until [condition]`
     condition: Option<Condition>,
-    /// `... until [timeout]`
+    /// `... for [timeout]`
     timeout: Option<TimeExpression>,
 }
 
@@ -76,11 +76,11 @@ impl Wait {
     pub fn sensitivity(&self) -> &InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
         &self.sensitivity
     }
-    /// `... for [condition]`
+    /// `... until [condition]`
     pub fn condition(&self) -> Option<&Condition> {
         self.condition.as_ref()
     }
-    /// `... until [timeout]`
+    /// `... for [timeout]`
     pub fn timeout(&self) -> Option<&TimeExpression> {
         self.timeout.as_ref()
     }
@@ -99,12 +99,12 @@ impl Wait {
         Ok(self)
     }
 
-    pub fn for_constant(mut self, val: bool) -> Self {
+    pub fn until_constant(mut self, val: bool) -> Self {
         self.condition = Some(Condition::constant(val));
         self
     }
 
-    pub fn for_relation(
+    pub fn until_relation(
         mut self,
         db: &dyn Arch,
         relation: impl TryResult<Relation>,
@@ -113,12 +113,12 @@ impl Wait {
         Ok(self)
     }
 
-    pub fn until_constant(mut self, val: impl Into<TimeValue>) -> Self {
+    pub fn for_constant(mut self, val: impl Into<TimeValue>) -> Self {
         self.timeout = Some(TimeExpression::constant(val));
         self
     }
 
-    pub fn until_variable(
+    pub fn for_variable(
         mut self,
         db: &dyn Arch,
         obj: impl TryResult<ObjectSelection>,
@@ -137,12 +137,12 @@ impl DeclareWithIndent for Wait {
         }
 
         if let Some(condition) = self.condition() {
-            result.push_str(" for ");
+            result.push_str(" until ");
             result.push_str(&condition.declare_with_indent(db, indent_style)?);
         }
 
         if let Some(timeout) = self.timeout() {
-            result.push_str(" until ");
+            result.push_str(" for ");
             result.push_str(&timeout.declare_with_indent(db, indent_style)?);
         }
 

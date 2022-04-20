@@ -23,3 +23,11 @@ impl fmt::Display for SeverityLevel {
 pub trait HasSeverity {
     fn severity(&self) -> Option<&SeverityLevel>;
 }
+
+pub trait SetSeverity: Sized {
+    fn with_severity(mut self, severity: impl Into<SeverityLevel>) -> Self {
+        self.set_severity(severity);
+        self
+    }
+    fn set_severity(&mut self, severity: impl Into<SeverityLevel>);
+}

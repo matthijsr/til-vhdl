@@ -10,8 +10,10 @@ use tydi_intern::Id;
 
 use crate::{
     architecture::arch_storage::Arch,
+    assignment::AssignmentKind,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{DeclareWithIndent, ObjectDeclaration, ObjectKind},
+    object::object_type::ObjectType,
     statement::label::Label,
     usings::{ListUsings, ListUsingsDb, Usings},
 };
@@ -79,6 +81,11 @@ impl Process {
         }
     }
 
+    pub fn add_sensitivity(&mut self, db: &dyn Arch, obj: Id<ObjectDeclaration>) -> Result<()> {
+        self.sensitivity_list
+            .try_insert(db.get_object_declaration_name(obj).as_ref().clone(), obj)
+    }
+
     pub fn add_statement(
         &mut self,
         db: &dyn Arch,
@@ -90,6 +97,21 @@ impl Process {
         Ok(())
     }
 
+    /// Declare a variable directly
+    pub fn declare_variable(
+        &mut self,
+        db: &dyn Arch,
+        identifier: impl TryResult<VhdlName>,
+        typ: impl TryResult<ObjectType>,
+        default: Option<AssignmentKind>,
+    ) -> Result<Id<ObjectDeclaration>> {
+        let name = identifier.try_result()?;
+        let var = ObjectDeclaration::variable(db, name.clone(), typ, default)?;
+        self.variable_declarations.try_insert(name, var)?;
+        Ok(var)
+    }
+
+    /// Add a variable from an ObjectDeclaration
     pub fn add_variable_declaration(
         &mut self,
         db: &dyn Arch,
@@ -161,5 +183,48 @@ impl DeclareWithIndent for Process {
         result.push_str(&format!("end process {};", &self.label));
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        architecture::arch_storage::db::Database,
+        assignment::{Assign, StdLogicValue},
+        declaration::Declare,
+        object::object_type::time::TimeValueFrom,
+        statement::relation::CombineRelation,
+    };
+
+    use super::{
+        statement::{test_statement::TestStatement, wait::Wait},
+        *,
+    };
+
+    #[test]
+    fn test_process_declare() -> Result<()> {
+        let mut _db = Database::default();
+        let db = &mut _db;
+        let mut process = Process::try_new("test_proc")?;
+        let clk = ObjectDeclaration::entity_clk(db);
+        process.add_sensitivity(db, clk)?;
+        let bool_var = process.declare_variable(db, "bool_var", ObjectType::Boolean, None)?;
+        process.add_statement(
+            db,
+            bool_var.assign(db, &clk.eq(db, StdLogicValue::Logic(true))?)?,
+        )?;
+        process.add_statement(db, Wait::wait().for_constant(1.us()))?;
+        process.add_statement(db, TestStatement::assert_report(false, "end test"))?;
+        assert_eq!(
+            r#"process(clk) is
+  variable bool_var : boolean;
+begin
+  bool_var := clk = '1';
+  wait for 1 us;
+  assert false report "end test";
+end process test_proc;"#,
+            process.declare(db)?
+        );
+        Ok(())
     }
 }

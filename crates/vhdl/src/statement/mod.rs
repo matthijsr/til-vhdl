@@ -71,6 +71,12 @@ impl From<PortMapping> for Statement {
     }
 }
 
+impl From<Process> for Statement {
+    fn from(process: Process) -> Self {
+        Statement::Process(process)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PortMapping {
     label: VhdlName,

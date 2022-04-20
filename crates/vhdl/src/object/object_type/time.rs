@@ -44,6 +44,19 @@ impl TimeValue {
         }
     }
 
+    pub fn new(value: impl Into<i32>, unit: TimeUnit, represent_as: Option<TimeUnit>) -> Self {
+        Self {
+            value: value.into(),
+            unit,
+            represent_as,
+        }
+    }
+
+    pub fn as_unit(mut self, represent_as: TimeUnit) -> Self {
+        self.represent_as = Some(represent_as);
+        self
+    }
+
     /// Get the time value's value.
     #[must_use]
     pub fn value(&self) -> i32 {
@@ -60,5 +73,50 @@ impl TimeValue {
     #[must_use]
     pub fn represent_as(&self) -> Option<TimeUnit> {
         self.represent_as
+    }
+}
+
+pub trait TimeValueFrom {
+    fn fs(self) -> TimeValue;
+    fn ps(self) -> TimeValue;
+    fn ns(self) -> TimeValue;
+    fn us(self) -> TimeValue;
+    fn ms(self) -> TimeValue;
+    fn sec(self) -> TimeValue;
+    fn min(self) -> TimeValue;
+    fn hr(self) -> TimeValue;
+}
+
+impl<T: Into<i32>> TimeValueFrom for T {
+    fn fs(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Femto, None)
+    }
+
+    fn ps(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Pico, None)
+    }
+
+    fn ns(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Nano, None)
+    }
+
+    fn us(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Micro, None)
+    }
+
+    fn ms(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Milli, None)
+    }
+
+    fn sec(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Second, None)
+    }
+
+    fn min(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Minute, None)
+    }
+
+    fn hr(self) -> TimeValue {
+        TimeValue::new(self, TimeUnit::Hour, None)
     }
 }

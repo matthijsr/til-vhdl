@@ -4,7 +4,7 @@ use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::VhdlName,
     declaration::DeclareWithIndent,
-    object::object_type::severity::{HasSeverity, SeverityLevel},
+    object::object_type::severity::{HasSeverity, SetSeverity, SeverityLevel},
     statement::label::Label,
 };
 
@@ -97,6 +97,16 @@ impl HasSeverity for TestStatementKind {
     }
 }
 
+impl SetSeverity for TestStatementKind {
+    fn set_severity(&mut self, severity: impl Into<SeverityLevel>) {
+        match self {
+            TestStatementKind::Assert(a) => a.severity = Some(severity.into()),
+            TestStatementKind::Report(r) => r.severity = Some(severity.into()),
+            TestStatementKind::AssertReport(ar) => ar.severity = Some(severity.into()),
+        }
+    }
+}
+
 impl DeclareWithIndent for TestStatementKind {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = match self {
@@ -133,6 +143,49 @@ impl TestStatement {
     #[must_use]
     pub fn kind(&self) -> &TestStatementKind {
         &self.kind
+    }
+
+    pub fn report(message: impl Into<String>) -> Self {
+        Self {
+            label: None,
+            kind: TestStatementKind::Report(Report {
+                message: message.into(),
+                severity: None,
+            }),
+        }
+    }
+
+    pub fn assert(condition: impl Into<Condition>) -> Self {
+        Self {
+            label: None,
+            kind: TestStatementKind::Assert(Assert {
+                condition: condition.into(),
+                severity: None,
+            }),
+        }
+    }
+
+    pub fn assert_report(condition: impl Into<Condition>, message: impl Into<String>) -> Self {
+        Self {
+            label: None,
+            kind: TestStatementKind::AssertReport(AssertReport {
+                condition: condition.into(),
+                message: message.into(),
+                severity: None,
+            }),
+        }
+    }
+}
+
+impl HasSeverity for TestStatement {
+    fn severity(&self) -> Option<&SeverityLevel> {
+        self.kind().severity()
+    }
+}
+
+impl SetSeverity for TestStatement {
+    fn set_severity(&mut self, severity: impl Into<SeverityLevel>) {
+        self.kind.set_severity(severity)
     }
 }
 
