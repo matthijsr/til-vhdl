@@ -1,33 +1,18 @@
 use tydi_common::error::Result;
 
-use crate::{
-    common::vhdl_name::VhdlName,
-    usings::{ListUsings, Usings},
-};
+use crate::usings::{ListUsings, Usings};
 
 use super::{
-    array_assignment::ArrayAssignment, bitvec::BitVecValue, AssignDeclaration, Assignment,
-    AssignmentKind, DirectAssignment, ValueAssignment,
+    array_assignment::ArrayAssignment, AssignDeclaration, Assignment, AssignmentKind,
+    DirectAssignment,
 };
 
 impl ListUsings for AssignmentKind {
     fn list_usings(&self) -> Result<Usings> {
         let mut usings = Usings::new_empty();
         match self {
-            AssignmentKind::Relation(_) => (),
+            AssignmentKind::Relation(relation) => usings.combine(&relation.list_usings()?),
             AssignmentKind::Direct(direct) => match direct {
-                DirectAssignment::Value(value) => match value {
-                    ValueAssignment::Bit(_) => (),
-                    ValueAssignment::BitVec(bitvec) => match bitvec {
-                        BitVecValue::Others(_) => (),
-                        BitVecValue::Full(_) => (),
-                        BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => {
-                            usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all")?;
-                        }
-                    },
-                    ValueAssignment::Time(_) => (),
-                    ValueAssignment::Boolean(_) => (),
-                },
                 DirectAssignment::FullRecord(rec) => {
                     for fa in rec {
                         usings.combine(&fa.assignment().list_usings()?);

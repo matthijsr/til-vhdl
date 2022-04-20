@@ -57,7 +57,6 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
         AssignmentKind::Relation(relation) => relation.can_assign(db, &to_typ),
         AssignmentKind::Direct(direct) => {
             match direct {
-                DirectAssignment::Value(value) => value.can_assign(&to_typ),
                 DirectAssignment::FullRecord(record) => {
                     if let ObjectType::Record(to_record) = &to_typ {
                         if to_record.fields().len() == record.len() {

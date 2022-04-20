@@ -22,30 +22,14 @@ where
     }
 }
 
-impl From<Relation> for AssignmentKind {
-    fn from(relation: Relation) -> Self {
-        AssignmentKind::Relation(relation)
+impl<T: Into<Relation>> From<T> for AssignmentKind {
+    fn from(relation: T) -> Self {
+        AssignmentKind::Relation(relation.into())
     }
 }
 
-impl From<ObjectSelection> for AssignmentKind {
-    fn from(assignment: ObjectSelection) -> Self {
-        AssignmentKind::Relation(Relation::from(assignment))
-    }
-}
-
-impl From<Id<ObjectDeclaration>> for AssignmentKind {
-    fn from(assignment: Id<ObjectDeclaration>) -> Self {
-        AssignmentKind::Relation(assignment.into())
-    }
-}
-
-// As there are more Direct kinds, this one gets to use the where T: Into...
-impl<T> From<T> for AssignmentKind
-where
-    T: Into<DirectAssignment>,
-{
-    fn from(assignment: T) -> Self {
+impl From<ArrayAssignment> for AssignmentKind {
+    fn from(assignment: ArrayAssignment) -> Self {
         AssignmentKind::Direct(assignment.into())
     }
 }
@@ -59,15 +43,6 @@ where
             object: object.into(),
             from_field: vec![],
         }
-    }
-}
-
-impl<T> From<T> for DirectAssignment
-where
-    T: Into<ValueAssignment>,
-{
-    fn from(assignment: T) -> Self {
-        DirectAssignment::Value(assignment.into())
     }
 }
 

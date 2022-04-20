@@ -4,9 +4,11 @@ use tydi_common::error::{Error, Result, TryResult};
 
 use crate::{
     architecture::arch_storage::Arch,
-    assignment::{ObjectSelection, ValueAssignment},
+    assignment::{bitvec::BitVecValue, ObjectSelection, StdLogicValue, ValueAssignment},
+    common::vhdl_name::VhdlName,
     declaration::DeclareWithIndent,
     object::object_type::ObjectType,
+    usings::{ListUsings, Usings},
 };
 
 use self::edge::Edge;
@@ -330,6 +332,18 @@ impl From<Edge> for Relation {
     }
 }
 
+impl From<StdLogicValue> for Relation {
+    fn from(assignment: StdLogicValue) -> Self {
+        Relation::from(ValueAssignment::from(assignment))
+    }
+}
+
+impl From<BitVecValue> for Relation {
+    fn from(assignment: BitVecValue) -> Self {
+        Relation::from(ValueAssignment::from(assignment))
+    }
+}
+
 impl Relation {
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
@@ -409,6 +423,37 @@ impl DeclareWithIndent for Relation {
             Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
             Relation::Edge(e) => e.declare_with_indent(db, indent_style),
         }
+    }
+}
+
+impl ListUsings for Relation {
+    fn list_usings(&self) -> Result<Usings> {
+        let mut usings = Usings::new_empty();
+        match self {
+            Relation::Value(value) => match value.as_ref() {
+                ValueAssignment::Bit(_) => (),
+                ValueAssignment::BitVec(bitvec) => match bitvec {
+                    BitVecValue::Others(_) => (),
+                    BitVecValue::Full(_) => (),
+                    BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => {
+                        usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all")?;
+                    }
+                },
+                ValueAssignment::Time(_) => (),
+                ValueAssignment::Boolean(_) => (),
+            },
+            Relation::Object(_) => (),
+            Relation::Combination(comb) => {
+                usings.combine(&comb.left().list_usings()?);
+                usings.combine(&comb.right().list_usings()?);
+            }
+            Relation::Edge(_) => (),
+            Relation::LogicalExpression(lex) => {
+                usings.combine(&lex.left().list_usings()?);
+                usings.combine(&lex.right().list_usings()?);
+            }
+        }
+        Ok(usings)
     }
 }
 

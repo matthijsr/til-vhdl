@@ -227,11 +227,11 @@ impl Assignment {
         object_identifier: impl TryResult<VhdlName>,
         indent_style: &str,
     ) -> Result<String> {
-        if let AssignmentKind::Direct(DirectAssignment::Value(ValueAssignment::BitVec(bitvec))) =
-            self.kind()
-        {
-            if let Some(FieldSelection::Range(range)) = self.to_field().last() {
-                return bitvec.declare_for_range(range);
+        if let AssignmentKind::Relation(Relation::Value(va)) = &self.kind() {
+            if let ValueAssignment::BitVec(bitvec) = va.as_ref() {
+                if let Some(FieldSelection::Range(range)) = self.to_field().last() {
+                    return bitvec.declare_for_range(range);
+                }
             }
         }
         self.kind().declare_for(db, object_identifier, indent_style)
@@ -359,14 +359,8 @@ impl AssignmentKind {
     ) -> Result<String> {
         let object_identifier = object_identifier.try_result()?;
         match self {
-            AssignmentKind::Relation(object) => object.declare_with_indent(db, indent_style),
+            AssignmentKind::Relation(relation) => relation.declare_with_indent(db, indent_style),
             AssignmentKind::Direct(direct) => match direct {
-                DirectAssignment::Value(value) => match value {
-                    ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
-                    ValueAssignment::BitVec(bitvec) => bitvec.declare_for(object_identifier),
-                    ValueAssignment::Time(t) => t.declare(),
-                    ValueAssignment::Boolean(b) => Ok(b.to_string()),
-                },
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
                     for rf in record {
@@ -574,8 +568,6 @@ impl fmt::Display for StdLogicValue {
 /// Directly assigning a value or an entire Record/Array
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DirectAssignment {
-    /// Assigning a specific value to a bit vector or single bit
-    Value(ValueAssignment),
     /// Assigning all fields of a Record
     FullRecord(Vec<FieldAssignment>),
     /// Assigning all fields of an Array
