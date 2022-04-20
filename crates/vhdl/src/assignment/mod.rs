@@ -13,7 +13,7 @@ use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
 
 use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::VhdlName;
-use crate::declaration::Declare;
+use crate::declaration::DeclareWithIndent;
 use crate::object::object_type::time::TimeValue;
 use crate::object::object_type::ObjectType;
 use crate::properties::Width;
@@ -358,7 +358,7 @@ impl AssignmentKind {
     ) -> Result<String> {
         let object_identifier = object_identifier.try_result()?;
         match self {
-            AssignmentKind::Object(object) => object.declare(db),
+            AssignmentKind::Object(object) => object.declare_with_indent(db, indent_style),
             AssignmentKind::Direct(direct) => match direct {
                 DirectAssignment::Value(value) => match value {
                     ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
@@ -472,8 +472,8 @@ impl ObjectAssignment {
     }
 }
 
-impl Declare for ObjectAssignment {
-    fn declare(&self, db: &dyn Arch) -> Result<String> {
+impl DeclareWithIndent for ObjectAssignment {
+    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
             .identifier()

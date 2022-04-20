@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tydi_common::error;
+use tydi_common::error::Result;
 use tydi_common::error::TryResult;
 use tydi_intern::Id;
 
@@ -60,11 +60,11 @@ pub trait InternAs<T> {
 }
 
 pub trait TryIntern<T> {
-    fn try_intern(self, db: &dyn Arch) -> error::Result<Id<T>>;
+    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>>;
 }
 
 pub trait TryInternAs<T> {
-    fn try_intern_as(self, db: &dyn Arch) -> error::Result<Id<T>>;
+    fn try_intern_as(self, db: &dyn Arch) -> Result<Id<T>>;
 }
 
 impl<T, U> InternAs<T> for U
@@ -82,7 +82,7 @@ where
     U: TryResult<T>,
     T: InternSelf,
 {
-    fn try_intern(self, db: &dyn Arch) -> error::Result<Id<T>> {
+    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>> {
         Ok(self.try_result()?.intern(db))
     }
 }

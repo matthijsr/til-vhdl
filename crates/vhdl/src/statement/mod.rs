@@ -22,7 +22,7 @@ use super::{
 
 pub mod declare;
 pub mod label;
-pub mod logical_expression;
+pub mod relation;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {

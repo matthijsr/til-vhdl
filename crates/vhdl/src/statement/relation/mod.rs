@@ -10,6 +10,10 @@ use crate::{
     object::object_type::ObjectType,
 };
 
+use self::edge::Edge;
+
+pub mod edge;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogicalOperator {
     And,
@@ -293,6 +297,7 @@ pub enum Relation {
     Value(Box<ValueAssignment>),
     Object(Id<ObjectDeclaration>),
     Combination(RelationalCombination),
+    Edge(Edge),
     LogicalExpression(LogicalExpression),
 }
 
@@ -320,6 +325,12 @@ impl From<LogicalExpression> for Relation {
     }
 }
 
+impl From<Edge> for Relation {
+    fn from(edge: Edge) -> Self {
+        Self::Edge(edge)
+    }
+}
+
 impl Relation {
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
@@ -327,6 +338,7 @@ impl Relation {
             Relation::Object(o) => db.get_object_declaration_type(*o)?.can_assign_type(to_typ),
             Relation::Combination(_) => ObjectType::Boolean.can_assign_type(to_typ),
             Relation::LogicalExpression(_) => todo!(),
+            Relation::Edge(_) => todo!(),
         }
     }
 
@@ -345,7 +357,7 @@ impl Relation {
                     }
                 }
                 Relation::Object(o) => v.can_assign(db.get_object_declaration_type(*o)?.as_ref()),
-                Relation::Combination(_) => match v.as_ref() {
+                Relation::Combination(_) | Relation::Edge(_) => match v.as_ref() {
                     ValueAssignment::Boolean(_) => Ok(()),
                     _ => Err(Error::InvalidArgument(format!(
                         "Cannot create a relation between {} and a boolean relation.",
@@ -359,11 +371,11 @@ impl Relation {
                 Relation::Object(oo) => db
                     .get_object_declaration_type(*o)?
                     .can_assign_type(db.get_object_declaration_type(*oo)?.as_ref()),
-                Relation::Combination(_) => ValueAssignment::Boolean(false)
+                Relation::Combination(_) | Relation::Edge(_) => ValueAssignment::Boolean(false)
                     .can_assign(db.get_object_declaration_type(*o)?.as_ref()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
             },
-            Relation::Combination(_) => match other {
+            Relation::Combination(_) | Relation::Edge(_) => match other {
                 Relation::Value(v) => match v.as_ref() {
                     ValueAssignment::Boolean(_) => Ok(()),
                     _ => Err(Error::InvalidArgument(format!(
@@ -373,7 +385,7 @@ impl Relation {
                 },
                 Relation::Object(o) => ValueAssignment::Boolean(false)
                     .can_assign(db.get_object_declaration_type(*o)?.as_ref()),
-                Relation::Combination(_) => Ok(()),
+                Relation::Combination(_) | Relation::Edge(_) => Ok(()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
@@ -388,6 +400,7 @@ impl DeclareWithIndent for Relation {
             Relation::Object(obj) => Ok(obj.get_name(db).to_string()),
             Relation::Combination(c) => c.declare_with_indent(db, indent_style),
             Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
+            Relation::Edge(e) => e.declare_with_indent(db, indent_style),
         }
     }
 }
@@ -421,7 +434,17 @@ mod tests {
             .lteq(db, ValueAssignment::Boolean(false))?
             .gt(db, ValueAssignment::Boolean(false))?
             .gteq(db, ValueAssignment::Boolean(false))?;
-        assert_eq!("true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false", comb.declare(db)?);
+        assert_eq!(
+            "true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false",
+            comb.declare(db)?
+        );
+        let obj = ObjectDeclaration::signal(db, "test_sig", ObjectType::Bit, None)?;
+        let rising_edge = Edge::rising_edge(db, obj)?;
+        let falling_edge = Edge::falling_edge(db, obj)?;
+        assert_eq!(
+            "rising_edge(test_sig) nand falling_edge(test_sig)",
+            rising_edge.nand(db, falling_edge)?.declare(db)?
+        );
 
         Ok(())
     }

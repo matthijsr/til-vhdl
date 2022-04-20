@@ -2,7 +2,7 @@ use tydi_common::error::Result;
 
 use crate::{
     architecture::arch_storage::Arch, declaration::DeclareWithIndent,
-    statement::logical_expression::Relation,
+    statement::relation::Relation,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
