@@ -1,15 +1,17 @@
 use itertools::Itertools;
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     map::InsertionOrderedMap,
 };
 use tydi_intern::Id;
 
 use crate::{
-    architecture::arch_storage::{interner::GetName, Arch},
+    architecture::arch_storage::Arch,
+    assignment::ObjectSelection,
     common::vhdl_name::VhdlName,
     declaration::{DeclareWithIndent, ObjectDeclaration},
     object::object_type::{time::TimeValue, ObjectType},
+    statement::relation::Relation,
 };
 
 use super::condition::Condition;
@@ -17,12 +19,13 @@ use super::condition::Condition;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TimeExpression {
     Constant(TimeValue),
-    Variable(Id<ObjectDeclaration>),
+    Variable(ObjectSelection),
 }
 
 impl TimeExpression {
-    pub fn variable(db: &dyn Arch, obj: Id<ObjectDeclaration>) -> Result<Self> {
-        let typ = db.get_object_declaration_type(obj)?;
+    pub fn variable(db: &dyn Arch, obj: impl TryResult<ObjectSelection>) -> Result<Self> {
+        let obj = obj.try_result()?;
+        let typ = db.get_object_type(obj.as_object_key(db))?;
         match typ.as_ref() {
             ObjectType::Time => Ok(Self::Variable(obj)),
             ObjectType::Bit
@@ -47,10 +50,10 @@ impl From<TimeValue> for TimeExpression {
 }
 
 impl DeclareWithIndent for TimeExpression {
-    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
             TimeExpression::Constant(t) => t.declare(),
-            TimeExpression::Variable(v) => Ok(v.get_name(db).to_string()),
+            TimeExpression::Variable(v) => v.declare_with_indent(db, indent_style),
         }
     }
 }
@@ -80,6 +83,48 @@ impl Wait {
     /// `... until [timeout]`
     pub fn timeout(&self) -> Option<&TimeExpression> {
         self.timeout.as_ref()
+    }
+
+    pub fn wait() -> Self {
+        Self {
+            sensitivity: InsertionOrderedMap::new(),
+            condition: None,
+            timeout: None,
+        }
+    }
+
+    pub fn on(mut self, db: &dyn Arch, obj: Id<ObjectDeclaration>) -> Result<Self> {
+        self.sensitivity
+            .try_insert(db.get_object_declaration_name(obj).as_ref().clone(), obj)?;
+        Ok(self)
+    }
+
+    pub fn for_constant(mut self, val: bool) -> Self {
+        self.condition = Some(Condition::constant(val));
+        self
+    }
+
+    pub fn for_relation(
+        mut self,
+        db: &dyn Arch,
+        relation: impl TryResult<Relation>,
+    ) -> Result<Self> {
+        self.condition = Some(Condition::relation(db, relation)?);
+        Ok(self)
+    }
+
+    pub fn until_constant(mut self, val: impl Into<TimeValue>) -> Self {
+        self.timeout = Some(TimeExpression::constant(val));
+        self
+    }
+
+    pub fn until_variable(
+        mut self,
+        db: &dyn Arch,
+        obj: impl TryResult<ObjectSelection>,
+    ) -> Result<Self> {
+        self.timeout = Some(TimeExpression::variable(db, obj)?);
+        Ok(self)
     }
 }
 

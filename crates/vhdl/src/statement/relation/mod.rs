@@ -345,6 +345,10 @@ impl From<BitVecValue> for Relation {
 }
 
 impl Relation {
+    pub fn is_bool(&self, db: &dyn Arch) -> Result<()> {
+        self.can_assign(db, &ObjectType::Boolean)
+    }
+
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
             Relation::Value(v) => v.can_assign(to_typ),
