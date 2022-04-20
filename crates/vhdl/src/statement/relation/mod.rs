@@ -353,9 +353,10 @@ impl Relation {
                 obj.assignable.from_or_err()?;
                 obj.typ(db).can_assign_type(to_typ)
             }
-            Relation::Combination(_) => ObjectType::Boolean.can_assign_type(to_typ),
-            Relation::LogicalExpression(_) => todo!(),
-            Relation::Edge(_) => todo!(),
+            Relation::Combination(_) | Relation::Edge(_) => {
+                ObjectType::Boolean.can_assign_type(to_typ)
+            }
+            Relation::LogicalExpression(lex) => lex.can_assign(db, to_typ),
         }
     }
 
