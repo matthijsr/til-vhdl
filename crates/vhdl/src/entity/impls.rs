@@ -1,6 +1,6 @@
 use textwrap::indent;
 use tydi_common::error::{Result, TryResult};
-use tydi_common::traits::{Document, Identify};
+use tydi_common::traits::{Document, Documents, Identify};
 
 use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
@@ -43,8 +43,14 @@ impl Identify for Entity {
 }
 
 impl Document for Entity {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for Entity {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 
@@ -73,17 +79,6 @@ impl Entity {
     pub fn parameters(&self) -> &Vec<Parameter> {
         &self.parameters
     }
-
-    /// Return this entity with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this entity.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
 }
 
 impl From<&Component> for Entity {
@@ -92,7 +87,7 @@ impl From<&Component> for Entity {
             identifier: comp.vhdl_name().clone(),
             parameters: comp.parameters().to_vec(),
             ports: comp.ports().to_vec(),
-            doc: comp.doc(),
+            doc: comp.doc().cloned(),
         }
     }
 }

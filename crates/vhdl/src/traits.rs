@@ -17,4 +17,3 @@ impl<T: Document> VhdlDocument for T {
         }
     }
 }
-

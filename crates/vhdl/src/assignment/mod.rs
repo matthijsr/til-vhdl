@@ -6,15 +6,19 @@ use indexmap::map::IndexMap;
 use array_assignment::ArrayAssignment;
 use textwrap::indent;
 use tydi_common::error::{Error, Result, TryResult};
-use tydi_common::traits::{Document, Identify};
+use tydi_common::traits::{Document, Documents, Identify};
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
 
 use crate::architecture::arch_storage::Arch;
 use crate::common::vhdl_name::VhdlName;
-use crate::declaration::Declare;
+use crate::declaration::DeclareWithIndent;
+use crate::object::object_type::time::TimeValue;
+use crate::object::object_type::ObjectType;
 use crate::properties::Width;
+use crate::statement::label::Label;
+use crate::statement::relation::Relation;
 
 use super::declaration::ObjectDeclaration;
 
@@ -39,6 +43,7 @@ pub trait Assign {
 /// Describing the declaration of an assignment
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssignDeclaration {
+    label: Option<VhdlName>,
     /// The declared object being assigned
     object: Id<ObjectDeclaration>,
     /// The assignment to the declared object
@@ -49,6 +54,7 @@ pub struct AssignDeclaration {
 impl AssignDeclaration {
     pub fn new(object: Id<ObjectDeclaration>, assignment: Assignment) -> AssignDeclaration {
         AssignDeclaration {
+            label: None,
             object,
             assignment,
             doc: None,
@@ -75,20 +81,9 @@ impl AssignDeclaration {
         result
     }
 
-    /// Return this assignment declaration with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this assignment declaration.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
-
     /// If this is an object to object assignment, return the object being assigned from
     pub fn from(&self) -> Option<Id<ObjectDeclaration>> {
-        if let AssignmentKind::Object(o) = self.assignment().kind() {
+        if let AssignmentKind::Relation(Relation::Object(o)) = self.assignment().kind() {
             Some(o.object())
         } else {
             None
@@ -135,23 +130,39 @@ impl AssignDeclaration {
     /// Attempts to reverse the assignment. This is (currently) only possible for object assignments
     pub fn reverse(&self, db: &dyn Arch) -> Result<AssignDeclaration> {
         match self.assignment().kind() {
-            AssignmentKind::Object(object) => object.object().assign(
+            AssignmentKind::Relation(Relation::Object(object)) => object.object().assign(
                 db,
                 &Assignment::from(
-                    ObjectAssignment::from(self.object()).assign_from(self.assignment().to_field()),
+                    ObjectSelection::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
             ),
-            AssignmentKind::Direct(_) => Err(Error::InvalidTarget(
-                "Cannot reverse a direct assignment.".to_string(),
+            _ => Err(Error::InvalidTarget(
+                "Cannot reverse an assignment that's not between objects.".to_string(),
             )),
         }
     }
 }
 
+impl Label for AssignDeclaration {
+    fn label(&self) -> Option<&VhdlName> {
+        self.label.as_ref()
+    }
+
+    fn set_label(&mut self, label: impl Into<VhdlName>) {
+        self.label = Some(label.into())
+    }
+}
+
 impl Document for AssignDeclaration {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for AssignDeclaration {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 
@@ -216,11 +227,11 @@ impl Assignment {
         object_identifier: impl TryResult<VhdlName>,
         indent_style: &str,
     ) -> Result<String> {
-        if let AssignmentKind::Direct(DirectAssignment::Value(ValueAssignment::BitVec(bitvec))) =
-            self.kind()
-        {
-            if let Some(FieldSelection::Range(range)) = self.to_field().last() {
-                return bitvec.declare_for_range(range);
+        if let AssignmentKind::Relation(Relation::Value(va)) = &self.kind() {
+            if let ValueAssignment::BitVec(bitvec) = va.as_ref() {
+                if let Some(FieldSelection::Range(range)) = self.to_field().last() {
+                    return bitvec.declare_for_range(range);
+                }
             }
         }
         self.kind().declare_for(db, object_identifier, indent_style)
@@ -230,8 +241,8 @@ impl Assignment {
 /// An object can be assigned a value or from another object
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssignmentKind {
-    /// An object is assigned from or driven by another object
-    Object(ObjectAssignment),
+    /// An object is assigned from or driven by a relation
+    Relation(Relation),
     /// An object is assigned a value, or all fields are assigned/driven at once
     Direct(DirectAssignment),
 }
@@ -348,12 +359,8 @@ impl AssignmentKind {
     ) -> Result<String> {
         let object_identifier = object_identifier.try_result()?;
         match self {
-            AssignmentKind::Object(object) => object.declare(db),
+            AssignmentKind::Relation(relation) => relation.declare_with_indent(db, indent_style),
             AssignmentKind::Direct(direct) => match direct {
-                DirectAssignment::Value(value) => match value {
-                    ValueAssignment::Bit(bit) => Ok(format!("'{}'", bit)),
-                    ValueAssignment::BitVec(bitvec) => bitvec.declare_for(object_identifier),
-                },
                 DirectAssignment::FullRecord(record) => {
                     let mut field_assignments = Vec::new();
                     for rf in record {
@@ -428,14 +435,14 @@ impl AssignmentKind {
 
 /// An object can be assigned a value or another object
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ObjectAssignment {
+pub struct ObjectSelection {
     /// The object being assigned from
     object: Id<ObjectDeclaration>,
     /// Optional selections on the object being assigned from, representing nested selections
     from_field: Vec<FieldSelection>,
 }
 
-impl ObjectAssignment {
+impl ObjectSelection {
     /// Returns a reference to the object being assigned from
     pub fn object(&self) -> Id<ObjectDeclaration> {
         self.object
@@ -460,8 +467,30 @@ impl ObjectAssignment {
     }
 }
 
-impl Declare for ObjectAssignment {
-    fn declare(&self, db: &dyn Arch) -> Result<String> {
+pub trait SelectObject: Sized {
+    fn select(
+        self,
+        fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
+    ) -> Result<ObjectSelection>;
+}
+
+impl<T: TryResult<ObjectSelection>> SelectObject for T {
+    fn select(
+        self,
+        fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
+    ) -> Result<ObjectSelection> {
+        let mut selection = self.try_result()?;
+        let mut fields_result = vec![];
+        for field in fields {
+            fields_result.push(field.try_result()?);
+        }
+        selection.from_field.append(&mut fields_result);
+        Ok(selection)
+    }
+}
+
+impl DeclareWithIndent for ObjectSelection {
+    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
             .identifier()
@@ -539,8 +568,6 @@ impl fmt::Display for StdLogicValue {
 /// Directly assigning a value or an entire Record/Array
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DirectAssignment {
-    /// Assigning a specific value to a bit vector or single bit
-    Value(ValueAssignment),
     /// Assigning all fields of a Record
     FullRecord(Vec<FieldAssignment>),
     /// Assigning all fields of an Array
@@ -576,10 +603,94 @@ impl Identify for FieldAssignment {
 /// Directly assigning a value or an entire Record, corresponds to the Types defined in `tydi::generator::common::Type`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValueAssignment {
+    /// Assigning a boolean to something
+    Boolean(bool),
+    /// Assigning an amount of time to something
+    Time(TimeValue),
     /// Assigning a value to a single bit
     Bit(StdLogicValue),
     /// Assigning a value to a (part of) a bit vector
     BitVec(BitVecValue),
+}
+
+impl ValueAssignment {
+    pub fn declare(&self) -> Result<String> {
+        match self {
+            ValueAssignment::Bit(b) => Ok(format!("'{}'", b)),
+            ValueAssignment::BitVec(bv) => bv.declare(),
+            ValueAssignment::Time(t) => t.declare(),
+            ValueAssignment::Boolean(b) => Ok(b.to_string()),
+        }
+    }
+
+    pub fn matching_value(&self, other: &ValueAssignment) -> bool {
+        match self {
+            ValueAssignment::Boolean(_) => match other {
+                ValueAssignment::Boolean(_) => true,
+                _ => false,
+            },
+            ValueAssignment::Time(_) => match other {
+                ValueAssignment::Time(_) => true,
+                _ => false,
+            },
+            ValueAssignment::Bit(_) => match other {
+                ValueAssignment::Bit(_) => true,
+                _ => false,
+            },
+            ValueAssignment::BitVec(bv) => match other {
+                ValueAssignment::BitVec(obv) => bv.matching_bitvec(obv),
+                _ => false,
+            },
+        }
+    }
+
+    pub fn can_assign(&self, to_typ: &ObjectType) -> Result<()> {
+        match self {
+            ValueAssignment::Bit(_) => match to_typ {
+                ObjectType::Bit => Ok(()),
+                ObjectType::Array(_)
+                | ObjectType::Record(_)
+                | ObjectType::Time
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                    "Cannot assign Bit to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::BitVec(bitvec) => match to_typ {
+                ObjectType::Array(array) if array.is_bitvector() => {
+                    bitvec.validate_width(array.width())
+                }
+                ObjectType::Array(_)
+                | ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Time
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                    "Cannot assign Bit Vector to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::Time(_) => match to_typ {
+                ObjectType::Time => Ok(()),
+                ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Array(_)
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                    "Cannot assign Time to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::Boolean(_) => match to_typ {
+                ObjectType::Boolean => Ok(()),
+                ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Array(_)
+                | ObjectType::Time => Err(Error::InvalidTarget(format!(
+                    "Cannot assign boolean to {}",
+                    to_typ
+                ))),
+            },
+        }
+    }
 }
 
 /// A VHDL assignment constraint
@@ -625,6 +736,26 @@ impl FieldSelection {
 
     pub fn name(name: impl Into<VhdlName>) -> FieldSelection {
         FieldSelection::Name(name.into())
+    }
+}
+
+impl TryFrom<&str> for FieldSelection {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        FieldSelection::try_name(value)
+    }
+}
+
+impl From<VhdlName> for FieldSelection {
+    fn from(name: VhdlName) -> Self {
+        FieldSelection::Name(name)
+    }
+}
+
+impl From<i32> for FieldSelection {
+    fn from(i: i32) -> Self {
+        FieldSelection::index(i)
     }
 }
 

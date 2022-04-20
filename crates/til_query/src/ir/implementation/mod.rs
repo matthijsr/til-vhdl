@@ -4,7 +4,7 @@ pub mod structure;
 use tydi_common::{
     error::{Result, TryResult},
     name::{Name, PathName, PathNameSelf},
-    traits::{Document, Identify},
+    traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
 
@@ -43,15 +43,6 @@ impl Implementation {
             kind: ImplementationKind::Link(link.try_result()?),
             doc: None,
         })
-    }
-
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
-
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
     }
 
     pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
@@ -96,8 +87,14 @@ impl Identify for Implementation {
 }
 
 impl Document for Implementation {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for Implementation {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 

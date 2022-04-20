@@ -1,6 +1,6 @@
 use crate::{
-    architecture::{arch_storage::Arch, ArchitectureDeclare},
-    declaration::ObjectKind,
+    architecture::arch_storage::Arch,
+    declaration::{DeclareWithIndent, ObjectKind},
     traits::VhdlDocument,
 };
 
@@ -8,7 +8,7 @@ use tydi_common::error::Result;
 
 use super::AssignDeclaration;
 
-impl ArchitectureDeclare for AssignDeclaration {
+impl DeclareWithIndent for AssignDeclaration {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {

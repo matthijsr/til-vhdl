@@ -1,8 +1,11 @@
-use tydi_common::error;
+use std::sync::Arc;
+
+use tydi_common::error::Result;
 use tydi_common::error::TryResult;
 use tydi_intern::Id;
 
 use crate::architecture::arch_storage::Arch;
+use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::object::object_type::ObjectType;
 use crate::{
     declaration::{ArchitectureDeclaration, ObjectDeclaration},
@@ -20,11 +23,28 @@ pub trait Interner {
     #[salsa::interned]
     fn intern_object_declaration(&self, obj_decl: ObjectDeclaration) -> Id<ObjectDeclaration>;
 
+    fn get_object_declaration_name(&self, obj_decl: Id<ObjectDeclaration>) -> Arc<VhdlName>;
+
     #[salsa::interned]
     fn intern_object(&self, obj: Object) -> Id<Object>;
 
     #[salsa::interned]
     fn intern_object_type(&self, object_type: ObjectType) -> Id<ObjectType>;
+}
+
+fn get_object_declaration_name(
+    db: &dyn Interner,
+    obj_decl: Id<ObjectDeclaration>,
+) -> Arc<VhdlName> {
+    Arc::from(
+        db.lookup_intern_object_declaration(obj_decl)
+            .vhdl_name()
+            .clone(),
+    )
+}
+
+pub trait GetName<T> {
+    fn get_name(&self, db: &dyn Arch) -> T;
 }
 
 pub trait GetSelf<T> {
@@ -40,11 +60,11 @@ pub trait InternAs<T> {
 }
 
 pub trait TryIntern<T> {
-    fn try_intern(self, db: &dyn Arch) -> error::Result<Id<T>>;
+    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>>;
 }
 
 pub trait TryInternAs<T> {
-    fn try_intern_as(self, db: &dyn Arch) -> error::Result<Id<T>>;
+    fn try_intern_as(self, db: &dyn Arch) -> Result<Id<T>>;
 }
 
 impl<T, U> InternAs<T> for U
@@ -62,7 +82,7 @@ where
     U: TryResult<T>,
     T: InternSelf,
 {
-    fn try_intern(self, db: &dyn Arch) -> error::Result<Id<T>> {
+    fn try_intern(self, db: &dyn Arch) -> Result<Id<T>> {
         Ok(self.try_result()?.intern(db))
     }
 }

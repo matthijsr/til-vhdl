@@ -149,6 +149,27 @@ impl BitVecValue {
             },
         }
     }
+
+    pub fn matching_bitvec(&self, other: &BitVecValue) -> bool {
+        match self {
+            BitVecValue::Others(_) => match other {
+                BitVecValue::Others(_) => true,
+                _ => false,
+            },
+            BitVecValue::Full(f) => match other {
+                BitVecValue::Full(o_f) => f.len() == o_f.len(),
+                _ => false,
+            },
+            BitVecValue::Unsigned(_) => match other {
+                BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => true,
+                _ => false,
+            },
+            BitVecValue::Signed(_) => match other {
+                BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => true,
+                _ => false,
+            },
+        }
+    }
 }
 
 #[cfg(test)]

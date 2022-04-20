@@ -59,5 +59,17 @@ pub trait Identify {
 /// Trait for things that have documentation.
 pub trait Document {
     /// Return optionally existing user-written documentation of self.
-    fn doc(&self) -> Option<String>;
+    fn doc(&self) -> Option<&String>;
+}
+
+/// Trait for things that have arbitrary, mutable documentation.
+pub trait Documents: Document + Sized {
+    /// Set the documentation.
+    fn set_doc(&mut self, doc: impl Into<String>);
+
+    /// Set the documentation and return self, for natural/factory patterns.
+    fn with_doc(mut self, doc: impl Into<String>) -> Self {
+        self.set_doc(doc);
+        self
+    }
 }

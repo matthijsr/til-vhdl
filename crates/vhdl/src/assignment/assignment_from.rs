@@ -1,10 +1,10 @@
 use tydi_intern::Id;
 
-use crate::declaration::ObjectDeclaration;
+use crate::{declaration::ObjectDeclaration, statement::relation::Relation};
 
 use super::{
     array_assignment::ArrayAssignment, bitvec::BitVecValue, Assignment, AssignmentKind,
-    DirectAssignment, ObjectAssignment, StdLogicValue, ValueAssignment,
+    DirectAssignment, ObjectSelection, StdLogicValue, ValueAssignment,
 };
 
 // I feel like there should be some way for Rust to recognize these connections automatically but unfortunately we can't just string "T: Into<...>"s together,
@@ -22,46 +22,27 @@ where
     }
 }
 
-impl From<ObjectAssignment> for AssignmentKind {
-    fn from(assignment: ObjectAssignment) -> Self {
-        AssignmentKind::Object(assignment)
+impl<T: Into<Relation>> From<T> for AssignmentKind {
+    fn from(relation: T) -> Self {
+        AssignmentKind::Relation(relation.into())
     }
 }
 
-impl From<Id<ObjectDeclaration>> for AssignmentKind {
-    fn from(assignment: Id<ObjectDeclaration>) -> Self {
-        AssignmentKind::Object(assignment.into())
-    }
-}
-
-// As there are more Direct kinds, this one gets to use the where T: Into...
-impl<T> From<T> for AssignmentKind
-where
-    T: Into<DirectAssignment>,
-{
-    fn from(assignment: T) -> Self {
+impl From<ArrayAssignment> for AssignmentKind {
+    fn from(assignment: ArrayAssignment) -> Self {
         AssignmentKind::Direct(assignment.into())
     }
 }
 
-impl<T> From<T> for ObjectAssignment
+impl<T> From<T> for ObjectSelection
 where
     T: Into<Id<ObjectDeclaration>>,
 {
     fn from(object: T) -> Self {
-        ObjectAssignment {
+        ObjectSelection {
             object: object.into(),
             from_field: vec![],
         }
-    }
-}
-
-impl<T> From<T> for DirectAssignment
-where
-    T: Into<ValueAssignment>,
-{
-    fn from(assignment: T) -> Self {
-        DirectAssignment::Value(assignment.into())
     }
 }
 

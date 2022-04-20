@@ -94,8 +94,32 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         self.items.get(key)
     }
 
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.items.get_mut(key)
+    }
+
+    pub fn get_or_insert(&mut self, key: &K, or_insert: V) -> &mut V {
+        if self.contains(key) {
+            self.get_mut(key).unwrap()
+        } else {
+            self.try_insert(key.clone(), or_insert).unwrap();
+            self.get_mut(key).unwrap()
+        }
+    }
+
     pub fn try_get(&self, key: &K) -> Result<&V> {
         if let Some(v) = self.get(key) {
+            Ok(v)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "Key {} does not exist in this map.",
+                key.to_string()
+            )))
+        }
+    }
+
+    pub fn try_get_mut(&mut self, key: &K) -> Result<&mut V> {
+        if let Some(v) = self.get_mut(key) {
             Ok(v)
         } else {
             Err(Error::InvalidArgument(format!(

@@ -1,18 +1,14 @@
 use textwrap::indent;
 use tydi_common::error::{Error, Result};
 
-use crate::architecture::{arch_storage::Arch, ArchitectureDeclare};
+use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
 
-use super::{PortMapping, Statement};
+use super::{label::Label, PortMapping, Statement};
 
-impl ArchitectureDeclare for PortMapping {
+impl DeclareWithIndent for PortMapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
-        result.push_str(&format!(
-            "{}: {} port map(\n",
-            self.label(),
-            self.component_name()
-        ));
+        result.push_str(&format!("{} port map(\n", self.component_name()));
         let mut port_maps = vec![];
         for (port, _) in self.ports() {
             if let Some(port_assign) = self.mappings().get(port) {
@@ -30,13 +26,19 @@ impl ArchitectureDeclare for PortMapping {
     }
 }
 
-impl ArchitectureDeclare for Statement {
+impl DeclareWithIndent for Statement {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
-        match self {
+        let result = match self {
             Statement::Assignment(assignment) => assignment.declare_with_indent(db, indent_style),
             Statement::PortMapping(portmapping) => {
                 portmapping.declare_with_indent(db, indent_style)
             }
+            Statement::Process(process) => process.declare_with_indent(db, indent_style),
+        };
+        if let Some(label) = self.label() {
+            Ok(format!("{}: {}", label, result?))
+        } else {
+            result
         }
     }
 }

@@ -11,7 +11,7 @@ use crate::{
     entity::Entity,
     package::Package,
     statement::Statement,
-    usings::{ListUsings, Usings},
+    usings::{ListUsings, ListUsingsDb, Usings},
 };
 
 use self::arch_storage::Arch;
@@ -72,13 +72,6 @@ pub struct Architecture {
     statement: Vec<Statement>,
 }
 
-pub trait ArchitectureDeclare {
-    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String>;
-    fn declare(&self, db: &dyn Arch) -> Result<String> {
-        self.declare_with_indent(db, "  ")
-    }
-}
-
 impl Architecture {
     /// Create the architecture based on a component contained within a package, assuming the library (project) is "work" and the architecture's identifier is "Behavioral"
     pub fn new_default(
@@ -134,17 +127,6 @@ impl Architecture {
         self.usings.add_using(library, using)
     }
 
-    /// Return this architecture with documentation added.
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    /// Set the documentation of this architecture.
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into())
-    }
-
     pub fn add_declaration(
         &mut self,
         db: &dyn Arch,
@@ -169,15 +151,7 @@ impl Architecture {
 
     pub fn add_statement(&mut self, db: &dyn Arch, statement: impl Into<Statement>) -> Result<()> {
         let statement = statement.into();
-        match &statement {
-            Statement::Assignment(assignment) => self.usings.combine(&assignment.list_usings()?),
-            Statement::PortMapping(pm) => {
-                for (_, object) in pm.ports() {
-                    self.usings
-                        .combine(&db.lookup_intern_object_declaration(*object).list_usings()?);
-                }
-            }
-        }
+        self.usings.combine(&statement.list_usings_db(db)?);
         self.statement.push(statement);
         Ok(())
     }

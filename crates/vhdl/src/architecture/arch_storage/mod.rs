@@ -13,7 +13,7 @@ use std::convert::TryInto;
 use crate::{
     assignment::{
         array_assignment::ArrayAssignment, Assignment, AssignmentKind, DirectAssignment,
-        FieldSelection, RangeConstraint, ValueAssignment,
+        FieldSelection, RangeConstraint,
     },
     object::object_type::ObjectType,
 };
@@ -21,6 +21,7 @@ use crate::{
 use self::object_queries::object_key::ObjectKey;
 
 pub mod db;
+pub mod get_name;
 pub mod get_self;
 pub mod intern_self;
 pub mod interner;
@@ -50,30 +51,12 @@ fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
 fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()> {
     let to_key = to.with_nested(assignment.to_field().clone());
     let to = db.get_object(to_key.clone())?;
+    to.assignable.to_or_err()?;
+    let to_typ = db.lookup_intern_object_type(to.typ);
     match assignment.kind() {
-        AssignmentKind::Object(object_assignment) => {
-            db.assignable_objects(to_key, object_assignment.as_object_key(db))
-        }
+        AssignmentKind::Relation(relation) => relation.can_assign(db, &to_typ),
         AssignmentKind::Direct(direct) => {
-            let to_typ = db.lookup_intern_object_type(to.typ);
             match direct {
-                DirectAssignment::Value(value) => match value {
-                    ValueAssignment::Bit(_) => match to_typ {
-                        ObjectType::Bit => Ok(()),
-                        ObjectType::Array(_) | ObjectType::Record(_) => Err(Error::InvalidTarget(
-                            format!("Cannot assign Bit to {}", to_typ),
-                        )),
-                    },
-                    ValueAssignment::BitVec(bitvec) => match to_typ {
-                        ObjectType::Array(array) if array.is_bitvector() => {
-                            bitvec.validate_width(array.width())
-                        }
-                        _ => Err(Error::InvalidTarget(format!(
-                            "Cannot assign Bit Vector to {}",
-                            to_typ
-                        ))),
-                    },
-                },
                 DirectAssignment::FullRecord(record) => {
                     if let ObjectType::Record(to_record) = &to_typ {
                         if to_record.fields().len() == record.len() {

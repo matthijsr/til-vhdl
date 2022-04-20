@@ -9,15 +9,16 @@ use tydi_common::{
     traits::Identify,
 };
 
+use crate::object::object_type::ObjectType;
 use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent},
+    object::object_type::DeclarationTypeName,
     properties::Analyze,
-    usings::{DeclareUsings, ListUsings, Usings}, object::object_type::DeclarationTypeName,
+    usings::{DeclareUsings, ListUsings, Usings},
 };
-use crate::object::object_type::ObjectType;
 
 // TODO: Eventually functions as well.
 /// A library of components and types.
@@ -55,7 +56,10 @@ impl Package {
                 .iter()
                 .map(|c| (c.vhdl_name().clone(), c.clone()))
                 .collect(),
-            types: all_types.into_iter().unique_by(|x| x.declaration_type_name()).collect(),
+            types: all_types
+                .into_iter()
+                .unique_by(|x| x.declaration_type_name())
+                .collect(),
         })
     }
 
@@ -142,6 +146,8 @@ impl ListUsings for Package {
                     .fields()
                     .into_iter()
                     .any(|(_, typ)| uses_std_logic(&typ)),
+                ObjectType::Time => false,
+                ObjectType::Boolean => false,
             }
         }
 

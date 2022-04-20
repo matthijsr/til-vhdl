@@ -11,6 +11,7 @@ pub mod entity;
 pub mod object;
 pub mod package;
 pub mod port;
+pub mod process;
 pub mod properties;
 pub mod statement;
 pub mod traits;

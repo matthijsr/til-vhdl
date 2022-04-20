@@ -1,7 +1,7 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName, PathNameSelf},
-    traits::{Document, Identify},
+    traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
 
@@ -54,15 +54,6 @@ impl Streamlet {
     pub fn with_name(mut self, name: impl Into<PathName>) -> Self {
         self.name = name.into();
         self
-    }
-
-    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
-        self.doc = Some(doc.into());
-        self
-    }
-
-    pub fn set_doc(&mut self, doc: impl Into<String>) {
-        self.doc = Some(doc.into());
     }
 
     pub fn try_with_name(mut self, name: impl TryResult<PathName>) -> Result<Self> {
@@ -138,8 +129,14 @@ impl Identify for Streamlet {
 }
 
 impl Document for Streamlet {
-    fn doc(&self) -> Option<String> {
-        self.doc.clone()
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for Streamlet {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
     }
 }
 
