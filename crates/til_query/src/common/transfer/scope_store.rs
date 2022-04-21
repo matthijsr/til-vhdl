@@ -67,8 +67,12 @@ impl<T: Clone> ScopeStore<T> {
         mut path: impl Iterator<Item = &'a Name>,
         mut parents: Vec<T>,
     ) -> Result<ScopeResult<T>> {
+        if !self.synched() {
+            parents = vec![];
+        }
         if let Some(name) = path.next() {
             parents.push(self.value().clone());
+
             let child = self.child_scopes().try_get(name)?;
             child.try_get_with_parents(path, parents)
         } else {
