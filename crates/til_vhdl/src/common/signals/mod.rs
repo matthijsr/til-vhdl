@@ -17,7 +17,12 @@ use tydi_common::{
     numbers::NonNegative,
     traits::{Identify, Reversed},
 };
-use tydi_vhdl::process::Process;
+use tydi_vhdl::{
+    architecture::arch_storage::db::Database,
+    assignment::{Assign, StdLogicValue},
+    process::{statement::wait::Wait, Process},
+    statement::relation::CombineRelation,
+};
 
 use crate::ir::streamlet::PhysicalStreamObject;
 
@@ -39,6 +44,10 @@ impl PhysicalStreamProcess {
     #[must_use]
     pub fn stream_object(&self) -> &PhysicalStreamObject {
         self.stream_object.as_ref()
+    }
+
+    pub fn with_db<'a>(self, db: &'a Database) -> PhysicalStreamProcessWithDb<'a> {
+        PhysicalStreamProcessWithDb { process: self, db }
     }
 }
 
@@ -66,13 +75,24 @@ impl<T: Into<Arc<PhysicalStreamObject>>> From<T> for PhysicalStreamProcess {
     }
 }
 
-impl PhysicalSignals for PhysicalStreamProcess {
+pub struct PhysicalStreamProcessWithDb<'a> {
+    process: PhysicalStreamProcess,
+    db: &'a Database,
+}
+
+impl<'a> PhysicalStreamProcessWithDb<'a> {
+    pub fn get(self) -> PhysicalStreamProcess {
+        self.process
+    }
+}
+
+impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     fn direction(&self) -> PhysicalStreamDirection {
-        let interface_dir = match self.stream_object().interface_direction() {
+        let interface_dir = match self.process.stream_object().interface_direction() {
             InterfaceDirection::Out => PhysicalStreamDirection::Source,
             InterfaceDirection::In => PhysicalStreamDirection::Sink,
         };
-        match self.stream_object().stream_direction() {
+        match self.process.stream_object().stream_direction() {
             StreamDirection::Forward => interface_dir,
             StreamDirection::Reverse => interface_dir.reversed(),
         }
@@ -161,7 +181,27 @@ impl PhysicalSignals for PhysicalStreamProcess {
     }
 
     fn handshake_start(&mut self) -> Result<()> {
-        todo!()
+        // If there's no Valid signal, this stream is always valid
+        if let Some(valid) = *self.process.stream_object().signal_list().valid() {
+            match self.direction() {
+                PhysicalStreamDirection::Source => {
+                    self.process.process.add_statement(
+                        self.db,
+                        Wait::wait().until_relation(
+                            self.db,
+                            valid.r_eq(self.db, StdLogicValue::Logic(true))?,
+                        )?,
+                    )?;
+                }
+                PhysicalStreamDirection::Sink => {
+                    self.process.process.add_statement(
+                        self.db,
+                        valid.assign(self.db, &StdLogicValue::Logic(true))?,
+                    )?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn handshake_end(&mut self) -> Result<()> {

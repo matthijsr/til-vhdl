@@ -334,7 +334,7 @@ impl VhdlStreamlet {
                             .try_map_fields(&mut try_signal_decl)?
                             .try_map_streams_named(|stream_name, stream| {
                                 Ok(PhysicalStreamObject {
-                                    name: stream_name.clone(),
+                                    name: stream_name.with_parent(name),
                                     signal_list: stream
                                         .signal_list()
                                         .clone()
@@ -387,7 +387,7 @@ impl VhdlStreamlet {
                     typed_stream: port.typed_stream().map_logical_stream(|ls| {
                         ls.clone().map_fields(entity_port_obj).map_streams_named(
                             |stream_name, stream| PhysicalStreamObject {
-                                name: stream_name.clone(),
+                                name: stream_name.with_parent(name),
                                 signal_list: stream.signal_list().clone().map(entity_port_obj),
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),

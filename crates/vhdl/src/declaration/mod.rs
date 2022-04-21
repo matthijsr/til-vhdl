@@ -293,12 +293,12 @@ impl ObjectDeclaration {
     }
 
     /// Create a default "clk" entity port object
-    pub fn entity_clk(db: &mut dyn Arch) -> Id<ObjectDeclaration> {
+    pub fn entity_clk(db: &dyn Arch) -> Id<ObjectDeclaration> {
         ObjectDeclaration::entity_port(db, "clk", ObjectType::Bit, Mode::In).unwrap()
     }
 
     /// Create a default "rst" entity port object
-    pub fn entity_rst(db: &mut dyn Arch) -> Id<ObjectDeclaration> {
+    pub fn entity_rst(db: &dyn Arch) -> Id<ObjectDeclaration> {
         ObjectDeclaration::entity_port(db, "rst", ObjectType::Bit, Mode::In).unwrap()
     }
 
