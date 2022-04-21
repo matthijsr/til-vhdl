@@ -1,7 +1,16 @@
 use std::sync::Arc;
 
+use til_query::common::{
+    signals::{PhysicalSignals, PhysicalStreamDirection},
+    transfer::{
+        element_type::ElementType,
+        physical_transfer::{LastMode, StrobeMode},
+    },
+};
 use tydi_common::{
+    error::Result,
     name::{PathName, PathNameSelf},
+    numbers::NonNegative,
     traits::Identify,
 };
 use tydi_vhdl::process::Process;
@@ -50,5 +59,100 @@ impl<T: Into<Arc<PhysicalStreamObject>>> From<T> for PhysicalStreamProcess {
             process,
             stream_object,
         }
+    }
+}
+
+impl PhysicalSignals for PhysicalStreamProcess {
+    fn direction(&self) -> PhysicalStreamDirection {
+        todo!()
+    }
+
+    fn comment(&mut self, comment: &str) {
+        todo!()
+    }
+
+    fn act_data_default(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_data_default(&mut self, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn act_data(&mut self, element_lane: NonNegative, data: &ElementType) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_data(
+        &mut self,
+        element_lane: NonNegative,
+        data: &ElementType,
+        message: &str,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    fn act_user_default(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_user_default(&mut self, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn act_user(&mut self, user: &ElementType) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_user(&mut self, user: &ElementType, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn act_stai(&mut self, stai: NonNegative) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_stai(&mut self, stai: NonNegative, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn act_endi(&mut self, endi: NonNegative) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_endi(&mut self, endi: NonNegative, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn act_strb(&mut self, strb: StrobeMode) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn act_last(&mut self, last: LastMode) -> Result<()> {
+        todo!()
+    }
+
+    fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn handshake(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    fn handshake_continue(&mut self, message: &str) -> Result<()> {
+        todo!()
+    }
+
+    fn handshake_start(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    fn handshake_end(&mut self) -> Result<()> {
+        todo!()
     }
 }
