@@ -1,17 +1,21 @@
 use std::sync::Arc;
 
-use til_query::common::{
-    signals::{PhysicalSignals, PhysicalStreamDirection},
-    transfer::{
-        element_type::ElementType,
-        physical_transfer::{LastMode, StrobeMode},
+use til_query::{
+    common::{
+        signals::{PhysicalSignals, PhysicalStreamDirection},
+        stream_direction::StreamDirection,
+        transfer::{
+            element_type::ElementType,
+            physical_transfer::{LastMode, StrobeMode},
+        },
     },
+    ir::physical_properties::InterfaceDirection,
 };
 use tydi_common::{
     error::Result,
     name::{PathName, PathNameSelf},
     numbers::NonNegative,
-    traits::Identify,
+    traits::{Identify, Reversed},
 };
 use tydi_vhdl::process::Process;
 
@@ -64,11 +68,19 @@ impl<T: Into<Arc<PhysicalStreamObject>>> From<T> for PhysicalStreamProcess {
 
 impl PhysicalSignals for PhysicalStreamProcess {
     fn direction(&self) -> PhysicalStreamDirection {
-        todo!()
+        let interface_dir = match self.stream_object().interface_direction() {
+            InterfaceDirection::Out => PhysicalStreamDirection::Source,
+            InterfaceDirection::In => PhysicalStreamDirection::Sink,
+        };
+        match self.stream_object().stream_direction() {
+            StreamDirection::Forward => interface_dir,
+            StreamDirection::Reverse => interface_dir.reversed(),
+        }
     }
 
-    fn comment(&mut self, comment: &str) {
-        todo!()
+    fn comment(&mut self, _comment: &str) {
+        // TODO: Add support for arbitrary comments in Processes
+        ()
     }
 
     fn act_data_default(&mut self) -> Result<()> {

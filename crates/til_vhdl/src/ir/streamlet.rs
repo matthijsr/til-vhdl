@@ -81,6 +81,8 @@ pub struct PhysicalStreamObject {
     dimensionality: NonNegative,
     /// Complexity.
     complexity: Complexity,
+    /// Direction of the parent interface.
+    interface_direction: InterfaceDirection,
     /// Overall direction of the physical stream
     stream_direction: StreamDirection,
 }
@@ -105,6 +107,12 @@ impl PhysicalStreamObject {
     /// Overall direction of the physical stream
     pub fn stream_direction(&self) -> StreamDirection {
         self.stream_direction
+    }
+
+    /// Get the physical stream object's interface direction.
+    #[must_use]
+    pub fn interface_direction(&self) -> InterfaceDirection {
+        self.interface_direction
     }
 }
 
@@ -334,6 +342,7 @@ impl VhdlStreamlet {
                                     element_lanes: stream.element_lanes().clone(),
                                     dimensionality: stream.dimensionality(),
                                     complexity: stream.complexity().clone(),
+                                    interface_direction: stream.interface_direction(),
                                     stream_direction: stream.stream_direction(),
                                 })
                             })
@@ -383,6 +392,7 @@ impl VhdlStreamlet {
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),
                                 complexity: stream.complexity().clone(),
+                                interface_direction: stream.interface_direction(),
                                 stream_direction: stream.stream_direction(),
                             },
                         )

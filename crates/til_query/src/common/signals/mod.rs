@@ -1,6 +1,7 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
     numbers::NonNegative,
+    traits::Reversed,
 };
 
 use crate::common::transfer::element_type::ElementType;
@@ -11,6 +12,15 @@ use super::transfer::physical_transfer::{IndexMode, LastMode, PhysicalTransfer, 
 pub enum PhysicalStreamDirection {
     Source,
     Sink,
+}
+
+impl Reversed for PhysicalStreamDirection {
+    fn reversed(&self) -> Self {
+        match self {
+            PhysicalStreamDirection::Source => PhysicalStreamDirection::Sink,
+            PhysicalStreamDirection::Sink => PhysicalStreamDirection::Source,
+        }
+    }
 }
 
 /// Act on the signals of a physical stream, or assert that they have certain
