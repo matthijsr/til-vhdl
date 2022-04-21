@@ -71,6 +71,8 @@ impl PortObject {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhysicalStreamObject {
+    /// The name of the Stream, including its interface
+    name: PathName,
     /// Signals associated with this stream
     signal_list: SignalList<Id<ObjectDeclaration>>,
     /// Number of element lanes.
@@ -103,6 +105,18 @@ impl PhysicalStreamObject {
     /// Overall direction of the physical stream
     pub fn stream_direction(&self) -> StreamDirection {
         self.stream_direction
+    }
+}
+
+impl PathNameSelf for PhysicalStreamObject {
+    fn path_name(&self) -> &PathName {
+        &self.name
+    }
+}
+
+impl Identify for PhysicalStreamObject {
+    fn identifier(&self) -> String {
+        self.path_name().to_string()
     }
 }
 
@@ -310,8 +324,9 @@ impl VhdlStreamlet {
                     typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
                         ls.clone()
                             .try_map_fields(&mut try_signal_decl)?
-                            .try_map_streams(|stream| {
+                            .try_map_streams_named(|stream_name, stream| {
                                 Ok(PhysicalStreamObject {
+                                    name: stream_name.clone(),
                                     signal_list: stream
                                         .signal_list()
                                         .clone()
@@ -361,14 +376,16 @@ impl VhdlStreamlet {
                 PortObject {
                     interface_direction: port.physical_properties().direction(),
                     typed_stream: port.typed_stream().map_logical_stream(|ls| {
-                        ls.clone()
-                            .map(entity_port_obj, |stream| PhysicalStreamObject {
+                        ls.clone().map_fields(entity_port_obj).map_streams_named(
+                            |stream_name, stream| PhysicalStreamObject {
+                                name: stream_name.clone(),
                                 signal_list: stream.signal_list().clone().map(entity_port_obj),
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),
                                 complexity: stream.complexity().clone(),
                                 stream_direction: stream.stream_direction(),
-                            })
+                            },
+                        )
                     }),
                     is_local: true,
                 },
