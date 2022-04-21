@@ -15,6 +15,8 @@ use tydi_vhdl::{
     package::Package,
 };
 
+use crate::ir::streamlet::StreamletArchitecture;
+
 pub mod common;
 pub mod ir;
 
@@ -70,12 +72,16 @@ pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
 
     for (streamlet, component_name) in streamlet_component_names.into_iter() {
         arch_db.set_subject_component_name(Arc::new(component_name));
-        let streamlet_arch: String = streamlet.to_architecture(db, &mut arch_db)?;
+        let streamlet_arch = streamlet.to_architecture(db, &mut arch_db)?;
+        let arch_string = match streamlet_arch {
+            StreamletArchitecture::Imported(i) => i,
+            StreamletArchitecture::Generated(g) => g.declare(&arch_db)?,
+        };
 
         let mut arch = dir.clone();
         arch.push(streamlet.identifier());
         arch.set_extension("vhd");
-        std::fs::write(arch.as_path(), streamlet_arch)?;
+        std::fs::write(arch.as_path(), arch_string)?;
         debug!("Wrote {}.", arch.as_path().to_str().unwrap_or(""));
     }
 

@@ -4,8 +4,6 @@ use tydi_common::error::{Error, Result};
 
 use crate::{common::vhdl_name::VhdlName, component::Component, package::Package};
 
-use super::Architecture;
-
 use self::{interner::Interner, object_queries::ObjectQueries};
 
 use std::convert::TryInto;
@@ -34,9 +32,6 @@ pub trait Arch: Interner + ObjectQueries {
 
     #[salsa::input]
     fn subject_component_name(&self) -> Arc<VhdlName>;
-
-    #[salsa::input]
-    fn architecture(&self) -> Architecture;
 
     fn subject_component(&self) -> Result<Arc<Component>>;
 

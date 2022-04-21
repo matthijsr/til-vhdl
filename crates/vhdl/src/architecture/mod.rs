@@ -56,7 +56,7 @@ impl ArchitectureBody {
 }
 
 /// An architecture
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Architecture {
     /// Name of the architecture
     identifier: VhdlName,

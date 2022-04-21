@@ -28,7 +28,7 @@ use tydi_vhdl::{
     assignment::Assign,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
-    declaration::{Declare, ObjectDeclaration},
+    declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
     port::Port,
     statement::PortMapping,
 };
@@ -116,6 +116,21 @@ pub struct VhdlStreamlet {
     component: Option<Arc<Component>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StreamletArchitecture {
+    Imported(String),
+    Generated(Architecture),
+}
+
+impl DeclareWithIndent for StreamletArchitecture {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        match self {
+            StreamletArchitecture::Imported(i) => Ok(i.clone()),
+            StreamletArchitecture::Generated(g) => g.declare_with_indent(db, indent_style),
+        }
+    }
+}
+
 impl VhdlStreamlet {
     pub fn prefix(&self) -> &Option<VhdlName> {
         &self.prefix
@@ -186,7 +201,11 @@ impl VhdlStreamlet {
     // The architecture for Structural and None is stored in the arch_db.
     // Might make more sense/be safer if we could either parse Linked architectures to an object,
     // or have some enclosing type which returns either an architecture or a string.
-    pub fn to_architecture(&self, ir_db: &dyn Ir, arch_db: &mut dyn Arch) -> Result<String> {
+    pub fn to_architecture(
+        &self,
+        ir_db: &dyn Ir,
+        arch_db: &mut dyn Arch,
+    ) -> Result<StreamletArchitecture> {
         match self.implementation(ir_db) {
             Some(implementation) => match implementation.kind() {
                 ImplementationKind::Structural(structure) => {
@@ -197,10 +216,7 @@ impl VhdlStreamlet {
             None => {
                 let architecture = Architecture::from_database(arch_db, "Behavioral")?;
 
-                let result_string = architecture.declare(arch_db)?;
-                arch_db.set_architecture(architecture);
-
-                Ok(result_string)
+                Ok(StreamletArchitecture::Generated(architecture))
             }
         }
     }
@@ -210,7 +226,7 @@ impl VhdlStreamlet {
         link: &Link,
         implementation: &Implementation,
         arch_db: &mut dyn Arch,
-    ) -> Result<String> {
+    ) -> Result<StreamletArchitecture> {
         let mut file_pth = link.path().to_path_buf();
         file_pth.push(self.identifier());
         file_pth.set_extension("vhd");
@@ -218,7 +234,7 @@ impl VhdlStreamlet {
             if file_pth.is_file() {
                 let result_string = fs::read_to_string(file_pth.as_path())
                     .map_err(|err| Error::FileIOError(err.to_string()))?;
-                Ok(result_string)
+                Ok(StreamletArchitecture::Imported(result_string))
             } else {
                 Err(Error::FileIOError(format!(
                     "Path {} exists, but is not a file.",
@@ -238,11 +254,10 @@ impl VhdlStreamlet {
             let result_string = architecture.declare(arch_db)?;
             fs::write(file_pth.as_path(), &result_string)
                 .map_err(|err| Error::FileIOError(err.to_string()))?;
-            arch_db.set_architecture(architecture);
 
             // TODO for much later: Try to incorporate "fancy wrapper" work into this
 
-            Ok(result_string)
+            Ok(StreamletArchitecture::Generated(architecture))
         }
     }
 
@@ -325,7 +340,7 @@ impl VhdlStreamlet {
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
         implementation: &Implementation,
-    ) -> Result<String> {
+    ) -> Result<StreamletArchitecture> {
         structure.validate_connections(ir_db)?;
 
         let mut architecture = if implementation.path_name().len() > 0 {
@@ -497,9 +512,7 @@ impl VhdlStreamlet {
             }
         }
 
-        let result_string = architecture.declare(arch_db)?;
-        arch_db.set_architecture(architecture);
-        Ok(result_string)
+        Ok(StreamletArchitecture::Generated(architecture))
     }
 }
 
