@@ -98,8 +98,15 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
 
     /// A helper function, since handshakes often call for a
     /// `wait until rising_edge(clk)`
-    fn wait_until_rising_edge_clk(&self) -> Result<Wait> {
-        Wait::wait().until_relation(self.db, self.rising_edge_clk()?)
+    fn wait_until_rising_edge_clk(&mut self) -> Result<()> {
+        self.add_statement(Wait::wait().until_relation(self.db, self.rising_edge_clk()?)?)
+    }
+
+    fn wait_until_rising_edge_clk_and_high(&mut self, sig: Id<ObjectDeclaration>) -> Result<()> {
+        self.add_statement(Wait::wait().until_relation(
+            self.db,
+            self.rising_edge_clk()?.and(self.db, self.is_high(sig)?)?,
+        )?)
     }
 
     fn signal_list(&self) -> &SignalList<Id<ObjectDeclaration>> {
@@ -112,6 +119,14 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
 
     fn is_high(&self, sig: Id<ObjectDeclaration>) -> Result<Relation> {
         Ok(sig.r_eq(self.db, StdLogicValue::Logic(true))?.into())
+    }
+
+    fn set_high(&mut self, sig: Id<ObjectDeclaration>) -> Result<()> {
+        self.add_statement(sig.assign(self.db, &StdLogicValue::Logic(true))?)
+    }
+
+    fn set_low(&mut self, sig: Id<ObjectDeclaration>) -> Result<()> {
+        self.add_statement(sig.assign(self.db, &StdLogicValue::Logic(false))?)
     }
 }
 
@@ -210,10 +225,7 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
             PhysicalStreamDirection::Source => todo!(),
             PhysicalStreamDirection::Sink => {
                 if let Some(ready) = *self.signal_list().ready() {
-                    self.add_statement(Wait::wait().until_relation(
-                        self.db,
-                        self.is_high(ready)?.and(self.db, self.rising_edge_clk()?)?,
-                    )?)?;
+                    self.wait_until_rising_edge_clk_and_high(ready)?;
                 }
             }
         }
@@ -225,17 +237,10 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
         if let Some(valid) = *self.signal_list().valid() {
             match self.direction() {
                 PhysicalStreamDirection::Source => {
-                    self.add_statement(
-                        Wait::wait().until_relation(
-                            self.db,
-                            valid
-                                .r_eq(self.db, StdLogicValue::Logic(true))?
-                                .and(self.db, self.rising_edge_clk()?)?,
-                        )?,
-                    )?;
+                    self.wait_until_rising_edge_clk_and_high(valid)?;
                 }
                 PhysicalStreamDirection::Sink => {
-                    self.add_statement(valid.assign(self.db, &StdLogicValue::Logic(true))?)?;
+                    self.set_high(valid)?;
                 }
             }
         }
@@ -246,14 +251,14 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
         match self.direction() {
             PhysicalStreamDirection::Source => {
                 if let Some(ready) = *self.signal_list().ready() {
-                    self.add_statement(ready.assign(self.db, &StdLogicValue::Logic(false))?)?;
-                    self.add_statement(self.wait_until_rising_edge_clk()?)?;
+                    self.set_low(ready)?;
+                    self.wait_until_rising_edge_clk()?;
                 }
             }
             PhysicalStreamDirection::Sink => {
                 if let Some(valid) = *self.signal_list().valid() {
-                    self.add_statement(valid.assign(self.db, &StdLogicValue::Logic(false))?)?;
-                    self.add_statement(self.wait_until_rising_edge_clk()?)?;
+                    self.set_low(valid)?;
+                    self.wait_until_rising_edge_clk()?;
                 }
             }
         }
