@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use til_parser::query::into_query_storage;
 use til_query::{
-    common::signals::PhysicalSignals,
+    common::{signals::PhysicalSignals, transfer::physical_transfer::LastMode},
     ir::{connection::InterfaceReference, traits::GetSelf, Ir},
 };
 use til_vhdl::{
@@ -26,9 +26,10 @@ fn process_playground() -> Result<()> {
 namespace my::test::space {
     type stream1 = Stream(
         data: Bits(8),
-        dimensionality: 0,
+        dimensionality: 3,
+        throughput: 2,
         synchronicity: Sync,
-        complexity: 4,
+        complexity: 8,
         direction: Forward,
     );
 
@@ -59,6 +60,9 @@ multiline#
 
     let mut vhdl_streamlet = streamlet.canonical(&db, &mut arch_db, None)?;
     let component = vhdl_streamlet.to_component();
+
+    println!("{}", component.declare(&arch_db)?);
+
     arch_db.set_subject_component_name(Arc::new(component.vhdl_name().clone()));
     package.add_component(component);
     arch_db.set_default_package(Arc::new(package));
@@ -80,6 +84,7 @@ multiline#
         let stream_proc = PhysicalStreamProcess::from(stream_obj.clone());
         let mut enclosed = stream_proc.with_db(&arch_db);
         enclosed.handshake_start()?;
+        enclosed.auto_last(&LastMode::Lane(vec![None, Some(3..1)]), "last test")?;
         let proc = enclosed.get();
         println!("{}", proc.process().declare(&arch_db)?);
     }
