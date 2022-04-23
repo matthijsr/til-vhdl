@@ -17,11 +17,15 @@ use tydi_common::{
     name::{PathName, PathNameSelf},
     numbers::{usize_to_u32, NonNegative},
     traits::{Identify, Reversed},
+    util::log2_ceil,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::db::Database,
-    assignment::{bitvec::BitVecValue, Assign, ObjectSelection, StdLogicValue},
+    assignment::{
+        bitvec::{BitVecValue, WidthSource},
+        Assign, ObjectSelection, StdLogicValue, ValueAssignment,
+    },
     declaration::ObjectDeclaration,
     process::{
         statement::{
@@ -180,6 +184,43 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
                 .collect(),
         }
     }
+
+    fn fit_index(&self, idx: NonNegative) -> Result<ValueAssignment> {
+        let lanes = self.stream_object().element_lanes().get();
+        if lanes > 2 {
+            if idx >= lanes {
+                Err(Error::InvalidArgument(format!(
+                    "Cannot assign start/end-index {} to {}, as it only has {} element lanes.",
+                    idx,
+                    self.process.path_name(),
+                    lanes
+                )))
+            } else {
+                Ok(BitVecValue::Unsigned(
+                    idx,
+                    WidthSource::Constant(log2_ceil(self.stream_object().element_lanes().clone())),
+                )
+                .into())
+            }
+        } else if lanes > 1 {
+            if idx > 1 {
+                Err(Error::InvalidArgument(format!(
+                    "Cannot assign start/end-index {} to {}, as it only has two element lanes.",
+                    idx,
+                    self.process.path_name()
+                )))
+            } else if idx == 1 {
+                Ok(StdLogicValue::Logic(true).into())
+            } else {
+                Ok(StdLogicValue::Logic(false).into())
+            }
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "Cannot assign a start/end-index to {}, as it only has one element lane.",
+                self.process.path_name()
+            )))
+        }
+    }
 }
 
 impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
@@ -237,23 +278,47 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn act_stai(&mut self, stai: NonNegative) -> Result<()> {
-        todo!()
+        if let Some(stai_sig) = *self.signal_list().stai() {
+            self.add_statement(stai_sig.assign(self.db, self.fit_index(stai)?)?)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have an stai signal",
+                self.process.path_name()
+            )))
+        }
     }
 
     fn assert_stai(&mut self, stai: NonNegative, message: &str) -> Result<()> {
-        todo!()
+        if let Some(stai_sig) = *self.signal_list().stai() {
+            self.assert_eq_report(stai_sig, self.fit_index(stai)?, message)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have an stai signal",
+                self.process.path_name()
+            )))
+        }
     }
 
     fn act_endi(&mut self, endi: NonNegative) -> Result<()> {
         if let Some(endi_sig) = *self.signal_list().endi() {
-            self.add_statement(endi_sig.assign(self.db, BitVecValue::Unsigned(endi))?)
+            self.add_statement(endi_sig.assign(self.db, self.fit_index(endi)?)?)
         } else {
-            todo!()
+            Err(Error::InvalidArgument(format!(
+                "{} does not have an endi signal",
+                self.process.path_name()
+            )))
         }
     }
 
     fn assert_endi(&mut self, endi: NonNegative, message: &str) -> Result<()> {
-        todo!()
+        if let Some(endi_sig) = *self.signal_list().endi() {
+            self.assert_eq_report(endi_sig, self.fit_index(endi)?, message)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have an endi signal",
+                self.process.path_name()
+            )))
+        }
     }
 
     fn act_strb(&mut self, strb: &StrobeMode) -> Result<()> {

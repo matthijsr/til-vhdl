@@ -461,7 +461,7 @@ impl ListUsings for Relation {
                 ValueAssignment::BitVec(bitvec) => match bitvec {
                     BitVecValue::Others(_) => (),
                     BitVecValue::Full(_) => (),
-                    BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => {
+                    BitVecValue::Unsigned(_, _) | BitVecValue::Signed(_, _) => {
                         usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all")?;
                     }
                 },

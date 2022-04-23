@@ -30,7 +30,7 @@ namespace my::test::space {
     type stream1 = Stream(
         data: Bits(8),
         dimensionality: 3,
-        throughput: 2,
+        throughput: 3,
         synchronicity: Sync,
         complexity: 8,
         direction: Forward,
@@ -85,8 +85,10 @@ multiline#
         let stream_proc = PhysicalStreamProcess::from(stream_obj.clone());
         let mut enclosed = stream_proc.with_db(&arch_db);
         enclosed.handshake_start()?;
-        enclosed.auto_last(&LastMode::Lane(vec![None, Some(2..1)]), "last test")?;
-        enclosed.auto_strb(&StrobeMode::Lane(vec![false, true]), "strb test")?;
+        enclosed.auto_last(&LastMode::Lane(vec![None, None, Some(2..1)]), "last test")?;
+        enclosed.auto_strb(&StrobeMode::Lane(vec![false, true, true]), "strb test")?;
+        enclosed.auto_stai(0, "stai test")?;
+        enclosed.auto_endi(2, "endi test")?;
         let proc = enclosed.get();
         println!("{}", proc.process().declare(&arch_db)?);
     }

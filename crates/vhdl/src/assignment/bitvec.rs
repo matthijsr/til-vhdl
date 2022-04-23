@@ -2,7 +2,7 @@ use crate::{assignment::*, common::vhdl_name::VhdlName};
 use tydi_common::error::{Error, Result, TryResult};
 
 /// Quick way to get the minimum number of binary values required for an unsigned integer
-fn min_length_unsigned(value: u32) -> u32 {
+pub fn min_length_unsigned(value: u32) -> u32 {
     if value == 0 {
         1
     } else {
@@ -11,7 +11,7 @@ fn min_length_unsigned(value: u32) -> u32 {
 }
 
 /// Quick way to get the minimum number of binary values required for a signed integer
-fn min_length_signed(value: i32) -> u32 {
+pub fn min_length_signed(value: i32) -> u32 {
     if value == 0 {
         1
     } else if value < 0 {
@@ -19,6 +19,22 @@ fn min_length_signed(value: i32) -> u32 {
     } else {
         33 - value.leading_zeros()
     }
+}
+
+/// Source of the width for a conversion between a number and an std_logic_vector
+///
+/// The predetermined values will always succeed, but may produce invalid VHDL.
+///
+/// The Auto option is more likely to fail earlier, but only works when assigning
+/// a value to an object.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum WidthSource {
+    /// A specific object's length
+    Object(VhdlName),
+    /// A constant value
+    Constant(u32),
+    /// Determine automatically at declaration (this may fail)
+    Auto,
 }
 
 /// A struct for describing value assigned to a bit vector
@@ -35,13 +51,13 @@ pub enum BitVecValue {
     /// Result: std_logic_vector(to_unsigned([value], [name]'length))
     ///
     /// Or: std_logic_vector(to_unsigned([value], [range length]))
-    Unsigned(u32),
+    Unsigned(u32, WidthSource),
     /// A value is assigned from a signed integer
     ///
     /// Result: std_logic_vector(to_signed([value], [name]'length))
     ///
     /// Or: std_logic_vector(to_signed([value], [range length]))
-    Signed(i32),
+    Signed(i32, WidthSource),
 }
 
 impl BitVecValue {
@@ -68,7 +84,7 @@ impl BitVecValue {
                     )))
                 }
             }
-            BitVecValue::Unsigned(value) => {
+            BitVecValue::Unsigned(value, _) => {
                 if min_length_unsigned(*value) > width {
                     Err(Error::InvalidArgument(format!(
                         "Cannot assign unsigned integer {} to range with width {}",
@@ -78,7 +94,7 @@ impl BitVecValue {
                     Ok(())
                 }
             }
-            BitVecValue::Signed(value) => {
+            BitVecValue::Signed(value, _) => {
                 if min_length_signed(*value) > width {
                     Err(Error::InvalidArgument(format!(
                         "Cannot assign signed integer {} to range with width {}",
@@ -101,7 +117,27 @@ impl BitVecValue {
                 }
                 Ok(format!("\"{}\"", result))
             }
-            BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => Err(Error::InvalidTarget("Unable to declare bit vector value, signed and unsigned values require a width or object identifier.".to_string())),
+            BitVecValue::Unsigned(value, WidthSource::Object(name)) => Ok(format!(
+                "std_logic_vector(to_unsigned({}, {}'length))",
+                value,
+                name
+            )),
+            BitVecValue::Signed(value, WidthSource::Object(name)) => Ok(format!(
+                "std_logic_vector(to_signed({}, {}'length))",
+                value,
+                name
+            )),
+            BitVecValue::Unsigned(value, WidthSource::Constant(width)) => Ok(format!(
+                "std_logic_vector(to_unsigned({}, {}))",
+                value,
+                width
+            )),
+            BitVecValue::Signed(value, WidthSource::Constant(width)) => Ok(format!(
+                "std_logic_vector(to_signed({}, {}))",
+                value,
+                width
+            )),
+            BitVecValue::Unsigned(_, WidthSource::Auto) | BitVecValue::Signed(_, WidthSource::Auto) => Err(Error::InvalidTarget("Unable to declare bit vector value, signed and unsigned values require a width or object identifier.".to_string())),
         }
     }
 
@@ -109,12 +145,12 @@ impl BitVecValue {
     pub fn declare_for(&self, object_identifier: impl TryResult<VhdlName>) -> Result<String> {
         Ok(match self {
             BitVecValue::Others(_) | BitVecValue::Full(_) => self.declare().unwrap(),
-            BitVecValue::Unsigned(value) => format!(
+            BitVecValue::Unsigned(value, _) => format!(
                 "std_logic_vector(to_unsigned({}, {}'length))",
                 value,
                 object_identifier.try_result()?
             ),
-            BitVecValue::Signed(value) => format!(
+            BitVecValue::Signed(value, _) => format!(
                 "std_logic_vector(to_signed({}, {}'length))",
                 value,
                 object_identifier.try_result()?
@@ -126,7 +162,7 @@ impl BitVecValue {
     pub fn declare_for_range(&self, range: &RangeConstraint) -> Result<String> {
         match self {
             BitVecValue::Others(_) | BitVecValue::Full(_) => self.declare(),
-            BitVecValue::Unsigned(value) => match range.width() {
+            BitVecValue::Unsigned(value, _) => match range.width() {
                 Width::Scalar => Err(Error::InvalidTarget(
                     "Cannot assign an std_logic_vector(unsigned) to indexed std_logic".to_string(),
                 )),
@@ -138,7 +174,7 @@ impl BitVecValue {
                     ))
                 }
             },
-            BitVecValue::Signed(value) => match range.width() {
+            BitVecValue::Signed(value, _) => match range.width() {
                 Width::Scalar => Err(Error::InvalidTarget(
                     "Cannot assign an std_logic_vector(signed) to indexed std_logic".to_string(),
                 )),
@@ -160,12 +196,12 @@ impl BitVecValue {
                 BitVecValue::Full(o_f) => f.len() == o_f.len(),
                 _ => false,
             },
-            BitVecValue::Unsigned(_) => match other {
-                BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => true,
+            BitVecValue::Unsigned(_, _) => match other {
+                BitVecValue::Unsigned(_, _) | BitVecValue::Signed(_, _) => true,
                 _ => false,
             },
-            BitVecValue::Signed(_) => match other {
-                BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => true,
+            BitVecValue::Signed(_, _) => match other {
+                BitVecValue::Unsigned(_, _) | BitVecValue::Signed(_, _) => true,
                 _ => false,
             },
         }
