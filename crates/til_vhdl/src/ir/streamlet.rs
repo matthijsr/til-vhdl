@@ -356,7 +356,7 @@ impl VhdlStreamlet {
                     p.typ().clone(),
                     None,
                 )?;
-                wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), &signal))?;
+                wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), signal))?;
 
                 architecture.add_declaration(arch_db, signal)?;
 
@@ -390,8 +390,8 @@ impl VhdlStreamlet {
                 },
             )?;
         }
-        wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
-        wrap_portmap_err(port_mapping.map_port(arch_db, "rst", &rst))?;
+        wrap_portmap_err(port_mapping.map_port(arch_db, "clk", clk))?;
+        wrap_portmap_err(port_mapping.map_port(arch_db, "rst", rst))?;
         architecture.add_statement(arch_db, port_mapping.finish()?)?;
 
         Ok(signals)
@@ -489,7 +489,7 @@ impl VhdlStreamlet {
                     arch_db,
                     field.assign(
                         arch_db,
-                        source
+                        *source
                             .typed_stream()
                             .logical_stream()
                             .fields()
@@ -504,7 +504,7 @@ impl VhdlStreamlet {
              -> Result<()> {
                 match (left, right) {
                     (Some(left), Some(right)) => {
-                        architecture.add_statement(arch_db, left.assign(arch_db, right)?)
+                        architecture.add_statement(arch_db, left.assign(arch_db, *right)?)
                     }
                     (None, None) => Ok(()),
                     (Some(_), None) => Err(Error::ProjectError(format!(

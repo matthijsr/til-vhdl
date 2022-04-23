@@ -128,11 +128,11 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
     }
 
     fn set_high(&mut self, sig: Id<ObjectDeclaration>) -> Result<()> {
-        self.add_statement(sig.assign(self.db, &StdLogicValue::Logic(true))?)
+        self.add_statement(sig.assign(self.db, StdLogicValue::Logic(true))?)
     }
 
     fn set_low(&mut self, sig: Id<ObjectDeclaration>) -> Result<()> {
-        self.add_statement(sig.assign(self.db, &StdLogicValue::Logic(false))?)
+        self.add_statement(sig.assign(self.db, StdLogicValue::Logic(false))?)
     }
 
     fn assert_eq_report(
@@ -245,7 +245,11 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn act_endi(&mut self, endi: NonNegative) -> Result<()> {
-        todo!()
+        if let Some(endi_sig) = *self.signal_list().endi() {
+            self.add_statement(endi_sig.assign(self.db, BitVecValue::Unsigned(endi))?)
+        } else {
+            todo!()
+        }
     }
 
     fn assert_endi(&mut self, endi: NonNegative, message: &str) -> Result<()> {
@@ -262,10 +266,10 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
                 ))),
                 StrobeMode::Transfer(transfer_strb) => self.add_statement(strb_sig.assign(
                     self.db,
-                    &BitVecValue::Others(StdLogicValue::Logic(*transfer_strb)),
+                    BitVecValue::Others(StdLogicValue::Logic(*transfer_strb)),
                 )?),
                 StrobeMode::Lane(lane_vals) => self.add_statement(
-                    strb_sig.assign(self.db, &BitVecValue::from(lane_vals.iter().map(|x| *x)))?,
+                    strb_sig.assign(self.db, BitVecValue::from(lane_vals.iter().map(|x| *x)))?,
                 ),
             }
         } else {
@@ -313,7 +317,7 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
 
     fn act_last(&mut self, last: &LastMode) -> Result<()> {
         for (sig, val) in self.last_and_val(last)? {
-            self.add_statement(sig.assign(self.db, &val)?)?;
+            self.add_statement(sig.assign(self.db, val)?)?;
         }
         Ok(())
     }

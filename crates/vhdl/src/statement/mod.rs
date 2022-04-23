@@ -119,7 +119,7 @@ impl PortMapping {
         &mut self,
         db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        assignment: &(impl Into<Assignment> + Clone),
+        assignment: impl Into<Assignment>,
     ) -> Result<()> {
         let identifier = identifier.try_result()?;
         let port = self

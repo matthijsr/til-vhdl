@@ -33,11 +33,8 @@ pub mod flatten;
 pub mod impls;
 
 pub trait Assign {
-    fn assign(
-        &self,
-        db: &dyn Arch,
-        assignment: &(impl Into<Assignment> + Clone),
-    ) -> Result<AssignDeclaration>;
+    fn assign(&self, db: &dyn Arch, assignment: impl Into<Assignment>)
+        -> Result<AssignDeclaration>;
 }
 
 /// Describing the declaration of an assignment
@@ -132,7 +129,7 @@ impl AssignDeclaration {
         match self.assignment().kind() {
             AssignmentKind::Relation(Relation::Object(object)) => object.object().assign(
                 db,
-                &Assignment::from(
+                Assignment::from(
                     ObjectSelection::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
