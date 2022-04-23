@@ -156,7 +156,7 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
         let right = if let Some(transfer_last) = last {
             let mut assign_vec = vec![];
             for dim in (0..self.stream_object().dimensionality()).rev() {
-                if dim <= transfer_last.end && dim >= transfer_last.start {
+                if dim >= transfer_last.end && dim <= transfer_last.start {
                     assign_vec.push(StdLogicValue::Logic(true));
                 } else {
                     assign_vec.push(StdLogicValue::Logic(false));
