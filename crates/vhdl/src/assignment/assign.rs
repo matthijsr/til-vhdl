@@ -9,7 +9,7 @@ use crate::{
     declaration::{ObjectDeclaration, ObjectKind},
 };
 
-use super::{Assign, AssignDeclaration, Assignment};
+use super::{Assign, AssignDeclaration, Assignment, ObjectSelection};
 
 impl Assign for Id<ObjectDeclaration> {
     fn assign(
@@ -37,6 +37,17 @@ impl Assign for Id<ObjectDeclaration> {
                 ))),
             },
         }
+    }
+}
+
+impl Assign for ObjectSelection {
+    fn assign(
+        &self,
+        db: &dyn Arch,
+        assignment: &(impl Into<Assignment> + Clone),
+    ) -> Result<AssignDeclaration> {
+        let true_assignment: Assignment = assignment.clone().into().to_nested(self.from_field());
+        self.object().assign(db, &true_assignment)
     }
 }
 

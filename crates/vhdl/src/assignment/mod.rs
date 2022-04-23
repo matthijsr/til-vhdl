@@ -468,14 +468,15 @@ impl ObjectSelection {
 }
 
 pub trait SelectObject: Sized {
-    fn select(
+    fn select(self, field: impl TryResult<FieldSelection>) -> Result<ObjectSelection>;
+    fn select_nested(
         self,
         fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
     ) -> Result<ObjectSelection>;
 }
 
 impl<T: TryResult<ObjectSelection>> SelectObject for T {
-    fn select(
+    fn select_nested(
         self,
         fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
     ) -> Result<ObjectSelection> {
@@ -485,6 +486,12 @@ impl<T: TryResult<ObjectSelection>> SelectObject for T {
             fields_result.push(field.try_result()?);
         }
         selection.from_field.append(&mut fields_result);
+        Ok(selection)
+    }
+
+    fn select(self, field: impl TryResult<FieldSelection>) -> Result<ObjectSelection> {
+        let mut selection = self.try_result()?;
+        selection.from_field.push(field.try_result()?);
         Ok(selection)
     }
 }

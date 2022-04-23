@@ -522,7 +522,7 @@ mod tests {
         );
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
         let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
-            .select([0])?;
+            .select_nested([0])?;
         let rising_edge = Edge::rising_edge(db, obj1)?;
         let falling_edge = Edge::falling_edge(db, obj2)?;
         assert_eq!(

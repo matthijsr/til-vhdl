@@ -139,13 +139,13 @@ pub trait PhysicalSignals {
     }
 
     /// Drive the corresponding `last` bits for the given range(s) high or low.
-    fn act_last(&mut self, last: LastMode) -> Result<()>;
+    fn act_last(&mut self, last: &LastMode) -> Result<()>;
 
     /// Assert that the corresponding `last` bits for the given range(s) are
     /// driven high or low.
-    fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()>;
+    fn assert_last(&mut self, last: &LastMode, message: &str) -> Result<()>;
 
-    fn auto_last(&mut self, last: LastMode, message: &str) -> Result<()> {
+    fn auto_last(&mut self, last: &LastMode, message: &str) -> Result<()> {
         match self.direction() {
             PhysicalStreamDirection::Source => self.assert_last(last, message),
             PhysicalStreamDirection::Sink => self.act_last(last),
@@ -183,7 +183,8 @@ pub trait PhysicalSignals {
 
     /// Open the (sequence) transfer.
     ///
-    /// Wait for `valid` to be high, or drive `valid` high.
+    /// Wait for `valid` to be high and an active clock edge,
+    /// or drive `valid` high.
     fn handshake_start(&mut self) -> Result<()>;
 
     /// Close the (sequence) transfer.
@@ -257,7 +258,7 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
             self.auto_data_default(message)?;
         }
 
-        self.auto_last(transfer.last().clone(), message)?;
+        self.auto_last(transfer.last(), message)?;
 
         self.auto_strb(transfer.strobe().clone(), message)?;
 
@@ -434,12 +435,12 @@ mod tests {
             Ok(())
         }
 
-        fn act_last(&mut self, last: LastMode) -> Result<()> {
+        fn act_last(&mut self, last: &LastMode) -> Result<()> {
             self.result.push_str(&format!("act_last({})\n", last));
             Ok(())
         }
 
-        fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()> {
+        fn assert_last(&mut self, last: &LastMode, message: &str) -> Result<()> {
             self.result
                 .push_str(&format!("assert_last({}): {}\n", last, message));
             Ok(())

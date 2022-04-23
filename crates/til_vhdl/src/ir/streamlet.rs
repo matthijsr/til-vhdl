@@ -15,17 +15,21 @@ use til_query::{
 };
 use tydi_common::{
     cat,
-    error::{Error, Result, TryOptional},
+    error::{Error, Result, TryOptional, TryResult},
     map::InsertionOrderedMap,
     name::{Name, PathName, PathNameSelf},
-    numbers::{NonNegative, Positive},
+    numbers::{u32_to_i32, NonNegative, Positive},
     traits::{Document, Documents, Identify},
+    util::log2_ceil,
 };
 
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::{arch_storage::Arch, Architecture},
-    assignment::Assign,
+    architecture::{
+        arch_storage::{object_queries::object_key::ObjectKey, Arch},
+        Architecture,
+    },
+    assignment::{Assign, FieldSelection, ObjectSelection, SelectObject},
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
@@ -120,6 +124,37 @@ impl PhysicalStreamObject {
     /// The clock (domain) associated with this physical stream
     pub fn clock(&self) -> Id<ObjectDeclaration> {
         self.clock
+    }
+
+    /// Get the last signal and optionally a field selection
+    ///
+    /// Will throw an error if this stream does not have a last signal.
+    ///
+    /// Will throw an error if `lane` > 0 and this stream's Complexity < 8, or
+    /// this stream does not have more than one element lane.
+    pub fn get_last(&self, lane: NonNegative) -> Result<ObjectSelection> {
+        if let Some(last) = *self.signal_list().last() {
+            if self.complexity() >= &Complexity::new_major(8) && self.element_lanes().get() > 1 {
+                let lower = self.dimensionality() * lane;
+                let upper = self.dimensionality() * (lane + 1) - 1;
+                last.select(FieldSelection::downto(
+                    u32_to_i32(upper)?,
+                    u32_to_i32(lower)?,
+                )?)
+            } else if lane > 0 {
+                Err(Error::InvalidArgument(format!(
+                    "{} only has one last signal.",
+                    self.path_name()
+                )))
+            } else {
+                last.try_result()
+            }
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have a last signal.",
+                self.path_name()
+            )))
+        }
     }
 }
 

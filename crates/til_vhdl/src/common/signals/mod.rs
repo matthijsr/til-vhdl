@@ -15,16 +15,18 @@ use til_query::{
 use tydi_common::{
     error::{Result, TryResult},
     name::{PathName, PathNameSelf},
-    numbers::NonNegative,
+    numbers::{usize_to_u32, NonNegative},
     traits::{Identify, Reversed},
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::db::Database,
-    assignment::{Assign, StdLogicValue},
+    assignment::{bitvec::BitVecValue, Assign, FieldSelection, ObjectSelection, StdLogicValue},
     declaration::ObjectDeclaration,
     process::{
-        statement::{wait::Wait, SequentialStatement},
+        statement::{
+            condition::Condition, test_statement::TestStatement, wait::Wait, SequentialStatement,
+        },
         Process,
     },
     statement::relation::{edge::Edge, CombineRelation, CreateLogicalExpression, Relation},
@@ -91,6 +93,10 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
         self.process
     }
 
+    fn stream_object(&self) -> &PhysicalStreamObject {
+        self.process.stream_object()
+    }
+
     /// A helper function, since handshakes often call for a `rising_edge(clk)`
     fn rising_edge_clk(&self) -> Result<Edge> {
         Edge::rising_edge(self.db, self.process.stream_object().clock())
@@ -110,7 +116,7 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
     }
 
     fn signal_list(&self) -> &SignalList<Id<ObjectDeclaration>> {
-        self.process.stream_object().signal_list()
+        self.stream_object().signal_list()
     }
 
     fn add_statement(&mut self, statement: impl TryResult<SequentialStatement>) -> Result<()> {
@@ -127,6 +133,52 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
 
     fn set_low(&mut self, sig: Id<ObjectDeclaration>) -> Result<()> {
         self.add_statement(sig.assign(self.db, &StdLogicValue::Logic(false))?)
+    }
+
+    fn assert_eq_report(
+        &mut self,
+        left: impl TryResult<Relation>,
+        right: impl TryResult<Relation>,
+        message: &str,
+    ) -> Result<()> {
+        self.add_statement(TestStatement::assert_report(
+            Condition::relation(self.db, left.r_eq(self.db, right)?)?,
+            message,
+        ))
+    }
+
+    fn last_for_lane(
+        &self,
+        lane: u32,
+        last: &Option<std::ops::Range<u32>>,
+    ) -> Result<(ObjectSelection, BitVecValue)> {
+        let left = self.stream_object().get_last(lane)?;
+        let right = if let Some(transfer_last) = last {
+            let mut assign_vec = vec![];
+            for dim in (0..self.stream_object().dimensionality()).rev() {
+                if dim <= transfer_last.end && dim >= transfer_last.start {
+                    assign_vec.push(StdLogicValue::Logic(true));
+                } else {
+                    assign_vec.push(StdLogicValue::Logic(false));
+                }
+            }
+            BitVecValue::Full(assign_vec)
+        } else {
+            BitVecValue::Others(StdLogicValue::Logic(false))
+        };
+        Ok((left, right))
+    }
+
+    fn last_and_val(&self, last: &LastMode) -> Result<Vec<(ObjectSelection, BitVecValue)>> {
+        match last {
+            LastMode::None => Ok(vec![]),
+            LastMode::Transfer(transfer_last) => Ok(vec![self.last_for_lane(0, transfer_last)?]),
+            LastMode::Lane(last_lanes) => last_lanes
+                .iter()
+                .enumerate()
+                .map(|(lane, last)| Ok(self.last_for_lane(usize_to_u32(lane)?, last)?))
+                .collect(),
+        }
     }
 }
 
@@ -208,23 +260,49 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
         todo!()
     }
 
-    fn act_last(&mut self, last: LastMode) -> Result<()> {
-        todo!()
+    fn act_last(&mut self, last: &LastMode) -> Result<()> {
+        for (sig, val) in self.last_and_val(last)? {
+            self.add_statement(sig.assign(self.db, &val)?)?;
+        }
+        Ok(())
     }
 
-    fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()> {
-        todo!()
+    fn assert_last(&mut self, last: &LastMode, message: &str) -> Result<()> {
+        for (sig, val) in self.last_and_val(last)? {
+            self.assert_eq_report(sig, val, message)?
+        }
+        Ok(())
     }
 
     fn handshake(&mut self) -> Result<()> {
-        todo!()
+        if let (Some(ready), Some(valid)) =
+            (*self.signal_list().ready(), *self.signal_list().valid())
+        {
+            match self.direction() {
+                PhysicalStreamDirection::Source => {
+                    self.set_high(ready)?;
+                    self.wait_until_rising_edge_clk_and_high(valid)?;
+                }
+                PhysicalStreamDirection::Sink => {
+                    self.set_high(valid)?;
+                    self.wait_until_rising_edge_clk_and_high(ready)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn handshake_continue(&mut self, message: &str) -> Result<()> {
-        match self.direction() {
-            PhysicalStreamDirection::Source => todo!(),
-            PhysicalStreamDirection::Sink => {
-                if let Some(ready) = *self.signal_list().ready() {
+        if let Some(ready) = *self.signal_list().ready() {
+            match self.direction() {
+                PhysicalStreamDirection::Source => {
+                    if let Some(valid) = *self.signal_list().valid() {
+                        self.set_high(ready)?;
+                        self.wait_until_rising_edge_clk()?;
+                        self.assert_eq_report(valid, StdLogicValue::Logic(true), message)?;
+                    }
+                }
+                PhysicalStreamDirection::Sink => {
                     self.wait_until_rising_edge_clk_and_high(ready)?;
                 }
             }
