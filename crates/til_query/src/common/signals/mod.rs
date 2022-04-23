@@ -126,12 +126,12 @@ pub trait PhysicalSignals {
     }
 
     /// Drive the corresponding `strb` bit(s) high or low.
-    fn act_strb(&mut self, strb: StrobeMode) -> Result<()>;
+    fn act_strb(&mut self, strb: &StrobeMode) -> Result<()>;
 
     /// Assert that the corresponding `strb` bit(s) are driven high or low.
-    fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()>;
+    fn assert_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()>;
 
-    fn auto_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
+    fn auto_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()> {
         match self.direction() {
             PhysicalStreamDirection::Source => self.assert_strb(strb, message),
             PhysicalStreamDirection::Sink => self.act_strb(strb),
@@ -260,7 +260,7 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
 
         self.auto_last(transfer.last(), message)?;
 
-        self.auto_strb(transfer.strobe().clone(), message)?;
+        self.auto_strb(transfer.strobe(), message)?;
 
         if let IndexMode::Index(Some(stai)) = transfer.start_index() {
             self.auto_stai(*stai, message)?;
@@ -424,12 +424,12 @@ mod tests {
             Ok(())
         }
 
-        fn act_strb(&mut self, strb: StrobeMode) -> Result<()> {
+        fn act_strb(&mut self, strb: &StrobeMode) -> Result<()> {
             self.result.push_str(&format!("act_strb({})\n", strb));
             Ok(())
         }
 
-        fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
+        fn assert_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()> {
             self.result
                 .push_str(&format!("assert_strb({}): {}\n", strb, message));
             Ok(())

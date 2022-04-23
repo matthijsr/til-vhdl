@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use til_parser::query::into_query_storage;
 use til_query::{
-    common::{signals::PhysicalSignals, transfer::physical_transfer::LastMode},
+    common::{
+        signals::PhysicalSignals,
+        transfer::physical_transfer::{LastMode, StrobeMode},
+    },
     ir::{connection::InterfaceReference, traits::GetSelf, Ir},
 };
 use til_vhdl::{
@@ -83,6 +86,7 @@ multiline#
         let mut enclosed = stream_proc.with_db(&arch_db);
         enclosed.handshake_start()?;
         enclosed.auto_last(&LastMode::Lane(vec![None, Some(2..1)]), "last test")?;
+        enclosed.auto_strb(&StrobeMode::Lane(vec![false, true]), "strb test")?;
         let proc = enclosed.get();
         println!("{}", proc.process().declare(&arch_db)?);
     }

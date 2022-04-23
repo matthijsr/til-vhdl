@@ -172,6 +172,16 @@ impl BitVecValue {
     }
 }
 
+impl<T: IntoIterator<Item = bool>> From<T> for BitVecValue {
+    fn from(it: T) -> Self {
+        let mut res_vec = vec![];
+        for val in it {
+            res_vec.push(StdLogicValue::Logic(val));
+        }
+        BitVecValue::Full(res_vec)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

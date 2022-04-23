@@ -13,7 +13,7 @@ use til_query::{
     ir::physical_properties::InterfaceDirection,
 };
 use tydi_common::{
-    error::{Result, TryResult},
+    error::{Error, Result, TryResult},
     name::{PathName, PathNameSelf},
     numbers::{usize_to_u32, NonNegative},
     traits::{Identify, Reversed},
@@ -252,12 +252,63 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
         todo!()
     }
 
-    fn act_strb(&mut self, strb: StrobeMode) -> Result<()> {
-        todo!()
+    fn act_strb(&mut self, strb: &StrobeMode) -> Result<()> {
+        if let Some(strb_sig) = *self.signal_list().strb() {
+            match strb {
+                StrobeMode::None => Err(Error::InvalidArgument(format!(
+                    "Cannot assign {} to {}, as it does have a strb signal.",
+                    strb,
+                    self.process.path_name()
+                ))),
+                StrobeMode::Transfer(transfer_strb) => self.add_statement(strb_sig.assign(
+                    self.db,
+                    &BitVecValue::Others(StdLogicValue::Logic(*transfer_strb)),
+                )?),
+                StrobeMode::Lane(lane_vals) => self.add_statement(
+                    strb_sig.assign(self.db, &BitVecValue::from(lane_vals.iter().map(|x| *x)))?,
+                ),
+            }
+        } else {
+            match strb {
+                StrobeMode::None => Ok(()),
+                _ => Err(Error::InvalidArgument(format!(
+                    "Cannot assign {} to {}, as it does not have a strb signal.",
+                    strb,
+                    self.process.path_name()
+                ))),
+            }
+        }
     }
 
-    fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
-        todo!()
+    fn assert_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()> {
+        if let Some(strb_sig) = *self.signal_list().strb() {
+            match strb {
+                StrobeMode::None => Err(Error::InvalidArgument(format!(
+                    "Cannot assert {} for {}, as it does have a strb signal.",
+                    strb,
+                    self.process.path_name()
+                ))),
+                StrobeMode::Transfer(transfer_strb) => self.assert_eq_report(
+                    strb_sig,
+                    BitVecValue::Others(StdLogicValue::Logic(*transfer_strb)),
+                    message,
+                ),
+                StrobeMode::Lane(lane_vals) => self.assert_eq_report(
+                    strb_sig,
+                    BitVecValue::from(lane_vals.iter().map(|x| *x)),
+                    message,
+                ),
+            }
+        } else {
+            match strb {
+                StrobeMode::None => Ok(()),
+                _ => Err(Error::InvalidArgument(format!(
+                    "Cannot assert {} for {}, as it does not have a strb signal.",
+                    strb,
+                    self.process.path_name()
+                ))),
+            }
+        }
     }
 
     fn act_last(&mut self, last: &LastMode) -> Result<()> {
