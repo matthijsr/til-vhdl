@@ -20,15 +20,11 @@ use tydi_common::{
     name::{Name, PathName, PathNameSelf},
     numbers::{u32_to_i32, NonNegative, Positive},
     traits::{Document, Documents, Identify},
-    util::log2_ceil,
 };
 
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::{
-        arch_storage::{object_queries::object_key::ObjectKey, Arch},
-        Architecture,
-    },
+    architecture::{arch_storage::Arch, Architecture},
     assignment::{Assign, FieldSelection, ObjectSelection, SelectObject},
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,

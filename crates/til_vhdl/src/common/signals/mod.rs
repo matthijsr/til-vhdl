@@ -21,7 +21,7 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::db::Database,
-    assignment::{bitvec::BitVecValue, Assign, FieldSelection, ObjectSelection, StdLogicValue},
+    assignment::{bitvec::BitVecValue, Assign, ObjectSelection, StdLogicValue},
     declaration::ObjectDeclaration,
     process::{
         statement::{

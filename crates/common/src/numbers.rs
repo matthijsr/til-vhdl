@@ -1,7 +1,5 @@
 use std::{convert::TryFrom, ops::Mul};
 
-use crate::error::TryResult;
-
 use super::error::{Error, Result};
 
 // Types for positive and non-negative integers.
