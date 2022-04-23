@@ -73,6 +73,8 @@ impl PortObject {
 pub struct PhysicalStreamObject {
     /// The name of the Stream, including its interface
     name: PathName,
+    /// The clock (domain) associated with this physical stream
+    clock: Id<ObjectDeclaration>,
     /// Signals associated with this stream
     signal_list: SignalList<Id<ObjectDeclaration>>,
     /// Number of element lanes.
@@ -113,6 +115,11 @@ impl PhysicalStreamObject {
     #[must_use]
     pub fn interface_direction(&self) -> InterfaceDirection {
         self.interface_direction
+    }
+
+    /// The clock (domain) associated with this physical stream
+    pub fn clock(&self) -> Id<ObjectDeclaration> {
+        self.clock
     }
 }
 
@@ -335,6 +342,7 @@ impl VhdlStreamlet {
                             .try_map_streams_named(|stream_name, stream| {
                                 Ok(PhysicalStreamObject {
                                     name: stream_name.with_parent(name),
+                                    clock: clk,
                                     signal_list: stream
                                         .signal_list()
                                         .clone()
@@ -377,6 +385,9 @@ impl VhdlStreamlet {
             architecture.set_doc(doc);
         }
 
+        let clk = ObjectDeclaration::entity_clk(arch_db);
+        let rst = ObjectDeclaration::entity_rst(arch_db);
+
         let mut ports = InsertionOrderedMap::new();
         let entity_port_obj = |p| ObjectDeclaration::from_port(arch_db, &p, true);
         for (name, port) in self.interface() {
@@ -388,6 +399,7 @@ impl VhdlStreamlet {
                         ls.clone().map_fields(entity_port_obj).map_streams_named(
                             |stream_name, stream| PhysicalStreamObject {
                                 name: stream_name.with_parent(name),
+                                clock: clk,
                                 signal_list: stream.signal_list().clone().map(entity_port_obj),
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),
@@ -401,9 +413,6 @@ impl VhdlStreamlet {
                 },
             )?;
         }
-
-        let clk = ObjectDeclaration::entity_clk(arch_db);
-        let rst = ObjectDeclaration::entity_rst(arch_db);
 
         for (instance_name, streamlet) in structure.streamlet_instances(ir_db) {
             let mut streamlet = streamlet.canonical(ir_db, arch_db, self.prefix().clone())?;

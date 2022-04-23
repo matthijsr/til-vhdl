@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use til_query::{
     common::{
+        physical::signal_list::SignalList,
         signals::{PhysicalSignals, PhysicalStreamDirection},
         stream_direction::StreamDirection,
         transfer::{
@@ -12,16 +13,21 @@ use til_query::{
     ir::physical_properties::InterfaceDirection,
 };
 use tydi_common::{
-    error::Result,
+    error::{Result, TryResult},
     name::{PathName, PathNameSelf},
     numbers::NonNegative,
     traits::{Identify, Reversed},
 };
+use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::db::Database,
     assignment::{Assign, StdLogicValue},
-    process::{statement::wait::Wait, Process},
-    statement::relation::CombineRelation,
+    declaration::ObjectDeclaration,
+    process::{
+        statement::{wait::Wait, SequentialStatement},
+        Process,
+    },
+    statement::relation::{edge::Edge, CombineRelation, CreateLogicalExpression, Relation},
 };
 
 use crate::ir::streamlet::PhysicalStreamObject;
@@ -83,6 +89,29 @@ pub struct PhysicalStreamProcessWithDb<'a> {
 impl<'a> PhysicalStreamProcessWithDb<'a> {
     pub fn get(self) -> PhysicalStreamProcess {
         self.process
+    }
+
+    /// A helper function, since handshakes often call for a `rising_edge(clk)`
+    fn rising_edge_clk(&self) -> Result<Edge> {
+        Edge::rising_edge(self.db, self.process.stream_object().clock())
+    }
+
+    /// A helper function, since handshakes often call for a
+    /// `wait until rising_edge(clk)`
+    fn wait_until_rising_edge_clk(&self) -> Result<Wait> {
+        Wait::wait().until_relation(self.db, self.rising_edge_clk()?)
+    }
+
+    fn signal_list(&self) -> &SignalList<Id<ObjectDeclaration>> {
+        self.process.stream_object().signal_list()
+    }
+
+    fn add_statement(&mut self, statement: impl TryResult<SequentialStatement>) -> Result<()> {
+        self.process.process.add_statement(self.db, statement)
+    }
+
+    fn is_high(&self, sig: Id<ObjectDeclaration>) -> Result<Relation> {
+        Ok(sig.r_eq(self.db, StdLogicValue::Logic(true))?.into())
     }
 }
 
@@ -177,27 +206,36 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn handshake_continue(&mut self, message: &str) -> Result<()> {
-        todo!()
+        match self.direction() {
+            PhysicalStreamDirection::Source => todo!(),
+            PhysicalStreamDirection::Sink => {
+                if let Some(ready) = *self.signal_list().ready() {
+                    self.add_statement(Wait::wait().until_relation(
+                        self.db,
+                        self.is_high(ready)?.and(self.db, self.rising_edge_clk()?)?,
+                    )?)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn handshake_start(&mut self) -> Result<()> {
         // If there's no Valid signal, this stream is always valid
-        if let Some(valid) = *self.process.stream_object().signal_list().valid() {
+        if let Some(valid) = *self.signal_list().valid() {
             match self.direction() {
                 PhysicalStreamDirection::Source => {
-                    self.process.process.add_statement(
-                        self.db,
+                    self.add_statement(
                         Wait::wait().until_relation(
                             self.db,
-                            valid.r_eq(self.db, StdLogicValue::Logic(true))?,
+                            valid
+                                .r_eq(self.db, StdLogicValue::Logic(true))?
+                                .and(self.db, self.rising_edge_clk()?)?,
                         )?,
                     )?;
                 }
                 PhysicalStreamDirection::Sink => {
-                    self.process.process.add_statement(
-                        self.db,
-                        valid.assign(self.db, &StdLogicValue::Logic(true))?,
-                    )?;
+                    self.add_statement(valid.assign(self.db, &StdLogicValue::Logic(true))?)?;
                 }
             }
         }
@@ -205,6 +243,20 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn handshake_end(&mut self) -> Result<()> {
-        todo!()
+        match self.direction() {
+            PhysicalStreamDirection::Source => {
+                if let Some(ready) = *self.signal_list().ready() {
+                    self.add_statement(ready.assign(self.db, &StdLogicValue::Logic(false))?)?;
+                    self.add_statement(self.wait_until_rising_edge_clk()?)?;
+                }
+            }
+            PhysicalStreamDirection::Sink => {
+                if let Some(valid) = *self.signal_list().valid() {
+                    self.add_statement(valid.assign(self.db, &StdLogicValue::Logic(false))?)?;
+                    self.add_statement(self.wait_until_rising_edge_clk()?)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
