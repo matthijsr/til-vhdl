@@ -144,7 +144,11 @@ impl PhysicalStream {
     /// Returns the number of last bits in this physical stream. The number of
     /// last bits equals the dimensionality.
     pub fn last_bit_count(&self) -> NonNegative {
-        self.dimensionality
+        if self.complexity().major() >= 8 {
+            self.dimensionality * self.element_lanes().get()
+        } else {
+            self.dimensionality
+        }
     }
 
     /// Returns the number of `stai` (start index) bits in this physical

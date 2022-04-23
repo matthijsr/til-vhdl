@@ -134,7 +134,7 @@ impl PhysicalStreamObject {
     /// this stream does not have more than one element lane.
     pub fn get_last(&self, lane: NonNegative) -> Result<ObjectSelection> {
         if let Some(last) = *self.signal_list().last() {
-            if self.complexity() >= &Complexity::new_major(8) && self.element_lanes().get() > 1 {
+            if self.complexity().major() >= 8 && self.element_lanes().get() > 1 {
                 let lower = self.dimensionality() * lane;
                 let upper = self.dimensionality() * (lane + 1) - 1;
                 last.select(FieldSelection::downto(

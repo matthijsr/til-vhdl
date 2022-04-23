@@ -61,8 +61,6 @@ multiline#
     let mut vhdl_streamlet = streamlet.canonical(&db, &mut arch_db, None)?;
     let component = vhdl_streamlet.to_component();
 
-    println!("{}", component.declare(&arch_db)?);
-
     arch_db.set_subject_component_name(Arc::new(component.vhdl_name().clone()));
     package.add_component(component);
     arch_db.set_default_package(Arc::new(package));
@@ -84,7 +82,7 @@ multiline#
         let stream_proc = PhysicalStreamProcess::from(stream_obj.clone());
         let mut enclosed = stream_proc.with_db(&arch_db);
         enclosed.handshake_start()?;
-        enclosed.auto_last(&LastMode::Lane(vec![None, Some(3..1)]), "last test")?;
+        enclosed.auto_last(&LastMode::Lane(vec![None, Some(2..1)]), "last test")?;
         let proc = enclosed.get();
         println!("{}", proc.process().declare(&arch_db)?);
     }
