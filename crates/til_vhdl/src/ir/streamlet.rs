@@ -446,7 +446,8 @@ impl VhdlStreamlet {
                             .try_map_fields(&mut try_signal_decl)?
                             .try_map_streams_named(|stream_name, stream| {
                                 Ok(PhysicalStreamObject {
-                                    name: stream_name.with_parent(name),
+                                    name: PathName::try_new([instance_name.clone(), name.clone()])?
+                                        .with_children(stream_name.clone()),
                                     clock: clk,
                                     signal_list: stream
                                         .signal_list()
