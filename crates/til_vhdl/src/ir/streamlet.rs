@@ -83,6 +83,10 @@ pub struct PhysicalStreamObject {
     dimensionality: NonNegative,
     /// Complexity.
     complexity: Complexity,
+    /// The absolute size of a data element
+    data_element_size: NonNegative,
+    /// The absolute size of the user data
+    user_size: NonNegative,
     /// Direction of the parent interface.
     interface_direction: InterfaceDirection,
     /// Overall direction of the physical stream
@@ -115,6 +119,16 @@ impl PhysicalStreamObject {
     #[must_use]
     pub fn interface_direction(&self) -> InterfaceDirection {
         self.interface_direction
+    }
+
+    /// The absolute size of the user data
+    pub fn user_size(&self) -> NonNegative {
+        self.user_size
+    }
+
+    /// The absolute size of a data element
+    pub fn data_element_size(&self) -> NonNegative {
+        self.data_element_size
     }
 
     /// The clock (domain) associated with this physical stream
@@ -381,6 +395,8 @@ impl VhdlStreamlet {
                                     element_lanes: stream.element_lanes().clone(),
                                     dimensionality: stream.dimensionality(),
                                     complexity: stream.complexity().clone(),
+                                    data_element_size: stream.data_element_size(),
+                                    user_size: stream.user_size(),
                                     interface_direction: stream.interface_direction(),
                                     stream_direction: stream.stream_direction(),
                                 })
@@ -435,6 +451,8 @@ impl VhdlStreamlet {
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),
                                 complexity: stream.complexity().clone(),
+                                data_element_size: stream.data_element_size(),
+                                user_size: stream.user_size(),
                                 interface_direction: stream.interface_direction(),
                                 stream_direction: stream.stream_direction(),
                             },

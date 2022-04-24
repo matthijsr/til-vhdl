@@ -8,6 +8,7 @@ description = "A VHDL compiler for the Tydi Intermediate representation Language
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bitvec = "1.0.0"
 log = "0.4.14"
 salsa = "0.16.1"
 til-query = {path = "../til_query"}

@@ -130,15 +130,20 @@ impl PhysicalStream {
         &self.user
     }
 
-    /// Returns the bit count of the data (element) fields in this physical
-    /// stream. The bit count is equal to the combined bit count of all fields
-    /// multiplied by the number of lanes.
-    pub fn data_bit_count(&self) -> NonNegative {
+    /// Returns the bit count of a single data element in this physical
+    /// stream. The bit count is equal to the combined bit count of all fields.
+    pub fn data_element_bit_count(&self) -> NonNegative {
         self.element_fields
             .values()
             .map(|b| b.get())
             .sum::<NonNegative>()
-            * self.element_lanes.get()
+    }
+
+    /// Returns the bit count of the data (element) fields in this physical
+    /// stream. The bit count is equal to the combined bit count of all fields
+    /// multiplied by the number of lanes.
+    pub fn data_bit_count(&self) -> NonNegative {
+        self.data_element_bit_count() * self.element_lanes.get()
     }
 
     /// Returns the number of last bits in this physical stream. The number of

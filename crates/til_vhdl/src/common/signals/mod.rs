@@ -155,7 +155,7 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
         &self,
         lane: u32,
         last: &Option<std::ops::Range<u32>>,
-    ) -> Result<(ObjectSelection, BitVecValue)> {
+    ) -> Result<(ObjectSelection, ValueAssignment)> {
         let left = self.stream_object().get_last(lane)?;
         let right = if let Some(transfer_last) = last {
             let mut assign_vec = vec![];
@@ -166,14 +166,22 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
                     assign_vec.push(StdLogicValue::Logic(false));
                 }
             }
-            BitVecValue::Full(assign_vec)
+            if assign_vec.len() == 1 {
+                assign_vec[0].into()
+            } else {
+                BitVecValue::Full(assign_vec).into()
+            }
         } else {
-            BitVecValue::Others(StdLogicValue::Logic(false))
+            if self.stream_object().dimensionality() == 1 {
+                StdLogicValue::Logic(false).into()
+            } else {
+                BitVecValue::Others(StdLogicValue::Logic(false)).into()
+            }
         };
         Ok((left, right))
     }
 
-    fn last_and_val(&self, last: &LastMode) -> Result<Vec<(ObjectSelection, BitVecValue)>> {
+    fn last_and_val(&self, last: &LastMode) -> Result<Vec<(ObjectSelection, ValueAssignment)>> {
         match last {
             LastMode::None => Ok(vec![]),
             LastMode::Transfer(transfer_last) => Ok(vec![self.last_for_lane(0, transfer_last)?]),
@@ -221,6 +229,32 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
             )))
         }
     }
+
+    fn default_data(&self) -> Result<ValueAssignment> {
+        if self.stream_object().data_element_size() == 0 {
+            Err(Error::InvalidArgument(format!(
+                "Cannot produce a default data signal assignment for {}, as it has no data signal.",
+                self.process.path_name()
+            )))
+        } else if self.stream_object().user_size() == 1 {
+            Ok(StdLogicValue::Logic(false).into())
+        } else {
+            Ok(BitVecValue::Others(StdLogicValue::Logic(false)).into())
+        }
+    }
+
+    fn default_user(&self) -> Result<ValueAssignment> {
+        if self.stream_object().user_size() == 0 {
+            Err(Error::InvalidArgument(format!(
+                "Cannot produce a default user signal assignment for {}, as it has no user signal.",
+                self.process.path_name()
+            )))
+        } else if self.stream_object().user_size() == 1 {
+            Ok(StdLogicValue::Logic(false).into())
+        } else {
+            Ok(BitVecValue::Others(StdLogicValue::Logic(false)).into())
+        }
+    }
 }
 
 impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
@@ -262,19 +296,39 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn act_user_default(&mut self) -> Result<()> {
-        todo!()
+        if let Some(user_sig) = *self.signal_list().user() {
+            self.add_statement(user_sig.assign(self.db, self.default_user()?)?)?;
+        }
+        Ok(())
     }
 
     fn assert_user_default(&mut self, message: &str) -> Result<()> {
-        todo!()
+        if let Some(user_sig) = *self.signal_list().user() {
+            self.assert_eq_report(user_sig, self.default_user()?, message)?;
+        }
+        Ok(())
     }
 
     fn act_user(&mut self, user: &ElementType) -> Result<()> {
-        todo!()
+        if let Some(user_sig) = *self.signal_list().user() {
+            self.add_statement(user_sig.assign(self.db, ValueAssignment::from(user.flatten()))?)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have an user signal",
+                self.process.path_name()
+            )))
+        }
     }
 
     fn assert_user(&mut self, user: &ElementType, message: &str) -> Result<()> {
-        todo!()
+        if let Some(user_sig) = *self.signal_list().user() {
+            self.assert_eq_report(user_sig, ValueAssignment::from(user.flatten()), message)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have an user signal",
+                self.process.path_name()
+            )))
+        }
     }
 
     fn act_stai(&mut self, stai: NonNegative) -> Result<()> {

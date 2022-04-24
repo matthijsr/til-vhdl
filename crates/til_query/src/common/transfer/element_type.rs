@@ -12,6 +12,10 @@ use tydi_common::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ElementType {
     Null,
+    /// Note that Bits are stored in Lsb0 order (as indicated by the `BitVec`
+    /// type, which is `BitVec<T = usize, O = Lsb0>` by default). The vector
+    /// will be converted to the appropriate bit numbering for the target
+    /// language/signal.
     Bits(BitVec),
     Group(InsertionOrderedMap<Name, ElementType>),
     Union(UnionElement),

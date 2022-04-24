@@ -51,6 +51,8 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             self.element_lanes().clone(),
             self.dimensionality(),
             self.complexity().clone(),
+            self.data_element_bit_count(),
+            self.user_bit_count(),
             InterfaceDirection::In,
             self.stream_direction(),
         ))
@@ -66,6 +68,10 @@ pub struct VhdlPhysicalStream {
     dimensionality: NonNegative,
     /// Complexity.
     complexity: Complexity,
+    /// The absolute size of a data element
+    data_element_size: NonNegative,
+    /// The absolute size of the user data
+    user_size: NonNegative,
     /// Direction of the parent interface.
     interface_direction: InterfaceDirection,
     /// The (logical) Stream's direction.
@@ -81,6 +87,8 @@ impl VhdlPhysicalStream {
         element_lanes: Positive,
         dimensionality: NonNegative,
         complexity: Complexity,
+        data_element_size: NonNegative,
+        user_size: NonNegative,
         interface_direction: InterfaceDirection,
         stream_direction: StreamDirection,
     ) -> Self {
@@ -89,6 +97,8 @@ impl VhdlPhysicalStream {
             element_lanes,
             dimensionality,
             complexity,
+            data_element_size,
+            user_size,
             interface_direction,
             stream_direction,
         }
@@ -136,6 +146,16 @@ impl VhdlPhysicalStream {
     /// a quality of the type.
     pub fn stream_direction(&self) -> StreamDirection {
         self.stream_direction
+    }
+
+    /// The absolute size of the user data
+    pub fn user_size(&self) -> NonNegative {
+        self.user_size
+    }
+
+    /// The absolute size of a data element
+    pub fn data_element_size(&self) -> NonNegative {
+        self.data_element_size
     }
 }
 
@@ -247,6 +267,8 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             Positive::new(1).unwrap(),
             0,
             Complexity::new_major(1),
+            1,
+            0,
             InterfaceDirection::Out,
             StreamDirection::Forward,
         );
@@ -326,6 +348,8 @@ a_strb : out std_logic_vector(1 downto 0)"#,
             Positive::new(1).unwrap(),
             0,
             Complexity::new_major(1),
+            1,
+            0,
             InterfaceDirection::In,
             StreamDirection::Forward,
         );

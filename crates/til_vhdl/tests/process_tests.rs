@@ -1,10 +1,15 @@
 use std::sync::Arc;
 
+use bitvec::prelude::*;
+
 use til_parser::query::into_query_storage;
 use til_query::{
     common::{
         signals::PhysicalSignals,
-        transfer::physical_transfer::{LastMode, StrobeMode},
+        transfer::{
+            element_type::ElementType,
+            physical_transfer::{LastMode, StrobeMode},
+        },
     },
     ir::{connection::InterfaceReference, traits::GetSelf, Ir},
 };
@@ -34,6 +39,7 @@ namespace my::test::space {
         synchronicity: Sync,
         complexity: 8,
         direction: Forward,
+        user: Bits(2),
     );
 
     #\
@@ -89,6 +95,8 @@ multiline#
         enclosed.auto_strb(&StrobeMode::Lane(vec![false, true, true]), "strb test")?;
         enclosed.auto_stai(0, "stai test")?;
         enclosed.auto_endi(2, "endi test")?;
+        enclosed.auto_user_default("user default")?;
+        enclosed.auto_user(&ElementType::Bits(bitvec![0, 1]), "user 10")?;
         let proc = enclosed.get();
         println!("{}", proc.process().declare(&arch_db)?);
     }
