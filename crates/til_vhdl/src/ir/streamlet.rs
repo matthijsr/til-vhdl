@@ -5,6 +5,7 @@ use til_query::{
         logical::logical_stream::TypedStream,
         physical::{complexity::Complexity, signal_list::SignalList},
         stream_direction::StreamDirection,
+        transfer::element_type::ElementType,
     },
     ir::{
         connection::InterfaceReference,
@@ -18,14 +19,14 @@ use tydi_common::{
     error::{Error, Result, TryOptional, TryResult},
     map::InsertionOrderedMap,
     name::{Name, PathName, PathNameSelf},
-    numbers::{u32_to_i32, NonNegative, Positive},
+    numbers::{u32_to_i32, usize_to_u32, NonNegative, Positive},
     traits::{Document, Documents, Identify},
 };
 
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
-    assignment::{Assign, FieldSelection, ObjectSelection, SelectObject},
+    assignment::{Assign, FieldSelection, ObjectSelection, SelectObject, ValueAssignment},
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
@@ -147,10 +148,12 @@ impl PhysicalStreamObject {
             if self.complexity().major() >= 8 && self.element_lanes().get() > 1 {
                 let lower = self.dimensionality() * lane;
                 let upper = self.dimensionality() * (lane + 1) - 1;
-                last.select(FieldSelection::downto(
-                    u32_to_i32(upper)?,
-                    u32_to_i32(lower)?,
-                )?)
+                let selection = if lower == upper {
+                    FieldSelection::index(u32_to_i32(lower)?)
+                } else {
+                    FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+                };
+                last.select(selection)
             } else if lane > 0 {
                 Err(Error::InvalidArgument(format!(
                     "{} only has one last signal.",
@@ -162,6 +165,63 @@ impl PhysicalStreamObject {
         } else {
             Err(Error::InvalidArgument(format!(
                 "{} does not have a last signal.",
+                self.path_name()
+            )))
+        }
+    }
+
+    pub fn get_user_for(
+        &self,
+        user_data: &ElementType,
+    ) -> Result<(ObjectSelection, ValueAssignment)> {
+        if let Some(user) = *self.signal_list().user() {
+            let user_bits = user_data.flatten();
+            let user_size = usize_to_u32(user_bits.len())?;
+            let lower = 0;
+            let upper = user_size - 1;
+            let selection = if lower == upper {
+                FieldSelection::index(u32_to_i32(lower)?)
+            } else {
+                FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+            };
+            Ok((user.select(selection)?, ValueAssignment::from(user_bits)))
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have a user signal.",
+                self.path_name()
+            )))
+        }
+    }
+
+    pub fn get_element_lane_for(
+        &self,
+        lane: NonNegative,
+        element: &ElementType,
+    ) -> Result<(ObjectSelection, ValueAssignment)> {
+        if let Some(data) = *self.signal_list().data() {
+            let element_bits = element.flatten();
+            let element_size = usize_to_u32(element_bits.len())?;
+            let lanes = self.element_lanes().get();
+            if lanes - 1 < lane {
+                Err(Error::InvalidArgument(format!(
+                    "Cannot select lane {}, as {} only has {} element lanes.",
+                    lane,
+                    self.path_name(),
+                    lanes
+                )))
+            } else {
+                let lower = lanes * self.data_element_size();
+                let upper = lower + element_size - 1;
+                let selection = if lower == upper {
+                    FieldSelection::index(u32_to_i32(lower)?)
+                } else {
+                    FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+                };
+                Ok((data.select(selection)?, ValueAssignment::from(element_bits)))
+            }
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have a data signal.",
                 self.path_name()
             )))
         }

@@ -310,25 +310,13 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn act_user(&mut self, user: &ElementType) -> Result<()> {
-        if let Some(user_sig) = *self.signal_list().user() {
-            self.add_statement(user_sig.assign(self.db, ValueAssignment::from(user.flatten()))?)
-        } else {
-            Err(Error::InvalidArgument(format!(
-                "{} does not have an user signal",
-                self.process.path_name()
-            )))
-        }
+        let (user_sig, user_data) = self.stream_object().get_user_for(user)?;
+        self.add_statement(user_sig.assign(self.db, user_data)?)
     }
 
     fn assert_user(&mut self, user: &ElementType, message: &str) -> Result<()> {
-        if let Some(user_sig) = *self.signal_list().user() {
-            self.assert_eq_report(user_sig, ValueAssignment::from(user.flatten()), message)
-        } else {
-            Err(Error::InvalidArgument(format!(
-                "{} does not have an user signal",
-                self.process.path_name()
-            )))
-        }
+        let (user_sig, user_data) = self.stream_object().get_user_for(user)?;
+        self.assert_eq_report(user_sig, user_data, message)
     }
 
     fn act_stai(&mut self, stai: NonNegative) -> Result<()> {
