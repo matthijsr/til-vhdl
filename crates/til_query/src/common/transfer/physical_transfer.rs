@@ -228,7 +228,7 @@ impl PhysicalTransfer {
         max_user_size: NonNegative,
     ) -> Self {
         let last_mode = if dimensionality >= 1 {
-            if complexity >= Complexity::new_major(8) {
+            if complexity.major() >= 8 {
                 LastMode::Lane(vec![
                     Some(0..(dimensionality - 1));
                     element_lanes.get().try_into().unwrap()
@@ -242,21 +242,19 @@ impl PhysicalTransfer {
 
         let element_lanes_gt_1 = element_lanes > Positive::new(1).unwrap();
 
-        let start_index = if element_lanes_gt_1 && complexity >= Complexity::new_major(6) {
+        let start_index = if element_lanes_gt_1 && complexity.major() >= 6 {
             IndexMode::Index(Some(0))
         } else {
             IndexMode::Unsupported
         };
 
-        let end_index = if element_lanes_gt_1
-            && (dimensionality >= 1 || complexity >= Complexity::new_major(5))
-        {
+        let end_index = if element_lanes_gt_1 && (dimensionality >= 1 || complexity.major() >= 5) {
             IndexMode::Index(Some(element_lanes.get() - 1))
         } else {
             IndexMode::Unsupported
         };
 
-        let strobe = if complexity >= Complexity::new_major(7) {
+        let strobe = if complexity.major() >= 7 {
             StrobeMode::Lane(vec![true; element_lanes.get().try_into().unwrap()])
         } else if dimensionality >= 1 {
             StrobeMode::Transfer(true)
@@ -264,8 +262,8 @@ impl PhysicalTransfer {
             StrobeMode::None
         };
 
-        let holds_valid = if complexity < Complexity::new_major(3) {
-            if complexity < Complexity::new_major(2) {
+        let holds_valid = if complexity.major() < 3 {
+            if complexity.major() < 2 {
                 HoldValidRule::WholeSequence(false)
             } else {
                 HoldValidRule::InnerSequence(false)
@@ -362,7 +360,7 @@ impl PhysicalTransfer {
                     )));
                 }
 
-                let comp_lt_4 = self.complexity() < &Complexity::new_major(4);
+                let comp_lt_4 = self.complexity().major() < 4;
 
                 let mut transfer_last: Result<Option<Range<NonNegative>>> = Ok(None);
 

@@ -5,6 +5,7 @@ use til_query::{
         logical::logical_stream::TypedStream,
         physical::{complexity::Complexity, signal_list::SignalList},
         stream_direction::StreamDirection,
+        transfer::element_type::ElementType,
     },
     ir::{
         connection::InterfaceReference,
@@ -15,20 +16,20 @@ use til_query::{
 };
 use tydi_common::{
     cat,
-    error::{Error, Result, TryOptional},
+    error::{Error, Result, TryOptional, TryResult},
     map::InsertionOrderedMap,
     name::{Name, PathName, PathNameSelf},
-    numbers::{NonNegative, Positive},
+    numbers::{u32_to_i32, usize_to_u32, NonNegative, Positive},
     traits::{Document, Documents, Identify},
 };
 
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::{arch_storage::Arch, Architecture},
-    assignment::Assign,
+    assignment::{Assign, FieldSelection, ObjectSelection, SelectObject, ValueAssignment},
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
-    declaration::{Declare, ObjectDeclaration},
+    declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
     port::Port,
     statement::PortMapping,
 };
@@ -71,6 +72,10 @@ impl PortObject {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhysicalStreamObject {
+    /// The name of the Stream, including its interface
+    name: PathName,
+    /// The clock (domain) associated with this physical stream
+    clock: Id<ObjectDeclaration>,
     /// Signals associated with this stream
     signal_list: SignalList<Id<ObjectDeclaration>>,
     /// Number of element lanes.
@@ -79,6 +84,12 @@ pub struct PhysicalStreamObject {
     dimensionality: NonNegative,
     /// Complexity.
     complexity: Complexity,
+    /// The absolute size of a data element
+    data_element_size: NonNegative,
+    /// The absolute size of the user data
+    user_size: NonNegative,
+    /// Direction of the parent interface.
+    interface_direction: InterfaceDirection,
     /// Overall direction of the physical stream
     stream_direction: StreamDirection,
 }
@@ -104,6 +115,129 @@ impl PhysicalStreamObject {
     pub fn stream_direction(&self) -> StreamDirection {
         self.stream_direction
     }
+
+    /// Get the physical stream object's interface direction.
+    #[must_use]
+    pub fn interface_direction(&self) -> InterfaceDirection {
+        self.interface_direction
+    }
+
+    /// The absolute size of the user data
+    pub fn user_size(&self) -> NonNegative {
+        self.user_size
+    }
+
+    /// The absolute size of a data element
+    pub fn data_element_size(&self) -> NonNegative {
+        self.data_element_size
+    }
+
+    /// The clock (domain) associated with this physical stream
+    pub fn clock(&self) -> Id<ObjectDeclaration> {
+        self.clock
+    }
+
+    /// Get the last signal and optionally a field selection
+    ///
+    /// Will throw an error if this stream does not have a last signal.
+    ///
+    /// Will throw an error if `lane` > 0 and this stream's Complexity < 8, or
+    /// this stream does not have more than one element lane.
+    pub fn get_last(&self, lane: NonNegative) -> Result<ObjectSelection> {
+        if let Some(last) = *self.signal_list().last() {
+            if self.complexity().major() >= 8 && self.element_lanes().get() > 1 {
+                let lower = self.dimensionality() * lane;
+                let upper = self.dimensionality() * (lane + 1) - 1;
+                let selection = if lower == upper {
+                    FieldSelection::index(u32_to_i32(lower)?)
+                } else {
+                    FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+                };
+                last.select(selection)
+            } else if lane > 0 {
+                Err(Error::InvalidArgument(format!(
+                    "{} only has one last signal.",
+                    self.path_name()
+                )))
+            } else {
+                last.try_result()
+            }
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have a last signal.",
+                self.path_name()
+            )))
+        }
+    }
+
+    pub fn get_user_for(
+        &self,
+        user_data: &ElementType,
+    ) -> Result<(ObjectSelection, ValueAssignment)> {
+        if let Some(user) = *self.signal_list().user() {
+            let user_bits = user_data.flatten();
+            let user_size = usize_to_u32(user_bits.len())?;
+            let lower = 0;
+            let upper = user_size - 1;
+            let selection = if lower == upper {
+                FieldSelection::index(u32_to_i32(lower)?)
+            } else {
+                FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+            };
+            Ok((user.select(selection)?, ValueAssignment::from(user_bits)))
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have a user signal.",
+                self.path_name()
+            )))
+        }
+    }
+
+    pub fn get_element_lane_for(
+        &self,
+        lane: NonNegative,
+        element: &ElementType,
+    ) -> Result<(ObjectSelection, ValueAssignment)> {
+        if let Some(data) = *self.signal_list().data() {
+            let element_bits = element.flatten();
+            let element_size = usize_to_u32(element_bits.len())?;
+            let lanes = self.element_lanes().get();
+            if lanes - 1 < lane {
+                Err(Error::InvalidArgument(format!(
+                    "Cannot select lane {}, as {} only has {} element lanes.",
+                    lane,
+                    self.path_name(),
+                    lanes
+                )))
+            } else {
+                let lower = lane * self.data_element_size();
+                let upper = lower + element_size - 1;
+                let selection = if lower == upper {
+                    FieldSelection::index(u32_to_i32(lower)?)
+                } else {
+                    FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+                };
+                Ok((data.select(selection)?, ValueAssignment::from(element_bits)))
+            }
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "{} does not have a data signal.",
+                self.path_name()
+            )))
+        }
+    }
+}
+
+impl PathNameSelf for PhysicalStreamObject {
+    fn path_name(&self) -> &PathName {
+        &self.name
+    }
+}
+
+impl Identify for PhysicalStreamObject {
+    fn identifier(&self) -> String {
+        self.path_name().to_string()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -114,6 +248,21 @@ pub struct VhdlStreamlet {
     interface: InsertionOrderedMap<Name, VhdlInterface>,
     doc: Option<String>,
     component: Option<Arc<Component>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StreamletArchitecture {
+    Imported(String),
+    Generated(Architecture),
+}
+
+impl DeclareWithIndent for StreamletArchitecture {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        match self {
+            StreamletArchitecture::Imported(i) => Ok(i.clone()),
+            StreamletArchitecture::Generated(g) => g.declare_with_indent(db, indent_style),
+        }
+    }
 }
 
 impl VhdlStreamlet {
@@ -186,7 +335,11 @@ impl VhdlStreamlet {
     // The architecture for Structural and None is stored in the arch_db.
     // Might make more sense/be safer if we could either parse Linked architectures to an object,
     // or have some enclosing type which returns either an architecture or a string.
-    pub fn to_architecture(&self, ir_db: &dyn Ir, arch_db: &mut dyn Arch) -> Result<String> {
+    pub fn to_architecture(
+        &self,
+        ir_db: &dyn Ir,
+        arch_db: &mut dyn Arch,
+    ) -> Result<StreamletArchitecture> {
         match self.implementation(ir_db) {
             Some(implementation) => match implementation.kind() {
                 ImplementationKind::Structural(structure) => {
@@ -197,10 +350,7 @@ impl VhdlStreamlet {
             None => {
                 let architecture = Architecture::from_database(arch_db, "Behavioral")?;
 
-                let result_string = architecture.declare(arch_db)?;
-                arch_db.set_architecture(architecture);
-
-                Ok(result_string)
+                Ok(StreamletArchitecture::Generated(architecture))
             }
         }
     }
@@ -210,7 +360,7 @@ impl VhdlStreamlet {
         link: &Link,
         implementation: &Implementation,
         arch_db: &mut dyn Arch,
-    ) -> Result<String> {
+    ) -> Result<StreamletArchitecture> {
         let mut file_pth = link.path().to_path_buf();
         file_pth.push(self.identifier());
         file_pth.set_extension("vhd");
@@ -218,7 +368,7 @@ impl VhdlStreamlet {
             if file_pth.is_file() {
                 let result_string = fs::read_to_string(file_pth.as_path())
                     .map_err(|err| Error::FileIOError(err.to_string()))?;
-                Ok(result_string)
+                Ok(StreamletArchitecture::Imported(result_string))
             } else {
                 Err(Error::FileIOError(format!(
                     "Path {} exists, but is not a file.",
@@ -238,11 +388,10 @@ impl VhdlStreamlet {
             let result_string = architecture.declare(arch_db)?;
             fs::write(file_pth.as_path(), &result_string)
                 .map_err(|err| Error::FileIOError(err.to_string()))?;
-            arch_db.set_architecture(architecture);
 
             // TODO for much later: Try to incorporate "fancy wrapper" work into this
 
-            Ok(result_string)
+            Ok(StreamletArchitecture::Generated(architecture))
         }
     }
 
@@ -281,7 +430,7 @@ impl VhdlStreamlet {
                     p.typ().clone(),
                     None,
                 )?;
-                wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), &signal))?;
+                wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), signal))?;
 
                 architecture.add_declaration(arch_db, signal)?;
 
@@ -295,8 +444,11 @@ impl VhdlStreamlet {
                     typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
                         ls.clone()
                             .try_map_fields(&mut try_signal_decl)?
-                            .try_map_streams(|stream| {
+                            .try_map_streams_named(|stream_name, stream| {
                                 Ok(PhysicalStreamObject {
+                                    name: PathName::try_new([instance_name.clone(), name.clone()])?
+                                        .with_children(stream_name.clone()),
+                                    clock: clk,
                                     signal_list: stream
                                         .signal_list()
                                         .clone()
@@ -304,6 +456,9 @@ impl VhdlStreamlet {
                                     element_lanes: stream.element_lanes().clone(),
                                     dimensionality: stream.dimensionality(),
                                     complexity: stream.complexity().clone(),
+                                    data_element_size: stream.data_element_size(),
+                                    user_size: stream.user_size(),
+                                    interface_direction: stream.interface_direction(),
                                     stream_direction: stream.stream_direction(),
                                 })
                             })
@@ -312,8 +467,8 @@ impl VhdlStreamlet {
                 },
             )?;
         }
-        wrap_portmap_err(port_mapping.map_port(arch_db, "clk", &clk))?;
-        wrap_portmap_err(port_mapping.map_port(arch_db, "rst", &rst))?;
+        wrap_portmap_err(port_mapping.map_port(arch_db, "clk", clk))?;
+        wrap_portmap_err(port_mapping.map_port(arch_db, "rst", rst))?;
         architecture.add_statement(arch_db, port_mapping.finish()?)?;
 
         Ok(signals)
@@ -325,7 +480,7 @@ impl VhdlStreamlet {
         ir_db: &dyn Ir,
         arch_db: &mut dyn Arch,
         implementation: &Implementation,
-    ) -> Result<String> {
+    ) -> Result<StreamletArchitecture> {
         structure.validate_connections(ir_db)?;
 
         let mut architecture = if implementation.path_name().len() > 0 {
@@ -338,6 +493,9 @@ impl VhdlStreamlet {
             architecture.set_doc(doc);
         }
 
+        let clk = ObjectDeclaration::entity_clk(arch_db);
+        let rst = ObjectDeclaration::entity_rst(arch_db);
+
         let mut ports = InsertionOrderedMap::new();
         let entity_port_obj = |p| ObjectDeclaration::from_port(arch_db, &p, true);
         for (name, port) in self.interface() {
@@ -346,22 +504,25 @@ impl VhdlStreamlet {
                 PortObject {
                     interface_direction: port.physical_properties().direction(),
                     typed_stream: port.typed_stream().map_logical_stream(|ls| {
-                        ls.clone()
-                            .map(entity_port_obj, |stream| PhysicalStreamObject {
+                        ls.clone().map_fields(entity_port_obj).map_streams_named(
+                            |stream_name, stream| PhysicalStreamObject {
+                                name: stream_name.with_parent(name),
+                                clock: clk,
                                 signal_list: stream.signal_list().clone().map(entity_port_obj),
                                 element_lanes: stream.element_lanes().clone(),
                                 dimensionality: stream.dimensionality(),
                                 complexity: stream.complexity().clone(),
+                                data_element_size: stream.data_element_size(),
+                                user_size: stream.user_size(),
+                                interface_direction: stream.interface_direction(),
                                 stream_direction: stream.stream_direction(),
-                            })
+                            },
+                        )
                     }),
                     is_local: true,
                 },
             )?;
         }
-
-        let clk = ObjectDeclaration::entity_clk(arch_db);
-        let rst = ObjectDeclaration::entity_rst(arch_db);
 
         for (instance_name, streamlet) in structure.streamlet_instances(ir_db) {
             let mut streamlet = streamlet.canonical(ir_db, arch_db, self.prefix().clone())?;
@@ -407,7 +568,7 @@ impl VhdlStreamlet {
                     arch_db,
                     field.assign(
                         arch_db,
-                        source
+                        *source
                             .typed_stream()
                             .logical_stream()
                             .fields()
@@ -422,7 +583,7 @@ impl VhdlStreamlet {
              -> Result<()> {
                 match (left, right) {
                     (Some(left), Some(right)) => {
-                        architecture.add_statement(arch_db, left.assign(arch_db, right)?)
+                        architecture.add_statement(arch_db, left.assign(arch_db, *right)?)
                     }
                     (None, None) => Ok(()),
                     (Some(_), None) => Err(Error::ProjectError(format!(
@@ -497,9 +658,7 @@ impl VhdlStreamlet {
             }
         }
 
-        let result_string = architecture.declare(arch_db)?;
-        arch_db.set_architecture(architecture);
-        Ok(result_string)
+        Ok(StreamletArchitecture::Generated(architecture))
     }
 }
 

@@ -1,6 +1,7 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
     numbers::NonNegative,
+    traits::Reversed,
 };
 
 use crate::common::transfer::element_type::ElementType;
@@ -11,6 +12,15 @@ use super::transfer::physical_transfer::{IndexMode, LastMode, PhysicalTransfer, 
 pub enum PhysicalStreamDirection {
     Source,
     Sink,
+}
+
+impl Reversed for PhysicalStreamDirection {
+    fn reversed(&self) -> Self {
+        match self {
+            PhysicalStreamDirection::Source => PhysicalStreamDirection::Sink,
+            PhysicalStreamDirection::Sink => PhysicalStreamDirection::Source,
+        }
+    }
 }
 
 /// Act on the signals of a physical stream, or assert that they have certain
@@ -116,12 +126,12 @@ pub trait PhysicalSignals {
     }
 
     /// Drive the corresponding `strb` bit(s) high or low.
-    fn act_strb(&mut self, strb: StrobeMode) -> Result<()>;
+    fn act_strb(&mut self, strb: &StrobeMode) -> Result<()>;
 
     /// Assert that the corresponding `strb` bit(s) are driven high or low.
-    fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()>;
+    fn assert_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()>;
 
-    fn auto_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
+    fn auto_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()> {
         match self.direction() {
             PhysicalStreamDirection::Source => self.assert_strb(strb, message),
             PhysicalStreamDirection::Sink => self.act_strb(strb),
@@ -129,13 +139,13 @@ pub trait PhysicalSignals {
     }
 
     /// Drive the corresponding `last` bits for the given range(s) high or low.
-    fn act_last(&mut self, last: LastMode) -> Result<()>;
+    fn act_last(&mut self, last: &LastMode) -> Result<()>;
 
     /// Assert that the corresponding `last` bits for the given range(s) are
     /// driven high or low.
-    fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()>;
+    fn assert_last(&mut self, last: &LastMode, message: &str) -> Result<()>;
 
-    fn auto_last(&mut self, last: LastMode, message: &str) -> Result<()> {
+    fn auto_last(&mut self, last: &LastMode, message: &str) -> Result<()> {
         match self.direction() {
             PhysicalStreamDirection::Source => self.assert_last(last, message),
             PhysicalStreamDirection::Sink => self.act_last(last),
@@ -173,7 +183,8 @@ pub trait PhysicalSignals {
 
     /// Open the (sequence) transfer.
     ///
-    /// Wait for `valid` to be high, or drive `valid` high.
+    /// Wait for `valid` to be high and an active clock edge,
+    /// or drive `valid` high.
     fn handshake_start(&mut self) -> Result<()>;
 
     /// Close the (sequence) transfer.
@@ -247,9 +258,9 @@ impl<T: PhysicalSignals> PhysicalTransfers for T {
             self.auto_data_default(message)?;
         }
 
-        self.auto_last(transfer.last().clone(), message)?;
+        self.auto_last(transfer.last(), message)?;
 
-        self.auto_strb(transfer.strobe().clone(), message)?;
+        self.auto_strb(transfer.strobe(), message)?;
 
         if let IndexMode::Index(Some(stai)) = transfer.start_index() {
             self.auto_stai(*stai, message)?;
@@ -413,23 +424,23 @@ mod tests {
             Ok(())
         }
 
-        fn act_strb(&mut self, strb: StrobeMode) -> Result<()> {
+        fn act_strb(&mut self, strb: &StrobeMode) -> Result<()> {
             self.result.push_str(&format!("act_strb({})\n", strb));
             Ok(())
         }
 
-        fn assert_strb(&mut self, strb: StrobeMode, message: &str) -> Result<()> {
+        fn assert_strb(&mut self, strb: &StrobeMode, message: &str) -> Result<()> {
             self.result
                 .push_str(&format!("assert_strb({}): {}\n", strb, message));
             Ok(())
         }
 
-        fn act_last(&mut self, last: LastMode) -> Result<()> {
+        fn act_last(&mut self, last: &LastMode) -> Result<()> {
             self.result.push_str(&format!("act_last({})\n", last));
             Ok(())
         }
 
-        fn assert_last(&mut self, last: LastMode, message: &str) -> Result<()> {
+        fn assert_last(&mut self, last: &LastMode, message: &str) -> Result<()> {
             self.result
                 .push_str(&format!("assert_last({}): {}\n", last, message));
             Ok(())

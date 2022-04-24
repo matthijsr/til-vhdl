@@ -9,15 +9,15 @@ use crate::{
     declaration::{ObjectDeclaration, ObjectKind},
 };
 
-use super::{Assign, AssignDeclaration, Assignment};
+use super::{Assign, AssignDeclaration, Assignment, ObjectSelection};
 
 impl Assign for Id<ObjectDeclaration> {
     fn assign(
         &self,
         db: &dyn Arch,
-        assignment: &(impl Into<Assignment> + Clone),
+        assignment: impl Into<Assignment>,
     ) -> Result<AssignDeclaration> {
-        let true_assignment = assignment.clone().into();
+        let true_assignment = assignment.into();
         let self_obj = db.lookup_intern_object_declaration(*self);
         match self_obj.kind() {
             ObjectKind::ComponentPort(_) if !true_assignment.to_field().is_empty() => {
@@ -37,6 +37,17 @@ impl Assign for Id<ObjectDeclaration> {
                 ))),
             },
         }
+    }
+}
+
+impl Assign for ObjectSelection {
+    fn assign(
+        &self,
+        db: &dyn Arch,
+        assignment: impl Into<Assignment>,
+    ) -> Result<AssignDeclaration> {
+        let true_assignment: Assignment = assignment.into().to_nested(self.from_field());
+        self.object().assign(db, true_assignment)
     }
 }
 

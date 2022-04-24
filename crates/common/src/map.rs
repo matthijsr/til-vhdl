@@ -157,6 +157,28 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         InsertionOrderedMap::<K, R> { len, keys, items }
     }
 
+    /// Use a function to convert the map's values from `V` to `R`, using `&K`
+    /// in its function
+    pub fn map_convert_with_key<F, R: Clone + PartialEq>(
+        self,
+        mut f: F,
+    ) -> InsertionOrderedMap<K, R>
+    where
+        F: FnMut(&K, V) -> R,
+    {
+        let len = self.len();
+        let keys = self.keys;
+        let items = self
+            .items
+            .into_iter()
+            .map(|(n, x)| {
+                let r = f(&n, x);
+                (n, r)
+            })
+            .collect();
+        InsertionOrderedMap::<K, R> { len, keys, items }
+    }
+
     /// Use a function to try to convert the map's values from `V` to `R`
     pub fn try_map_convert<F, R: Clone + PartialEq>(
         self,
@@ -170,6 +192,25 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         let mut items = BTreeMap::new();
         for (n, x) in self.items.into_iter() {
             items.insert(n, f(x)?);
+        }
+        Ok(InsertionOrderedMap::<K, R> { len, keys, items })
+    }
+
+    /// Use a function to try to convert the map's values from `V` to `R`, using
+    /// `&K` in its function
+    pub fn try_map_convert_with_key<F, R: Clone + PartialEq>(
+        self,
+        mut f: F,
+    ) -> Result<InsertionOrderedMap<K, R>>
+    where
+        F: FnMut(&K, V) -> Result<R>,
+    {
+        let len = self.len();
+        let keys = self.keys;
+        let mut items = BTreeMap::new();
+        for (n, x) in self.items.into_iter() {
+            let r = f(&n, x)?;
+            items.insert(n, r);
         }
         Ok(InsertionOrderedMap::<K, R> { len, keys, items })
     }

@@ -24,7 +24,7 @@ pub mod declare;
 pub mod label;
 pub mod relation;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
     Assignment(AssignDeclaration),
     PortMapping(PortMapping),
@@ -119,7 +119,7 @@ impl PortMapping {
         &mut self,
         db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        assignment: &(impl Into<Assignment> + Clone),
+        assignment: impl Into<Assignment>,
     ) -> Result<()> {
         let identifier = identifier.try_result()?;
         let port = self

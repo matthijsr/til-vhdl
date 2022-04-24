@@ -541,11 +541,11 @@ fn playground() -> Result<()> {
 
     arch_db.set_default_package(package);
 
-    let declaration = streamlet.to_architecture(db, arch_db)?;
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
 
     println!("{}", arch_db.default_package().declare(arch_db)?);
 
-    println!("{}", declaration);
+    println!("{}", streamlet_arch.declare(arch_db)?);
 
     Ok(())
 }

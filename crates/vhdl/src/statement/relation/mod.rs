@@ -229,16 +229,25 @@ pub trait CombineRelation: Sized {
         Ok((Box::new(left), Box::new(right)))
     }
 
-    fn eq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn neq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn lt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn lteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn gt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
-    fn gteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
+    fn r_eq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
+    fn r_neq(self, db: &dyn Arch, right: impl TryResult<Relation>)
+        -> Result<RelationalCombination>;
+    fn r_lt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
+    fn r_lteq(
+        self,
+        db: &dyn Arch,
+        right: impl TryResult<Relation>,
+    ) -> Result<RelationalCombination>;
+    fn r_gt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination>;
+    fn r_gteq(
+        self,
+        db: &dyn Arch,
+        right: impl TryResult<Relation>,
+    ) -> Result<RelationalCombination>;
 }
 
 impl<T: TryResult<Relation>> CombineRelation for T {
-    fn eq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
+    fn r_eq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -247,7 +256,11 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn neq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
+    fn r_neq(
+        self,
+        db: &dyn Arch,
+        right: impl TryResult<Relation>,
+    ) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -256,7 +269,7 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn lt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
+    fn r_lt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -265,7 +278,11 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn lteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
+    fn r_lteq(
+        self,
+        db: &dyn Arch,
+        right: impl TryResult<Relation>,
+    ) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -274,7 +291,7 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn gt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
+    fn r_gt(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -283,7 +300,11 @@ impl<T: TryResult<Relation>> CombineRelation for T {
         })
     }
 
-    fn gteq(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<RelationalCombination> {
+    fn r_gteq(
+        self,
+        db: &dyn Arch,
+        right: impl TryResult<Relation>,
+    ) -> Result<RelationalCombination> {
         let (left, right) = Self::validate_combine(db, self, right)?;
         Ok(RelationalCombination {
             left,
@@ -440,7 +461,7 @@ impl ListUsings for Relation {
                 ValueAssignment::BitVec(bitvec) => match bitvec {
                     BitVecValue::Others(_) => (),
                     BitVecValue::Full(_) => (),
-                    BitVecValue::Unsigned(_) | BitVecValue::Signed(_) => {
+                    BitVecValue::Unsigned(_, _) | BitVecValue::Signed(_, _) => {
                         usings.add_using(VhdlName::try_new("ieee")?, "numeric_std.all")?;
                     }
                 },
@@ -489,19 +510,19 @@ mod tests {
         );
         let comb = lex
             .clone()
-            .eq(db, lex)?
-            .neq(db, ValueAssignment::Boolean(false))?
-            .lt(db, ValueAssignment::Boolean(false))?
-            .lteq(db, ValueAssignment::Boolean(false))?
-            .gt(db, ValueAssignment::Boolean(false))?
-            .gteq(db, ValueAssignment::Boolean(false))?;
+            .r_eq(db, lex)?
+            .r_neq(db, ValueAssignment::Boolean(false))?
+            .r_lt(db, ValueAssignment::Boolean(false))?
+            .r_lteq(db, ValueAssignment::Boolean(false))?
+            .r_gt(db, ValueAssignment::Boolean(false))?
+            .r_gteq(db, ValueAssignment::Boolean(false))?;
         assert_eq!(
             "true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false",
             comb.declare(db)?
         );
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
         let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
-            .select([0])?;
+            .select_nested([0])?;
         let rising_edge = Edge::rising_edge(db, obj1)?;
         let falling_edge = Edge::falling_edge(db, obj2)?;
         assert_eq!(

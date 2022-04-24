@@ -70,3 +70,19 @@ impl From<Positive> for PositiveReal {
         NonZeroReal(val.get() as f64)
     }
 }
+
+pub fn u32_to_i32(u: u32) -> Result<i32> {
+    i32::try_from(u).map_err(|err| Error::InvalidArgument(err.to_string()))
+}
+
+pub fn i32_to_u32(i: i32) -> Result<u32> {
+    u32::try_from(i).map_err(|err| Error::InvalidArgument(err.to_string()))
+}
+
+pub fn usize_to_u32(u: usize) -> Result<u32> {
+    u32::try_from(u).map_err(|err| Error::InvalidArgument(err.to_string()))
+}
+
+pub fn u32_to_usize(u: u32) -> Result<usize> {
+    usize::try_from(u).map_err(|err| Error::InvalidArgument(err.to_string()))
+}

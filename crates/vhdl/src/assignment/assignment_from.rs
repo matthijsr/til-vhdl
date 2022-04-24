@@ -1,3 +1,4 @@
+use bitvec::prelude::BitVec;
 use tydi_intern::Id;
 
 use crate::{declaration::ObjectDeclaration, statement::relation::Relation};
@@ -61,5 +62,20 @@ impl From<StdLogicValue> for ValueAssignment {
 impl From<BitVecValue> for ValueAssignment {
     fn from(assignment: BitVecValue) -> Self {
         ValueAssignment::BitVec(assignment.into())
+    }
+}
+
+impl From<BitVec> for ValueAssignment {
+    fn from(bv: BitVec) -> Self {
+        if bv.len() == 1 {
+            ValueAssignment::Bit(StdLogicValue::Logic(bv[0]))
+        } else {
+            let mut result_vec = vec![];
+            // As the BitVec is Lsb0, reverse it to follow Msb0 numbering instead
+            for val in bv.iter().by_vals().rev() {
+                result_vec.push(StdLogicValue::Logic(val))
+            }
+            ValueAssignment::BitVec(BitVecValue::Full(result_vec))
+        }
     }
 }

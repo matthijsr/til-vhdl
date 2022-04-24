@@ -1,9 +1,12 @@
-use crate::{port::{Parameter, Port}, common::vhdl_name::VhdlName};
+use crate::{
+    common::vhdl_name::VhdlName,
+    port::{Parameter, Port},
+};
 
 mod impls;
 
 /// An Entity.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Entity {
     /// Component identifier.
     identifier: VhdlName,

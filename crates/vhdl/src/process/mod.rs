@@ -211,7 +211,7 @@ mod tests {
         let bool_var = process.declare_variable(db, "bool_var", ObjectType::Boolean, None)?;
         process.add_statement(
             db,
-            bool_var.assign(db, &clk.eq(db, StdLogicValue::Logic(true))?)?,
+            bool_var.assign(db, clk.r_eq(db, StdLogicValue::Logic(true))?)?,
         )?;
         process.add_statement(db, Wait::wait().for_constant(1.us()))?;
         process.add_statement(db, TestStatement::assert_report(false, "end test"))?;

@@ -33,11 +33,8 @@ pub mod flatten;
 pub mod impls;
 
 pub trait Assign {
-    fn assign(
-        &self,
-        db: &dyn Arch,
-        assignment: &(impl Into<Assignment> + Clone),
-    ) -> Result<AssignDeclaration>;
+    fn assign(&self, db: &dyn Arch, assignment: impl Into<Assignment>)
+        -> Result<AssignDeclaration>;
 }
 
 /// Describing the declaration of an assignment
@@ -132,7 +129,7 @@ impl AssignDeclaration {
         match self.assignment().kind() {
             AssignmentKind::Relation(Relation::Object(object)) => object.object().assign(
                 db,
-                &Assignment::from(
+                Assignment::from(
                     ObjectSelection::from(self.object()).assign_from(self.assignment().to_field()),
                 )
                 .to_nested(object.from_field()),
@@ -468,14 +465,15 @@ impl ObjectSelection {
 }
 
 pub trait SelectObject: Sized {
-    fn select(
+    fn select(self, field: impl TryResult<FieldSelection>) -> Result<ObjectSelection>;
+    fn select_nested(
         self,
         fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
     ) -> Result<ObjectSelection>;
 }
 
 impl<T: TryResult<ObjectSelection>> SelectObject for T {
-    fn select(
+    fn select_nested(
         self,
         fields: impl IntoIterator<Item = impl TryResult<FieldSelection>>,
     ) -> Result<ObjectSelection> {
@@ -485,6 +483,12 @@ impl<T: TryResult<ObjectSelection>> SelectObject for T {
             fields_result.push(field.try_result()?);
         }
         selection.from_field.append(&mut fields_result);
+        Ok(selection)
+    }
+
+    fn select(self, field: impl TryResult<FieldSelection>) -> Result<ObjectSelection> {
+        let mut selection = self.try_result()?;
+        selection.from_field.push(field.try_result()?);
         Ok(selection)
     }
 }
