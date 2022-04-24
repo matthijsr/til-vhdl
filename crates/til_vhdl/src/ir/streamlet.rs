@@ -210,7 +210,7 @@ impl PhysicalStreamObject {
                     lanes
                 )))
             } else {
-                let lower = lanes * self.data_element_size();
+                let lower = lane * self.data_element_size();
                 let upper = lower + element_size - 1;
                 let selection = if lower == upper {
                     FieldSelection::index(u32_to_i32(lower)?)

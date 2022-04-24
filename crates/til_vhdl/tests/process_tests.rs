@@ -97,6 +97,22 @@ multiline#
         enclosed.auto_endi(2, "endi test")?;
         enclosed.auto_user_default("user default")?;
         enclosed.auto_user(&ElementType::Bits(bitvec![0, 1]), "user 10")?;
+        enclosed.auto_data_default("data default")?;
+        enclosed.auto_data(
+            0,
+            &ElementType::Bits(bitvec![0, 0, 1, 0, 0, 0, 0, 1]),
+            "data[0] = 10000100",
+        )?;
+        enclosed.auto_data(
+            1,
+            &ElementType::Bits(bitvec![0, 0, 1, 0, 0, 0, 1, 1]),
+            "data[1] = 11000100",
+        )?;
+        enclosed.auto_data(
+            2,
+            &ElementType::Bits(bitvec![0, 0, 1, 0, 0, 1, 0, 1]),
+            "data[2] = 10100100",
+        )?;
         let proc = enclosed.get();
         println!("{}", proc.process().declare(&arch_db)?);
     }

@@ -236,7 +236,10 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
                 "Cannot produce a default data signal assignment for {}, as it has no data signal.",
                 self.process.path_name()
             )))
-        } else if self.stream_object().user_size() == 1 {
+        } else if self.stream_object().data_element_size()
+            * self.stream_object().element_lanes().get()
+            == 1
+        {
             Ok(StdLogicValue::Logic(false).into())
         } else {
             Ok(BitVecValue::Others(StdLogicValue::Logic(false)).into())
@@ -275,15 +278,24 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn act_data_default(&mut self) -> Result<()> {
-        todo!()
+        if let Some(data_sig) = *self.signal_list().data() {
+            self.add_statement(data_sig.assign(self.db, self.default_data()?)?)?;
+        }
+        Ok(())
     }
 
     fn assert_data_default(&mut self, message: &str) -> Result<()> {
-        todo!()
+        if let Some(data_sig) = *self.signal_list().data() {
+            self.assert_eq_report(data_sig, self.default_data()?, message)?;
+        }
+        Ok(())
     }
 
     fn act_data(&mut self, element_lane: NonNegative, data: &ElementType) -> Result<()> {
-        todo!()
+        let (data_sig, el_data) = self
+            .stream_object()
+            .get_element_lane_for(element_lane, data)?;
+        self.add_statement(data_sig.assign(self.db, el_data)?)
     }
 
     fn assert_data(
@@ -292,7 +304,10 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
         data: &ElementType,
         message: &str,
     ) -> Result<()> {
-        todo!()
+        let (data_sig, el_data) = self
+            .stream_object()
+            .get_element_lane_for(element_lane, data)?;
+        self.assert_eq_report(data_sig, el_data, message)
     }
 
     fn act_user_default(&mut self) -> Result<()> {
