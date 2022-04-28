@@ -31,17 +31,51 @@ impl Streamlet {
         }
     }
 
-    pub fn with_ports(
+    pub fn with_domains_ports(
         mut self,
         db: &dyn Ir,
-        ports: Vec<impl TryResult<InterfacePort>>,
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = Interface::new(db, ports)?.intern(db);
+        let interface = Interface::new(db, domains, ports)?.intern(db);
         self.interface = Some(interface);
+
         Ok(self)
     }
 
-    pub fn with_interface_collection(
+    pub fn with_domains(
+        mut self,
+        db: &dyn Ir,
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
+    ) -> Result<Streamlet> {
+        if let Some(interface) = self.interface {
+            let new_interface = interface.get(db).with_domains(domains)?;
+            self.interface = Some(new_interface.intern(db));
+        } else {
+            let interface = Interface::new_domains(domains)?.intern(db);
+            self.interface = Some(interface);
+        }
+
+        Ok(self)
+    }
+
+    pub fn with_ports(
+        mut self,
+        db: &dyn Ir,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Streamlet> {
+        if let Some(interface) = self.interface {
+            let new_interface = interface.get(db).with_ports(db, ports)?;
+            self.interface = Some(new_interface.intern(db));
+        } else {
+            let interface = Interface::new_ports(db, ports)?.intern(db);
+            self.interface = Some(interface);
+        }
+
+        Ok(self)
+    }
+
+    pub fn with_interface(
         mut self,
         db: &dyn Ir,
         coll: impl TryIntern<Interface>,

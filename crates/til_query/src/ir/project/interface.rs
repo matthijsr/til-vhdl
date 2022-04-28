@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    map::InsertionOrderedMap,
+    map::{InsertionOrderedMap, InsertionOrderedSet},
     name::Name,
     traits::Identify,
 };
@@ -20,27 +20,104 @@ use crate::ir::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {
+    domains: InsertionOrderedSet<Name>,
     ports: InsertionOrderedMap<Name, Id<InterfacePort>>,
 }
 
 impl Interface {
     pub fn new_empty() -> Self {
         Interface {
+            domains: InsertionOrderedSet::new(),
             ports: InsertionOrderedMap::new(),
         }
     }
 
-    pub fn new(db: &dyn Ir, ports: Vec<impl TryResult<InterfacePort>>) -> Result<Self> {
+    pub fn new(
+        db: &dyn Ir,
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Self> {
+        let mut domain_set = InsertionOrderedSet::new();
+        for domain in domains {
+            let domain = domain.try_result()?;
+            domain_set.try_insert(domain)?;
+        }
+
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
             port_map.try_insert(port.name().clone(), port.intern(db))?
         }
 
-        Ok(Interface { ports: port_map })
+        Ok(Interface {
+            domains: domain_set,
+            ports: port_map,
+        })
     }
 
-    pub fn push(&mut self, db: &dyn Ir, port: impl TryResult<InterfacePort>) -> Result<()> {
+    pub fn new_domains(domains: impl IntoIterator<Item = impl TryResult<Name>>) -> Result<Self> {
+        let mut domain_set = InsertionOrderedSet::new();
+        for domain in domains {
+            let domain = domain.try_result()?;
+            domain_set.try_insert(domain)?;
+        }
+
+        Ok(Interface {
+            domains: domain_set,
+            ports: InsertionOrderedMap::new(),
+        })
+    }
+
+    pub fn new_ports(
+        db: &dyn Ir,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Self> {
+        let mut port_map = InsertionOrderedMap::new();
+        for port in ports {
+            let port = port.try_result()?;
+            port_map.try_insert(port.name().clone(), port.intern(db))?
+        }
+
+        Ok(Interface {
+            domains: InsertionOrderedSet::new(),
+            ports: port_map,
+        })
+    }
+
+    pub fn with_domains(
+        mut self,
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
+    ) -> Result<Self> {
+        let mut domain_set = InsertionOrderedSet::new();
+        for domain in domains {
+            let domain = domain.try_result()?;
+            domain_set.try_insert(domain)?;
+        }
+
+        self.domains = domain_set;
+        Ok(self)
+    }
+
+    pub fn with_ports(
+        mut self,
+        db: &dyn Ir,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Self> {
+        let mut port_map = InsertionOrderedMap::new();
+        for port in ports {
+            let port = port.try_result()?;
+            port_map.try_insert(port.name().clone(), port.intern(db))?
+        }
+
+        self.ports = port_map;
+        Ok(self)
+    }
+
+    pub fn push_domain(&mut self, domain: impl TryResult<Name>) -> Result<()> {
+        self.domains.try_insert(domain.try_result()?)
+    }
+
+    pub fn push_port(&mut self, db: &dyn Ir, port: impl TryResult<InterfacePort>) -> Result<()> {
         let port = port.try_result()?;
         self.ports.try_insert(port.name().clone(), port.intern(db))
     }
@@ -93,7 +170,11 @@ impl MoveDb<Id<Interface>> for Interface {
         for (name, port) in self.port_ids() {
             ports.try_insert(name.clone(), port.move_db(original_db, target_db, prefix)?)?;
         }
-        Ok(Interface { ports }.intern(target_db))
+        Ok(Interface {
+            domains: self.domains.clone(),
+            ports,
+        }
+        .intern(target_db))
     }
 }
 

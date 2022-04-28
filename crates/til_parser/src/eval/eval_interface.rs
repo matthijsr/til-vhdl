@@ -67,7 +67,7 @@ pub fn eval_interface_expr(
                         if let Some(doc) = doc {
                             port.set_doc(doc);
                         }
-                        eval_common_error(result.push(db, port), name_span)?;
+                        eval_common_error(result.push_port(db, port), name_span)?;
                     }
                 } else {
                     return Err(EvalError {

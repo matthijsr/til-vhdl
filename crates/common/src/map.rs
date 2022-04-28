@@ -2,6 +2,67 @@ use crate::error::{Error, Result};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// A Set which keeps track of insertion order, but also implements Eq and Hash
+///
+/// This Set exists so that it may be used in structs stored in `salsa` databases.
+/// In virtually all other cases, you should prefer `IndexSet`.
+///
+/// This set does not support Remove, and will return an Error when attempting to
+/// insert a key which already exists.
+pub struct InsertionOrderedSet<V: Clone + PartialEq + Ord> {
+    items: InsertionOrderedMap<V, ()>,
+}
+
+impl<V: Clone + PartialEq + Ord + ToString> InsertionOrderedSet<V> {
+    pub fn new() -> Self {
+        InsertionOrderedSet {
+            items: InsertionOrderedMap::new(),
+        }
+    }
+
+    pub fn try_new(from: impl IntoIterator<Item = V>) -> Result<Self> {
+        let mut result = Self::new();
+        for v in from.into_iter() {
+            result.try_insert(v)?;
+        }
+        Ok(result)
+    }
+
+    /// Tries to insert a value into the set.
+    ///
+    /// If the given value already exists in the map, this function
+    /// will return an `Error::UnexpectedDuplicate`.
+    pub fn try_insert(&mut self, value: V) -> Result<()> {
+        self.items.try_insert(value, ())
+    }
+
+    /// Adds a value to the set.
+    ///
+    /// If the set did not have an equal element present, `true` is returned.
+    ///
+    /// If the set did have an equal element present, `false` is returned, and
+    /// the entry is not updated.
+    pub fn insert(&mut self, value: V) -> bool {
+        match self.items.insert_or_replace(value, ()) {
+            Some(_) => false,
+            None => true,
+        }
+    }
+
+    pub fn contains(&self, value: &V) -> bool {
+        self.items.contains(value)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &V> {
+        self.items.iter().map(|(v, _)| v)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A Map which keeps track of insertion order, but also implements Eq and Hash
 ///
 /// This Map exists so that it may be used in structs stored in `salsa` databases.
@@ -56,7 +117,7 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         replaced_vals
     }
 
-    /// Tries to insert a key and value in to the map.
+    /// Tries to insert a key and value into the map.
     ///
     /// If an item with the given key already exists in the map, this function
     /// will return an `Error::UnexpectedDuplicate`.
@@ -133,7 +194,7 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         self.len
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&K, &V)> {
         (&self).into_iter()
     }
 
