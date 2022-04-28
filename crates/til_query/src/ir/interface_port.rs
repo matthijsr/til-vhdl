@@ -57,6 +57,14 @@ impl InterfacePort {
     pub fn direction(&self) -> InterfaceDirection {
         self.physical_properties().direction()
     }
+
+    pub fn domain(&self) -> Option<&Name> {
+        self.physical_properties().domain()
+    }
+
+    pub fn set_domain(&mut self, domain: Name) {
+        self.physical_properties.set_domain(domain)
+    }
 }
 
 impl Identify for InterfacePort {
