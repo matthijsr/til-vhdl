@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
-        implementation::Implementation, project::interface::InterfaceCollection,
+        implementation::Implementation, project::interface::Interface,
         streamlet::Streamlet, Ir,
     },
 };
@@ -29,8 +29,8 @@ pub fn eval_declaration(
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &mut HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &mut HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &mut HashMap<Name, Id<Interface>>,
+    interface_imports: &HashMap<PathName, Id<Interface>>,
     types: &mut HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<(), EvalError> {

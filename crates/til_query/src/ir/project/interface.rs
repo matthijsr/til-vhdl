@@ -11,46 +11,45 @@ use tydi_intern::Id;
 
 use crate::ir::{
     implementation::structure::Structure,
-    interface::Interface,
+    interface_port::InterfacePort,
     physical_properties::InterfaceDirection,
     streamlet::Streamlet,
     traits::{GetSelf, InternSelf, MoveDb},
     Ir,
 };
 
-// TODO: Can probably replace this with an InsertionOrderedMap
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InterfaceCollection {
-    ports: InsertionOrderedMap<Name, Id<Interface>>,
+pub struct Interface {
+    ports: InsertionOrderedMap<Name, Id<InterfacePort>>,
 }
 
-impl InterfaceCollection {
+impl Interface {
     pub fn new_empty() -> Self {
-        InterfaceCollection {
+        Interface {
             ports: InsertionOrderedMap::new(),
         }
     }
 
-    pub fn new(db: &dyn Ir, ports: Vec<impl TryResult<Interface>>) -> Result<Self> {
+    pub fn new(db: &dyn Ir, ports: Vec<impl TryResult<InterfacePort>>) -> Result<Self> {
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
             port_map.try_insert(port.name().clone(), port.intern(db))?
         }
 
-        Ok(InterfaceCollection { ports: port_map })
+        Ok(Interface { ports: port_map })
     }
 
-    pub fn push(&mut self, db: &dyn Ir, port: impl TryResult<Interface>) -> Result<()> {
+    pub fn push(&mut self, db: &dyn Ir, port: impl TryResult<InterfacePort>) -> Result<()> {
         let port = port.try_result()?;
         self.ports.try_insert(port.name().clone(), port.intern(db))
     }
 
-    pub fn port_ids(&self) -> &InsertionOrderedMap<Name, Id<Interface>> {
+    pub fn port_ids(&self) -> &InsertionOrderedMap<Name, Id<InterfacePort>> {
         &self.ports
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn ports(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         let mut result = vec![];
         for (_, port) in &self.ports {
             result.push(port.get(db));
@@ -58,21 +57,21 @@ impl InterfaceCollection {
         result
     }
 
-    pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn inputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         self.ports(db)
             .into_iter()
             .filter(|x| x.physical_properties().direction() == InterfaceDirection::In)
             .collect()
     }
 
-    pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn outputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         self.ports(db)
             .into_iter()
             .filter(|x| x.physical_properties().direction() == InterfaceDirection::Out)
             .collect()
     }
 
-    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<Interface> {
+    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<InterfacePort> {
         match self.port_ids().get(name) {
             Some(port) => Ok(port.get(db)),
             None => Err(Error::InvalidArgument(format!(
@@ -83,34 +82,34 @@ impl InterfaceCollection {
     }
 }
 
-impl MoveDb<Id<InterfaceCollection>> for InterfaceCollection {
+impl MoveDb<Id<Interface>> for Interface {
     fn move_db(
         &self,
         original_db: &dyn Ir,
         target_db: &dyn Ir,
         prefix: &Option<Name>,
-    ) -> Result<Id<InterfaceCollection>> {
+    ) -> Result<Id<Interface>> {
         let mut ports = InsertionOrderedMap::new();
         for (name, port) in self.port_ids() {
             ports.try_insert(name.clone(), port.move_db(original_db, target_db, prefix)?)?;
         }
-        Ok(InterfaceCollection { ports }.intern(target_db))
+        Ok(Interface { ports }.intern(target_db))
     }
 }
 
-impl From<Structure> for Id<InterfaceCollection> {
+impl From<Structure> for Id<Interface> {
     fn from(st: Structure) -> Self {
         st.interface_id()
     }
 }
 
-impl From<&Structure> for Id<InterfaceCollection> {
+impl From<&Structure> for Id<Interface> {
     fn from(st: &Structure) -> Self {
         st.interface_id()
     }
 }
 
-impl TryFrom<Streamlet> for Id<InterfaceCollection> {
+impl TryFrom<Streamlet> for Id<Interface> {
     type Error = Error;
 
     fn try_from(streamlet: Streamlet) -> Result<Self> {
@@ -118,7 +117,7 @@ impl TryFrom<Streamlet> for Id<InterfaceCollection> {
     }
 }
 
-impl TryFrom<&Streamlet> for Id<InterfaceCollection> {
+impl TryFrom<&Streamlet> for Id<Interface> {
     type Error = Error;
 
     fn try_from(streamlet: &Streamlet) -> Result<Self> {
@@ -133,7 +132,7 @@ impl TryFrom<&Streamlet> for Id<InterfaceCollection> {
     }
 }
 
-impl fmt::Display for InterfaceCollection {
+impl fmt::Display for Interface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = self
             .port_ids()

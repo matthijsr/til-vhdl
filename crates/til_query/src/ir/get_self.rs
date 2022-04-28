@@ -1,9 +1,9 @@
 use tydi_intern::Id;
 
 use super::{
-    project::{interface::InterfaceCollection, namespace::Namespace},
+    project::{interface::Interface, namespace::Namespace},
     traits::GetSelf,
-    Implementation, Interface, Ir, LogicalType, Stream, Streamlet,
+    Implementation, InterfacePort, Ir, LogicalType, Stream, Streamlet,
 };
 
 impl GetSelf<Implementation> for Id<Implementation> {
@@ -18,8 +18,8 @@ impl GetSelf<LogicalType> for Id<LogicalType> {
     }
 }
 
-impl GetSelf<Interface> for Id<Interface> {
-    fn get(&self, db: &dyn Ir) -> Interface {
+impl GetSelf<InterfacePort> for Id<InterfacePort> {
+    fn get(&self, db: &dyn Ir) -> InterfacePort {
         db.lookup_intern_port(*self)
     }
 }
@@ -42,8 +42,8 @@ impl GetSelf<Namespace> for Id<Namespace> {
     }
 }
 
-impl GetSelf<InterfaceCollection> for Id<InterfaceCollection> {
-    fn get(&self, db: &dyn Ir) -> InterfaceCollection {
+impl GetSelf<Interface> for Id<Interface> {
+    fn get(&self, db: &dyn Ir) -> Interface {
         db.lookup_intern_interface_collection(*self)
     }
 }

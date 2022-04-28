@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::interface::InterfaceCollection;
+use super::interface::Interface;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
@@ -34,7 +34,7 @@ pub struct Namespace {
     /// As implementations and streamlets both contain an Interface,
     /// they are also declared as interfaces.
     /// This means that streamlet and implementation names cannot overlap.
-    interfaces: BTreeMap<Name, Id<InterfaceCollection>>,
+    interfaces: BTreeMap<Name, Id<Interface>>,
 }
 
 impl Namespace {
@@ -81,11 +81,11 @@ impl Namespace {
             .collect()
     }
 
-    pub fn interface_ids(&self) -> &BTreeMap<Name, Id<InterfaceCollection>> {
+    pub fn interface_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
         &self.interfaces
     }
 
-    pub fn interfaces(&self, db: &dyn Ir) -> BTreeMap<Name, InterfaceCollection> {
+    pub fn interfaces(&self, db: &dyn Ir) -> BTreeMap<Name, Interface> {
         self.interface_ids()
             .iter()
             .map(|(name, id)| (name.clone(), id.get(db)))
@@ -143,7 +143,7 @@ impl Namespace {
     pub fn import_interface(
         &mut self,
         name: impl TryResult<Name>,
-        interface_id: Id<InterfaceCollection>,
+        interface_id: Id<Interface>,
     ) -> Result<()> {
         let name = name.try_result()?;
         match self.interfaces.insert(name.clone(), interface_id) {
@@ -202,8 +202,8 @@ impl Namespace {
         &mut self,
         db: &dyn Ir,
         name: impl TryResult<Name>,
-        interface: impl TryIntern<InterfaceCollection>,
-    ) -> Result<Id<InterfaceCollection>> {
+        interface: impl TryIntern<Interface>,
+    ) -> Result<Id<Interface>> {
         let name = name.try_result()?;
         let interface_id = interface.try_intern(db)?;
         self.import_interface(name, interface_id)?;
@@ -276,7 +276,7 @@ impl Namespace {
         }
     }
 
-    pub fn get_interface_id(&self, name: impl TryResult<Name>) -> Result<Id<InterfaceCollection>> {
+    pub fn get_interface_id(&self, name: impl TryResult<Name>) -> Result<Id<Interface>> {
         let name = name.try_result()?;
         self.interface_ids()
             .get(&name)
@@ -292,7 +292,7 @@ impl Namespace {
         &self,
         db: &dyn Ir,
         name: impl TryResult<Name>,
-    ) -> Result<InterfaceCollection> {
+    ) -> Result<Interface> {
         Ok(self.get_interface_id(name)?.get(db))
     }
 

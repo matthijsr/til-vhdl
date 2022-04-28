@@ -12,21 +12,21 @@ use tydi_intern::Id;
 use crate::ir::{
     connection::{Connection, InterfaceReference},
     physical_properties::InterfaceDirection,
-    project::interface::InterfaceCollection,
+    project::interface::Interface,
     traits::{GetSelf, MoveDb},
-    Interface, Ir, Streamlet,
+    InterfacePort, Ir, Streamlet,
 };
 
 /// This node represents a structural `Implementation`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Structure {
-    interface: Id<InterfaceCollection>,
+    interface: Id<Interface>,
     streamlet_instances: BTreeMap<Name, Id<Streamlet>>,
     connections: Vec<Connection>,
 }
 
 impl Structure {
-    pub fn new(interface: Id<InterfaceCollection>) -> Self {
+    pub fn new(interface: Id<Interface>) -> Self {
         Structure {
             interface,
             streamlet_instances: BTreeMap::new(),
@@ -34,15 +34,15 @@ impl Structure {
         }
     }
 
-    pub fn interface_id(&self) -> Id<InterfaceCollection> {
+    pub fn interface_id(&self) -> Id<Interface> {
         self.interface
     }
 
-    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
+    pub fn interface(&self, db: &dyn Ir) -> Interface {
         self.interface_id().get(db)
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn ports(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         self.interface(db).ports(db)
     }
 
@@ -96,7 +96,7 @@ impl Structure {
 
         struct InterfaceAndStructure {
             on_streamlet: bool,
-            interface: Interface,
+            interface: InterfacePort,
         }
 
         let get_port = |i: &InterfaceReference| match i.streamlet_instance() {

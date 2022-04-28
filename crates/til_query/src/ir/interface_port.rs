@@ -16,7 +16,7 @@ use super::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Interface {
+pub struct InterfacePort {
     name: Name,
     stream: Id<Stream>,
     physical_properties: PhysicalProperties,
@@ -24,13 +24,13 @@ pub struct Interface {
     doc: Option<String>,
 }
 
-impl Interface {
+impl InterfacePort {
     pub fn try_new(
         name: impl TryResult<Name>,
         stream: Id<Stream>,
         physical_properties: PhysicalProperties,
-    ) -> Result<Interface> {
-        Ok(Interface {
+    ) -> Result<InterfacePort> {
+        Ok(InterfacePort {
             name: name.try_result()?,
             stream,
             physical_properties,
@@ -59,13 +59,13 @@ impl Interface {
     }
 }
 
-impl Identify for Interface {
+impl Identify for InterfacePort {
     fn identifier(&self) -> String {
         self.name.to_string()
     }
 }
 
-impl<N, S, P> TryFrom<(N, S, P)> for Interface
+impl<N, S, P> TryFrom<(N, S, P)> for InterfacePort
 where
     N: TryResult<Name>,
     S: TryResult<Id<Stream>>,
@@ -74,7 +74,7 @@ where
     type Error = Error;
 
     fn try_from((name, stream, physical_properties): (N, S, P)) -> Result<Self> {
-        Ok(Interface {
+        Ok(InterfacePort {
             name: name.try_result()?,
             stream: stream.try_result()?,
             physical_properties: physical_properties.try_result()?,
@@ -83,14 +83,14 @@ where
     }
 }
 
-impl MoveDb<Id<Interface>> for Interface {
+impl MoveDb<Id<InterfacePort>> for InterfacePort {
     fn move_db(
         &self,
         original_db: &dyn Ir,
         target_db: &dyn Ir,
         prefix: &Option<Name>,
-    ) -> Result<Id<Interface>> {
-        Ok(Interface {
+    ) -> Result<Id<InterfacePort>> {
+        Ok(InterfacePort {
             name: self.name.clone(),
             stream: self.stream.move_db(original_db, target_db, prefix)?,
             physical_properties: self.physical_properties.clone(),
@@ -100,13 +100,13 @@ impl MoveDb<Id<Interface>> for Interface {
     }
 }
 
-impl Document for Interface {
+impl Document for InterfacePort {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
     }
 }
 
-impl Documents for Interface {
+impl Documents for InterfacePort {
     fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into());
     }

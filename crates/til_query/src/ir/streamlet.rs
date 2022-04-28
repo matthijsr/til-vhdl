@@ -6,9 +6,9 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    project::interface::InterfaceCollection,
+    project::interface::Interface,
     traits::{GetSelf, InternSelf, MoveDb, TryIntern},
-    Implementation, Interface, Ir,
+    Implementation, InterfacePort, Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -17,7 +17,7 @@ pub struct Streamlet {
     /// and can be suffixed with their implementation.
     name: PathName,
     implementation: Option<Id<Implementation>>,
-    interface: Option<Id<InterfaceCollection>>,
+    interface: Option<Id<Interface>>,
     doc: Option<String>,
 }
 
@@ -34,9 +34,9 @@ impl Streamlet {
     pub fn with_ports(
         mut self,
         db: &dyn Ir,
-        ports: Vec<impl TryResult<Interface>>,
+        ports: Vec<impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = InterfaceCollection::new(db, ports)?.intern(db);
+        let interface = Interface::new(db, ports)?.intern(db);
         self.interface = Some(interface);
         Ok(self)
     }
@@ -44,7 +44,7 @@ impl Streamlet {
     pub fn with_interface_collection(
         mut self,
         db: &dyn Ir,
-        coll: impl TryIntern<InterfaceCollection>,
+        coll: impl TryIntern<Interface>,
     ) -> Result<Streamlet> {
         self.interface = Some(coll.try_intern(db)?);
 
@@ -78,33 +78,33 @@ impl Streamlet {
         }
     }
 
-    pub fn interface_id(&self) -> Option<Id<InterfaceCollection>> {
+    pub fn interface_id(&self) -> Option<Id<Interface>> {
         self.interface.clone()
     }
 
-    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
+    pub fn interface(&self, db: &dyn Ir) -> Interface {
         if let Some(interface_id) = self.interface_id() {
             interface_id.get(db)
         } else {
-            let interface = InterfaceCollection::new_empty();
+            let interface = Interface::new_empty();
             interface.clone().intern(db);
             interface
         }
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn ports(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         self.interface(db).ports(db)
     }
 
-    pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn inputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         self.interface(db).inputs(db)
     }
 
-    pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
+    pub fn outputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
         self.interface(db).outputs(db)
     }
 
-    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<Interface> {
+    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<InterfacePort> {
         match self.interface(db).try_get_port(db, name) {
             Ok(port) => Ok(port),
             Err(_) => Err(Error::InvalidArgument(format!(
@@ -165,8 +165,8 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
     }
 }
 
-impl From<Id<InterfaceCollection>> for Streamlet {
-    fn from(id: Id<InterfaceCollection>) -> Self {
+impl From<Id<Interface>> for Streamlet {
+    fn from(id: Id<Interface>) -> Self {
         Streamlet {
             name: PathName::new_empty(),
             implementation: None,

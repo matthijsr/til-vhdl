@@ -6,8 +6,8 @@ use std::{
 use til_query::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
     ir::{
-        interface::Interface,
-        project::interface::InterfaceCollection,
+        interface_port::InterfacePort,
+        project::interface::Interface,
         traits::{GetSelf, InternSelf},
         Ir,
     },
@@ -25,18 +25,18 @@ use super::{eval_common_error, eval_name, eval_type::eval_type_expr, EvalError};
 pub fn eval_interface_expr(
     db: &dyn Ir,
     expr: &Spanned<Expr>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &HashMap<Name, Id<Interface>>,
+    interface_imports: &HashMap<PathName, Id<Interface>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<Id<InterfaceCollection>, EvalError> {
+) -> Result<Id<Interface>, EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")
         }
         Expr::InterfaceDef(iface) => {
             let mut dups = HashSet::new();
-            let mut result = InterfaceCollection::new_empty();
+            let mut result = Interface::new_empty();
             for port_def_expr in iface {
                 let mut port_def_expr = port_def_expr;
                 let mut doc = None;
@@ -61,7 +61,7 @@ pub fn eval_interface_expr(
                             &props.typ.1,
                         )?;
                         let mut port = eval_common_error(
-                            Interface::try_from((name, stream_id, props.mode.0)),
+                            InterfacePort::try_from((name, stream_id, props.mode.0)),
                             name_span,
                         )?;
                         if let Some(doc) = doc {
@@ -103,7 +103,7 @@ pub(crate) mod tests {
         name: impl TryResult<Name>,
         db: &dyn Ir,
         types: &HashMap<Name, Id<LogicalType>>,
-        interfaces: &mut HashMap<Name, Id<InterfaceCollection>>,
+        interfaces: &mut HashMap<Name, Id<Interface>>,
     ) {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());

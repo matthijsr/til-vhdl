@@ -4,7 +4,7 @@ use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
         implementation::Implementation,
-        project::interface::InterfaceCollection,
+        project::interface::Interface,
         streamlet::Streamlet,
         traits::{GetSelf, InternSelf},
         Ir,
@@ -30,11 +30,11 @@ pub fn eval_streamlet_expr(
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &HashMap<Name, Id<Interface>>,
+    interface_imports: &HashMap<PathName, Id<Interface>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<(Id<Streamlet>, Id<InterfaceCollection>), EvalError> {
+) -> Result<(Id<Streamlet>, Id<Interface>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports, "streamlet")

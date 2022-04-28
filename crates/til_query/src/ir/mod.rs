@@ -26,7 +26,7 @@ use crate::{
 };
 
 use self::{
-    implementation::Implementation, interface::Interface, interner::Interner, project::Project,
+    implementation::Implementation, interface_port::InterfacePort, interner::Interner, project::Project,
     streamlet::Streamlet, traits::GetSelf,
 };
 
@@ -35,7 +35,7 @@ pub mod connection;
 pub mod db;
 pub mod get_self;
 pub mod implementation;
-pub mod interface;
+pub mod interface_port;
 pub mod intern_self;
 pub mod interner;
 pub mod physical_properties;

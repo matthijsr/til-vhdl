@@ -5,7 +5,7 @@ use til_query::{
     ir::{
         connection::InterfaceReference,
         implementation::{link::Link, structure::Structure, Implementation},
-        project::interface::InterfaceCollection,
+        project::interface::Interface,
         streamlet::Streamlet,
         traits::InternSelf,
         Ir,
@@ -31,8 +31,8 @@ pub fn eval_struct_stat(
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &HashMap<Name, Id<Interface>>,
+    interface_imports: &HashMap<PathName, Id<Interface>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<(), EvalError> {
@@ -104,16 +104,16 @@ pub fn eval_implementation_expr(
     expr: &Spanned<Expr>,
     name: &PathName,
     doc: Option<&String>,
-    interface: Option<Id<InterfaceCollection>>,
+    interface: Option<Id<Interface>>,
     streamlets: &HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &HashMap<Name, Id<Interface>>,
+    interface_imports: &HashMap<PathName, Id<Interface>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<(Id<Implementation>, Id<InterfaceCollection>), EvalError> {
+) -> Result<(Id<Implementation>, Id<Interface>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             let implementation = eval_ident(
