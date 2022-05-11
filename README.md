@@ -1,2 +1,4 @@
-# til-vhdl
-WIP/Playground VHDL back-end for (yet to be defined) Tydi intermediate representation
+# TIL -> VHDL
+A prototype toolchain for demonstrating and exploring an intermediate representation for defining components using the Tydi interface specification.
+
+This repository defines a grammar (simply called TIL, for Tydi Intermediate Language), and implements a parser, incremental query system, and VHDL backend.
