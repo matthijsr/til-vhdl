@@ -66,7 +66,7 @@ namespace evaluation {
         ),
         dimensionality: 0,
         synchronicity: Sync,
-        complexity: 1, // Adds a strobe
+        complexity: 1,
         user: Bits(4),
     );
 
