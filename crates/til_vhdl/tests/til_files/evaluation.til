@@ -33,19 +33,14 @@ namespace evaluation {
         complexity: 1,
         user: Bits(4),
     );
-
     type axi4_write_data = Stream (
         data: Bits(8),
         throughput: 256.0, // Max transfers
         dimensionality: 1, // Equivalent to LAST
         synchronicity: Sync,
         complexity: 7, // Adds a strobe
-        user: Group (
-            ID: Bits(4),
-            USER: Bits(4),
-        ),
+        user: Bits(4),
     );
-
     type axi4_read_data = Stream (
         data: Bits(8),
         throughput: 256.0, // Max transfers
@@ -58,7 +53,6 @@ namespace evaluation {
             USER: Bits(4),
         ),
     );
-
     type axi4_response = Stream (
         data: Group(
             RESP: Bits(2),
