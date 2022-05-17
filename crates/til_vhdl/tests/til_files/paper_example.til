@@ -8,7 +8,7 @@ namespace my::example::space {
     type stream = Stream (
         data: rgb,
         throughput: 2.0, // 1.0 by default
-        dimensionality: 0, // 0 by default
+        dimensionality: 0,
         synchronicity: Sync,
         complexity: 4,
         direction: Forward, // Forward by default

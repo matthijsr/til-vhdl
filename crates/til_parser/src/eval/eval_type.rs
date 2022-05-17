@@ -246,7 +246,7 @@ pub fn eval_type_expr(
                 stream.dimensionality.ok_or(missing_err("dimensionality"))?,
                 stream.synchronicity.ok_or(missing_err("synchronicity"))?,
                 stream.complexity.ok_or(missing_err("complexity"))?,
-                stream.direction.ok_or(missing_err("direction"))?,
+                stream.direction.unwrap_or_default(),
                 stream.user.unwrap_or(LogicalType::null_id(db)),
                 stream.keep.unwrap_or(false),
             ),
