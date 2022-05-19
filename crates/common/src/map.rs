@@ -283,6 +283,11 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
     pub fn values(&self) -> impl Iterator<Item = &V> {
         self.iter().map(|(_, v)| v)
     }
+
+    ///Returns an unordered iterator of mutable values
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
+        self.items.values_mut()
+    }
 }
 
 pub struct InsertionOrderedMapIter<K: Ord + Clone, V: Clone> {

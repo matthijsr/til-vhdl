@@ -11,7 +11,7 @@ use tydi_intern::Id;
 use crate::common::logical::logicaltype::stream::Stream;
 
 use super::{
-    physical_properties::{InterfaceDirection, PhysicalProperties},
+    physical_properties::{InterfaceDirection, PhysicalProperties, Domain},
     Ir,
 };
 
@@ -54,11 +54,11 @@ impl InterfacePort {
         self.physical_properties().direction()
     }
 
-    pub fn domain(&self) -> Option<&Name> {
+    pub fn domain(&self) -> Option<&Domain> {
         self.physical_properties().domain()
     }
 
-    pub fn set_domain(&mut self, domain: Name) {
+    pub fn set_domain(&mut self, domain: Option<Domain>) {
         self.physical_properties.set_domain(domain)
     }
 }

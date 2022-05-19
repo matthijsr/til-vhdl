@@ -1,6 +1,6 @@
 use core::fmt;
 
-use tydi_common::{name::Name};
+use tydi_common::name::Name;
 
 pub type Domain = Name;
 
@@ -51,8 +51,8 @@ impl PhysicalProperties {
         self.domain.as_ref()
     }
 
-    pub fn set_domain(&mut self, domain: Domain) {
-        self.domain = Some(domain);
+    pub fn set_domain(&mut self, domain: Option<Domain>) {
+        self.domain = domain;
     }
 }
 
