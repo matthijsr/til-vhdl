@@ -1,6 +1,8 @@
 use core::fmt;
 
-use tydi_common::name::Name;
+use tydi_common::{name::Name};
+
+use super::project::domain::Domain;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InterfaceDirection {
@@ -21,12 +23,12 @@ impl fmt::Display for InterfaceDirection {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PhysicalProperties {
-    domain: Option<Name>,
+    domain: Option<Domain>,
     direction: InterfaceDirection,
 }
 
 impl PhysicalProperties {
-    pub fn new(domain: Name, direction: InterfaceDirection) -> Self {
+    pub fn new(domain: Domain, direction: InterfaceDirection) -> Self {
         PhysicalProperties {
             domain: Some(domain),
             direction,
@@ -44,13 +46,12 @@ impl PhysicalProperties {
         self.direction
     }
 
-    /// Get a reference to the physical properties's domain.
-    #[must_use]
-    pub fn domain(&self) -> Option<&Name> {
+    /// When `None`, this refers to the Default domain instead
+    pub fn domain(&self) -> Option<&Domain> {
         self.domain.as_ref()
     }
 
-    pub fn set_domain(&mut self, domain: Name) {
+    pub fn set_domain(&mut self, domain: Domain) {
         self.domain = Some(domain);
     }
 }

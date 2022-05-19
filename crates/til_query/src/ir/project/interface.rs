@@ -18,16 +18,18 @@ use crate::ir::{
     Ir,
 };
 
+use super::domain::Domain;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {
-    domains: InsertionOrderedSet<Name>,
+    domains: Option<InsertionOrderedSet<Domain>>,
     ports: InsertionOrderedMap<Name, Id<InterfacePort>>,
 }
 
 impl Interface {
     pub fn new_empty() -> Self {
         Interface {
-            domains: InsertionOrderedSet::new(),
+            domains: None,
             ports: InsertionOrderedMap::new(),
         }
     }
@@ -49,6 +51,12 @@ impl Interface {
             port_map.try_insert(port.name().clone(), port.intern(db))?
         }
 
+        let domain_set = if domain_set.len() > 0 {
+            Some(domain_set)
+        } else {
+            None
+        };
+
         Ok(Interface {
             domains: domain_set,
             ports: port_map,
@@ -61,6 +69,12 @@ impl Interface {
             let domain = domain.try_result()?;
             domain_set.try_insert(domain)?;
         }
+
+        let domain_set = if domain_set.len() > 0 {
+            Some(domain_set)
+        } else {
+            None
+        };
 
         Ok(Interface {
             domains: domain_set,
@@ -79,7 +93,7 @@ impl Interface {
         }
 
         Ok(Interface {
-            domains: InsertionOrderedSet::new(),
+            domains: None,
             ports: port_map,
         })
     }
@@ -93,6 +107,12 @@ impl Interface {
             let domain = domain.try_result()?;
             domain_set.try_insert(domain)?;
         }
+
+        let domain_set = if domain_set.len() > 0 {
+            Some(domain_set)
+        } else {
+            None
+        };
 
         self.domains = domain_set;
         Ok(self)
@@ -114,7 +134,15 @@ impl Interface {
     }
 
     pub fn push_domain(&mut self, domain: impl TryResult<Name>) -> Result<()> {
-        self.domains.try_insert(domain.try_result()?)
+        let domain = domain.try_result()?;
+        if let Some(domains) = &mut self.domains {
+            domains.try_insert(domain)
+        } else {
+            let mut domains = InsertionOrderedSet::new();
+            domains.try_insert(domain)?;
+            self.domains = Some(domains);
+            Ok(())
+        }
     }
 
     pub fn push_port(&mut self, db: &dyn Ir, port: impl TryResult<InterfacePort>) -> Result<()> {

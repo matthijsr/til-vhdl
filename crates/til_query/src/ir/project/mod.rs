@@ -17,6 +17,7 @@ use super::{
     Ir,
 };
 
+pub mod domain;
 pub mod interface;
 pub mod namespace;
 
