@@ -9,7 +9,11 @@ use til_query::{
     },
     ir::{
         connection::InterfaceReference,
-        implementation::{link::Link, structure::Structure, Implementation, ImplementationKind},
+        implementation::{
+            link::Link,
+            structure::{streamlet_instance::StreamletInstance, Structure},
+            Implementation, ImplementationKind,
+        },
         physical_properties::InterfaceDirection,
         Ir,
     },
@@ -18,7 +22,7 @@ use tydi_common::{
     cat,
     error::{Error, Result, TryOptional, TryResult},
     map::InsertionOrderedMap,
-    name::{Name, PathName, PathNameSelf},
+    name::{Name, NameSelf, PathName, PathNameSelf},
     numbers::{u32_to_i32, usize_to_u32, NonNegative, Positive},
     traits::{Document, Documents, Identify},
 };
@@ -36,7 +40,10 @@ use tydi_vhdl::{
 
 use crate::IntoVhdl;
 
-use super::{interface_port::VhdlInterface, physical_properties::VhdlDomainListOrDefault};
+use super::{
+    interface_port::VhdlInterface,
+    physical_properties::{VhdlDomain, VhdlDomainListOrDefault},
+};
 
 pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
 
@@ -266,6 +273,125 @@ impl DeclareWithIndent for StreamletArchitecture {
     }
 }
 
+pub fn create_instance(
+    ir_db: &dyn Ir,
+    arch_db: &mut dyn Arch,
+    instance: &StreamletInstance,
+    architecture: &mut Architecture,
+    parent_domains: &VhdlDomainListOrDefault<Id<ObjectDeclaration>>,
+    prefix: impl TryOptional<VhdlName>,
+) -> Result<InsertionOrderedMap<InterfaceReference, PortObject>> {
+    let prefix = prefix.try_optional()?;
+
+    let mut vhdl_streamlet = instance
+        .definition()
+        .canonical(ir_db, arch_db, prefix.clone())?;
+    let component = vhdl_streamlet.to_component();
+
+    let instance_name = instance.name();
+    let wrap_portmap_err = |result: Result<()>| -> Result<()> {
+        match result {
+                        Ok(result) => Ok(result),
+                        Err(err) => Err(Error::BackEndError(format!(
+                    "Something went wrong trying to generate port mappings for streamlet instance {} (type: {}):\n\t{}",
+                    &instance_name, instance.definition().identifier(), err
+                ))),
+                    }
+    };
+
+    let mut port_mapping = PortMapping::from_component(arch_db, &component, instance_name.clone())?;
+
+    let mut signals = InsertionOrderedMap::new();
+
+    let mut interface = InsertionOrderedMap::new();
+    for (name, port) in instance.ports() {
+        interface.try_insert(
+            name.clone(),
+            port.canonical(ir_db, arch_db, prefix.clone())?,
+        )?;
+    }
+
+    for (name, port) in interface {
+        let mut try_signal_decl = |p: Port| {
+            let signal = ObjectDeclaration::signal(
+                arch_db,
+                format!("{}__{}", instance_name, p.identifier()),
+                p.typ().clone(),
+                None,
+            )?;
+            wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), signal))?;
+
+            architecture.add_declaration(arch_db, signal)?;
+
+            Ok(signal)
+        };
+
+        signals.try_insert(
+            InterfaceReference::new(Some(instance_name.clone()), name.clone()),
+            PortObject {
+                interface_direction: port.physical_properties().direction(),
+                typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
+                    ls.clone()
+                        .try_map_fields(&mut try_signal_decl)?
+                        .try_map_streams_named(|stream_name, stream| {
+                            Ok(PhysicalStreamObject {
+                                name: PathName::try_new([instance_name.clone(), name.clone()])?
+                                    .with_children(stream_name.clone()),
+                                clock: *parent_domains
+                                    .get(port.physical_properties().domain())?
+                                    .clock(),
+                                signal_list: stream
+                                    .signal_list()
+                                    .clone()
+                                    .try_map(&mut try_signal_decl)?,
+                                element_lanes: stream.element_lanes().clone(),
+                                dimensionality: stream.dimensionality(),
+                                complexity: stream.complexity().clone(),
+                                data_element_size: stream.data_element_size(),
+                                user_size: stream.user_size(),
+                                interface_direction: stream.interface_direction(),
+                                stream_direction: stream.stream_direction(),
+                            })
+                        })
+                })?,
+                is_local: false,
+            },
+        )?;
+    }
+    let map_domain = |port_mapping: &mut PortMapping,
+                      base_domain: &VhdlDomain<Port>,
+                      parent_domain: &VhdlDomain<Id<ObjectDeclaration>>|
+     -> Result<()> {
+        wrap_portmap_err(port_mapping.map_port(
+            arch_db,
+            base_domain.clock().vhdl_name().clone(),
+            *parent_domain.clock(),
+        ))?;
+        wrap_portmap_err(port_mapping.map_port(
+            arch_db,
+            base_domain.reset().vhdl_name().clone(),
+            *parent_domain.reset(),
+        ))?;
+        Ok(())
+    };
+
+    for (base_domain_name, base_domain) in vhdl_streamlet.domains().iterable().into_iter() {
+        map_domain(
+            &mut port_mapping,
+            base_domain,
+            parent_domains.get(
+                instance
+                    .domain_assignments()
+                    .get_assignment(base_domain_name.as_ref())?,
+            )?,
+        )?;
+    }
+
+    architecture.add_statement(arch_db, port_mapping.finish()?)?;
+
+    Ok(signals)
+}
+
 impl VhdlStreamlet {
     pub fn prefix(&self) -> &Option<VhdlName> {
         &self.prefix
@@ -302,7 +428,7 @@ impl VhdlStreamlet {
 
             let mut ports = vec![];
 
-            for domain in self.domains().iterable().into_iter() {
+            for (_, domain) in self.domains().iterable().into_iter() {
                 ports.push(domain.clock().clone());
                 ports.push(domain.reset().clone());
             }

@@ -2,6 +2,7 @@ use std::iter;
 
 use til_query::ir::physical_properties::Domain;
 use tydi_common::{
+    error::{Error, Result, WrapError},
     map::{InsertionOrderedMap, InsertionOrderedSet},
     name::{Name, PathName},
 };
@@ -15,10 +16,33 @@ pub enum VhdlDomainListOrDefault<T: Clone + PartialEq + Eq> {
 }
 
 impl<T: Clone + PartialEq + Eq> VhdlDomainListOrDefault<T> {
-    pub fn iterable(&self) -> impl IntoIterator<Item = &VhdlDomain<T>> {
+    pub fn iterable(&self) -> impl IntoIterator<Item = (Option<Domain>, &VhdlDomain<T>)> {
         match self {
-            VhdlDomainListOrDefault::List(list) => list.values().collect::<Vec<_>>(),
-            VhdlDomainListOrDefault::Default(res) => iter::once(res).collect::<Vec<_>>(),
+            VhdlDomainListOrDefault::List(list) => list
+                .iter()
+                .map(|(k, v)| (Some(k.clone()), v))
+                .collect::<Vec<_>>(),
+            VhdlDomainListOrDefault::Default(res) => iter::once((None, res)).collect::<Vec<_>>(),
+        }
+    }
+
+    pub fn get(&self, selected_domain: Option<&Domain>) -> Result<&VhdlDomain<T>> {
+        match self {
+            VhdlDomainListOrDefault::List(list) => match selected_domain {
+                Some(selected_domain) => list.try_get(selected_domain).wrap_err(
+                    Error::ProjectError("Domain does not exist on parent".to_string()),
+                ),
+                None => Err(Error::ProjectError(format!(
+                    "Attempted to retrieve default domain, but parent has named clock domains."
+                ))),
+            },
+            VhdlDomainListOrDefault::Default(res) => match selected_domain {
+                Some(selected_domain) => Err(Error::ProjectError(format!(
+                    "Attempted to retrieve domain {}, but parent only has default clock domain.",
+                    selected_domain
+                ))),
+                None => Ok(res),
+            },
         }
     }
 }
