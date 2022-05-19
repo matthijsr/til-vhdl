@@ -99,6 +99,42 @@ pub struct StreamletInstance {
 }
 
 impl StreamletInstance {
+    pub fn new_assign_default(
+        db: &dyn Ir,
+        name: impl TryResult<Name>,
+        definition: Id<Arc<Streamlet>>,
+    ) -> Result<Self> {
+        let name = name.try_result()?;
+        let definition = definition.get(db);
+        let base_domains = definition.domains(db);
+        let domain_assignments = match base_domains {
+            Some(named_domains) => {
+                if named_domains.len() > 0 {
+                    let mut result_assignments = InsertionOrderedMap::new();
+                    for name in named_domains.iter() {
+                        result_assignments.try_insert(name.clone(), None)?;
+                    }
+                    DomainAssignments::List(result_assignments)
+                } else {
+                    return Err(Error::ProjectError(format!("Streamlet {} has an empty named domain list. Should be None (= Default Domain).", definition.identifier())));
+                }
+            }
+            None => DomainAssignments::Default(None),
+        };
+        let mut ports = definition.ports(db);
+        for port in ports.values_mut() {
+            port.set_domain(domain_assignments.get_assignment(port.domain())?.cloned());
+        }
+
+        Ok(Self {
+            name,
+            definition,
+            domain_assignments,
+            ports,
+            doc: None,
+        })
+    }
+
     pub fn new(
         db: &dyn Ir,
         name: impl TryResult<Name>,
@@ -106,20 +142,20 @@ impl StreamletInstance {
         assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
     ) -> Result<Self> {
         let name = name.try_result()?;
-        let definition = definition.get(db);
-        let base_domains = definition.domains(db);
         let mut assignments = assignments
             .into_iter()
             .map(|(x, a)| Ok((x.try_optional()?, a.try_result()?)))
             .collect::<Result<Vec<(Option<Domain>, Domain)>>>()?;
-        let domain_assignments = match base_domains {
-            Some(named_domains) => {
-                if named_domains.len() > 0 {
-                    if named_domains.len() != assignments.len() {
-                        return Err(Error::InvalidArgument(format!("Domain assignment list does not match base domain list length. Base: {}, Assignments: {}", named_domains.len(), assignments.len())));
-                    }
-                    let mut result_assignments = InsertionOrderedMap::new();
-                    if assignments.len() > 0 {
+        if assignments.len() > 0 {
+            let definition = definition.get(db);
+            let base_domains = definition.domains(db);
+            let domain_assignments = match base_domains {
+                Some(named_domains) => {
+                    if named_domains.len() > 0 {
+                        if named_domains.len() != assignments.len() {
+                            return Err(Error::InvalidArgument(format!("Domain assignment list does not match base domain list length. Base: {}, Assignments: {}", named_domains.len(), assignments.len())));
+                        }
+                        let mut result_assignments = InsertionOrderedMap::new();
                         let mut ordered_assignments = vec![];
                         let mut named_assignments = InsertionOrderedMap::new();
                         let mut used_name = false;
@@ -161,38 +197,37 @@ impl StreamletInstance {
                                 result_assignments.try_insert(base_name, Some(n_val.clone()))?;
                             }
                         }
-                    } else {
-                        for name in named_domains.iter() {
-                            result_assignments.try_insert(name.clone(), None)?;
-                        }
-                    }
-                    DomainAssignments::List(result_assignments)
-                } else {
-                    return Err(Error::ProjectError(format!("Streamlet {} has an empty named domain list. Should be None (= Default Domain).", definition.identifier())));
-                }
-            }
-            None => {
-                if assignments.len() > 1 {
-                    return Err(Error::ProjectError("Attempting to assign multiple Domains, but Streamlet should only have one (Default) domain.".to_string()));
-                } else if assignments.len() == 1 {
-                    DomainAssignments::Default(Some(assignments.pop().unwrap().1))
-                } else {
-                    DomainAssignments::Default(None)
-                }
-            }
-        };
-        let mut ports = definition.ports(db);
-        for port in ports.values_mut() {
-            port.set_domain(domain_assignments.get_assignment(port.domain())?.cloned());
-        }
 
-        Ok(Self {
-            name,
-            definition,
-            domain_assignments,
-            ports,
-            doc: None,
-        })
+                        DomainAssignments::List(result_assignments)
+                    } else {
+                        return Err(Error::ProjectError(format!("Streamlet {} has an empty named domain list. Should be None (= Default Domain).", definition.identifier())));
+                    }
+                }
+                None => {
+                    if assignments.len() > 1 {
+                        return Err(Error::ProjectError("Attempting to assign multiple Domains, but Streamlet should only have one (Default) domain.".to_string()));
+                    } else if assignments.len() == 1 {
+                        DomainAssignments::Default(Some(assignments.pop().unwrap().1))
+                    } else {
+                        unreachable!()
+                    }
+                }
+            };
+            let mut ports = definition.ports(db);
+            for port in ports.values_mut() {
+                port.set_domain(domain_assignments.get_assignment(port.domain())?.cloned());
+            }
+
+            Ok(Self {
+                name,
+                definition,
+                domain_assignments,
+                ports,
+                doc: None,
+            })
+        } else {
+            Self::new_assign_default(db, name, definition)
+        }
     }
 
     pub fn definition(&self) -> Arc<Streamlet> {

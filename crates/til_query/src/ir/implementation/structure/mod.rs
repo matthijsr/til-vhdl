@@ -5,7 +5,7 @@ use std::{
 };
 
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryOptional, TryResult},
     map::InsertionOrderedMap,
     name::Name,
 };
@@ -13,7 +13,7 @@ use tydi_intern::Id;
 
 use crate::ir::{
     connection::{Connection, InterfaceReference},
-    physical_properties::InterfaceDirection,
+    physical_properties::{Domain, InterfaceDirection},
     project::interface::Interface,
     traits::{GetSelf, MoveDb},
     InterfacePort, Ir, Streamlet,
@@ -158,6 +158,24 @@ impl Structure {
         &mut self,
         name: impl TryResult<Name>,
         streamlet: Id<Arc<Streamlet>>,
+        assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
+    ) -> Result<()> {
+        let name = name.try_result()?;
+        if self.streamlet_instance_ids().contains_key(&name) {
+            Err(Error::InvalidArgument(format!(
+                "A streamlet instance with name {} already exists in this structure",
+                name
+            )))
+        } else {
+            self.streamlet_instances.insert(name, streamlet);
+            Ok(())
+        }
+    }
+
+    pub fn try_add_streamlet_instance_default(
+        &mut self,
+        name: impl TryResult<Name>,
+        streamlet: Id<Arc<Streamlet>>,
     ) -> Result<()> {
         let name = name.try_result()?;
         if self.streamlet_instance_ids().contains_key(&name) {
@@ -271,7 +289,7 @@ mod tests {
             ],
         )?;
         let mut structure = Structure::try_from(&streamlet)?;
-        structure.try_add_streamlet_instance(
+        structure.try_add_streamlet_instance_default(
             "instance",
             streamlet.with_implementation(None).intern_arc(db),
         )?;
@@ -294,7 +312,7 @@ mod tests {
         )?;
 
         let mut structure = Structure::try_from(&streamlet)?;
-        structure.try_add_streamlet_instance(
+        structure.try_add_streamlet_instance_default(
             "instance",
             streamlet.with_implementation(None).intern_arc(db),
         )?;
@@ -335,7 +353,7 @@ mod tests {
             ],
         )?;
         let mut structure = Structure::try_from(&streamlet)?;
-        structure.try_add_streamlet_instance(
+        structure.try_add_streamlet_instance_default(
             "instance",
             streamlet.with_implementation(None).intern_arc(db),
         )?;
