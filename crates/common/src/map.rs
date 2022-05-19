@@ -60,6 +60,10 @@ impl<V: Clone + PartialEq + Ord + ToString> InsertionOrderedSet<V> {
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &V> {
         self.items.iter().map(|(v, _)| v)
     }
+
+    pub fn into_iter(self) -> impl ExactSizeIterator<Item = V> {
+        self.items.into_iter().map(|(v, _)| v)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

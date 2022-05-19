@@ -120,27 +120,45 @@ impl StreamletInstance {
                     }
                     let mut result_assignments = InsertionOrderedMap::new();
                     if assignments.len() > 0 {
+                        let mut ordered_assignments = vec![];
+                        let mut named_assignments = InsertionOrderedMap::new();
                         let mut used_name = false;
-                        for ((a_name, a_val), base_name) in
-                            assignments.into_iter().zip(named_domains.iter())
-                        {
+                        for (a_name, a_val) in assignments {
                             match a_name {
                                 Some(a_name) => {
                                     used_name = true;
-                                    result_assignments
-                                        .try_insert(a_name, Some(a_val))
-                                        .wrap_err(Error::InvalidArgument(
-                                            "Duplicate domain assignment".to_string(),
-                                        ))?;
+                                    if named_domains.contains(&a_name) {
+                                        named_assignments.try_insert(a_name, a_val).wrap_err(
+                                            Error::InvalidArgument(
+                                                "Duplicate domain assignment".to_string(),
+                                            ),
+                                        )?;
+                                    } else {
+                                        return Err(Error::InvalidArgument(format!(
+                                            "No Domain named {} on Streamlet {}",
+                                            &a_name,
+                                            definition.identifier()
+                                        )));
+                                    }
                                 }
                                 None => {
                                     if used_name {
                                         return Err(Error::InvalidArgument("Cannot use nameless Domain assignment after using a name.".to_string()));
                                     } else {
-                                        result_assignments
-                                            .try_insert(base_name.clone(), Some(a_val))?;
+                                        ordered_assignments.push(a_val);
                                     }
                                 }
+                            }
+                        }
+                        let mut ordered_assignments = ordered_assignments.into_iter();
+                        for base_name in named_domains.into_iter() {
+                            if let Some(a_val) = ordered_assignments.next() {
+                                result_assignments.try_insert(base_name, Some(a_val))?;
+                            } else {
+                                let n_val = named_assignments.try_get(&base_name).wrap_err(
+                                    Error::InvalidArgument("Missing domain assignment".to_string()),
+                                )?;
+                                result_assignments.try_insert(base_name, Some(n_val.clone()))?;
                             }
                         }
                     } else {
