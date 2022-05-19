@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tydi_common::{
     error::{Error, Result, WrapError},
-    map::InsertionOrderedMap,
+    map::{InsertionOrderedMap, InsertionOrderedSet},
     name::{Name, NameSelf},
     traits::{Document, Documents, Identify},
 };
@@ -45,6 +45,44 @@ impl ListOrDefault {
             None => self.get_assignment_default(),
         }
     }
+
+    pub fn assigned_domains(&self) -> Result<Option<InsertionOrderedSet<Domain>>> {
+        match self {
+            ListOrDefault::List(list) => {
+                let mut set = InsertionOrderedSet::new();
+                let mut has_default = false;
+                for assigned in list.values() {
+                    match assigned {
+                        Some(name) => {
+                            set.insert(name.clone());
+                        }
+                        None => {
+                            has_default = true;
+                        }
+                    }
+                }
+                if has_default {
+                    if set.len() > 0 {
+                        Err(Error::ProjectError(
+                            "Streamlet has both Default and named domains assigned.".to_string(),
+                        ))
+                    } else {
+                        Ok(None)
+                    }
+                } else {
+                    Ok(Some(set))
+                }
+            }
+            ListOrDefault::Default(res) => match res {
+                Some(assigned) => {
+                    let mut set = InsertionOrderedSet::new();
+                    set.try_insert(assigned.clone())?;
+                    Ok(Some(set))
+                }
+                None => Ok(None),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -54,6 +92,16 @@ pub struct StreamletInstance {
     domain_assignments: ListOrDefault,
     ports: InsertionOrderedMap<Name, InterfacePort>,
     doc: Option<String>,
+}
+
+impl StreamletInstance {
+    pub fn definition(&self) -> Arc<Streamlet> {
+        self.definition.clone()
+    }
+
+    pub fn assigned_domains(&self) -> Result<Option<InsertionOrderedSet<Domain>>> {
+        self.domain_assignments.assigned_domains()
+    }
 }
 
 impl Document for StreamletInstance {
