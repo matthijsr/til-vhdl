@@ -36,7 +36,7 @@ use tydi_vhdl::{
 
 use crate::IntoVhdl;
 
-use super::interface::VhdlInterface;
+use super::interface_port::VhdlInterface;
 
 pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
 

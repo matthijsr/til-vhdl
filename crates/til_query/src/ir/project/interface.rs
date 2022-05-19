@@ -12,13 +12,11 @@ use tydi_intern::Id;
 use crate::ir::{
     implementation::structure::Structure,
     interface_port::InterfacePort,
-    physical_properties::InterfaceDirection,
+    physical_properties::{InterfaceDirection, Domain},
     streamlet::Streamlet,
     traits::{InternSelf, MoveDb},
     Ir,
 };
-
-use super::domain::Domain;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {

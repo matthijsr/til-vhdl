@@ -2,7 +2,7 @@ use core::fmt;
 
 use tydi_common::{name::Name};
 
-use super::project::domain::Domain;
+pub type Domain = Name;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InterfaceDirection {

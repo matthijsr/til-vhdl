@@ -9,9 +9,9 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    project::{domain::Domain, interface::Interface},
+    project::{interface::Interface},
     traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
-    Implementation, InterfacePort, Ir,
+    Implementation, InterfacePort, Ir, physical_properties::Domain,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

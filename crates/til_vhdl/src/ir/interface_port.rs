@@ -21,7 +21,7 @@ use tydi_vhdl::{
 
 use crate::{common::physical::stream::VhdlPhysicalStream, IntoVhdl};
 
-pub(crate) type Interface = til_query::ir::interface_port::InterfacePort;
+pub(crate) type InterfacePort = til_query::ir::interface_port::InterfacePort;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// The VHDL representation of a Tydi interface, consisting of physical streams
@@ -60,7 +60,7 @@ impl Document for VhdlInterface {
     }
 }
 
-impl IntoVhdl<VhdlInterface> for Interface {
+impl IntoVhdl<VhdlInterface> for InterfacePort {
     fn canonical(
         &self,
         ir_db: &dyn Ir,
