@@ -1,11 +1,13 @@
 use std::{
     collections::{BTreeMap, HashSet},
     convert::{TryFrom, TryInto},
+    sync::Arc,
 };
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::Name, map::InsertionOrderedMap,
+    map::InsertionOrderedMap,
+    name::Name,
 };
 use tydi_intern::Id;
 
@@ -17,16 +19,18 @@ use crate::ir::{
     InterfacePort, Ir, Streamlet,
 };
 
+pub mod streamlet_instance;
+
 /// This node represents a structural `Implementation`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Structure {
-    interface: Id<Interface>,
+    interface: Id<Arc<Interface>>,
     streamlet_instances: BTreeMap<Name, Id<Streamlet>>,
     connections: Vec<Connection>,
 }
 
 impl Structure {
-    pub fn new(interface: Id<Interface>) -> Self {
+    pub fn new(interface: Id<Arc<Interface>>) -> Self {
         Structure {
             interface,
             streamlet_instances: BTreeMap::new(),
@@ -34,11 +38,11 @@ impl Structure {
         }
     }
 
-    pub fn interface_id(&self) -> Id<Interface> {
+    pub fn interface_id(&self) -> Id<Arc<Interface>> {
         self.interface
     }
 
-    pub fn interface(&self, db: &dyn Ir) -> Interface {
+    pub fn interface(&self, db: &dyn Ir) -> Arc<Interface> {
         self.interface_id().get(db)
     }
 

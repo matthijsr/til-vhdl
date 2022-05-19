@@ -1,5 +1,5 @@
 use core::fmt;
-use std::convert::{TryFrom, TryInto};
+use std::{convert::{TryFrom, TryInto}, sync::Arc};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -160,30 +160,30 @@ impl Interface {
     }
 }
 
-impl MoveDb<Id<Interface>> for Interface {
+impl MoveDb<Id<Arc<Interface>>> for Arc<Interface> {
     fn move_db(
         &self,
         _original_db: &dyn Ir,
         target_db: &dyn Ir,
         _prefix: &Option<Name>,
-    ) -> Result<Id<Interface>> {
+    ) -> Result<Id<Arc<Interface>>> {
         Ok(self.clone().intern(target_db))
     }
 }
 
-impl From<Structure> for Id<Interface> {
+impl From<Structure> for Id<Arc<Interface>> {
     fn from(st: Structure) -> Self {
         st.interface_id()
     }
 }
 
-impl From<&Structure> for Id<Interface> {
+impl From<&Structure> for Id<Arc<Interface>> {
     fn from(st: &Structure) -> Self {
         st.interface_id()
     }
 }
 
-impl TryFrom<Streamlet> for Id<Interface> {
+impl TryFrom<Streamlet> for Id<Arc<Interface>> {
     type Error = Error;
 
     fn try_from(streamlet: Streamlet) -> Result<Self> {
@@ -191,7 +191,7 @@ impl TryFrom<Streamlet> for Id<Interface> {
     }
 }
 
-impl TryFrom<&Streamlet> for Id<Interface> {
+impl TryFrom<&Streamlet> for Id<Arc<Interface>> {
     type Error = Error;
 
     fn try_from(streamlet: &Streamlet) -> Result<Self> {

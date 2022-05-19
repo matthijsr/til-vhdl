@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tydi_intern::Id;
 
 use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
@@ -21,5 +23,5 @@ pub trait Interner {
     #[salsa::interned]
     fn intern_streamlet(&self, streamlet: Streamlet) -> Id<Streamlet>;
     #[salsa::interned]
-    fn intern_interface_collection(&self, interface: Interface) -> Id<Interface>;
+    fn intern_interface(&self, interface: Arc<Interface>) -> Id<Arc<Interface>>;
 }

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -34,7 +34,7 @@ pub struct Namespace {
     /// As implementations and streamlets both contain an Interface,
     /// they are also declared as interfaces.
     /// This means that streamlet and implementation names cannot overlap.
-    interfaces: BTreeMap<Name, Id<Interface>>,
+    interfaces: BTreeMap<Name, Id<Arc<Interface>>>,
 }
 
 impl Namespace {
@@ -81,11 +81,11 @@ impl Namespace {
             .collect()
     }
 
-    pub fn interface_ids(&self) -> &BTreeMap<Name, Id<Interface>> {
+    pub fn interface_ids(&self) -> &BTreeMap<Name, Id<Arc<Interface>>> {
         &self.interfaces
     }
 
-    pub fn interfaces(&self, db: &dyn Ir) -> BTreeMap<Name, Interface> {
+    pub fn interfaces(&self, db: &dyn Ir) -> BTreeMap<Name, Arc<Interface>> {
         self.interface_ids()
             .iter()
             .map(|(name, id)| (name.clone(), id.get(db)))
@@ -143,7 +143,7 @@ impl Namespace {
     pub fn import_interface(
         &mut self,
         name: impl TryResult<Name>,
-        interface_id: Id<Interface>,
+        interface_id: Id<Arc<Interface>>,
     ) -> Result<()> {
         let name = name.try_result()?;
         match self.interfaces.insert(name.clone(), interface_id) {
@@ -202,8 +202,8 @@ impl Namespace {
         &mut self,
         db: &dyn Ir,
         name: impl TryResult<Name>,
-        interface: impl TryIntern<Interface>,
-    ) -> Result<Id<Interface>> {
+        interface: impl TryIntern<Arc<Interface>>,
+    ) -> Result<Id<Arc<Interface>>> {
         let name = name.try_result()?;
         let interface_id = interface.try_intern(db)?;
         self.import_interface(name, interface_id)?;
@@ -276,7 +276,7 @@ impl Namespace {
         }
     }
 
-    pub fn get_interface_id(&self, name: impl TryResult<Name>) -> Result<Id<Interface>> {
+    pub fn get_interface_id(&self, name: impl TryResult<Name>) -> Result<Id<Arc<Interface>>> {
         let name = name.try_result()?;
         self.interface_ids()
             .get(&name)
@@ -288,11 +288,7 @@ impl Namespace {
             )))
     }
 
-    pub fn get_interface(
-        &self,
-        db: &dyn Ir,
-        name: impl TryResult<Name>,
-    ) -> Result<Interface> {
+    pub fn get_interface(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Arc<Interface>> {
         Ok(self.get_interface_id(name)?.get(db))
     }
 

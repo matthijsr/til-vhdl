@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tydi_intern::Id;
 
 use super::{
@@ -36,8 +38,8 @@ impl GetSelf<Namespace> for Id<Namespace> {
     }
 }
 
-impl GetSelf<Interface> for Id<Interface> {
-    fn get(&self, db: &dyn Ir) -> Interface {
-        db.lookup_intern_interface_collection(*self)
+impl GetSelf<Arc<Interface>> for Id<Arc<Interface>> {
+    fn get(&self, db: &dyn Ir) -> Arc<Interface> {
+        db.lookup_intern_interface(*self)
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
@@ -11,7 +11,10 @@ use til_query::{
         Ir,
     },
 };
-use tydi_common::{name::{Name, PathName}, traits::Documents};
+use tydi_common::{
+    name::{Name, PathName},
+    traits::Documents,
+};
 use tydi_intern::Id;
 
 use crate::{
@@ -31,8 +34,8 @@ pub fn eval_struct_stat(
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<Interface>>,
-    interface_imports: &HashMap<PathName, Id<Interface>>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<(), EvalError> {
@@ -104,16 +107,16 @@ pub fn eval_implementation_expr(
     expr: &Spanned<Expr>,
     name: &PathName,
     doc: Option<&String>,
-    interface: Option<Id<Interface>>,
+    interface: Option<Id<Arc<Interface>>>,
     streamlets: &HashMap<Name, Id<Streamlet>>,
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<Interface>>,
-    interface_imports: &HashMap<PathName, Id<Interface>>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<(Id<Implementation>, Id<Interface>), EvalError> {
+) -> Result<(Id<Implementation>, Id<Arc<Interface>>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             let implementation = eval_ident(

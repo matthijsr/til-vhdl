@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tydi_common::{
     error::{Error, Result, TryResult},
     map::{InsertionOrderedMap, InsertionOrderedSet},
@@ -8,7 +10,7 @@ use tydi_intern::Id;
 
 use super::{
     project::{domain::Domain, interface::Interface},
-    traits::{GetSelf, InternSelf, MoveDb, TryIntern},
+    traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
     Implementation, InterfacePort, Ir,
 };
 
@@ -18,7 +20,7 @@ pub struct Streamlet {
     /// and can be suffixed with their implementation.
     name: PathName,
     implementation: Option<Id<Implementation>>,
-    interface: Option<Id<Interface>>,
+    interface: Option<Id<Arc<Interface>>>,
     doc: Option<String>,
 }
 
@@ -38,7 +40,7 @@ impl Streamlet {
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = Interface::new(domains, ports)?.intern(db);
+        let interface = Interface::new(domains, ports)?.intern_arc(db);
         self.interface = Some(interface);
 
         Ok(self)
@@ -50,10 +52,10 @@ impl Streamlet {
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
         if let Some(interface) = self.interface {
-            let new_interface = interface.get(db).with_ports(ports)?;
-            self.interface = Some(new_interface.intern(db));
+            let new_interface = interface.get(db).as_ref().clone().with_ports(ports)?;
+            self.interface = Some(new_interface.intern_arc(db));
         } else {
-            let interface = Interface::new_ports(ports)?.intern(db);
+            let interface = Interface::new_ports(ports)?.intern_arc(db);
             self.interface = Some(interface);
         }
 
@@ -63,7 +65,7 @@ impl Streamlet {
     pub fn with_interface(
         mut self,
         db: &dyn Ir,
-        coll: impl TryIntern<Interface>,
+        coll: impl TryIntern<Arc<Interface>>,
     ) -> Result<Streamlet> {
         self.interface = Some(coll.try_intern(db)?);
 
@@ -97,15 +99,15 @@ impl Streamlet {
         }
     }
 
-    pub fn interface_id(&self) -> Option<Id<Interface>> {
+    pub fn interface_id(&self) -> Option<Id<Arc<Interface>>> {
         self.interface.clone()
     }
 
-    pub fn interface(&self, db: &dyn Ir) -> Interface {
+    pub fn interface(&self, db: &dyn Ir) -> Arc<Interface> {
         if let Some(interface_id) = self.interface_id() {
             interface_id.get(db)
         } else {
-            let interface = Interface::new_empty();
+            let interface = Arc::new(Interface::new_empty());
             interface.clone().intern(db);
             interface
         }
@@ -188,8 +190,8 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
     }
 }
 
-impl From<Id<Interface>> for Streamlet {
-    fn from(id: Id<Interface>) -> Self {
+impl From<Id<Arc<Interface>>> for Streamlet {
+    fn from(id: Id<Arc<Interface>>) -> Self {
         Streamlet {
             name: PathName::new_empty(),
             implementation: None,

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
@@ -10,7 +10,10 @@ use til_query::{
         Ir,
     },
 };
-use tydi_common::{name::{Name, PathName}, traits::Documents};
+use tydi_common::{
+    name::{Name, PathName},
+    traits::Documents,
+};
 use tydi_intern::Id;
 
 use crate::{
@@ -30,11 +33,11 @@ pub fn eval_streamlet_expr(
     streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<Interface>>,
-    interface_imports: &HashMap<PathName, Id<Interface>>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<(Id<Streamlet>, Id<Interface>), EvalError> {
+) -> Result<(Id<Streamlet>, Id<Arc<Interface>>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports, "streamlet")

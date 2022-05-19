@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
+    sync::Arc,
 };
 
 use til_query::{
@@ -8,13 +9,14 @@ use til_query::{
     ir::{
         interface_port::InterfacePort,
         project::interface::Interface,
-        traits::{GetSelf, InternSelf},
+        traits::{GetSelf, InternArc},
         Ir,
     },
 };
 use tydi_common::{
     error::TryResult,
-    name::{Name, PathName}, traits::Documents,
+    name::{Name, PathName},
+    traits::Documents,
 };
 use tydi_intern::Id;
 
@@ -25,11 +27,11 @@ use super::{eval_common_error, eval_name, eval_type::eval_type_expr, EvalError};
 pub fn eval_interface_expr(
     db: &dyn Ir,
     expr: &Spanned<Expr>,
-    interfaces: &HashMap<Name, Id<Interface>>,
-    interface_imports: &HashMap<PathName, Id<Interface>>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<Id<Interface>, EvalError> {
+) -> Result<Id<Arc<Interface>>, EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")
@@ -76,7 +78,7 @@ pub fn eval_interface_expr(
                     });
                 }
             }
-            Ok(result.intern(db))
+            Ok(result.intern_arc(db))
         }
         _ => Err(EvalError {
             span: expr.1.clone(),
@@ -103,7 +105,7 @@ pub(crate) mod tests {
         name: impl TryResult<Name>,
         db: &dyn Ir,
         types: &HashMap<Name, Id<LogicalType>>,
-        interfaces: &mut HashMap<Name, Id<Interface>>,
+        interfaces: &mut HashMap<Name, Id<Arc<Interface>>>,
     ) {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());

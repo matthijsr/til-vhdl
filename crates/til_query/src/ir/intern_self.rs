@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tydi_intern::Id;
 
 use super::{
@@ -44,8 +46,8 @@ impl InternSelf for Namespace {
     }
 }
 
-impl InternSelf for Interface {
+impl InternSelf for Arc<Interface> {
     fn intern(self, db: &dyn Ir) -> Id<Self> {
-        db.intern_interface_collection(self)
+        db.intern_interface(self)
     }
 }
