@@ -1,6 +1,9 @@
 use core::fmt;
 
-use tydi_common::name::Name;
+use tydi_common::{
+    error::{Error, Result, TryResult},
+    name::Name,
+};
 
 pub type Domain = Name;
 
@@ -71,5 +74,16 @@ impl From<(Name, InterfaceDirection)> for PhysicalProperties {
             domain: Some(name),
             direction,
         }
+    }
+}
+
+impl TryFrom<(&str, InterfaceDirection)> for PhysicalProperties {
+    type Error = Error;
+
+    fn try_from((name, direction): (&str, InterfaceDirection)) -> Result<Self> {
+        Ok(PhysicalProperties {
+            domain: Some(name.try_result()?),
+            direction,
+        })
     }
 }

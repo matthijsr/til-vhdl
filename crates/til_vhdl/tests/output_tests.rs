@@ -66,18 +66,19 @@ fn playground() -> Result<()> {
     namespace.define_streamlet(
         db,
         "streamlet",
-        Streamlet::new().with_ports(
+        Streamlet::new().with_domains_ports(
             db,
+            vec!["domain1", "domain2", "domain3"],
             vec![
                 (
                     "a",
                     namespace.get_stream_id(db, "stream")?,
-                    InterfaceDirection::In,
+                    ("domain1", InterfaceDirection::In),
                 ),
                 (
                     "b",
                     namespace.get_stream_id(db, "stream")?,
-                    InterfaceDirection::Out,
+                    ("domain2", InterfaceDirection::Out),
                 ),
             ],
         )?,
@@ -85,7 +86,16 @@ fn playground() -> Result<()> {
 
     let streamlet_id = namespace.get_streamlet_id("streamlet")?;
     let mut structure: Structure = streamlet_id.get(db).as_ref().try_into()?;
-    structure.try_add_streamlet_instance_default(db, "a", streamlet_id)?;
+    structure.try_add_streamlet_instance(
+        db,
+        "a",
+        streamlet_id,
+        vec![
+            ("", "domain1"),
+            ("domain2", "domain2"),
+            ("domain3", "domain1"),
+        ],
+    )?;
     structure.try_add_connection(db, ("a", "a"), "a")?;
     structure.try_add_connection(db, ("a", "b"), "b")?;
     namespace.define_implementation(db, "implementation", structure)?;
