@@ -3,7 +3,7 @@ use tydi_intern::Id;
 use super::{
     project::{interface::Interface, namespace::Namespace},
     traits::GetSelf,
-    Implementation, InterfacePort, Ir, LogicalType, Stream, Streamlet,
+    Implementation, Ir, LogicalType, Stream, Streamlet,
 };
 
 impl GetSelf<Implementation> for Id<Implementation> {
@@ -15,12 +15,6 @@ impl GetSelf<Implementation> for Id<Implementation> {
 impl GetSelf<LogicalType> for Id<LogicalType> {
     fn get(&self, db: &dyn Ir) -> LogicalType {
         db.lookup_intern_type(*self)
-    }
-}
-
-impl GetSelf<InterfacePort> for Id<InterfacePort> {
-    fn get(&self, db: &dyn Ir) -> InterfacePort {
-        db.lookup_intern_port(*self)
     }
 }
 

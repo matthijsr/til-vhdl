@@ -1,8 +1,9 @@
+use core::fmt;
 use std::convert::TryFrom;
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::Name,
+    name::{Name, NameSelf},
     traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
@@ -11,7 +12,6 @@ use crate::common::logical::logicaltype::stream::Stream;
 
 use super::{
     physical_properties::{InterfaceDirection, PhysicalProperties},
-    traits::{InternSelf, MoveDb},
     Ir,
 };
 
@@ -36,10 +36,6 @@ impl InterfacePort {
             physical_properties,
             doc: None,
         })
-    }
-
-    pub fn name(&self) -> &Name {
-        &self.name
     }
 
     pub fn stream(&self, db: &dyn Ir) -> Stream {
@@ -73,6 +69,12 @@ impl Identify for InterfacePort {
     }
 }
 
+impl NameSelf for InterfacePort {
+    fn name(&self) -> &Name {
+        &self.name
+    }
+}
+
 impl<N, S, P> TryFrom<(N, S, P)> for InterfacePort
 where
     N: TryResult<Name>,
@@ -91,23 +93,6 @@ where
     }
 }
 
-impl MoveDb<Id<InterfacePort>> for InterfacePort {
-    fn move_db(
-        &self,
-        original_db: &dyn Ir,
-        target_db: &dyn Ir,
-        prefix: &Option<Name>,
-    ) -> Result<Id<InterfacePort>> {
-        Ok(InterfacePort {
-            name: self.name.clone(),
-            stream: self.stream.move_db(original_db, target_db, prefix)?,
-            physical_properties: self.physical_properties.clone(),
-            doc: self.doc.clone(),
-        }
-        .intern(target_db))
-    }
-}
-
 impl Document for InterfacePort {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
@@ -117,5 +102,22 @@ impl Document for InterfacePort {
 impl Documents for InterfacePort {
     fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into());
+    }
+}
+
+impl fmt::Display for InterfacePort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let domain = if let Some(domain) = self.domain() {
+            domain.as_ref()
+        } else {
+            "Default"
+        };
+        write!(
+            f,
+            "InterfacePort(Name: {}, Direction: {}, Domain: {})",
+            self.name(),
+            self.direction(),
+            domain
+        )
     }
 }

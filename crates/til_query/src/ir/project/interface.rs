@@ -4,7 +4,7 @@ use std::convert::{TryFrom, TryInto};
 use tydi_common::{
     error::{Error, Result, TryResult},
     map::{InsertionOrderedMap, InsertionOrderedSet},
-    name::Name,
+    name::{Name, NameSelf},
     traits::Identify,
 };
 use tydi_intern::Id;
@@ -14,7 +14,7 @@ use crate::ir::{
     interface_port::InterfacePort,
     physical_properties::InterfaceDirection,
     streamlet::Streamlet,
-    traits::{GetSelf, InternSelf, MoveDb},
+    traits::{InternSelf, MoveDb},
     Ir,
 };
 
@@ -23,7 +23,7 @@ use super::domain::Domain;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {
     domains: Option<InsertionOrderedSet<Domain>>,
-    ports: InsertionOrderedMap<Name, Id<InterfacePort>>,
+    ports: InsertionOrderedMap<Name, InterfacePort>,
 }
 
 impl Interface {
@@ -35,7 +35,6 @@ impl Interface {
     }
 
     pub fn new(
-        db: &dyn Ir,
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
@@ -48,7 +47,7 @@ impl Interface {
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
-            port_map.try_insert(port.name().clone(), port.intern(db))?
+            port_map.try_insert(port.name().clone(), port)?
         }
 
         let domain_set = if domain_set.len() > 0 {
@@ -83,13 +82,12 @@ impl Interface {
     }
 
     pub fn new_ports(
-        db: &dyn Ir,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
-            port_map.try_insert(port.name().clone(), port.intern(db))?
+            port_map.try_insert(port.name().clone(), port)?
         }
 
         Ok(Interface {
@@ -120,13 +118,12 @@ impl Interface {
 
     pub fn with_ports(
         mut self,
-        db: &dyn Ir,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
-            port_map.try_insert(port.name().clone(), port.intern(db))?
+            port_map.try_insert(port.name().clone(), port)?
         }
 
         self.ports = port_map;
@@ -145,40 +142,32 @@ impl Interface {
         }
     }
 
-    pub fn push_port(&mut self, db: &dyn Ir, port: impl TryResult<InterfacePort>) -> Result<()> {
+    pub fn push_port(&mut self, port: impl TryResult<InterfacePort>) -> Result<()> {
         let port = port.try_result()?;
-        self.ports.try_insert(port.name().clone(), port.intern(db))
+        self.ports.try_insert(port.name().clone(), port)
     }
 
-    pub fn port_ids(&self) -> &InsertionOrderedMap<Name, Id<InterfacePort>> {
+    pub fn ports(&self) -> &InsertionOrderedMap<Name, InterfacePort> {
         &self.ports
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        let mut result = vec![];
-        for (_, port) in &self.ports {
-            result.push(port.get(db));
-        }
-        result
-    }
-
-    pub fn inputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        self.ports(db)
+    pub fn inputs(&self) -> impl Iterator<Item = &InterfacePort> {
+        self.ports()
             .into_iter()
+            .map(|(_, x)| x)
             .filter(|x| x.physical_properties().direction() == InterfaceDirection::In)
-            .collect()
     }
 
-    pub fn outputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        self.ports(db)
+    pub fn outputs(&self) -> impl Iterator<Item = &InterfacePort> {
+        self.ports()
             .into_iter()
+            .map(|(_, x)| x)
             .filter(|x| x.physical_properties().direction() == InterfaceDirection::Out)
-            .collect()
     }
 
-    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<InterfacePort> {
-        match self.port_ids().get(name) {
-            Some(port) => Ok(port.get(db)),
+    pub fn try_get_port(&self, name: &Name) -> Result<InterfacePort> {
+        match self.ports().get(name) {
+            Some(port) => Ok(port.clone()),
             None => Err(Error::InvalidArgument(format!(
                 "No port with name {} exists on this interface collection",
                 name
@@ -195,19 +184,11 @@ impl Interface {
 impl MoveDb<Id<Interface>> for Interface {
     fn move_db(
         &self,
-        original_db: &dyn Ir,
+        _original_db: &dyn Ir,
         target_db: &dyn Ir,
-        prefix: &Option<Name>,
+        _prefix: &Option<Name>,
     ) -> Result<Id<Interface>> {
-        let mut ports = InsertionOrderedMap::new();
-        for (name, port) in self.port_ids() {
-            ports.try_insert(name.clone(), port.move_db(original_db, target_db, prefix)?)?;
-        }
-        Ok(Interface {
-            domains: self.domains.clone(),
-            ports,
-        }
-        .intern(target_db))
+        Ok(self.clone().intern(target_db))
     }
 }
 
@@ -249,9 +230,9 @@ impl TryFrom<&Streamlet> for Id<Interface> {
 impl fmt::Display for Interface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fields = self
-            .port_ids()
+            .ports()
             .iter()
-            .map(|(name, id)| format!("{}: Id({})", name, id))
+            .map(|(name, port)| format!("{}: {}", name, port))
             .collect::<Vec<String>>()
             .join(", ");
         write!(f, "InterfaceCollection({})", fields)

@@ -690,9 +690,9 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
         let prefix = prefix.try_optional()?;
 
         let mut interface = InsertionOrderedMap::new();
-        for port in self.interface(ir_db).ports(ir_db) {
+        for (name, port) in self.interface(ir_db).ports() {
             interface.try_insert(
-                port.name().clone(),
+                name.clone(),
                 port.canonical(ir_db, arch_db, prefix.clone())?,
             )?;
         }

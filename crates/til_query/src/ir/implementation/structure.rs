@@ -5,7 +5,7 @@ use std::{
 
 use tydi_common::{
     error::{Error, Result, TryResult},
-    name::Name,
+    name::Name, map::InsertionOrderedMap,
 };
 use tydi_intern::Id;
 
@@ -42,8 +42,8 @@ impl Structure {
         self.interface_id().get(db)
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        self.interface(db).ports(db)
+    pub fn ports(&self, db: &dyn Ir) -> InsertionOrderedMap<Name, InterfacePort> {
+        self.interface(db).ports().clone()
     }
 
     pub fn interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
@@ -54,7 +54,7 @@ impl Structure {
 
     pub fn local_interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
         self.interface(db)
-            .port_ids()
+            .ports()
             .keys()
             .map(|name| InterfaceReference::new(None, name.clone()))
             .collect()
@@ -66,7 +66,7 @@ impl Structure {
             .flat_map(|(name, streamlet)| {
                 streamlet
                     .interface(db)
-                    .port_ids()
+                    .ports()
                     .keys()
                     .map(|port| InterfaceReference::new(Some(name.clone()), port.clone()))
                     .collect::<Vec<InterfaceReference>>()
@@ -108,10 +108,10 @@ impl Structure {
                         interface: x.get(db).try_get_port(db, i.port())?,
                     })
                 }),
-            None => match self.interface(db).port_ids().get(i.port()) {
+            None => match self.interface(db).ports().get(i.port()) {
                 Some(port) => Ok(InterfaceAndStructure {
                     on_streamlet: false,
-                    interface: port.get(db),
+                    interface: port.clone(),
                 }),
                 None => Err(Error::InvalidArgument(format!(
                     "No port with name {} exists within this structure",

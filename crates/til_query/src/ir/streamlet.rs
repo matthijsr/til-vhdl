@@ -1,12 +1,13 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::{InsertionOrderedMap, InsertionOrderedSet},
     name::{Name, PathName, PathNameSelf},
-    traits::{Document, Documents, Identify}, map::InsertionOrderedSet,
+    traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
 
 use super::{
-    project::{interface::Interface, domain::Domain},
+    project::{domain::Domain, interface::Interface},
     traits::{GetSelf, InternSelf, MoveDb, TryIntern},
     Implementation, InterfacePort, Ir,
 };
@@ -37,7 +38,7 @@ impl Streamlet {
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = Interface::new(db, domains, ports)?.intern(db);
+        let interface = Interface::new(domains, ports)?.intern(db);
         self.interface = Some(interface);
 
         Ok(self)
@@ -65,10 +66,10 @@ impl Streamlet {
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
         if let Some(interface) = self.interface {
-            let new_interface = interface.get(db).with_ports(db, ports)?;
+            let new_interface = interface.get(db).with_ports(ports)?;
             self.interface = Some(new_interface.intern(db));
         } else {
-            let interface = Interface::new_ports(db, ports)?.intern(db);
+            let interface = Interface::new_ports(ports)?.intern(db);
             self.interface = Some(interface);
         }
 
@@ -126,20 +127,20 @@ impl Streamlet {
         }
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        self.interface(db).ports(db)
+    pub fn ports(&self, db: &dyn Ir) -> InsertionOrderedMap<Name, InterfacePort> {
+        self.interface(db).ports().clone()
     }
 
     pub fn inputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        self.interface(db).inputs(db)
+        self.interface(db).inputs().cloned().collect()
     }
 
     pub fn outputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
-        self.interface(db).outputs(db)
+        self.interface(db).outputs().cloned().collect()
     }
 
     pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<InterfacePort> {
-        match self.interface(db).try_get_port(db, name) {
+        match self.interface(db).try_get_port(name) {
             Ok(port) => Ok(port),
             Err(_) => Err(Error::InvalidArgument(format!(
                 "No port with name {} exists on Streamlet {}",

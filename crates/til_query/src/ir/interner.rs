@@ -4,7 +4,6 @@ use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
 
 use super::{
     implementation::Implementation,
-    interface_port::InterfacePort,
     project::{interface::Interface, namespace::Namespace},
     streamlet::Streamlet,
 };
@@ -18,14 +17,9 @@ pub trait Interner {
     #[salsa::interned]
     fn intern_type(&self, logical_type: LogicalType) -> Id<LogicalType>;
     #[salsa::interned]
-    fn intern_port(&self, logical_type: InterfacePort) -> Id<InterfacePort>;
-    #[salsa::interned]
     fn intern_stream(&self, stream: Stream) -> Id<Stream>;
     #[salsa::interned]
     fn intern_streamlet(&self, streamlet: Streamlet) -> Id<Streamlet>;
     #[salsa::interned]
-    fn intern_interface_collection(
-        &self,
-        interface: Interface,
-    ) -> Id<Interface>;
+    fn intern_interface_collection(&self, interface: Interface) -> Id<Interface>;
 }
