@@ -36,7 +36,7 @@ use tydi_vhdl::{
 
 use crate::IntoVhdl;
 
-use super::interface_port::VhdlInterface;
+use super::{interface_port::VhdlInterface, physical_properties::VhdlDomainListOrDefault};
 
 pub(crate) type Streamlet = til_query::ir::streamlet::Streamlet;
 
@@ -245,6 +245,7 @@ pub struct VhdlStreamlet {
     prefix: Option<VhdlName>,
     name: PathName,
     implementation: Option<Id<Implementation>>,
+    domains: VhdlDomainListOrDefault<Port>,
     interface: InsertionOrderedMap<Name, VhdlInterface>,
     doc: Option<String>,
     component: Option<Arc<Component>>,
@@ -286,6 +287,10 @@ impl VhdlStreamlet {
         &self.interface
     }
 
+    pub fn domains(&self) -> &VhdlDomainListOrDefault<Port> {
+        &self.domains
+    }
+
     pub fn to_component(&mut self) -> Arc<Component> {
         if let Some(component) = &self.component {
             component.clone()
@@ -296,8 +301,11 @@ impl VhdlStreamlet {
             };
 
             let mut ports = vec![];
-            ports.push(Port::clk());
-            ports.push(Port::rst());
+
+            for domain in self.domains().iterable().into_iter() {
+                ports.push(domain.clock().clone());
+                ports.push(domain.reset().clone());
+            }
 
             for (_, vhdl_interface) in self.interface() {
                 let logical_stream = vhdl_interface.typed_stream().logical_stream();
@@ -697,10 +705,13 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
             )?;
         }
 
+        let domains = self.domains(ir_db).into();
+
         Ok(VhdlStreamlet {
             prefix,
             name: self.path_name().clone(),
             implementation: self.implementation_id(),
+            domains,
             interface,
             doc: self.doc().cloned(),
             component: None,
