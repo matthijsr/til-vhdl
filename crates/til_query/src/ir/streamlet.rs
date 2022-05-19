@@ -44,22 +44,6 @@ impl Streamlet {
         Ok(self)
     }
 
-    pub fn with_domains(
-        mut self,
-        db: &dyn Ir,
-        domains: impl IntoIterator<Item = impl TryResult<Name>>,
-    ) -> Result<Streamlet> {
-        if let Some(interface) = self.interface {
-            let new_interface = interface.get(db).with_domains(domains)?;
-            self.interface = Some(new_interface.intern(db));
-        } else {
-            let interface = Interface::new_domains(domains)?.intern(db);
-            self.interface = Some(interface);
-        }
-
-        Ok(self)
-    }
-
     pub fn with_ports(
         mut self,
         db: &dyn Ir,

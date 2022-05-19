@@ -38,28 +38,7 @@ impl Interface {
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
-        let mut domain_set = InsertionOrderedSet::new();
-        for domain in domains {
-            let domain = domain.try_result()?;
-            domain_set.try_insert(domain)?;
-        }
-
-        let mut port_map = InsertionOrderedMap::new();
-        for port in ports {
-            let port = port.try_result()?;
-            port_map.try_insert(port.name().clone(), port)?
-        }
-
-        let domain_set = if domain_set.len() > 0 {
-            Some(domain_set)
-        } else {
-            None
-        };
-
-        Ok(Interface {
-            domains: domain_set,
-            ports: port_map,
-        })
+        Self::new_domains(domains)?.with_ports(ports)
     }
 
     pub fn new_domains(domains: impl IntoIterator<Item = impl TryResult<Name>>) -> Result<Self> {
@@ -84,36 +63,46 @@ impl Interface {
     pub fn new_ports(
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
-        let mut port_map = InsertionOrderedMap::new();
-        for port in ports {
-            let port = port.try_result()?;
-            port_map.try_insert(port.name().clone(), port)?
-        }
-
-        Ok(Interface {
-            domains: None,
-            ports: port_map,
-        })
+        Self::new_empty().with_ports(ports)
     }
 
-    pub fn with_domains(
-        mut self,
-        domains: impl IntoIterator<Item = impl TryResult<Name>>,
-    ) -> Result<Self> {
-        let mut domain_set = InsertionOrderedSet::new();
-        for domain in domains {
-            let domain = domain.try_result()?;
-            domain_set.try_insert(domain)?;
-        }
+    fn verify_port(&self, port: &InterfacePort) -> Result<()> {
+        if let Some(domains) = self.domains() {
+            let domains_string = domains
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
 
-        let domain_set = if domain_set.len() > 0 {
-            Some(domain_set)
+            if let Some(domain) = port.domain() {
+                if domains.contains(domain) {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidArgument(format!(
+                        "Port {} has domain {}, but Interface has domains: {}",
+                        port.name(),
+                        domain,
+                        domains_string
+                    )))
+                }
+            } else {
+                Err(Error::InvalidArgument(format!(
+                    "Port {} has Default domain, but Interface has domains: {}",
+                    port.name(),
+                    domains_string
+                )))
+            }
         } else {
-            None
-        };
-
-        self.domains = domain_set;
-        Ok(self)
+            if let Some(domain) = port.domain() {
+                Err(Error::InvalidArgument(format!(
+                    "Port {} has domain {}, but Interface has Default domain",
+                    port.name(),
+                    domain
+                )))
+            } else {
+                Ok(())
+            }
+        }
     }
 
     pub fn with_ports(
@@ -123,6 +112,7 @@ impl Interface {
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
+            self.verify_port(&port)?;
             port_map.try_insert(port.name().clone(), port)?
         }
 
@@ -130,20 +120,9 @@ impl Interface {
         Ok(self)
     }
 
-    pub fn push_domain(&mut self, domain: impl TryResult<Name>) -> Result<()> {
-        let domain = domain.try_result()?;
-        if let Some(domains) = &mut self.domains {
-            domains.try_insert(domain)
-        } else {
-            let mut domains = InsertionOrderedSet::new();
-            domains.try_insert(domain)?;
-            self.domains = Some(domains);
-            Ok(())
-        }
-    }
-
     pub fn push_port(&mut self, port: impl TryResult<InterfacePort>) -> Result<()> {
         let port = port.try_result()?;
+        self.verify_port(&port)?;
         self.ports.try_insert(port.name().clone(), port)
     }
 
