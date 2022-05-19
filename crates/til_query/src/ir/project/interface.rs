@@ -185,6 +185,11 @@ impl Interface {
             ))),
         }
     }
+
+    /// When `None`, this Interface only has a Default domain.
+    pub fn domains(&self) -> &Option<InsertionOrderedSet<Domain>> {
+        &self.domains
+    }
 }
 
 impl MoveDb<Id<Interface>> for Interface {

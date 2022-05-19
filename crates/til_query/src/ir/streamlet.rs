@@ -1,12 +1,12 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, PathName, PathNameSelf},
-    traits::{Document, Documents, Identify},
+    traits::{Document, Documents, Identify}, map::InsertionOrderedSet,
 };
 use tydi_intern::Id;
 
 use super::{
-    project::interface::Interface,
+    project::{interface::Interface, domain::Domain},
     traits::{GetSelf, InternSelf, MoveDb, TryIntern},
     Implementation, InterfacePort, Ir,
 };
@@ -147,6 +147,10 @@ impl Streamlet {
                 self.identifier()
             ))),
         }
+    }
+
+    pub fn domains(&self, db: &dyn Ir) -> Option<InsertionOrderedSet<Domain>> {
+        self.interface(db).domains().clone()
     }
 }
 
