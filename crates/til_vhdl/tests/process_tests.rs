@@ -12,16 +12,21 @@ use til_query::{
             physical_transfer::{LastMode, PhysicalTransfer, StrobeMode},
         },
     },
-    ir::{connection::InterfaceReference, traits::GetSelf, Ir},
+    ir::{
+        connection::InterfaceReference,
+        implementation::structure::streamlet_instance::StreamletInstance, traits::GetSelf, Ir,
+    },
 };
 use til_vhdl::{
-    common::signals::PhysicalStreamProcess, ir::streamlet::StreamletArchitecture, IntoVhdl,
+    common::signals::PhysicalStreamProcess,
+    ir::{
+        physical_properties::{VhdlDomain, VhdlDomainListOrDefault},
+        streamlet::{create_instance, StreamletArchitecture},
+    },
+    IntoVhdl,
 };
-use tydi_common::{
-    error::Result,
-    name::{Name, PathName},
-    numbers::Positive,
-};
+use tydi_common::{error::Result, name::PathName, numbers::Positive};
+use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
     common::vhdl_name::VhdlNameSelf,
@@ -64,12 +69,16 @@ multiline#
         .get(&("my::test::space".try_into()?))
         .unwrap()
         .get(&db)
-        .get_streamlet(&db, "doc_streamlet")?;
+        .get_streamlet_id("doc_streamlet")?;
 
     let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let mut package = Package::new_default_empty();
 
-    let mut vhdl_streamlet = streamlet.canonical(&db, &mut arch_db, None)?;
+    let streamlet_instance = StreamletInstance::new_assign_default(&db, "a", streamlet)?;
+
+    let mut vhdl_streamlet = streamlet_instance
+        .definition()
+        .canonical(&db, &mut arch_db, None)?;
     let component = vhdl_streamlet.to_component();
 
     arch_db.set_subject_component_name(Arc::new(component.vhdl_name().clone()));
@@ -78,10 +87,17 @@ multiline#
 
     let mut arch = vhdl_streamlet.to_architecture(&db, &mut arch_db)?;
     if let StreamletArchitecture::Generated(arch) = &mut arch {
-        let clk = ObjectDeclaration::entity_clk(&arch_db);
-        let rst = ObjectDeclaration::entity_rst(&arch_db);
-        let instance =
-            vhdl_streamlet.to_instance(&mut arch_db, Name::try_new("a")?, arch, clk, rst)?;
+        let domain_list = VhdlDomainListOrDefault::Default(
+            VhdlDomain::<Id<ObjectDeclaration>>::default(&mut arch_db),
+        );
+        let instance = create_instance(
+            &db,
+            &mut arch_db,
+            &streamlet_instance,
+            arch,
+            &domain_list,
+            None,
+        )?;
         let iref = InterfaceReference::try_from(("a", "x"))?;
         let port_obj = instance.get(&iref).unwrap();
         let stream_obj = port_obj
@@ -158,12 +174,16 @@ multiline#
         .get(&("my::test::space".try_into()?))
         .unwrap()
         .get(&db)
-        .get_streamlet(&db, "doc_streamlet")?;
+        .get_streamlet_id("doc_streamlet")?;
 
     let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let mut package = Package::new_default_empty();
 
-    let mut vhdl_streamlet = streamlet.canonical(&db, &mut arch_db, None)?;
+    let streamlet_instance = StreamletInstance::new_assign_default(&db, "a", streamlet)?;
+
+    let mut vhdl_streamlet = streamlet_instance
+        .definition()
+        .canonical(&db, &mut arch_db, None)?;
     let component = vhdl_streamlet.to_component();
 
     arch_db.set_subject_component_name(Arc::new(component.vhdl_name().clone()));
@@ -182,11 +202,17 @@ multiline#
             PhysicalTransfer::new(Complexity::new_major(8), Positive::new(3).unwrap(), 2, 3, 3)
                 .with_logical_transfer([("01", Some(0..1)), ("-", Some(2..2)), ("-", None)])?; // 10]], -], -
 
-        let clk = ObjectDeclaration::entity_clk(&arch_db);
-        let rst = ObjectDeclaration::entity_rst(&arch_db);
-
-        let instance =
-            vhdl_streamlet.to_instance(&mut arch_db, Name::try_new("a")?, arch, clk, rst)?;
+        let domain_list = VhdlDomainListOrDefault::Default(
+            VhdlDomain::<Id<ObjectDeclaration>>::default(&mut arch_db),
+        );
+        let instance = create_instance(
+            &db,
+            &mut arch_db,
+            &streamlet_instance,
+            arch,
+            &domain_list,
+            None,
+        )?;
         let iref = InterfaceReference::try_from(("a", "x"))?;
         let port_obj = instance.get(&iref).unwrap();
         let stream_obj = port_obj

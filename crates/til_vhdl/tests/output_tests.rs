@@ -85,7 +85,7 @@ fn playground() -> Result<()> {
 
     let streamlet_id = namespace.get_streamlet_id("streamlet")?;
     let mut structure: Structure = streamlet_id.get(db).as_ref().try_into()?;
-    structure.try_add_streamlet_instance_default("a", streamlet_id)?;
+    structure.try_add_streamlet_instance_default(db, "a", streamlet_id)?;
     structure.try_add_connection(db, ("a", "a"), "a")?;
     structure.try_add_connection(db, ("a", "b"), "b")?;
     namespace.define_implementation(db, "implementation", structure)?;

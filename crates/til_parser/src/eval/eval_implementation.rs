@@ -71,7 +71,7 @@ pub fn eval_struct_stat(
                 "streamlet",
             )?;
             eval_common_error(
-                structure.try_add_streamlet_instance_default(name, streamlet),
+                structure.try_add_streamlet_instance_default(db, name, streamlet),
                 name_span,
             )?;
             Ok(())

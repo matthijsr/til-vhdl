@@ -529,85 +529,6 @@ impl VhdlStreamlet {
         }
     }
 
-    /// Creates a port-mapping for this Streamlet and returns a map of signals
-    /// for its interfaces
-    pub fn to_instance(
-        &mut self,
-        arch_db: &mut dyn Arch,
-        instance_name: Name,
-        architecture: &mut Architecture,
-        clk: Id<ObjectDeclaration>,
-        rst: Id<ObjectDeclaration>,
-    ) -> Result<InsertionOrderedMap<InterfaceReference, PortObject>> {
-        let identifier = self.identifier();
-        let wrap_portmap_err = |result: Result<()>| -> Result<()> {
-            match result {
-                        Ok(result) => Ok(result),
-                        Err(err) => Err(Error::BackEndError(format!(
-                    "Something went wrong trying to generate port mappings for streamlet instance {} (type: {}):\n\t{}",
-                    &instance_name, identifier, err
-                ))),
-                    }
-        };
-
-        let component = self.to_component();
-        let mut port_mapping =
-            PortMapping::from_component(arch_db, &component, instance_name.clone())?;
-
-        let mut signals = InsertionOrderedMap::new();
-
-        for (name, port) in self.interface() {
-            let mut try_signal_decl = |p: Port| {
-                let signal = ObjectDeclaration::signal(
-                    arch_db,
-                    format!("{}__{}", instance_name, p.identifier()),
-                    p.typ().clone(),
-                    None,
-                )?;
-                wrap_portmap_err(port_mapping.map_port(arch_db, p.vhdl_name().clone(), signal))?;
-
-                architecture.add_declaration(arch_db, signal)?;
-
-                Ok(signal)
-            };
-
-            signals.try_insert(
-                InterfaceReference::new(Some(instance_name.clone()), name.clone()),
-                PortObject {
-                    interface_direction: port.physical_properties().direction(),
-                    typed_stream: port.typed_stream().try_map_logical_stream(|ls| {
-                        ls.clone()
-                            .try_map_fields(&mut try_signal_decl)?
-                            .try_map_streams_named(|stream_name, stream| {
-                                Ok(PhysicalStreamObject {
-                                    name: PathName::try_new([instance_name.clone(), name.clone()])?
-                                        .with_children(stream_name.clone()),
-                                    clock: clk,
-                                    signal_list: stream
-                                        .signal_list()
-                                        .clone()
-                                        .try_map(&mut try_signal_decl)?,
-                                    element_lanes: stream.element_lanes().clone(),
-                                    dimensionality: stream.dimensionality(),
-                                    complexity: stream.complexity().clone(),
-                                    data_element_size: stream.data_element_size(),
-                                    user_size: stream.user_size(),
-                                    interface_direction: stream.interface_direction(),
-                                    stream_direction: stream.stream_direction(),
-                                })
-                            })
-                    })?,
-                    is_local: false,
-                },
-            )?;
-        }
-        wrap_portmap_err(port_mapping.map_port(arch_db, "clk", clk))?;
-        wrap_portmap_err(port_mapping.map_port(arch_db, "rst", rst))?;
-        architecture.add_statement(arch_db, port_mapping.finish()?)?;
-
-        Ok(signals)
-    }
-
     fn structural_arch(
         &self,
         structure: &Structure,
@@ -627,12 +548,14 @@ impl VhdlStreamlet {
             architecture.set_doc(doc);
         }
 
-        let clk = ObjectDeclaration::entity_clk(arch_db);
-        let rst = ObjectDeclaration::entity_rst(arch_db);
+        let entity_domains = self.domains().into_entity_objects(arch_db);
 
         let mut ports = InsertionOrderedMap::new();
         let entity_port_obj = |p| ObjectDeclaration::from_port(arch_db, &p, true);
         for (name, port) in self.interface() {
+            let clk = *entity_domains
+                .get(port.physical_properties().domain())?
+                .clock();
             ports.try_insert(
                 InterfaceReference::new(None, name.clone()),
                 PortObject {
@@ -658,14 +581,14 @@ impl VhdlStreamlet {
             )?;
         }
 
-        for (instance_name, streamlet) in structure.streamlet_instances(ir_db) {
-            let mut streamlet = streamlet.canonical(ir_db, arch_db, self.prefix().clone())?;
-            ports.try_append(streamlet.to_instance(
+        for (_, streamlet) in structure.streamlet_instances() {
+            ports.try_append(create_instance(
+                ir_db,
                 arch_db,
-                instance_name,
+                streamlet,
                 &mut architecture,
-                clk,
-                rst,
+                &entity_domains,
+                self.prefix().clone(),
             )?)?;
         }
 
