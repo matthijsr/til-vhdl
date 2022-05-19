@@ -20,8 +20,8 @@ impl GetSelf<LogicalType> for Id<LogicalType> {
     }
 }
 
-impl GetSelf<Streamlet> for Id<Streamlet> {
-    fn get(&self, db: &dyn Ir) -> Streamlet {
+impl GetSelf<Arc<Streamlet>> for Id<Arc<Streamlet>> {
+    fn get(&self, db: &dyn Ir) -> Arc<Streamlet> {
         db.lookup_intern_streamlet(*self)
     }
 }

@@ -28,7 +28,7 @@ impl InternSelf for LogicalType {
     }
 }
 
-impl InternSelf for Streamlet {
+impl InternSelf for Arc<Streamlet> {
     fn intern(self, db: &dyn Ir) -> Id<Self> {
         db.intern_streamlet(self)
     }

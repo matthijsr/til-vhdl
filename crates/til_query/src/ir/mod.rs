@@ -26,8 +26,8 @@ use crate::{
 };
 
 use self::{
-    implementation::Implementation, interface_port::InterfacePort, interner::Interner, project::Project,
-    streamlet::Streamlet, traits::GetSelf,
+    implementation::Implementation, interface_port::InterfacePort, interner::Interner,
+    project::Project, streamlet::Streamlet, traits::GetSelf,
 };
 
 pub mod annotation_keys;
@@ -51,14 +51,14 @@ pub trait Ir: Interner {
     #[salsa::input]
     fn project(&self) -> Arc<Project>;
 
-    fn all_streamlets(&self) -> Arc<Vec<Streamlet>>;
+    fn all_streamlets(&self) -> Arc<Vec<Arc<Streamlet>>>;
 
     fn logical_type_split_streams(&self, key: Id<LogicalType>) -> Result<SplitStreams>;
 
     fn stream_split_streams(&self, key: Id<Stream>) -> Result<SplitStreams>;
 }
 
-fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Streamlet>> {
+fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Arc<Streamlet>>> {
     let project = db.project();
 
     Arc::new(
@@ -71,7 +71,7 @@ fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Streamlet>> {
                     .streamlets(db)
                     .into_iter()
                     .map(|(_, streamlet)| streamlet)
-                    .collect::<Vec<Streamlet>>()
+                    .collect::<Vec<Arc<Streamlet>>>()
             })
             .flatten()
             .collect(),
@@ -226,6 +226,8 @@ mod tests {
             "implemented_streamlet",
             namespace
                 .get_streamlet(db, "streamlet")?
+                .as_ref()
+                .clone()
                 .with_implementation(None),
         )?;
         project.add_namespace(db, namespace)?;

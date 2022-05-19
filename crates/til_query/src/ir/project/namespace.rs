@@ -12,7 +12,7 @@ use crate::{
     ir::{
         implementation::Implementation,
         streamlet::Streamlet,
-        traits::{GetSelf, InternSelf, MoveDb, TryIntern},
+        traits::{GetSelf, InternSelf, InternArc, MoveDb, TryIntern},
         Ir,
     },
 };
@@ -27,7 +27,7 @@ pub struct Namespace {
     /// Names are purely for tracking, and do not affect type equivalence.
     types: BTreeMap<Name, Id<LogicalType>>,
     /// The streamlets declared within the namespace.
-    streamlets: BTreeMap<Name, Id<Streamlet>>,
+    streamlets: BTreeMap<Name, Id<Arc<Streamlet>>>,
     /// The implementations declared within the namespace.
     implementations: BTreeMap<Name, Id<Implementation>>,
     /// Interface declarations.
@@ -59,11 +59,11 @@ impl Namespace {
             .collect()
     }
 
-    pub fn streamlet_ids(&self) -> &BTreeMap<Name, Id<Streamlet>> {
+    pub fn streamlet_ids(&self) -> &BTreeMap<Name, Id<Arc<Streamlet>>> {
         &self.streamlets
     }
 
-    pub fn streamlets(&self, db: &dyn Ir) -> BTreeMap<Name, Streamlet> {
+    pub fn streamlets(&self, db: &dyn Ir) -> BTreeMap<Name, Arc<Streamlet>> {
         self.streamlet_ids()
             .iter()
             .map(|(name, id)| (name.clone(), id.get(db)))
@@ -111,7 +111,7 @@ impl Namespace {
     pub fn import_streamlet(
         &mut self,
         name: impl TryResult<Name>,
-        streamlet_id: Id<Streamlet>,
+        streamlet_id: Id<Arc<Streamlet>>,
     ) -> Result<()> {
         let name = name.try_result()?;
         match self.streamlets.insert(name.clone(), streamlet_id) {
@@ -173,12 +173,12 @@ impl Namespace {
         db: &dyn Ir,
         name: impl TryResult<Name>,
         streamlet: impl TryResult<Streamlet>,
-    ) -> Result<Id<Streamlet>> {
+    ) -> Result<Id<Arc<Streamlet>>> {
         let name = name.try_result()?;
         let streamlet = streamlet
             .try_result()?
             .with_name(self.path_name().with_child(&name));
-        let streamlet_id = streamlet.intern(db);
+        let streamlet_id = streamlet.intern_arc(db);
         self.import_streamlet(name, streamlet_id)?;
         Ok(streamlet_id)
     }
@@ -226,7 +226,7 @@ impl Namespace {
         Ok(self.get_type_id(name)?.get(db))
     }
 
-    pub fn get_streamlet_id(&self, name: impl TryResult<Name>) -> Result<Id<Streamlet>> {
+    pub fn get_streamlet_id(&self, name: impl TryResult<Name>) -> Result<Id<Arc<Streamlet>>> {
         let name = name.try_result()?;
         self.streamlet_ids()
             .get(&name)
@@ -238,7 +238,7 @@ impl Namespace {
             )))
     }
 
-    pub fn get_streamlet(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Streamlet> {
+    pub fn get_streamlet(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Arc<Streamlet>> {
         Ok(self.get_streamlet_id(name)?.get(db))
     }
 

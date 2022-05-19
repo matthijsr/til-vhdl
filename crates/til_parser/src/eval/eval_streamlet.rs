@@ -6,7 +6,7 @@ use til_query::{
         implementation::Implementation,
         project::interface::Interface,
         streamlet::Streamlet,
-        traits::{GetSelf, InternSelf},
+        traits::{GetSelf, InternArc},
         Ir,
     },
 };
@@ -29,26 +29,26 @@ pub fn eval_streamlet_expr(
     expr: &Spanned<Expr>,
     name: &PathName,
     doc: &Option<String>,
-    streamlets: &HashMap<Name, Id<Streamlet>>,
-    streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
+    streamlets: &HashMap<Name, Id<Arc<Streamlet>>>,
+    streamlet_imports: &HashMap<PathName, Id<Arc<Streamlet>>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
     interfaces: &HashMap<Name, Id<Arc<Interface>>>,
     interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<(Id<Streamlet>, Id<Arc<Interface>>), EvalError> {
+) -> Result<(Id<Arc<Streamlet>>, Id<Arc<Interface>>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {
             if let Ok(val) = eval_ident(ident, &expr.1, streamlets, streamlet_imports, "streamlet")
             {
                 let interface =
                     eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
-                let mut streamlet = val.get(db).with_name(name.clone());
+                let mut streamlet = val.get(db).as_ref().clone().with_name(name.clone());
                 if let Some(doc) = doc {
                     streamlet.set_doc(doc);
                 }
-                Ok((streamlet.intern(db), interface))
+                Ok((streamlet.intern_arc(db), interface))
             } else {
                 match eval_ident(ident, &expr.1, interfaces, interface_imports, "streamlet") {
                     Ok(interface) => {
@@ -56,7 +56,7 @@ pub fn eval_streamlet_expr(
                         if let Some(doc) = doc {
                             streamlet.set_doc(doc);
                         }
-                        Ok((streamlet.with_name(name.clone()).intern(db), interface))
+                        Ok((streamlet.with_name(name.clone()).intern_arc(db), interface))
                     }
                     Err(err) => Err(EvalError {
                         span: err.span,
@@ -112,7 +112,7 @@ pub fn eval_streamlet_expr(
                     if let Some(doc) = doc {
                         streamlet.set_doc(doc);
                     }
-                    Ok((streamlet.with_name(name.clone()).intern(db), interface))
+                    Ok((streamlet.with_name(name.clone()).intern_arc(db), interface))
                 }
                 _ => Err(EvalError {
                     span: properties.1.clone(),
@@ -127,7 +127,7 @@ pub fn eval_streamlet_expr(
             if let Some(doc) = doc {
                 streamlet.set_doc(doc);
             }
-            Ok((streamlet.with_name(name.clone()).intern(db), interface))
+            Ok((streamlet.with_name(name.clone()).intern_arc(db), interface))
         }
         _ => Err(EvalError {
             span: expr.1.clone(),

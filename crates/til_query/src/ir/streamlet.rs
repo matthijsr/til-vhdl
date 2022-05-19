@@ -9,9 +9,10 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
-    project::{interface::Interface},
+    physical_properties::Domain,
+    project::interface::Interface,
     traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
-    Implementation, InterfacePort, Ir, physical_properties::Domain,
+    Implementation, InterfacePort, Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -165,13 +166,13 @@ impl Documents for Streamlet {
     }
 }
 
-impl MoveDb<Id<Streamlet>> for Streamlet {
+impl MoveDb<Id<Arc<Streamlet>>> for Arc<Streamlet> {
     fn move_db(
         &self,
         original_db: &dyn Ir,
         target_db: &dyn Ir,
         prefix: &Option<Name>,
-    ) -> Result<Id<Streamlet>> {
+    ) -> Result<Id<Arc<Streamlet>>> {
         let interface = match &self.interface {
             Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
             None => None,
@@ -180,12 +181,12 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
             Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
             None => None,
         };
-        Ok(Streamlet {
-            name: self.name.with_parents(prefix),
+        Ok(Arc::new(Streamlet {
+            name: self.name.clone().with_parents(prefix),
             implementation,
             interface,
             doc: self.doc.clone(),
-        }
+        })
         .intern(target_db))
     }
 }

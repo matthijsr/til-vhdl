@@ -21,7 +21,7 @@ pub trait Interner {
     #[salsa::interned]
     fn intern_stream(&self, stream: Stream) -> Id<Stream>;
     #[salsa::interned]
-    fn intern_streamlet(&self, streamlet: Streamlet) -> Id<Streamlet>;
+    fn intern_streamlet(&self, streamlet: Arc<Streamlet>) -> Id<Arc<Streamlet>>;
     #[salsa::interned]
     fn intern_interface(&self, interface: Arc<Interface>) -> Id<Arc<Interface>>;
 }
