@@ -1,5 +1,8 @@
 use core::fmt;
-use std::{convert::{TryFrom, TryInto}, sync::Arc};
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -12,7 +15,7 @@ use tydi_intern::Id;
 use crate::ir::{
     implementation::structure::Structure,
     interface_port::InterfacePort,
-    physical_properties::{InterfaceDirection, Domain},
+    physical_properties::{Domain, InterfaceDirection},
     streamlet::Streamlet,
     traits::{InternSelf, MoveDb},
     Ir,
@@ -146,7 +149,7 @@ impl Interface {
         match self.ports().get(name) {
             Some(port) => Ok(port.clone()),
             None => Err(Error::InvalidArgument(format!(
-                "No port with name {} exists on this interface collection",
+                "No port with name {} exists on this interface",
                 name
             ))),
         }

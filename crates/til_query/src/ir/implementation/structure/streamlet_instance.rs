@@ -9,8 +9,11 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::ir::{
-    interface_port::InterfacePort, physical_properties::Domain, streamlet::Streamlet,
-    traits::GetSelf, Ir,
+    interface_port::InterfacePort,
+    physical_properties::{Domain, InterfaceDirection},
+    streamlet::Streamlet,
+    traits::GetSelf,
+    Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -236,6 +239,38 @@ impl StreamletInstance {
 
     pub fn assigned_domains(&self) -> Result<Option<InsertionOrderedSet<Domain>>> {
         self.domain_assignments.assigned_domains()
+    }
+
+    pub fn ports(&self) -> &InsertionOrderedMap<Name, InterfacePort> {
+        &self.ports
+    }
+
+    pub fn inputs(&self) -> impl Iterator<Item = &InterfacePort> {
+        self.ports()
+            .into_iter()
+            .map(|(_, x)| x)
+            .filter(|x| x.physical_properties().direction() == InterfaceDirection::In)
+    }
+
+    pub fn outputs(&self) -> impl Iterator<Item = &InterfacePort> {
+        self.ports()
+            .into_iter()
+            .map(|(_, x)| x)
+            .filter(|x| x.physical_properties().direction() == InterfaceDirection::Out)
+    }
+
+    pub fn try_get_port(&self, name: &Name) -> Result<InterfacePort> {
+        match self.ports().get(name) {
+            Some(port) => Ok(port.clone()),
+            None => Err(Error::InvalidArgument(format!(
+                "No port with name {} exists on this Streamlet instance",
+                name
+            ))),
+        }
+    }
+
+    pub fn domain_assignments(&self) -> &DomainAssignments {
+        &self.domain_assignments
     }
 }
 
