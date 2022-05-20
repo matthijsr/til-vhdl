@@ -138,7 +138,7 @@ mod tests {
         let src = src.into();
         let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
-        // println!("{:#?}", tokens);
+        //println!("{:#?}", tokens);
 
         let parse_errs = if let Some(tokens) = tokens {
             // println!("Tokens = {:?}", tokens);

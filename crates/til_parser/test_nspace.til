@@ -21,7 +21,7 @@ namespace my::test::space {
         d: out stream2,
     );
 
-    //interface iface1 = (a: in stream, b: out stream);
+    interface iface1 = (a: in stream, b: out stream);
 
     streamlet comp2 = iface1;
 
