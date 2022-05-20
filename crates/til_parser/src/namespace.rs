@@ -68,7 +68,7 @@ pub fn namespaces_parser(
         .map(|(n, e)| Decl::InterfaceDecl(n, Box::new(e)));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
-        .ignore_then(name.clone())
+        .ignore_then(name)
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
         .then_ignore(just(Token::Ctrl(';')));
@@ -89,8 +89,7 @@ pub fn namespaces_parser(
     let namespace = just(Token::Decl(DeclKeyword::Namespace))
         .ignore_then(namespace_name)
         .then(
-            stat.clone()
-                .repeated()
+            stat.repeated()
                 .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}'))),
         )
         .map(|(name, stats)| {
