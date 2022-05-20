@@ -13,7 +13,11 @@ use std::hash::Hash;
 pub enum StructStat {
     Error,
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    Instance(Spanned<String>, Spanned<IdentExpr>),
+    Instance(
+        Spanned<String>,
+        Spanned<IdentExpr>,
+        Vec<(Option<Spanned<String>>, Spanned<String>)>,
+    ),
     Connection(Spanned<PortSel>, Spanned<PortSel>),
 }
 
@@ -26,13 +30,47 @@ pub enum PortSel {
 pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple<Token>> + Clone {
     let name = name_parser().labelled("name");
 
+    let domain = just(Token::Ctrl('\'')).ignore_then(name.clone());
+
     let ident = ident_expr_parser().labelled("identifier");
+
+    let domain_assignment = domain
+        .clone()
+        .then(
+            just(Token::Op(Operator::Declare))
+                .ignore_then(domain.clone())
+                .or_not(),
+        )
+        .map(|(left, right)| match right {
+            // <'instance_domain = 'parent_domain>
+            Some(right) => (Some(left), right),
+            // <'parent_domain>
+            None => (None, left),
+        });
+
+    let domain_assignments = domain_assignment
+        .clone()
+        .chain(
+            just(Token::Ctrl(','))
+                .ignore_then(domain_assignment.clone())
+                .repeated(),
+        )
+        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .or_not()
+        .map(|item| item.unwrap_or_else(Vec::<(Option<Spanned<String>>, Spanned<String>)>::new))
+        .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
 
     let instance = name
         .clone()
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
-        .map(|(i_name, streamlet_name)| StructStat::Instance(i_name, streamlet_name));
+        // .then(
+        //     domain_assignments
+        //         .clone()
+        //         .or_not()
+        //         .map(|x| x.unwrap_or_else(Vec::new)),
+        // )
+        .map(|((i_name, streamlet_name))| StructStat::Instance(i_name, streamlet_name, Vec::new()));
 
     let portsel = name
         .clone()

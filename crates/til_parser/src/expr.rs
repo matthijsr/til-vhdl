@@ -88,6 +88,7 @@ impl fmt::Display for Value {
 pub struct PortProps {
     pub mode: Spanned<InterfaceDirection>,
     pub typ: Box<Spanned<Expr>>,
+    pub domain: Option<Spanned<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -95,10 +96,11 @@ pub enum Expr {
     Error,
     Value(Value),
     Ident(IdentExpr),
+    Domain(Spanned<String>),
     TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
     PortDef(Spanned<String>, Spanned<PortProps>),
-    InterfaceDef(Vec<Spanned<Self>>),
+    InterfaceDef(Vec<Spanned<String>>, Vec<Spanned<Self>>),
     RawImpl(RawImpl),
     ImplDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
     StreamletProps(Vec<(Spanned<Token>, StreamletProperty)>),
@@ -206,6 +208,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     let label = name.clone().then_ignore(just(Token::Ctrl(':')));
 
+    let domain = just(Token::Ctrl('\'')).ignore_then(name.clone());
+
     // ......
     // TYPE DEFINITIONS
     // ......
@@ -278,9 +282,11 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     })
     .map_with_span(|mode, span| (mode, span))
     .then(typ.clone())
-    .map(|(mode, typ)| PortProps {
+    .then(domain.clone().or_not())
+    .map(|((mode, typ), dom)| PortProps {
         mode,
         typ: Box::new(typ),
+        domain: dom,
     })
     .map_with_span(|p, span| (p, span))
     .labelled("port properties");
@@ -298,18 +304,36 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|d, span| (d, span));
     let port_def = doc_port_def.or(port_def);
 
-    let interface_def = port_def
+    let domain_list = domain
         .clone()
         .chain(
             just(Token::Ctrl(','))
-                .ignore_then(port_def.clone())
+                .ignore_then(domain.clone())
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .or_not()
         .map(|item| item.unwrap_or_else(Vec::new))
-        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
-        .map(Expr::InterfaceDef)
+        .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
+
+    let interface_def = domain_list
+        .clone()
+        .or_not()
+        .map(|list| list.unwrap_or_else(Vec::new))
+        .then(
+            port_def
+                .clone()
+                .chain(
+                    just(Token::Ctrl(','))
+                        .ignore_then(port_def.clone())
+                        .repeated(),
+                )
+                .then_ignore(just(Token::Ctrl(',')).or_not())
+                .or_not()
+                .map(|item| item.unwrap_or_else(Vec::new))
+                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')'))),
+        )
+        .map(|(doms, ports)| Expr::InterfaceDef(doms, ports))
         .map_with_span(|i, span| (i, span));
 
     // As with types, interfaces can be declared with identities
@@ -505,8 +529,23 @@ doc doc# some_port: in a)"#,
     }
 
     #[test]
+    fn test_port_list_empty_dom() {
+        test_expr_parse("<>(port: in a, port: out b)")
+    }
+
+    #[test]
+    fn test_port_list_with_dom() {
+        test_expr_parse("<'a, 'b>(port: in a 'b, port: out b 'a)")
+    }
+
+    #[test]
     fn test_invalid_port_list() {
         test_expr_parse("(port: a, port: out b)")
+    }
+
+    #[test]
+    fn test_invalid_dom_list() {
+        test_expr_parse("<'a, b>(port: in a, port: out b)")
     }
 
     #[test]

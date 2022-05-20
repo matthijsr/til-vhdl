@@ -36,7 +36,7 @@ pub fn eval_interface_expr(
         Expr::Ident(ident) => {
             eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")
         }
-        Expr::InterfaceDef(iface) => {
+        Expr::InterfaceDef(domain_list, iface) => {
             let mut dups = HashSet::new();
             let mut result = Interface::new_empty();
             for port_def_expr in iface {

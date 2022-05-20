@@ -120,7 +120,7 @@ pub fn eval_streamlet_expr(
                 }),
             }
         }
-        Expr::InterfaceDef(_) => {
+        Expr::InterfaceDef(_, _) => {
             let interface =
                 eval_interface_expr(db, expr, interfaces, interface_imports, types, type_imports)?;
             let mut streamlet = Streamlet::from(interface);

@@ -61,7 +61,7 @@ pub fn eval_struct_stat(
             )?;
             Ok(())
         }
-        StructStat::Instance((name_string, name_span), (ident_expr, ident_span)) => {
+        StructStat::Instance((name_string, name_span), (ident_expr, ident_span), domain_assignments) => {
             let name = eval_name(name_string, name_span)?;
             let streamlet = eval_ident(
                 ident_expr,
