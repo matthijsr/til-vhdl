@@ -201,14 +201,11 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let name = name_parser().labelled("name");
 
     let ident = ident_expr_parser().labelled("identifier");
-    let ident_expr = ident
-        .clone()
-        .map(Expr::Ident)
-        .map_with_span(|i, span| (i, span));
+    let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
 
     let label = name.clone().then_ignore(just(Token::Ctrl(':')));
 
-    let domain = just(Token::Ctrl('\'')).ignore_then(name.clone());
+    let domain = just(Token::Ctrl('\'')).ignore_then(name);
 
     // ......
     // TYPE DEFINITIONS
@@ -238,15 +235,11 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
         // Stream properties are either values or types
-        let stream_prop = typ_el.or(label.clone().then(val.clone()));
+        let stream_prop = typ_el.or(label.clone().then(val));
 
         let stream_def = stream_prop
             .clone()
-            .chain(
-                just(Token::Ctrl(','))
-                    .ignore_then(stream_prop.clone())
-                    .repeated(),
-            )
+            .chain(just(Token::Ctrl(',')).ignore_then(stream_prop).repeated())
             .then_ignore(just(Token::Ctrl(',')).or_not())
             .or_not()
             .map(|item| item.unwrap_or_else(Vec::new))
@@ -261,7 +254,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
                 .ignore_then(group_def.clone())
                 .map(|g| LogicalTypeExpr::Group(g)))
             .or(just(Token::Type(TypeKeyword::Union))
-                .ignore_then(group_def.clone())
+                .ignore_then(group_def)
                 .map(|g| LogicalTypeExpr::Union(g)))
             .or(just(Token::Type(TypeKeyword::Stream))
                 .ignore_then(stream_def)
@@ -292,8 +285,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     .labelled("port properties");
 
     let port_def = label
-        .clone()
-        .then(port_props.clone())
+        .then(port_props)
         .map(|(l, p)| Expr::PortDef(l, p))
         .map_with_span(|p, span| (p, span));
 
@@ -306,28 +298,19 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     let domain_list = domain
         .clone()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(domain.clone())
-                .repeated(),
-        )
+        .chain(just(Token::Ctrl(',')).ignore_then(domain).repeated())
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .or_not()
         .map(|item| item.unwrap_or_else(Vec::new))
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
 
     let interface_def = domain_list
-        .clone()
         .or_not()
         .map(|list| list.unwrap_or_else(Vec::new))
         .then(
             port_def
                 .clone()
-                .chain(
-                    just(Token::Ctrl(','))
-                        .ignore_then(port_def.clone())
-                        .repeated(),
-                )
+                .chain(just(Token::Ctrl(',')).ignore_then(port_def).repeated())
                 .then_ignore(just(Token::Ctrl(',')).or_not())
                 .or_not()
                 .map(|item| item.unwrap_or_else(Vec::new))
@@ -387,7 +370,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let impl_prop = just(Token::Decl(DeclKeyword::Implementation))
         .map_with_span(|tok, span| (tok, span))
         .then_ignore(just(Token::Ctrl(':')))
-        .then(raw_impl.clone().or(ident_expr.clone()))
+        .then(raw_impl.or(ident_expr.clone()))
         .map(|(lab, i)| (lab, StreamletProperty::Implementation(Box::new(i))));
 
     // In case more properties are added in the future, use a generic type
@@ -398,7 +381,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .clone()
         .chain(
             just(Token::Ctrl(','))
-                .ignore_then(streamlet_prop.clone())
+                .ignore_then(streamlet_prop)
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
@@ -412,7 +395,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         ));
 
     let streamlet_def = interface
-        .clone()
         .then(streamlet_props)
         .map(|(i, p)| Expr::StreamletDef(Box::new(i), Box::new(p)))
         .map_with_span(|s, span| (s, span));

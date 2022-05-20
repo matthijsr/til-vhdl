@@ -38,7 +38,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
         .clone()
         .then(
             just(Token::Op(Operator::Declare))
-                .ignore_then(domain.clone())
+                .ignore_then(domain)
                 .or_not(),
         )
         .map(|(left, right)| match right {
@@ -52,7 +52,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
         .clone()
         .chain(
             just(Token::Ctrl(','))
-                .ignore_then(domain_assignment.clone())
+                .ignore_then(domain_assignment)
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
@@ -66,7 +66,6 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
         .then(ident.clone().map_with_span(|i, span| (i, span)))
         .then(
             domain_assignments
-                .clone()
                 .or_not()
                 .map(|x| x.unwrap_or_else(Vec::new)),
         )
@@ -74,11 +73,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
 
     let portsel = name
         .clone()
-        .then(
-            just(Token::Op(Operator::Select))
-                .ignore_then(name.clone())
-                .or_not(),
-        )
+        .then(just(Token::Op(Operator::Select)).ignore_then(name).or_not())
         .map(|(subj, port)| {
             if let Some(port) = port {
                 PortSel::Instance(subj, port)
@@ -91,7 +86,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     let conn = portsel
         .clone()
         .then_ignore(just(Token::Op(Operator::Connect)))
-        .then(portsel.clone())
+        .then(portsel)
         .map(|(left, right)| StructStat::Connection(left, right));
 
     let stat = instance
@@ -107,12 +102,16 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     .labelled("documentation");
 
     let doc = doc_body
-        .clone()
         .then(stat.clone())
         .map(|(body, subj)| StructStat::Documentation(body, Box::new(subj)))
         .map_with_span(|expr, span| (expr, span));
 
-    stat.or(doc)
+    stat.or(doc).recover_with(nested_delimiters(
+        Token::Ctrl('<'),
+        Token::Ctrl('>'),
+        [],
+        |span| (StructStat::Error, span),
+    ))
 }
 
 // TODO: Also do an eval, to confirm the ports and streamlets actually exist
