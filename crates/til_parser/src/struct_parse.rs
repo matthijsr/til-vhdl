@@ -60,8 +60,6 @@ pub fn domain_assignments_parser(
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
-        .or_not()
-        .map(|item| item.unwrap_or_else(Vec::new))
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
         .or_not()
         .map_with_span(|x, span| {

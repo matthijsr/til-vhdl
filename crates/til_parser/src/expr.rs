@@ -299,8 +299,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .clone()
         .chain(just(Token::Ctrl(',')).ignore_then(domain).repeated())
         .then_ignore(just(Token::Ctrl(',')).or_not())
-        .or_not()
-        .map(|item| item.unwrap_or_else(Vec::new))
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
 
     let interface_def = domain_list
