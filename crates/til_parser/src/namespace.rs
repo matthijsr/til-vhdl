@@ -79,7 +79,7 @@ pub fn namespaces_parser(
         .or(streamlet_decl.map(|(n, e)| Decl::StreamletDecl(None, n, Box::new(e))));
 
     let decl = type_decl
-        .or(impl_decl)
+        //.or(impl_decl)
         .or(interface_decl)
         .or(streamlet_decl)
         .map_with_span(|d, span| (Statement::Decl(d), span));

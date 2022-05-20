@@ -57,20 +57,20 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .or_not()
-        .map(|item| item.unwrap_or_else(Vec::<(Option<Spanned<String>>, Spanned<String>)>::new))
+        .map(|item| item.unwrap_or_else(Vec::new))
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
 
     let instance = name
         .clone()
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
-        // .then(
-        //     domain_assignments
-        //         .clone()
-        //         .or_not()
-        //         .map(|x| x.unwrap_or_else(Vec::new)),
-        // )
-        .map(|((i_name, streamlet_name))| StructStat::Instance(i_name, streamlet_name, Vec::new()));
+        .then(
+            domain_assignments
+                .clone()
+                .or_not()
+                .map(|x| x.unwrap_or_else(Vec::new)),
+        )
+        .map(|((i_name, streamlet_name), doms)| StructStat::Instance(i_name, streamlet_name, doms));
 
     let portsel = name
         .clone()
