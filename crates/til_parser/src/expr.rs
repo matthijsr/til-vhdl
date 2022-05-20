@@ -96,7 +96,6 @@ pub enum Expr {
     Error,
     Value(Value),
     Ident(IdentExpr),
-    Domain(Spanned<String>),
     TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
     PortDef(Spanned<String>, Spanned<PortProps>),

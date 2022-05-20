@@ -10,13 +10,20 @@ use chumsky::prelude::*;
 use std::hash::Hash;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DomainAssignments {
+    Error,
+    None,
+    List(Vec<(Option<Spanned<String>>, Spanned<String>)>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StructStat {
     Error,
     Documentation(Spanned<String>, Box<Spanned<Self>>),
     Instance(
         Spanned<String>,
         Spanned<IdentExpr>,
-        Vec<(Option<Spanned<String>>, Spanned<String>)>,
+        Spanned<DomainAssignments>,
     ),
     Connection(Spanned<PortSel>, Spanned<PortSel>),
 }
@@ -27,12 +34,9 @@ pub enum PortSel {
     Instance(Spanned<String>, Spanned<String>),
 }
 
-pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple<Token>> + Clone {
-    let name = name_parser().labelled("name");
-
-    let domain = just(Token::Ctrl('\'')).ignore_then(name.clone());
-
-    let ident = ident_expr_parser().labelled("identifier");
+pub fn domain_assignments_parser(
+) -> impl Parser<Token, Spanned<DomainAssignments>, Error = Simple<Token>> + Clone {
+    let domain = just(Token::Ctrl('\'')).ignore_then(name_parser().labelled("domain"));
 
     let domain_assignment = domain
         .clone()
@@ -48,7 +52,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
             None => (None, left),
         });
 
-    let domain_assignments = domain_assignment
+    domain_assignment
         .clone()
         .chain(
             just(Token::Ctrl(','))
@@ -58,17 +62,35 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .or_not()
         .map(|item| item.unwrap_or_else(Vec::new))
-        .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
+        .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
+        .or_not()
+        .map_with_span(|x, span| {
+            (
+                match x {
+                    Some(list) => DomainAssignments::List(list),
+                    None => DomainAssignments::None,
+                },
+                span,
+            )
+        })
+        .recover_with(nested_delimiters(
+            Token::Ctrl('<'),
+            Token::Ctrl('>'),
+            [],
+            |span| (DomainAssignments::Error, span),
+        ))
+}
+
+pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple<Token>> + Clone {
+    let name = name_parser().labelled("name");
+
+    let ident = ident_expr_parser().labelled("identifier");
 
     let instance = name
         .clone()
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
-        .then(
-            domain_assignments
-                .or_not()
-                .map(|x| x.unwrap_or_else(Vec::new)),
-        )
+        .then(domain_assignments_parser())
         .map(|((i_name, streamlet_name), doms)| StructStat::Instance(i_name, streamlet_name, doms));
 
     let portsel = name
@@ -106,12 +128,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
         .map(|(body, subj)| StructStat::Documentation(body, Box::new(subj)))
         .map_with_span(|expr, span| (expr, span));
 
-    stat.or(doc).recover_with(nested_delimiters(
-        Token::Ctrl('<'),
-        Token::Ctrl('>'),
-        [],
-        |span| (StructStat::Error, span),
-    ))
+    stat.or(doc)
 }
 
 // TODO: Also do an eval, to confirm the ports and streamlets actually exist
