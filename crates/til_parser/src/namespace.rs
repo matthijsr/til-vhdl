@@ -5,7 +5,7 @@ use crate::{
     doc_expr::{doc_expr, DocExpr},
     expr::{doc_parser, expr_parser, Expr},
     ident_expr::{name, path_name},
-    impl_expr::{impl_body_expr, impl_def_expr, ImplDefExpr},
+    impl_expr::{impl_def_expr, ImplDefExpr},
     interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Operator, Token},
     type_expr::{type_expr, TypeExpr},

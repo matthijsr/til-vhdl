@@ -19,8 +19,7 @@ use tydi_intern::Id;
 
 use crate::{
     doc_expr::DocExpr,
-    eval::{eval_ident, eval_interface::eval_interface_expr},
-    expr::{Expr, RawImpl},
+    eval::eval_ident,
     impl_expr::ImplBodyExpr,
     struct_parse::{PortSel, StructStat},
     Spanned,

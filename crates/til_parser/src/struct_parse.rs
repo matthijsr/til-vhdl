@@ -83,9 +83,9 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     let instance = name()
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
-        //.then(domain_assignments())
-        .map(|(i_name, streamlet_name)| {
-            StructStat::Instance(i_name, streamlet_name, (DomainAssignments::None, 0..0))
+        .then(domain_assignments())
+        .map(|((i_name, streamlet_name), domain_assignments)| {
+            StructStat::Instance(i_name, streamlet_name, domain_assignments)
         });
 
     let portsel = name()
