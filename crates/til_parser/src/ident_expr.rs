@@ -12,28 +12,35 @@ pub enum IdentExpr {
     PathName(Vec<Spanned<String>>),
 }
 
-pub fn name_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
+pub fn name() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
     filter_map(|span, tok| match tok {
         Token::Identifier(ident) => Ok((ident, span)),
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
+    .labelled("name")
 }
 
-pub fn path_name_parser() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> + Clone
-{
-    let name = name_parser().labelled("name");
-
-    name.clone().chain(
-        just(Token::Op(Operator::Path))
-            .ignore_then(name.clone())
-            .repeated(),
-    )
+pub fn domain_name() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
+    just(Token::Ctrl('\'')).ignore_then(name().labelled("domain name"))
 }
 
-pub fn ident_expr_parser() -> impl Parser<Token, IdentExpr, Error = Simple<Token>> + Clone {
-    let name = name_parser().labelled("name");
+pub fn label() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
+    name().then_ignore(just(Token::Ctrl(':'))).labelled("label")
+}
 
-    let path_name = path_name_parser().map(|pth| IdentExpr::PathName(pth));
+pub fn path_name() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> + Clone {
+    name()
+        .chain(
+            just(Token::Op(Operator::Path))
+                .ignore_then(name())
+                .repeated(),
+        )
+        .labelled("path name")
+}
 
-    name.map(IdentExpr::Name).or(path_name)
+pub fn ident_expr() -> impl Parser<Token, IdentExpr, Error = Simple<Token>> + Clone {
+    name()
+        .map(IdentExpr::Name)
+        .or(path_name().map(|pth| IdentExpr::PathName(pth)))
+        .labelled("identifier")
 }

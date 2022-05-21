@@ -1,10 +1,14 @@
+pub mod doc_expr;
 pub mod eval;
 pub mod expr;
 pub mod ident_expr;
+pub mod impl_expr;
+pub mod interface_expr;
 pub mod lex;
 pub mod namespace;
 pub mod query;
 pub mod report;
 pub mod struct_parse;
+pub mod type_expr;
 pub type Span = std::ops::Range<usize>;
 pub type Spanned<T> = (T, Span);

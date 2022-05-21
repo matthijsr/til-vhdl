@@ -1,87 +1,129 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
+    sync::Arc,
 };
 
 use til_query::{
     common::logical::logicaltype::{stream::Stream, LogicalType},
     ir::{
-        interface::Interface,
-        project::interface::InterfaceCollection,
-        traits::{GetSelf, InternSelf},
+        interface_port::InterfacePort,
+        project::interface::Interface,
+        traits::{GetSelf, InternArc},
         Ir,
     },
 };
 use tydi_common::{
     error::TryResult,
-    name::{Name, PathName}, traits::Documents,
+    map::InsertionOrderedSet,
+    name::{Name, PathName},
+    traits::Documents,
 };
 use tydi_intern::Id;
 
-use crate::{eval::eval_ident, expr::Expr, Spanned};
+use crate::{
+    eval::eval_ident,
+    interface_expr::{DomainList, InterfaceDef, InterfaceExpr, PortsDef},
+    Spanned,
+};
 
 use super::{eval_common_error, eval_name, eval_type::eval_type_expr, EvalError};
 
 pub fn eval_interface_expr(
     db: &dyn Ir,
-    expr: &Spanned<Expr>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    expr: &Spanned<InterfaceExpr>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<Id<InterfaceCollection>, EvalError> {
+) -> Result<Id<Arc<Interface>>, EvalError> {
     match &expr.0 {
-        Expr::Ident(ident) => {
+        InterfaceExpr::Identifier(ident) => {
             eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")
         }
-        Expr::InterfaceDef(iface) => {
-            let mut dups = HashSet::new();
-            let mut result = InterfaceCollection::new_empty();
-            for port_def_expr in iface {
-                let mut port_def_expr = port_def_expr;
-                let mut doc = None;
-                if let (Expr::Documentation((doc_str, _), sub_expr), _) = port_def_expr {
-                    port_def_expr = sub_expr;
-                    doc = Some(doc_str);
-                };
-
-                if let Expr::PortDef((name_string, name_span), (props, _)) = &port_def_expr.0 {
-                    let name = eval_name(name_string, name_span)?;
-                    if dups.contains(&name) {
-                        return Err(EvalError {
-                            span: name_span.clone(),
-                            msg: format!("Duplicate label in Interface, \"{}\"", name),
-                        });
+        InterfaceExpr::Definition((iface_def, span)) => match iface_def {
+            InterfaceDef::Error => Err(EvalError {
+                span: span.clone(),
+                msg: "Invalid expression for interface definition".to_string(),
+            }),
+            InterfaceDef::Def(domain_list, ports) => match &ports.0 {
+                PortsDef::Error => Err(EvalError {
+                    span: ports.1.clone(),
+                    msg: "Invalid expression for ports definition".to_string(),
+                }),
+                PortsDef::Def(ports_def) => {
+                    let mut result = if let Some(domain_list) = domain_list {
+                        match &domain_list.0 {
+                            DomainList::Error => Err(EvalError {
+                                span: domain_list.1.clone(),
+                                msg: "Domain list error".to_string(),
+                            }),
+                            DomainList::List(list) => {
+                                let mut doms = InsertionOrderedSet::new();
+                                for dom in list {
+                                    if !doms.insert(eval_name(&dom.0, &dom.1)?) {
+                                        return Err(EvalError {
+                                            span: dom.1.clone(),
+                                            msg: format!(
+                                                "Duplicate domain in Interface, \"{}\"",
+                                                dom.0
+                                            ),
+                                        });
+                                    }
+                                }
+                                eval_common_error(
+                                    Interface::new_domains(doms.iter()),
+                                    &domain_list.1,
+                                )
+                            }
+                        }
                     } else {
-                        dups.insert(name.clone());
-                        let stream_id: Id<Stream> = eval_common_error(
-                            eval_type_expr(db, &props.typ, types, type_imports)?
+                        Ok(Interface::new_empty())
+                    }?;
+                    let mut dups = HashSet::new();
+                    for (port_def, port_span) in ports_def {
+                        let name = eval_name(&port_def.name.0, &port_def.name.1)?;
+                        if dups.contains(&name) {
+                            return Err(EvalError {
+                                span: port_def.name.1.clone(),
+                                msg: format!("Duplicate label in Interface, \"{}\"", name),
+                            });
+                        } else {
+                            dups.insert(name.clone());
+                            let stream_id: Id<Stream> = eval_common_error(
+                                eval_type_expr(
+                                    db,
+                                    (&port_def.props.0.typ.0, &port_def.props.0.typ.1),
+                                    types,
+                                    type_imports,
+                                )?
                                 .get(db)
                                 .try_result(),
-                            &props.typ.1,
-                        )?;
-                        let mut port = eval_common_error(
-                            Interface::try_from((name, stream_id, props.mode.0)),
-                            name_span,
-                        )?;
-                        if let Some(doc) = doc {
-                            port.set_doc(doc);
+                                &port_def.props.0.typ.1,
+                            )?;
+                            let port_dom = if let Some(domain) = &port_def.props.0.domain {
+                                Some(eval_name(&domain.0, &domain.1)?)
+                            } else {
+                                None
+                            };
+                            let mut port = eval_common_error(
+                                InterfacePort::try_from((
+                                    name,
+                                    stream_id,
+                                    (port_dom, port_def.props.0.mode.0),
+                                )),
+                                port_span,
+                            )?;
+                            if let Some(doc) = &port_def.doc {
+                                port.set_doc(&doc.0);
+                            }
+                            eval_common_error(result.push_port(port), port_span)?;
                         }
-                        eval_common_error(result.push(db, port), name_span)?;
                     }
-                } else {
-                    return Err(EvalError {
-                        span: port_def_expr.1.clone(),
-                        msg: format!("{:#?} is not a port definition", port_def_expr.0),
-                    });
+                    Ok(result.intern_arc(db))
                 }
-            }
-            Ok(result.intern(db))
-        }
-        _ => Err(EvalError {
-            span: expr.1.clone(),
-            msg: format!("Invalid expression {:#?} for interface definition", &expr.0),
-        }),
+            },
+        },
     }
 }
 
@@ -92,7 +134,7 @@ pub(crate) mod tests {
     use tydi_common::error::TryResult;
 
     use crate::{
-        eval::eval_type::tests::test_expr_parse_type, expr::expr_parser, lex::lexer,
+        eval::eval_type::tests::test_expr_parse_type, interface_expr::interface_expr, lex::lexer,
         report::report_errors,
     };
 
@@ -103,7 +145,7 @@ pub(crate) mod tests {
         name: impl TryResult<Name>,
         db: &dyn Ir,
         types: &HashMap<Name, Id<LogicalType>>,
-        interfaces: &mut HashMap<Name, Id<InterfaceCollection>>,
+        interfaces: &mut HashMap<Name, Id<Arc<Interface>>>,
     ) {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
@@ -113,8 +155,8 @@ pub(crate) mod tests {
         let parse_errs = if let Some(tokens) = tokens {
             // println!("Tokens = {:?}", tokens);
             let len = src.chars().count();
-            let (ast, parse_errs) =
-                expr_parser().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
+            let (ast, parse_errs) = interface_expr()
+                .parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
 
             if let Some(expr) = ast {
                 match eval_interface_expr(

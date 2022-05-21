@@ -1,7 +1,9 @@
-use tydi_common::error::TryResult;
-use tydi_common::{name::Name, error::Result};
-use tydi_intern::Id;
+use std::sync::Arc;
+
 use super::Ir;
+use tydi_common::error::TryResult;
+use tydi_common::{error::Result, name::Name};
+use tydi_intern::Id;
 
 pub trait GetSelf<T> {
     fn get(&self, db: &dyn Ir) -> T;
@@ -9,6 +11,19 @@ pub trait GetSelf<T> {
 
 pub trait InternSelf: Sized {
     fn intern(self, db: &dyn Ir) -> Id<Self>;
+}
+
+pub trait InternArc: Sized {
+    fn intern_arc(self, db: &dyn Ir) -> Id<Arc<Self>>;
+}
+
+impl<T> InternArc for T
+where
+    Arc<T>: InternSelf,
+{
+    fn intern_arc(self, db: &dyn Ir) -> Id<Arc<Self>> {
+        Arc::new(self).intern(db)
+    }
 }
 
 pub trait InternAs<T> {

@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use tydi_intern::Id;
 
 use super::{
-    project::{interface::InterfaceCollection, namespace::Namespace},
+    project::{interface::Interface, namespace::Namespace},
     traits::InternSelf,
-    Implementation, Interface, Ir, LogicalType, Stream, Streamlet,
+    Implementation, Ir, LogicalType, Stream, Streamlet,
 };
 
 // This will almost certainly lead to bad design, so comment it out for now unless I can think of a valid use.
@@ -26,13 +28,7 @@ impl InternSelf for LogicalType {
     }
 }
 
-impl InternSelf for Interface {
-    fn intern(self, db: &dyn Ir) -> Id<Self> {
-        db.intern_port(self)
-    }
-}
-
-impl InternSelf for Streamlet {
+impl InternSelf for Arc<Streamlet> {
     fn intern(self, db: &dyn Ir) -> Id<Self> {
         db.intern_streamlet(self)
     }
@@ -50,8 +46,8 @@ impl InternSelf for Namespace {
     }
 }
 
-impl InternSelf for InterfaceCollection {
+impl InternSelf for Arc<Interface> {
     fn intern(self, db: &dyn Ir) -> Id<Self> {
-        db.intern_interface_collection(self)
+        db.intern_interface(self)
     }
 }

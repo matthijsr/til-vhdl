@@ -1,7 +1,7 @@
 use chumsky::{prelude::Simple, Parser};
 
 use crate::{
-    ident_expr::{ident_expr_parser, name_parser, IdentExpr},
+    ident_expr::{domain_name, ident_expr, name, IdentExpr},
     lex::{Operator, Token},
     Spanned,
 };
@@ -10,10 +10,21 @@ use chumsky::prelude::*;
 use std::hash::Hash;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DomainAssignments {
+    Error,
+    None,
+    List(Vec<(Option<Spanned<String>>, Spanned<String>)>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StructStat {
     Error,
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    Instance(Spanned<String>, Spanned<IdentExpr>),
+    Instance(
+        Spanned<String>,
+        Spanned<IdentExpr>,
+        Spanned<DomainAssignments>,
+    ),
     Connection(Spanned<PortSel>, Spanned<PortSel>),
 }
 
@@ -23,22 +34,64 @@ pub enum PortSel {
     Instance(Spanned<String>, Spanned<String>),
 }
 
-pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple<Token>> + Clone {
-    let name = name_parser().labelled("name");
-
-    let ident = ident_expr_parser().labelled("identifier");
-
-    let instance = name
-        .clone()
-        .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(ident.clone().map_with_span(|i, span| (i, span)))
-        .map(|(i_name, streamlet_name)| StructStat::Instance(i_name, streamlet_name));
-
-    let portsel = name
+pub fn domain_assignments(
+) -> impl Parser<Token, Spanned<DomainAssignments>, Error = Simple<Token>> + Clone {
+    let domain_assignment = domain_name()
         .clone()
         .then(
+            just(Token::Op(Operator::Declare))
+                .ignore_then(domain_name())
+                .or_not(),
+        )
+        .map(|(left, right)| match right {
+            // <'instance_domain = 'parent_domain>
+            Some(right) => (Some(left), right),
+            // <'parent_domain>
+            None => (None, left),
+        });
+
+    domain_assignment
+        .clone()
+        .chain(
+            just(Token::Ctrl(','))
+                .ignore_then(domain_assignment)
+                .repeated(),
+        )
+        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
+        .or_not()
+        .map_with_span(|x, span| {
+            (
+                match x {
+                    Some(list) => DomainAssignments::List(list),
+                    None => DomainAssignments::None,
+                },
+                span,
+            )
+        })
+        .recover_with(nested_delimiters(
+            Token::Ctrl('<'),
+            Token::Ctrl('>'),
+            [],
+            |span| (DomainAssignments::Error, span),
+        ))
+}
+
+pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple<Token>> + Clone {
+    let ident = ident_expr();
+
+    let instance = name()
+        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then(ident.clone().map_with_span(|i, span| (i, span)))
+        .then(domain_assignments())
+        .map(|((i_name, streamlet_name), domain_assignments)| {
+            StructStat::Instance(i_name, streamlet_name, domain_assignments)
+        });
+
+    let portsel = name()
+        .then(
             just(Token::Op(Operator::Select))
-                .ignore_then(name.clone())
+                .ignore_then(name())
                 .or_not(),
         )
         .map(|(subj, port)| {
@@ -53,7 +106,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     let conn = portsel
         .clone()
         .then_ignore(just(Token::Op(Operator::Connect)))
-        .then(portsel.clone())
+        .then(portsel)
         .map(|(left, right)| StructStat::Connection(left, right));
 
     let stat = instance
@@ -69,7 +122,6 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     .labelled("documentation");
 
     let doc = doc_body
-        .clone()
         .then(stat.clone())
         .map(|(body, subj)| StructStat::Documentation(body, Box::new(subj)))
         .map_with_span(|expr, span| (expr, span));

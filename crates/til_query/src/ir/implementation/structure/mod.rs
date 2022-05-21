@@ -1,32 +1,38 @@
 use std::{
     collections::{BTreeMap, HashSet},
     convert::{TryFrom, TryInto},
+    sync::Arc,
 };
 
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryOptional, TryResult},
+    map::InsertionOrderedMap,
     name::Name,
 };
 use tydi_intern::Id;
 
 use crate::ir::{
     connection::{Connection, InterfaceReference},
-    physical_properties::InterfaceDirection,
-    project::interface::InterfaceCollection,
+    physical_properties::{Domain, InterfaceDirection},
+    project::interface::Interface,
     traits::{GetSelf, MoveDb},
-    Interface, Ir, Streamlet,
+    InterfacePort, Ir, Streamlet,
 };
+
+use self::streamlet_instance::StreamletInstance;
+
+pub mod streamlet_instance;
 
 /// This node represents a structural `Implementation`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Structure {
-    interface: Id<InterfaceCollection>,
-    streamlet_instances: BTreeMap<Name, Id<Streamlet>>,
+    interface: Id<Arc<Interface>>,
+    streamlet_instances: BTreeMap<Name, StreamletInstance>,
     connections: Vec<Connection>,
 }
 
 impl Structure {
-    pub fn new(interface: Id<InterfaceCollection>) -> Self {
+    pub fn new(interface: Id<Arc<Interface>>) -> Self {
         Structure {
             interface,
             streamlet_instances: BTreeMap::new(),
@@ -34,39 +40,38 @@ impl Structure {
         }
     }
 
-    pub fn interface_id(&self) -> Id<InterfaceCollection> {
+    pub fn interface_id(&self) -> Id<Arc<Interface>> {
         self.interface
     }
 
-    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
+    pub fn interface(&self, db: &dyn Ir) -> Arc<Interface> {
         self.interface_id().get(db)
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.interface(db).ports(db)
+    pub fn ports(&self, db: &dyn Ir) -> InsertionOrderedMap<Name, InterfacePort> {
+        self.interface(db).ports().clone()
     }
 
     pub fn interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
         let mut result = self.local_interface_references(db);
-        result.extend(self.streamlet_instance_interface_references(db));
+        result.extend(self.streamlet_instance_interface_references());
         result
     }
 
     pub fn local_interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
         self.interface(db)
-            .port_ids()
+            .ports()
             .keys()
             .map(|name| InterfaceReference::new(None, name.clone()))
             .collect()
     }
 
-    pub fn streamlet_instance_interface_references(&self, db: &dyn Ir) -> Vec<InterfaceReference> {
-        self.streamlet_instances(db)
+    pub fn streamlet_instance_interface_references(&self) -> Vec<InterfaceReference> {
+        self.streamlet_instances()
             .iter()
             .flat_map(|(name, streamlet)| {
                 streamlet
-                    .interface(db)
-                    .port_ids()
+                    .ports()
                     .keys()
                     .map(|port| InterfaceReference::new(Some(name.clone()), port.clone()))
                     .collect::<Vec<InterfaceReference>>()
@@ -74,15 +79,8 @@ impl Structure {
             .collect()
     }
 
-    pub fn streamlet_instance_ids(&self) -> &BTreeMap<Name, Id<Streamlet>> {
+    pub fn streamlet_instances(&self) -> &BTreeMap<Name, StreamletInstance> {
         &self.streamlet_instances
-    }
-
-    pub fn streamlet_instances(&self, db: &dyn Ir) -> BTreeMap<Name, Streamlet> {
-        self.streamlet_instance_ids()
-            .iter()
-            .map(|(name, id)| (name.clone(), id.get(db)))
-            .collect()
     }
 
     pub fn try_add_connection(
@@ -96,7 +94,7 @@ impl Structure {
 
         struct InterfaceAndStructure {
             on_streamlet: bool,
-            interface: Interface,
+            interface: InterfacePort,
         }
 
         let get_port = |i: &InterfaceReference| match i.streamlet_instance() {
@@ -105,13 +103,13 @@ impl Structure {
                 .and_then(|x| {
                     Ok(InterfaceAndStructure {
                         on_streamlet: true,
-                        interface: x.get(db).try_get_port(db, i.port())?,
+                        interface: x.try_get_port(i.port())?,
                     })
                 }),
-            None => match self.interface(db).port_ids().get(i.port()) {
+            None => match self.interface(db).ports().get(i.port()) {
                 Some(port) => Ok(InterfaceAndStructure {
                     on_streamlet: false,
-                    interface: port.get(db),
+                    interface: port.clone(),
                 }),
                 None => Err(Error::InvalidArgument(format!(
                     "No port with name {} exists within this structure",
@@ -129,6 +127,23 @@ impl Structure {
             // If they are not on the same layer, their directions should be the same.
             && same_layer == (left_i.interface.direction() != right_i.interface.direction())
         {
+            if left_i.interface.domain() != right_i.interface.domain() {
+                let dom_str = |dom: Option<&Domain>| {
+                    if let Some(dom) = dom {
+                        dom.to_string()
+                    } else {
+                        "Default".to_string()
+                    }
+                };
+                return Err(Error::InvalidTarget(format!(
+                    "Port {} has domain {}, port {} has domain {}",
+                    left,
+                    dom_str(left_i.interface.domain()),
+                    right,
+                    dom_str(right_i.interface.domain())
+                )));
+            }
+
             let (source, sink) = match left_i.interface.direction() {
                 // If left_interface belongs to a streamlet instance, Out means it's a Source
                 InterfaceDirection::Out if left_i.on_streamlet => (left, right),
@@ -152,24 +167,50 @@ impl Structure {
 
     pub fn try_add_streamlet_instance(
         &mut self,
+        db: &dyn Ir,
         name: impl TryResult<Name>,
-        streamlet: Id<Streamlet>,
+        streamlet: Id<Arc<Streamlet>>,
+        assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
     ) -> Result<()> {
         let name = name.try_result()?;
-        if self.streamlet_instance_ids().contains_key(&name) {
+        if self.streamlet_instances().contains_key(&name) {
             Err(Error::InvalidArgument(format!(
                 "A streamlet instance with name {} already exists in this structure",
                 name
             )))
         } else {
-            self.streamlet_instances.insert(name, streamlet);
+            self.streamlet_instances.insert(
+                name.clone(),
+                StreamletInstance::new(db, name, streamlet, assignments)?,
+            );
             Ok(())
         }
     }
 
-    pub fn try_get_streamlet_instance(&self, name: &Name) -> Result<Id<Streamlet>> {
-        match self.streamlet_instance_ids().get(name) {
-            Some(streamlet) => Ok(*streamlet),
+    pub fn try_add_streamlet_instance_default(
+        &mut self,
+        db: &dyn Ir,
+        name: impl TryResult<Name>,
+        streamlet: Id<Arc<Streamlet>>,
+    ) -> Result<()> {
+        let name = name.try_result()?;
+        if self.streamlet_instances().contains_key(&name) {
+            Err(Error::InvalidArgument(format!(
+                "A streamlet instance with name {} already exists in this structure",
+                name
+            )))
+        } else {
+            self.streamlet_instances.insert(
+                name.clone(),
+                StreamletInstance::new_assign_default(db, name, streamlet)?,
+            );
+            Ok(())
+        }
+    }
+
+    pub fn try_get_streamlet_instance(&self, name: &Name) -> Result<&StreamletInstance> {
+        match self.streamlet_instances().get(name) {
+            Some(streamlet) => Ok(streamlet),
             None => Err(Error::InvalidArgument(format!(
                 "A streamlet instance with name {} does not exist in this structure",
                 name
@@ -231,14 +272,15 @@ impl MoveDb<Structure> for Structure {
         prefix: &Option<Name>,
     ) -> Result<Structure> {
         let interface = self.interface.move_db(original_db, target_db, prefix)?;
-        let streamlet_instances = self
-            .streamlet_instances
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
-            .collect::<Result<_>>()?;
+        // TODO
+        // let streamlet_instances = self
+        //     .streamlet_instances
+        //     .iter()
+        //     .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
+        //     .collect::<Result<_>>()?;
         let connections = self.connections.clone();
         Ok(Structure {
-            streamlet_instances,
+            streamlet_instances: BTreeMap::new(),
             connections,
             interface,
         })
@@ -248,7 +290,7 @@ impl MoveDb<Structure> for Structure {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ir::{db::Database, traits::InternSelf},
+        ir::{db::Database, traits::InternArc},
         test_utils::test_stream_id,
     };
 
@@ -267,9 +309,10 @@ mod tests {
             ],
         )?;
         let mut structure = Structure::try_from(&streamlet)?;
-        structure.try_add_streamlet_instance(
+        structure.try_add_streamlet_instance_default(
+            db,
             "instance",
-            streamlet.with_implementation(None).intern(db),
+            streamlet.with_implementation(None).intern_arc(db),
         )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
@@ -290,9 +333,10 @@ mod tests {
         )?;
 
         let mut structure = Structure::try_from(&streamlet)?;
-        structure.try_add_streamlet_instance(
+        structure.try_add_streamlet_instance_default(
+            db,
             "instance",
-            streamlet.with_implementation(None).intern(db),
+            streamlet.with_implementation(None).intern_arc(db),
         )?;
         structure.try_add_connection(db, "a", ("instance", "a"))?;
 
@@ -331,9 +375,10 @@ mod tests {
             ],
         )?;
         let mut structure = Structure::try_from(&streamlet)?;
-        structure.try_add_streamlet_instance(
+        structure.try_add_streamlet_instance_default(
+            db,
             "instance",
-            streamlet.with_implementation(None).intern(db),
+            streamlet.with_implementation(None).intern_arc(db),
         )?;
         structure.try_get_streamlet_instance(&("instance".try_result()?))?;
 

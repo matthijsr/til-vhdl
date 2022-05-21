@@ -1,14 +1,18 @@
+use std::sync::Arc;
+
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::{InsertionOrderedMap, InsertionOrderedSet},
     name::{Name, PathName, PathNameSelf},
     traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
 
 use super::{
-    project::interface::InterfaceCollection,
-    traits::{GetSelf, InternSelf, MoveDb, TryIntern},
-    Implementation, Interface, Ir,
+    physical_properties::Domain,
+    project::interface::Interface,
+    traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
+    Implementation, InterfacePort, Ir,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -17,7 +21,7 @@ pub struct Streamlet {
     /// and can be suffixed with their implementation.
     name: PathName,
     implementation: Option<Id<Implementation>>,
-    interface: Option<Id<InterfaceCollection>>,
+    interface: Option<Id<Arc<Interface>>>,
     doc: Option<String>,
 }
 
@@ -31,20 +35,38 @@ impl Streamlet {
         }
     }
 
-    pub fn with_ports(
+    pub fn with_domains_ports(
         mut self,
         db: &dyn Ir,
-        ports: Vec<impl TryResult<Interface>>,
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = InterfaceCollection::new(db, ports)?.intern(db);
+        let interface = Interface::new(domains, ports)?.intern_arc(db);
         self.interface = Some(interface);
+
         Ok(self)
     }
 
-    pub fn with_interface_collection(
+    pub fn with_ports(
         mut self,
         db: &dyn Ir,
-        coll: impl TryIntern<InterfaceCollection>,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Streamlet> {
+        if let Some(interface) = self.interface {
+            let new_interface = interface.get(db).as_ref().clone().with_ports(ports)?;
+            self.interface = Some(new_interface.intern_arc(db));
+        } else {
+            let interface = Interface::new_ports(ports)?.intern_arc(db);
+            self.interface = Some(interface);
+        }
+
+        Ok(self)
+    }
+
+    pub fn with_interface(
+        mut self,
+        db: &dyn Ir,
+        coll: impl TryIntern<Arc<Interface>>,
     ) -> Result<Streamlet> {
         self.interface = Some(coll.try_intern(db)?);
 
@@ -78,34 +100,34 @@ impl Streamlet {
         }
     }
 
-    pub fn interface_id(&self) -> Option<Id<InterfaceCollection>> {
+    pub fn interface_id(&self) -> Option<Id<Arc<Interface>>> {
         self.interface.clone()
     }
 
-    pub fn interface(&self, db: &dyn Ir) -> InterfaceCollection {
+    pub fn interface(&self, db: &dyn Ir) -> Arc<Interface> {
         if let Some(interface_id) = self.interface_id() {
             interface_id.get(db)
         } else {
-            let interface = InterfaceCollection::new_empty();
+            let interface = Arc::new(Interface::new_empty());
             interface.clone().intern(db);
             interface
         }
     }
 
-    pub fn ports(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.interface(db).ports(db)
+    pub fn ports(&self, db: &dyn Ir) -> InsertionOrderedMap<Name, InterfacePort> {
+        self.interface(db).ports().clone()
     }
 
-    pub fn inputs(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.interface(db).inputs(db)
+    pub fn inputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
+        self.interface(db).inputs().cloned().collect()
     }
 
-    pub fn outputs(&self, db: &dyn Ir) -> Vec<Interface> {
-        self.interface(db).outputs(db)
+    pub fn outputs(&self, db: &dyn Ir) -> Vec<InterfacePort> {
+        self.interface(db).outputs().cloned().collect()
     }
 
-    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<Interface> {
-        match self.interface(db).try_get_port(db, name) {
+    pub fn try_get_port(&self, db: &dyn Ir, name: &Name) -> Result<InterfacePort> {
+        match self.interface(db).try_get_port(name) {
             Ok(port) => Ok(port),
             Err(_) => Err(Error::InvalidArgument(format!(
                 "No port with name {} exists on Streamlet {}",
@@ -113,6 +135,10 @@ impl Streamlet {
                 self.identifier()
             ))),
         }
+    }
+
+    pub fn domains(&self, db: &dyn Ir) -> Option<InsertionOrderedSet<Domain>> {
+        self.interface(db).domains().clone()
     }
 }
 
@@ -140,13 +166,13 @@ impl Documents for Streamlet {
     }
 }
 
-impl MoveDb<Id<Streamlet>> for Streamlet {
+impl MoveDb<Id<Arc<Streamlet>>> for Arc<Streamlet> {
     fn move_db(
         &self,
         original_db: &dyn Ir,
         target_db: &dyn Ir,
         prefix: &Option<Name>,
-    ) -> Result<Id<Streamlet>> {
+    ) -> Result<Id<Arc<Streamlet>>> {
         let interface = match &self.interface {
             Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
             None => None,
@@ -155,18 +181,18 @@ impl MoveDb<Id<Streamlet>> for Streamlet {
             Some(id) => Some(id.move_db(original_db, target_db, prefix)?),
             None => None,
         };
-        Ok(Streamlet {
-            name: self.name.with_parents(prefix),
+        Ok(Arc::new(Streamlet {
+            name: self.name.clone().with_parents(prefix),
             implementation,
             interface,
             doc: self.doc.clone(),
-        }
+        })
         .intern(target_db))
     }
 }
 
-impl From<Id<InterfaceCollection>> for Streamlet {
-    fn from(id: Id<InterfaceCollection>) -> Self {
+impl From<Id<Arc<Interface>>> for Streamlet {
+    fn from(id: Id<Arc<Interface>>) -> Self {
         Streamlet {
             name: PathName::new_empty(),
             implementation: None,

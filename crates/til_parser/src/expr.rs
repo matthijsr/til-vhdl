@@ -1,22 +1,16 @@
 use chumsky::prelude::*;
 use std::{fmt, hash::Hash};
-use til_query::{
-    common::{
-        logical::logicaltype::stream::{Synchronicity, Throughput},
-        physical::complexity::Complexity,
-        stream_direction::StreamDirection,
-    },
-    ir::physical_properties::InterfaceDirection,
+use til_query::common::{
+    logical::logicaltype::stream::{Synchronicity, Throughput},
+    stream_direction::StreamDirection,
 };
-use tydi_common::{
-    name::Name,
-    numbers::{NonNegative, Positive, PositiveReal},
-};
+use tydi_common::numbers::{NonNegative, Positive, PositiveReal};
 
 use crate::{
-    ident_expr::{ident_expr_parser, name_parser, IdentExpr},
-    lex::{DeclKeyword, Token, TypeKeyword},
-    struct_parse::{struct_parser, StructStat},
+    ident_expr::{ident_expr, IdentExpr},
+    impl_expr::{streamlet_impl_expr, StreamletImplExpr},
+    interface_expr::{interface_expr, InterfaceExpr},
+    lex::{DeclKeyword, Token},
     Span, Spanned,
 };
 
@@ -85,70 +79,17 @@ impl fmt::Display for Value {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PortProps {
-    pub mode: Spanned<InterfaceDirection>,
-    pub typ: Box<Spanned<Expr>>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Error,
-    Value(Value),
     Ident(IdentExpr),
-    TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    PortDef(Spanned<String>, Spanned<PortProps>),
-    InterfaceDef(Vec<Spanned<Self>>),
-    RawImpl(RawImpl),
-    ImplDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
     StreamletProps(Vec<(Spanned<Token>, StreamletProperty)>),
-    StreamletDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
-}
-
-// Implementation definitions without ports. Used when defining an implementation on a streamlet directly.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum RawImpl {
-    // Structural
-    Struct(Vec<Spanned<StructStat>>),
-    // Path
-    Link(String),
-}
-
-// Before eval
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum LogicalTypeExpr {
-    Null,
-    Bits(Spanned<String>),
-    Group(Vec<(Spanned<String>, Spanned<Expr>)>),
-    Union(Vec<(Spanned<String>, Spanned<Expr>)>),
-    Stream(Vec<(Spanned<String>, Spanned<Expr>)>),
-}
-
-// After eval
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum LogicalType {
-    Null,
-    Bits(Positive),
-    Group(Vec<(Spanned<Name>, Spanned<LogicalTypeExpr>)>),
-    Union(Vec<(Spanned<Name>, Spanned<LogicalTypeExpr>)>),
-    Stream(StreamType),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StreamType {
-    data: Box<Spanned<Expr>>,
-    throughput: Spanned<Throughput>,
-    dimensionality: Spanned<NonNegative>,
-    synchronicity: Spanned<Synchronicity>,
-    complexity: Spanned<Complexity>,
-    direction: Spanned<StreamDirection>,
-    user: Box<Spanned<Expr>>,
-    keep: Spanned<bool>,
+    StreamletDef(Spanned<InterfaceExpr>, Option<Box<Spanned<Self>>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StreamletProperty {
-    Implementation(Box<Spanned<Expr>>),
+    Implementation(Spanned<StreamletImplExpr>),
 }
 
 pub fn doc_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
@@ -160,12 +101,8 @@ pub fn doc_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>
     .labelled("documentation")
 }
 
-pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
-    // ......
-    // VALUES
-    // ......
-
-    let val = filter_map(|span: Span, tok| match tok {
+pub fn val() -> impl Parser<Token, Spanned<Value>, Error = Simple<Token>> + Clone {
+    filter_map(|span: Span, tok| match tok {
         Token::Num(num) => {
             if let Ok(i) = num.parse() {
                 Ok(Value::Int(i))
@@ -189,172 +126,16 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         Token::Boolean(boolean) => Ok(Value::Boolean(boolean)),
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
-    .map(Expr::Value)
-    .map_with_span(|v, span| (v, span));
+    .map_with_span(|v, span| (v, span))
+}
 
+pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     // ......
     // IDENTITIES
     // ......
 
-    let name = name_parser().labelled("name");
-
-    let ident = ident_expr_parser().labelled("identifier");
-    let ident_expr = ident
-        .clone()
-        .map(Expr::Ident)
-        .map_with_span(|i, span| (i, span));
-
-    let label = name.clone().then_ignore(just(Token::Ctrl(':')));
-
-    // ......
-    // TYPE DEFINITIONS
-    // ......
-
-    // Type definitions are recursive, as they can contain other type definitions
-    let typ = recursive(|type_def| {
-        let typ_el = label.clone().then(type_def.clone());
-
-        // A group of types
-        let group_def = typ_el
-            .clone()
-            .chain(
-                just(Token::Ctrl(','))
-                    .ignore_then(typ_el.clone())
-                    .repeated(),
-            )
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
-
-        let bits_def = filter_map(|span, tok| match tok {
-            Token::Num(num) => Ok((num, span)),
-            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-        })
-        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
-
-        // Stream properties are either values or types
-        let stream_prop = typ_el.or(label.clone().then(val.clone()));
-
-        let stream_def = stream_prop
-            .clone()
-            .chain(
-                just(Token::Ctrl(','))
-                    .ignore_then(stream_prop.clone())
-                    .repeated(),
-            )
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
-
-        just(Token::Type(TypeKeyword::Null))
-            .to(LogicalTypeExpr::Null)
-            .or(just(Token::Type(TypeKeyword::Bits))
-                .ignore_then(bits_def)
-                .map(|n| LogicalTypeExpr::Bits(n)))
-            .or(just(Token::Type(TypeKeyword::Group))
-                .ignore_then(group_def.clone())
-                .map(|g| LogicalTypeExpr::Group(g)))
-            .or(just(Token::Type(TypeKeyword::Union))
-                .ignore_then(group_def.clone())
-                .map(|g| LogicalTypeExpr::Union(g)))
-            .or(just(Token::Type(TypeKeyword::Stream))
-                .ignore_then(stream_def)
-                .map(|g| LogicalTypeExpr::Stream(g)))
-            .map(Expr::TypeDef)
-            .map_with_span(|t, span| (t, span))
-            // Type defs can be declared with identities
-            .or(ident_expr.clone())
-    });
-
-    // ......
-    // INTERFACE DEFINITIONS
-    // ......
-
-    let port_props = filter_map(|span, tok| match tok {
-        Token::PortMode(mode) => Ok(mode),
-        _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-    })
-    .map_with_span(|mode, span| (mode, span))
-    .then(typ.clone())
-    .map(|(mode, typ)| PortProps {
-        mode,
-        typ: Box::new(typ),
-    })
-    .map_with_span(|p, span| (p, span))
-    .labelled("port properties");
-
-    let port_def = label
-        .clone()
-        .then(port_props.clone())
-        .map(|(l, p)| Expr::PortDef(l, p))
-        .map_with_span(|p, span| (p, span));
-
-    // Individual ports can have documentation
-    let doc_port_def = doc_parser()
-        .then(port_def.clone())
-        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
-        .map_with_span(|d, span| (d, span));
-    let port_def = doc_port_def.or(port_def);
-
-    let interface_def = port_def
-        .clone()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(port_def.clone())
-                .repeated(),
-        )
-        .then_ignore(just(Token::Ctrl(',')).or_not())
-        .or_not()
-        .map(|item| item.unwrap_or_else(Vec::new))
-        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
-        .map(Expr::InterfaceDef)
-        .map_with_span(|i, span| (i, span));
-
-    // As with types, interfaces can be declared with identities
-    // Note: Interfaces can also be derived from streamlets and implementations
-    let interface = interface_def.clone().or(ident_expr.clone());
-
-    // ......
-    // IMPLEMENTATION DEFINITIONS
-    // ......
-
-    let behav = filter_map(|span, tok| match tok {
-        Token::Path(pth) => Ok(RawImpl::Link(pth)),
-        _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-    })
-    .labelled("behavioural impl path")
-    .map(Expr::RawImpl)
-    .map_with_span(|ri, span| (ri, span));
-
-    let struct_bod = struct_parser()
-        .repeated()
-        .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
-        .map(|stats| RawImpl::Struct(stats))
-        .map(Expr::RawImpl)
-        .map_with_span(|ri, span| (ri, span))
-        .recover_with(nested_delimiters(
-            Token::Ctrl('{'),
-            Token::Ctrl('}'),
-            [],
-            |span| (Expr::Error, span),
-        ));
-
-    let raw_impl = behav.or(struct_bod);
-    // Implementations can have documentation set on their raw definition, or on their overall declaration.
-    let doc_raw_impl = doc_parser()
-        .then(raw_impl.clone())
-        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
-        .map_with_span(|d, span| (d, span));
-    let raw_impl = doc_raw_impl.or(raw_impl);
-
-    // Implementations consist of an interface definition and a structural or behavioural implementation
-    let impl_def = interface
-        .clone()
-        .then(raw_impl.clone())
-        .map(|(e, ri)| Expr::ImplDef(Box::new(e), Box::new(ri)))
-        .map_with_span(|i, span| (i, span));
+    let ident = ident_expr();
+    let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
 
     // ......
     // STREAMLET DEFINITIONS
@@ -363,8 +144,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let impl_prop = just(Token::Decl(DeclKeyword::Implementation))
         .map_with_span(|tok, span| (tok, span))
         .then_ignore(just(Token::Ctrl(':')))
-        .then(raw_impl.clone().or(ident_expr.clone()))
-        .map(|(lab, i)| (lab, StreamletProperty::Implementation(Box::new(i))));
+        .then(streamlet_impl_expr())
+        .map(|(lab, i)| (lab, StreamletProperty::Implementation(i)));
 
     // In case more properties are added in the future, use a generic type
     let streamlet_prop = impl_prop;
@@ -374,7 +155,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .clone()
         .chain(
             just(Token::Ctrl(','))
-                .ignore_then(streamlet_prop.clone())
+                .ignore_then(streamlet_prop)
                 .repeated(),
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
@@ -387,10 +168,9 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             |span| (Expr::Error, span),
         ));
 
-    let streamlet_def = interface
-        .clone()
-        .then(streamlet_props)
-        .map(|(i, p)| Expr::StreamletDef(Box::new(i), Box::new(p)))
+    let streamlet_def = interface_expr()
+        .then(streamlet_props.map(|x| Box::new(x)).or_not())
+        .map(|(i, p)| Expr::StreamletDef(i, p))
         .map_with_span(|s, span| (s, span));
 
     // Note: Streamlet definitions can not have documentation, but streamlet declarations can.
@@ -405,10 +185,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // All of which can be identities
     // ......
 
-    impl_def
-        .or(streamlet_def)
-        .or(interface_def)
-        .or(typ)
+    streamlet_def
         .or(ident_expr)
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),
@@ -505,8 +282,23 @@ doc doc# some_port: in a)"#,
     }
 
     #[test]
+    fn test_port_list_empty_dom() {
+        test_expr_parse("<>(port: in a, port: out b)")
+    }
+
+    #[test]
+    fn test_port_list_with_dom() {
+        test_expr_parse("<'a, 'b>(port: in a 'b, port: out b 'a)")
+    }
+
+    #[test]
     fn test_invalid_port_list() {
         test_expr_parse("(port: a, port: out b)")
+    }
+
+    #[test]
+    fn test_invalid_dom_list() {
+        test_expr_parse("<'a, b>(port: in a, port: out b)")
     }
 
     #[test]

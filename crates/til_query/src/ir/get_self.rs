@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use tydi_intern::Id;
 
 use super::{
-    project::{interface::InterfaceCollection, namespace::Namespace},
+    project::{interface::Interface, namespace::Namespace},
     traits::GetSelf,
-    Implementation, Interface, Ir, LogicalType, Stream, Streamlet,
+    Implementation, Ir, LogicalType, Stream, Streamlet,
 };
 
 impl GetSelf<Implementation> for Id<Implementation> {
@@ -18,14 +20,8 @@ impl GetSelf<LogicalType> for Id<LogicalType> {
     }
 }
 
-impl GetSelf<Interface> for Id<Interface> {
-    fn get(&self, db: &dyn Ir) -> Interface {
-        db.lookup_intern_port(*self)
-    }
-}
-
-impl GetSelf<Streamlet> for Id<Streamlet> {
-    fn get(&self, db: &dyn Ir) -> Streamlet {
+impl GetSelf<Arc<Streamlet>> for Id<Arc<Streamlet>> {
+    fn get(&self, db: &dyn Ir) -> Arc<Streamlet> {
         db.lookup_intern_streamlet(*self)
     }
 }
@@ -42,8 +38,8 @@ impl GetSelf<Namespace> for Id<Namespace> {
     }
 }
 
-impl GetSelf<InterfaceCollection> for Id<InterfaceCollection> {
-    fn get(&self, db: &dyn Ir) -> InterfaceCollection {
-        db.lookup_intern_interface_collection(*self)
+impl GetSelf<Arc<Interface>> for Id<Arc<Interface>> {
+    fn get(&self, db: &dyn Ir) -> Arc<Interface> {
+        db.lookup_intern_interface(*self)
     }
 }

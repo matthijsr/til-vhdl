@@ -1,23 +1,27 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
         connection::InterfaceReference,
         implementation::{link::Link, structure::Structure, Implementation},
-        project::interface::InterfaceCollection,
+        project::interface::Interface,
         streamlet::Streamlet,
         traits::InternSelf,
         Ir,
     },
 };
-use tydi_common::{name::{Name, PathName}, traits::Documents};
+use tydi_common::{
+    name::{Name, PathName},
+    traits::Documents,
+};
 use tydi_intern::Id;
 
 use crate::{
-    eval::{eval_ident, eval_interface::eval_interface_expr},
-    expr::{Expr, RawImpl},
-    struct_parse::{PortSel, StructStat},
+    doc_expr::DocExpr,
+    eval::eval_ident,
+    impl_expr::ImplBodyExpr,
+    struct_parse::{DomainAssignments, PortSel, StructStat},
     Spanned,
 };
 
@@ -27,12 +31,12 @@ pub fn eval_struct_stat(
     db: &dyn Ir,
     stat: &Spanned<StructStat>,
     structure: &mut Structure,
-    streamlets: &HashMap<Name, Id<Streamlet>>,
-    streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
+    streamlets: &HashMap<Name, Id<Arc<Streamlet>>>,
+    streamlet_imports: &HashMap<PathName, Id<Arc<Streamlet>>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<(), EvalError> {
@@ -58,7 +62,11 @@ pub fn eval_struct_stat(
             )?;
             Ok(())
         }
-        StructStat::Instance((name_string, name_span), (ident_expr, ident_span)) => {
+        StructStat::Instance(
+            (name_string, name_span),
+            (ident_expr, ident_span),
+            domain_assignments,
+        ) => {
             let name = eval_name(name_string, name_span)?;
             let streamlet = eval_ident(
                 ident_expr,
@@ -67,11 +75,32 @@ pub fn eval_struct_stat(
                 streamlet_imports,
                 "streamlet",
             )?;
-            eval_common_error(
-                structure.try_add_streamlet_instance(name, streamlet),
-                name_span,
-            )?;
-            Ok(())
+            match &domain_assignments.0 {
+                DomainAssignments::Error => Err(EvalError {
+                    span: stat.1.clone(),
+                    msg: "Invalid domain assignments (ERROR)".to_string(),
+                }),
+                DomainAssignments::None => eval_common_error(
+                    structure.try_add_streamlet_instance_default(db, name, streamlet),
+                    name_span,
+                ),
+                DomainAssignments::List(list) => {
+                    let mut name_list = vec![];
+                    for (left, right) in list.iter() {
+                        let left = if let Some(left) = left {
+                            Some(eval_name(&left.0, &left.1)?)
+                        } else {
+                            None
+                        };
+                        let right = eval_name(&right.0, &right.1)?;
+                        name_list.push((left, right));
+                    }
+                    eval_common_error(
+                        structure.try_add_streamlet_instance(db, name, streamlet, name_list),
+                        name_span,
+                    )
+                }
+            }
         }
         StructStat::Connection(left_sel, right_sel) => {
             let parse_sel = |sel: &Spanned<PortSel>| -> Result<InterfaceReference, EvalError> {
@@ -101,68 +130,58 @@ pub fn eval_struct_stat(
 
 pub fn eval_implementation_expr(
     db: &dyn Ir,
-    expr: &Spanned<Expr>,
+    expr: &Spanned<ImplBodyExpr>,
     name: &PathName,
-    doc: Option<&String>,
-    interface: Option<Id<InterfaceCollection>>,
-    streamlets: &HashMap<Name, Id<Streamlet>>,
-    streamlet_imports: &HashMap<PathName, Id<Streamlet>>,
+    doc: &DocExpr,
+    interface: Option<Id<Arc<Interface>>>,
+    streamlets: &HashMap<Name, Id<Arc<Streamlet>>>,
+    streamlet_imports: &HashMap<PathName, Id<Arc<Streamlet>>>,
     implementations: &HashMap<Name, Id<Implementation>>,
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
-    interfaces: &HashMap<Name, Id<InterfaceCollection>>,
-    interface_imports: &HashMap<PathName, Id<InterfaceCollection>>,
+    interfaces: &HashMap<Name, Id<Arc<Interface>>>,
+    interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
-) -> Result<(Id<Implementation>, Id<InterfaceCollection>), EvalError> {
+) -> Result<(Id<Implementation>, Id<Arc<Interface>>), EvalError> {
     match &expr.0 {
-        Expr::Ident(ident) => {
-            let implementation = eval_ident(
-                ident,
-                &expr.1,
-                implementations,
-                implementation_imports,
-                "implementation",
-            )?;
-            let interface = eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
-            Ok((implementation, interface))
-        }
-        Expr::RawImpl(raw_impl) => {
+        ImplBodyExpr::Error => Err(EvalError {
+            span: expr.1.clone(),
+            msg: "Error parsing implementation body".to_string(),
+        }),
+        ImplBodyExpr::Struct(struct_doc, struct_stats) => {
             if let Some(interface) = interface {
-                match raw_impl {
-                    RawImpl::Struct(struct_stats) => {
-                        let mut structure = Structure::new(interface);
-                        for stat in struct_stats.iter() {
-                            eval_struct_stat(
-                                db,
-                                stat,
-                                &mut structure,
-                                streamlets,
-                                streamlet_imports,
-                                implementations,
-                                implementation_imports,
-                                interfaces,
-                                interface_imports,
-                                types,
-                                type_imports,
-                            )?;
-                        }
-                        eval_common_error(structure.validate_connections(db), &expr.1)?;
-                        let mut implementation =
-                            Implementation::from(structure).with_name(name.clone());
-                        if let Some(doc) = doc {
-                            implementation.set_doc(doc);
-                        }
-                        Ok((implementation.intern(db), interface))
-                    }
-                    RawImpl::Link(pth) => {
-                        let link = eval_common_error(Link::try_new(pth), &expr.1)?;
-                        let mut implementation = Implementation::from(link).with_name(name.clone());
-                        if let Some(doc) = doc {
-                            implementation.set_doc(doc);
-                        }
-                        Ok((implementation.intern(db), interface))
+                let mut structure = Structure::new(interface);
+                for stat in struct_stats.iter() {
+                    eval_struct_stat(
+                        db,
+                        stat,
+                        &mut structure,
+                        streamlets,
+                        streamlet_imports,
+                        implementations,
+                        implementation_imports,
+                        interfaces,
+                        interface_imports,
+                        types,
+                        type_imports,
+                    )?;
+                }
+                eval_common_error(structure.validate_connections(db), &expr.1)?;
+                let mut implementation = Implementation::from(structure).with_name(name.clone());
+                if let Some(struct_doc) = struct_doc {
+                    if doc.is_some() {
+                        return Err(EvalError {
+                            span: struct_doc.1.clone(),
+                            msg: "Two documentation instances".to_string(),
+                        });
+                    } else {
+                        implementation.set_doc(&struct_doc.0);
                     }
                 }
+                if let Some(doc) = doc {
+                    implementation.set_doc(&doc.0);
+                }
+                Ok((implementation.intern(db), interface))
             } else {
                 Err(EvalError {
                     span: expr.1.clone(),
@@ -170,61 +189,20 @@ pub fn eval_implementation_expr(
                 })
             }
         }
-        Expr::ImplDef(interface, raw_impl) => {
-            let interface = eval_interface_expr(
-                db,
-                interface,
-                interfaces,
-                interface_imports,
-                types,
-                type_imports,
-            )?;
-            eval_implementation_expr(
-                db,
-                raw_impl,
-                name,
-                doc,
-                Some(interface),
-                streamlets,
-                streamlet_imports,
-                implementations,
-                implementation_imports,
-                interfaces,
-                interface_imports,
-                types,
-                type_imports,
-            )
-        }
-        Expr::Documentation((doc_str, doc_span), sub_expr) => {
-            if doc == None {
-                eval_implementation_expr(
-                    db,
-                    sub_expr,
-                    name,
-                    Some(doc_str),
-                    interface,
-                    streamlets,
-                    streamlet_imports,
-                    implementations,
-                    implementation_imports,
-                    interfaces,
-                    interface_imports,
-                    types,
-                    type_imports,
-                )
+        ImplBodyExpr::Link(pth) => {
+            let link = eval_common_error(Link::try_new(pth), &expr.1)?;
+            let mut implementation = Implementation::from(link).with_name(name.clone());
+            if let Some(doc) = doc {
+                implementation.set_doc(&doc.0);
+            }
+            if let Some(interface) = interface {
+                Ok((implementation.intern(db), interface))
             } else {
-                Err(EvalError::new(
-                    doc_span,
-                    "Documentation already set on declaration.",
-                ))
+                Err(EvalError {
+                    span: expr.1.clone(),
+                    msg: "An implementation definition requires an interface".to_string(),
+                })
             }
         }
-        _ => Err(EvalError {
-            span: expr.1.clone(),
-            msg: format!(
-                "Invalid expression {:#?} for implementation definition",
-                &expr.0
-            ),
-        }),
     }
 }

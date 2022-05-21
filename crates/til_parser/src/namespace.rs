@@ -2,17 +2,21 @@ use chumsky::prelude::*;
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
+    doc_expr::{doc_expr, DocExpr},
     expr::{doc_parser, expr_parser, Expr},
-    ident_expr::{name_parser, path_name_parser},
+    ident_expr::{name, path_name},
+    impl_expr::{impl_def_expr, ImplDefExpr},
+    interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Operator, Token},
+    type_expr::{type_expr, TypeExpr},
     Span, Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
-    TypeDecl(Spanned<String>, Box<Spanned<Expr>>),
-    ImplDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
-    InterfaceDecl(Spanned<String>, Box<Spanned<Expr>>),
+    TypeDecl(Spanned<String>, Spanned<TypeExpr>),
+    ImplDecl(DocExpr, Spanned<String>, Spanned<ImplDefExpr>),
+    InterfaceDecl(Spanned<String>, Spanned<InterfaceExpr>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
 }
 
@@ -40,35 +44,31 @@ impl Namespace {
 
 pub fn namespaces_parser(
 ) -> impl Parser<Token, HashMap<Vec<String>, Namespace>, Error = Simple<Token>> + Clone {
-    let namespace_name = path_name_parser().map_with_span(|p, span| (p, span));
-    let name = name_parser();
+    let namespace_name = path_name().map_with_span(|p, span| (p, span));
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
-        .ignore_then(name.clone())
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
+        .then(type_expr())
         .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::TypeDecl(n, Box::new(e)));
+        .map(|(n, e)| Decl::TypeDecl(n, e));
 
-    let impl_decl = just(Token::Decl(DeclKeyword::Implementation))
-        .ignore_then(name.clone())
+    let impl_decl = doc_expr()
+        .then(just(Token::Decl(DeclKeyword::Implementation)).ignore_then(name()))
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
-        .then_ignore(just(Token::Ctrl(';')));
-    let doc_impl_decl = doc_parser()
-        .then(impl_decl.clone())
-        .map(|((doc, _), (n, e))| Decl::ImplDecl(Some(doc), n, Box::new(e)));
-    let impl_decl = doc_impl_decl.or(impl_decl.map(|(n, e)| Decl::ImplDecl(None, n, Box::new(e))));
+        .then(impl_def_expr())
+        .then_ignore(just(Token::Ctrl(';')))
+        .map(|((doc, name), body)| Decl::ImplDecl(doc, name, body));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
-        .ignore_then(name.clone())
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
+        .then(interface_expr())
         .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::InterfaceDecl(n, Box::new(e)));
+        .map(|(n, e)| Decl::InterfaceDecl(n, e));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
-        .ignore_then(name.clone())
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
         .then_ignore(just(Token::Ctrl(';')));
@@ -89,8 +89,7 @@ pub fn namespaces_parser(
     let namespace = just(Token::Decl(DeclKeyword::Namespace))
         .ignore_then(namespace_name)
         .then(
-            stat.clone()
-                .repeated()
+            stat.repeated()
                 .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}'))),
         )
         .map(|(name, stats)| {
@@ -139,7 +138,7 @@ mod tests {
         let src = src.into();
         let (tokens, errs) = lexer().parse_recovery(src.as_str());
 
-        // println!("{:#?}", tokens);
+        //println!("{:#?}", tokens);
 
         let parse_errs = if let Some(tokens) = tokens {
             // println!("Tokens = {:?}", tokens);

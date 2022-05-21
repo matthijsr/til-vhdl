@@ -25,19 +25,19 @@ namespace my::test::space {
 
     streamlet comp2 = iface1;
 
-    impl struct = (
-        a: in stream, // Ports are declared as *name* : *direction* *stream name*
-        b: out stream,
-        c: in stream2,
-        d: out stream2,
+    impl struct = <'a, 'b>(
+        a: in stream 'a, // Ports are declared as *name* : *direction* *stream name* *domain name (optional)*
+        b: out stream 'a,
+        c: in stream2 'b,
+        d: out stream2 'b,
     ){
         // Ports can be connected with --
         a -- b;
 
         // Streamlet instances are declared with
         // *instance name* = *streamlet name*
-        a = comp;
-        b = comp;
+        a = comp<'a, 'b>;
+        b = comp<'a, 'b>;
 
         // Considering c, d = comp;
 
