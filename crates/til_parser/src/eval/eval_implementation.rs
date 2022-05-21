@@ -21,7 +21,7 @@ use crate::{
     doc_expr::DocExpr,
     eval::eval_ident,
     impl_expr::ImplBodyExpr,
-    struct_parse::{PortSel, StructStat},
+    struct_parse::{DomainAssignments, PortSel, StructStat},
     Spanned,
 };
 
@@ -75,11 +75,32 @@ pub fn eval_struct_stat(
                 streamlet_imports,
                 "streamlet",
             )?;
-            eval_common_error(
-                structure.try_add_streamlet_instance_default(db, name, streamlet),
-                name_span,
-            )?;
-            Ok(())
+            match &domain_assignments.0 {
+                DomainAssignments::Error => Err(EvalError {
+                    span: stat.1.clone(),
+                    msg: "Invalid domain assignments (ERROR)".to_string(),
+                }),
+                DomainAssignments::None => eval_common_error(
+                    structure.try_add_streamlet_instance_default(db, name, streamlet),
+                    name_span,
+                ),
+                DomainAssignments::List(list) => {
+                    let mut name_list = vec![];
+                    for (left, right) in list.iter() {
+                        let left = if let Some(left) = left {
+                            Some(eval_name(&left.0, &left.1)?)
+                        } else {
+                            None
+                        };
+                        let right = eval_name(&right.0, &right.1)?;
+                        name_list.push((left, right));
+                    }
+                    eval_common_error(
+                        structure.try_add_streamlet_instance(db, name, streamlet, name_list),
+                        name_span,
+                    )
+                }
+            }
         }
         StructStat::Connection(left_sel, right_sel) => {
             let parse_sel = |sel: &Spanned<PortSel>| -> Result<InterfaceReference, EvalError> {

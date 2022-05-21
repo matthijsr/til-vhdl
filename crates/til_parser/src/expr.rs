@@ -1,11 +1,8 @@
 use chumsky::prelude::*;
 use std::{fmt, hash::Hash};
-use til_query::{
-    common::{
-        logical::logicaltype::stream::{Synchronicity, Throughput},
-        stream_direction::StreamDirection,
-    },
-    ir::physical_properties::InterfaceDirection,
+use til_query::common::{
+    logical::logicaltype::stream::{Synchronicity, Throughput},
+    stream_direction::StreamDirection,
 };
 use tydi_common::numbers::{NonNegative, Positive, PositiveReal};
 
@@ -14,7 +11,6 @@ use crate::{
     impl_expr::{streamlet_impl_expr, StreamletImplExpr},
     interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Token},
-    type_expr::TypeExpr,
     Span, Spanned,
 };
 
