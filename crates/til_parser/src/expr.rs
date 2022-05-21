@@ -11,6 +11,7 @@ use tydi_common::numbers::{NonNegative, Positive, PositiveReal};
 
 use crate::{
     ident_expr::{ident_expr, IdentExpr},
+    impl_expr::{streamlet_impl_expr, StreamletImplExpr},
     interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Token},
     struct_parse::{struct_parser, StructStat},
@@ -111,7 +112,7 @@ pub enum RawImpl {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StreamletProperty {
-    Implementation(Box<Spanned<Expr>>),
+    Implementation(Spanned<StreamletImplExpr>),
 }
 
 pub fn doc_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
@@ -205,8 +206,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let impl_prop = just(Token::Decl(DeclKeyword::Implementation))
         .map_with_span(|tok, span| (tok, span))
         .then_ignore(just(Token::Ctrl(':')))
-        .then(raw_impl.or(ident_expr.clone()))
-        .map(|(lab, i)| (lab, StreamletProperty::Implementation(Box::new(i))));
+        .then(streamlet_impl_expr())
+        .map(|(lab, i)| (lab, StreamletProperty::Implementation(i)));
 
     // In case more properties are added in the future, use a generic type
     let streamlet_prop = impl_prop;

@@ -2,9 +2,18 @@ use std::{collections::HashMap, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
-    ir::{implementation::Implementation, project::interface::Interface, streamlet::Streamlet, Ir},
+    ir::{
+        implementation::Implementation,
+        project::interface::Interface,
+        streamlet::Streamlet,
+        traits::{GetSelf, InternSelf},
+        Ir,
+    },
 };
-use tydi_common::name::{Name, PathName};
+use tydi_common::{
+    name::{Name, PathName},
+    traits::Documents,
+};
 use tydi_intern::Id;
 
 use crate::{
@@ -12,11 +21,12 @@ use crate::{
         eval_implementation::eval_implementation_expr, eval_interface::eval_interface_expr,
         eval_streamlet::eval_streamlet_expr,
     },
+    impl_expr::ImplDefExpr,
     namespace::Decl,
     Span,
 };
 
-use super::{eval_name, eval_type::eval_type_expr, EvalError};
+use super::{eval_ident, eval_name, eval_type::eval_type_expr, EvalError};
 
 pub fn eval_declaration(
     db: &dyn Ir,
@@ -51,21 +61,48 @@ pub fn eval_declaration(
         }
         Decl::ImplDecl(doc, (n, s), expr) => {
             let name = eval_name(n, s)?;
-            let (impl_id, interface_id) = eval_implementation_expr(
-                db,
-                expr,
-                &namespace.with_child(name.clone()),
-                doc.as_ref(),
-                None,
-                streamlets,
-                streamlet_imports,
-                implementations,
-                implementation_imports,
-                interfaces,
-                interface_imports,
-                types,
-                type_imports,
-            )?;
+            let (impl_id, interface_id) = match &expr.0 {
+                ImplDefExpr::Identity(ident) => {
+                    let mut implementation = eval_ident(
+                        ident,
+                        &expr.1,
+                        implementations,
+                        implementation_imports,
+                        "implementation",
+                    )?;
+                    if let Some(doc) = doc {
+                        implementation = implementation.get(db).with_doc(&doc.0).intern(db);
+                    }
+                    let interface =
+                        eval_ident(ident, &expr.1, interfaces, interface_imports, "interface")?;
+                    (implementation, interface)
+                }
+                ImplDefExpr::Def(iface, body) => {
+                    let interface = eval_interface_expr(
+                        db,
+                        iface,
+                        interfaces,
+                        interface_imports,
+                        types,
+                        type_imports,
+                    )?;
+                    eval_implementation_expr(
+                        db,
+                        body,
+                        &namespace.with_child(name.clone()),
+                        doc,
+                        Some(interface),
+                        streamlets,
+                        streamlet_imports,
+                        implementations,
+                        implementation_imports,
+                        interfaces,
+                        interface_imports,
+                        types,
+                        type_imports,
+                    )?
+                }
+            };
 
             if let Some(_) = interfaces.insert(name.clone(), interface_id) {
                 Err(dup_id(n, s, "interface"))

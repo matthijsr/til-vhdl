@@ -19,6 +19,7 @@ use tydi_intern::Id;
 use crate::{
     eval::eval_implementation::eval_implementation_expr,
     expr::{Expr, StreamletProperty},
+    impl_expr::StreamletImplExpr,
     Spanned,
 };
 
@@ -86,21 +87,42 @@ pub fn eval_streamlet_expr(
                             match prop {
                                 StreamletProperty::Implementation(impl_expr) => {
                                     if implementation == None {
-                                        implementation = Some(eval_implementation_expr(
-                                            db,
-                                            impl_expr,
-                                            name,
-                                            None,
-                                            Some(interface),
-                                            streamlets,
-                                            streamlet_imports,
-                                            implementations,
-                                            implementation_imports,
-                                            interfaces,
-                                            interface_imports,
-                                            types,
-                                            type_imports,
-                                        )?)
+                                        implementation = Some(match &impl_expr.0 {
+                                            StreamletImplExpr::Identity(ident) => {
+                                                let implementation = eval_ident(
+                                                    ident,
+                                                    &expr.1,
+                                                    implementations,
+                                                    implementation_imports,
+                                                    "implementation",
+                                                )?;
+                                                let interface = eval_ident(
+                                                    ident,
+                                                    &expr.1,
+                                                    interfaces,
+                                                    interface_imports,
+                                                    "interface",
+                                                )?;
+                                                (implementation, interface)
+                                            }
+                                            StreamletImplExpr::Def(impl_expr) => {
+                                                eval_implementation_expr(
+                                                    db,
+                                                    impl_expr,
+                                                    name,
+                                                    &None,
+                                                    Some(interface),
+                                                    streamlets,
+                                                    streamlet_imports,
+                                                    implementations,
+                                                    implementation_imports,
+                                                    interfaces,
+                                                    interface_imports,
+                                                    types,
+                                                    type_imports,
+                                                )?
+                                            }
+                                        });
                                     } else {
                                         return Err(EvalError {
                                             span: prop_span.clone(),
@@ -116,10 +138,12 @@ pub fn eval_streamlet_expr(
                             streamlet = streamlet.with_implementation(Some(implementation));
                         }
                     }
-                    _ => return Err(EvalError {
-                        span: properties.1.clone(),
-                        msg: "Invalid expression, expected streamlet properties".to_string(),
-                    }),
+                    _ => {
+                        return Err(EvalError {
+                            span: properties.1.clone(),
+                            msg: "Invalid expression, expected streamlet properties".to_string(),
+                        })
+                    }
                 }
             }
             Ok((streamlet.with_name(name.clone()).intern_arc(db), interface))

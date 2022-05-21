@@ -2,8 +2,10 @@ use chumsky::prelude::*;
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
+    doc_expr::{doc_expr, DocExpr},
     expr::{doc_parser, expr_parser, Expr},
     ident_expr::{name, path_name},
+    impl_expr::{impl_body_expr, impl_def_expr, ImplDefExpr},
     interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Operator, Token},
     type_expr::{type_expr, TypeExpr},
@@ -13,7 +15,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
     TypeDecl(Spanned<String>, Spanned<TypeExpr>),
-    ImplDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
+    ImplDecl(DocExpr, Spanned<String>, Spanned<ImplDefExpr>),
     InterfaceDecl(Spanned<String>, Spanned<InterfaceExpr>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
 }
@@ -51,15 +53,12 @@ pub fn namespaces_parser(
         .then_ignore(just(Token::Ctrl(';')))
         .map(|(n, e)| Decl::TypeDecl(n, e));
 
-    let impl_decl = just(Token::Decl(DeclKeyword::Implementation))
-        .ignore_then(name())
+    let impl_decl = doc_expr()
+        .then(just(Token::Decl(DeclKeyword::Implementation)).ignore_then(name()))
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
-        .then_ignore(just(Token::Ctrl(';')));
-    let doc_impl_decl = doc_parser()
-        .then(impl_decl.clone())
-        .map(|((doc, _), (n, e))| Decl::ImplDecl(Some(doc), n, Box::new(e)));
-    let impl_decl = doc_impl_decl.or(impl_decl.map(|(n, e)| Decl::ImplDecl(None, n, Box::new(e))));
+        .then(impl_def_expr())
+        .then_ignore(just(Token::Ctrl(';')))
+        .map(|((doc, name), body)| Decl::ImplDecl(doc, name, body));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
         .ignore_then(name())
