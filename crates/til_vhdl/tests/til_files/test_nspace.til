@@ -140,9 +140,9 @@ Newline.# {
     streamlet multi_streamlet = <'a, 'b>(x: in multi_stream 'b, y: out multi_stream 'a);
 
     streamlet domains_streamlet = <'a, 'b>(x: in my_stream 'a, y: out my_stream 'b);
-    streamlet impl_domains_streamlet = <'a, 'b>(x: in my_stream 'b, y: out my_stream 'a) {
+    streamlet impl_domains_streamlet = <'x, 'y>(x: in my_stream 'y, y: out my_stream 'x) {
         impl: {
-            doms = domains_streamlet<'b, 'a>;
+            doms = domains_streamlet<'y, 'x>;
             doms.x -- x;
             doms.y -- y;
         }
