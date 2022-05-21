@@ -22,7 +22,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::{
-    expr::{Expr, Value},
+    expr::Value,
     type_expr::{FieldsDef, LogicalTypeDef, StreamProp, StreamProps, TypeExpr},
     Span, Spanned,
 };

@@ -4,6 +4,7 @@ use std::{collections::HashMap, hash::Hash};
 use crate::{
     expr::{doc_parser, expr_parser, Expr},
     ident_expr::{name, path_name},
+    interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Operator, Token},
     type_expr::{type_expr, TypeExpr},
     Span, Spanned,
@@ -13,7 +14,7 @@ use crate::{
 pub enum Decl {
     TypeDecl(Spanned<String>, Spanned<TypeExpr>),
     ImplDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
-    InterfaceDecl(Spanned<String>, Box<Spanned<Expr>>),
+    InterfaceDecl(Spanned<String>, Spanned<InterfaceExpr>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
 }
 
@@ -63,9 +64,9 @@ pub fn namespaces_parser(
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
         .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
+        .then(interface_expr())
         .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::InterfaceDecl(n, Box::new(e)));
+        .map(|(n, e)| Decl::InterfaceDecl(n, e));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
         .ignore_then(name())

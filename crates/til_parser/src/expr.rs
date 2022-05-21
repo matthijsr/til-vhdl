@@ -10,10 +10,11 @@ use til_query::{
 use tydi_common::numbers::{NonNegative, Positive, PositiveReal};
 
 use crate::{
-    ident_expr::{domain_name, ident_expr, label, name, IdentExpr},
+    ident_expr::{ident_expr, IdentExpr},
+    interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Token},
     struct_parse::{struct_parser, StructStat},
-    type_expr::{type_expr, TypeExpr},
+    type_expr::TypeExpr,
     Span, Spanned,
 };
 
@@ -95,11 +96,10 @@ pub enum Expr {
     Ident(IdentExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
     PortDef(Spanned<String>, Spanned<PortProps>),
-    InterfaceDef(Vec<Spanned<String>>, Vec<Spanned<Self>>),
     RawImpl(RawImpl),
-    ImplDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
+    ImplDef(Spanned<InterfaceExpr>, Box<Spanned<Self>>),
     StreamletProps(Vec<(Spanned<Token>, StreamletProperty)>),
-    StreamletDef(Box<Spanned<Self>>, Box<Spanned<Self>>),
+    StreamletDef(Spanned<InterfaceExpr>, Option<Box<Spanned<Self>>>),
 }
 
 // Implementation definitions without ports. Used when defining an implementation on a streamlet directly.
@@ -162,61 +162,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
 
     // ......
-    // INTERFACE DEFINITIONS
-    // ......
-
-    let port_props = filter_map(|span, tok| match tok {
-        Token::PortMode(mode) => Ok(mode),
-        _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-    })
-    .map_with_span(|mode, span| (mode, span))
-    .then(type_expr())
-    .then(domain_name().or_not())
-    .map(|((mode, typ), dom)| PortProps {
-        mode,
-        typ,
-        domain: dom,
-    })
-    .map_with_span(|p, span| (p, span))
-    .labelled("port properties");
-
-    let port_def = label()
-        .then(port_props)
-        .map(|(l, p)| Expr::PortDef(l, p))
-        .map_with_span(|p, span| (p, span));
-
-    // Individual ports can have documentation
-    let doc_port_def = doc_parser()
-        .then(port_def.clone())
-        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
-        .map_with_span(|d, span| (d, span));
-    let port_def = doc_port_def.or(port_def);
-
-    let domain_list = domain_name()
-        .chain(just(Token::Ctrl(',')).ignore_then(domain_name()).repeated())
-        .then_ignore(just(Token::Ctrl(',')).or_not())
-        .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
-
-    let interface_def = domain_list
-        .or_not()
-        .map(|list| list.unwrap_or_else(Vec::new))
-        .then(
-            port_def
-                .clone()
-                .chain(just(Token::Ctrl(',')).ignore_then(port_def).repeated())
-                .then_ignore(just(Token::Ctrl(',')).or_not())
-                .or_not()
-                .map(|item| item.unwrap_or_else(Vec::new))
-                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')'))),
-        )
-        .map(|(doms, ports)| Expr::InterfaceDef(doms, ports))
-        .map_with_span(|i, span| (i, span));
-
-    // As with types, interfaces can be declared with identities
-    // Note: Interfaces can also be derived from streamlets and implementations
-    let interface = interface_def.clone().or(ident_expr.clone());
-
-    // ......
     // IMPLEMENTATION DEFINITIONS
     // ......
 
@@ -250,10 +195,9 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let raw_impl = doc_raw_impl.or(raw_impl);
 
     // Implementations consist of an interface definition and a structural or behavioural implementation
-    let impl_def = interface
-        .clone()
+    let impl_def = interface_expr()
         .then(raw_impl.clone())
-        .map(|(e, ri)| Expr::ImplDef(Box::new(e), Box::new(ri)))
+        .map(|(e, ri)| Expr::ImplDef(e, Box::new(ri)))
         .map_with_span(|i, span| (i, span));
 
     // ......
@@ -287,9 +231,9 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
             |span| (Expr::Error, span),
         ));
 
-    let streamlet_def = interface
-        .then(streamlet_props)
-        .map(|(i, p)| Expr::StreamletDef(Box::new(i), Box::new(p)))
+    let streamlet_def = interface_expr()
+        .then(streamlet_props.map(|x| Box::new(x)).or_not())
+        .map(|(i, p)| Expr::StreamletDef(i, p))
         .map_with_span(|s, span| (s, span));
 
     // Note: Streamlet definitions can not have documentation, but streamlet declarations can.
@@ -306,7 +250,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     impl_def
         .or(streamlet_def)
-        .or(interface_def)
         .or(ident_expr)
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),

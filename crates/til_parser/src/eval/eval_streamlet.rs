@@ -74,58 +74,53 @@ pub fn eval_streamlet_expr(
                 types,
                 type_imports,
             )?;
-            match &properties.0 {
-                Expr::StreamletProps(props) => {
-                    let mut implementation = None;
-                    for ((_, prop_span), prop) in props.iter() {
-                        match prop {
-                            StreamletProperty::Implementation(impl_expr) => {
-                                if implementation == None {
-                                    implementation = Some(eval_implementation_expr(
-                                        db,
-                                        impl_expr,
-                                        name,
-                                        None,
-                                        Some(interface),
-                                        streamlets,
-                                        streamlet_imports,
-                                        implementations,
-                                        implementation_imports,
-                                        interfaces,
-                                        interface_imports,
-                                        types,
-                                        type_imports,
-                                    )?)
-                                } else {
-                                    return Err(EvalError {
-                                        span: prop_span.clone(),
-                                        msg: format!("Duplicate property implementation property"),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    let mut streamlet = Streamlet::from(interface);
-                    if let Some((implementation, _)) = implementation {
-                        streamlet = streamlet.with_implementation(Some(implementation));
-                    }
-                    if let Some(doc) = doc {
-                        streamlet.set_doc(doc);
-                    }
-                    Ok((streamlet.with_name(name.clone()).intern_arc(db), interface))
-                }
-                _ => Err(EvalError {
-                    span: properties.1.clone(),
-                    msg: "Invalid expression, expected streamlet properties".to_string(),
-                }),
-            }
-        }
-        Expr::InterfaceDef(_, _) => {
-            let interface =
-                eval_interface_expr(db, expr, interfaces, interface_imports, types, type_imports)?;
             let mut streamlet = Streamlet::from(interface);
             if let Some(doc) = doc {
                 streamlet.set_doc(doc);
+            }
+            if let Some(properties) = properties {
+                match &properties.0 {
+                    Expr::StreamletProps(props) => {
+                        let mut implementation = None;
+                        for ((_, prop_span), prop) in props.iter() {
+                            match prop {
+                                StreamletProperty::Implementation(impl_expr) => {
+                                    if implementation == None {
+                                        implementation = Some(eval_implementation_expr(
+                                            db,
+                                            impl_expr,
+                                            name,
+                                            None,
+                                            Some(interface),
+                                            streamlets,
+                                            streamlet_imports,
+                                            implementations,
+                                            implementation_imports,
+                                            interfaces,
+                                            interface_imports,
+                                            types,
+                                            type_imports,
+                                        )?)
+                                    } else {
+                                        return Err(EvalError {
+                                            span: prop_span.clone(),
+                                            msg: format!(
+                                                "Duplicate property implementation property"
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        if let Some((implementation, _)) = implementation {
+                            streamlet = streamlet.with_implementation(Some(implementation));
+                        }
+                    }
+                    _ => return Err(EvalError {
+                        span: properties.1.clone(),
+                        msg: "Invalid expression, expected streamlet properties".to_string(),
+                    }),
+                }
             }
             Ok((streamlet.with_name(name.clone()).intern_arc(db), interface))
         }
