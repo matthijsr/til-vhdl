@@ -40,6 +40,11 @@ fn from_til_parse() -> Result<()> {
 }
 
 #[test]
+fn evaluation_parse() -> Result<()> {
+    parse_to_output(source("tests/til_files/evaluation.til"), "evaluation")
+}
+
+#[test]
 fn playground() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
