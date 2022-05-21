@@ -15,6 +15,7 @@ use til_query::{
 };
 use tydi_common::{
     error::TryResult,
+    map::InsertionOrderedSet,
     name::{Name, PathName},
     traits::Documents,
 };
@@ -22,7 +23,7 @@ use tydi_intern::Id;
 
 use crate::{
     eval::eval_ident,
-    interface_expr::{InterfaceDef, InterfaceExpr, PortsDef},
+    interface_expr::{DomainList, InterfaceDef, InterfaceExpr, PortsDef},
     Spanned,
 };
 
@@ -51,8 +52,35 @@ pub fn eval_interface_expr(
                     msg: "Invalid expression for ports definition".to_string(),
                 }),
                 PortsDef::Def(ports_def) => {
+                    let mut result = if let Some(domain_list) = domain_list {
+                        match &domain_list.0 {
+                            DomainList::Error => Err(EvalError {
+                                span: domain_list.1.clone(),
+                                msg: "Domain list error".to_string(),
+                            }),
+                            DomainList::List(list) => {
+                                let mut doms = InsertionOrderedSet::new();
+                                for dom in list {
+                                    if !doms.insert(eval_name(&dom.0, &dom.1)?) {
+                                        return Err(EvalError {
+                                            span: dom.1.clone(),
+                                            msg: format!(
+                                                "Duplicate domain in Interface, \"{}\"",
+                                                dom.0
+                                            ),
+                                        });
+                                    }
+                                }
+                                eval_common_error(
+                                    Interface::new_domains(doms.iter()),
+                                    &domain_list.1,
+                                )
+                            }
+                        }
+                    } else {
+                        Ok(Interface::new_empty())
+                    }?;
                     let mut dups = HashSet::new();
-                    let mut result = Interface::new_empty();
                     for (port_def, port_span) in ports_def {
                         let name = eval_name(&port_def.name.0, &port_def.name.1)?;
                         if dups.contains(&name) {
@@ -73,8 +101,17 @@ pub fn eval_interface_expr(
                                 .try_result(),
                                 &port_def.props.0.typ.1,
                             )?;
+                            let port_dom = if let Some(domain) = &port_def.props.0.domain {
+                                Some(eval_name(&domain.0, &domain.1)?)
+                            } else {
+                                None
+                            };
                             let mut port = eval_common_error(
-                                InterfacePort::try_from((name, stream_id, port_def.props.0.mode.0)),
+                                InterfacePort::try_from((
+                                    name,
+                                    stream_id,
+                                    (port_dom, port_def.props.0.mode.0),
+                                )),
                                 port_span,
                             )?;
                             if let Some(doc) = &port_def.doc {

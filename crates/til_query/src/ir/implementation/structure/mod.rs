@@ -127,6 +127,23 @@ impl Structure {
             // If they are not on the same layer, their directions should be the same.
             && same_layer == (left_i.interface.direction() != right_i.interface.direction())
         {
+            if left_i.interface.domain() != right_i.interface.domain() {
+                let dom_str = |dom: Option<&Domain>| {
+                    if let Some(dom) = dom {
+                        dom.to_string()
+                    } else {
+                        "Default".to_string()
+                    }
+                };
+                return Err(Error::InvalidTarget(format!(
+                    "Port {} has domain {}, port {} has domain {}",
+                    left,
+                    dom_str(left_i.interface.domain()),
+                    right,
+                    dom_str(right_i.interface.domain())
+                )));
+            }
+
             let (source, sink) = match left_i.interface.direction() {
                 // If left_interface belongs to a streamlet instance, Out means it's a Source
                 InterfaceDirection::Out if left_i.on_streamlet => (left, right),
@@ -162,7 +179,10 @@ impl Structure {
                 name
             )))
         } else {
-            self.streamlet_instances.insert(name.clone(), StreamletInstance::new(db, name, streamlet, assignments)?);
+            self.streamlet_instances.insert(
+                name.clone(),
+                StreamletInstance::new(db, name, streamlet, assignments)?,
+            );
             Ok(())
         }
     }
@@ -180,7 +200,10 @@ impl Structure {
                 name
             )))
         } else {
-            self.streamlet_instances.insert(name.clone(), StreamletInstance::new_assign_default(db, name, streamlet)?);
+            self.streamlet_instances.insert(
+                name.clone(),
+                StreamletInstance::new_assign_default(db, name, streamlet)?,
+            );
             Ok(())
         }
     }

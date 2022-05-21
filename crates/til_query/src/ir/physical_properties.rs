@@ -68,6 +68,15 @@ impl From<InterfaceDirection> for PhysicalProperties {
     }
 }
 
+impl From<(Option<Name>, InterfaceDirection)> for PhysicalProperties {
+    fn from((name, direction): (Option<Name>, InterfaceDirection)) -> Self {
+        PhysicalProperties {
+            domain: name,
+            direction,
+        }
+    }
+}
+
 impl From<(Name, InterfaceDirection)> for PhysicalProperties {
     fn from((name, direction): (Name, InterfaceDirection)) -> Self {
         PhysicalProperties {

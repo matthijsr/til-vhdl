@@ -137,5 +137,5 @@ Newline.# {
         direction: Forward,
     );
 
-    streamlet multi_streamlet = (x: in multi_stream, y: out multi_stream);
+    streamlet multi_streamlet = <'a, 'b>(x: in multi_stream 'b, y: out multi_stream 'a);
 }
