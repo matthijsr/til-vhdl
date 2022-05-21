@@ -1,7 +1,7 @@
 use chumsky::{prelude::Simple, Parser};
 
 use crate::{
-    ident_expr::{ident_expr_parser, name_parser, IdentExpr},
+    ident_expr::{domain_name, ident_expr, name, IdentExpr},
     lex::{Operator, Token},
     Spanned,
 };
@@ -34,15 +34,13 @@ pub enum PortSel {
     Instance(Spanned<String>, Spanned<String>),
 }
 
-pub fn domain_assignments_parser(
+pub fn domain_assignments(
 ) -> impl Parser<Token, Spanned<DomainAssignments>, Error = Simple<Token>> + Clone {
-    let domain = just(Token::Ctrl('\'')).ignore_then(name_parser().labelled("domain"));
-
-    let domain_assignment = domain
+    let domain_assignment = domain_name()
         .clone()
         .then(
             just(Token::Op(Operator::Declare))
-                .ignore_then(domain)
+                .ignore_then(domain_name())
                 .or_not(),
         )
         .map(|(left, right)| match right {
@@ -80,20 +78,22 @@ pub fn domain_assignments_parser(
 }
 
 pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple<Token>> + Clone {
-    let name = name_parser().labelled("name");
+    let ident = ident_expr();
 
-    let ident = ident_expr_parser().labelled("identifier");
-
-    let instance = name
-        .clone()
+    let instance = name()
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
-        .then(domain_assignments_parser())
-        .map(|((i_name, streamlet_name), doms)| StructStat::Instance(i_name, streamlet_name, doms));
+        //.then(domain_assignments())
+        .map(|(i_name, streamlet_name)| {
+            StructStat::Instance(i_name, streamlet_name, (DomainAssignments::None, 0..0))
+        });
 
-    let portsel = name
-        .clone()
-        .then(just(Token::Op(Operator::Select)).ignore_then(name).or_not())
+    let portsel = name()
+        .then(
+            just(Token::Op(Operator::Select))
+                .ignore_then(name())
+                .or_not(),
+        )
         .map(|(subj, port)| {
             if let Some(port) = port {
                 PortSel::Instance(subj, port)

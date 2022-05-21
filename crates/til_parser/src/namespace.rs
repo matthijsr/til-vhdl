@@ -3,7 +3,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     expr::{doc_parser, expr_parser, Expr},
-    ident_expr::{name_parser, path_name_parser},
+    ident_expr::{name, path_name},
     lex::{DeclKeyword, Operator, Token},
     Span, Spanned,
 };
@@ -40,18 +40,17 @@ impl Namespace {
 
 pub fn namespaces_parser(
 ) -> impl Parser<Token, HashMap<Vec<String>, Namespace>, Error = Simple<Token>> + Clone {
-    let namespace_name = path_name_parser().map_with_span(|p, span| (p, span));
-    let name = name_parser();
+    let namespace_name = path_name().map_with_span(|p, span| (p, span));
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
-        .ignore_then(name.clone())
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
         .then_ignore(just(Token::Ctrl(';')))
         .map(|(n, e)| Decl::TypeDecl(n, Box::new(e)));
 
     let impl_decl = just(Token::Decl(DeclKeyword::Implementation))
-        .ignore_then(name.clone())
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
         .then_ignore(just(Token::Ctrl(';')));
@@ -61,14 +60,14 @@ pub fn namespaces_parser(
     let impl_decl = doc_impl_decl.or(impl_decl.map(|(n, e)| Decl::ImplDecl(None, n, Box::new(e))));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
-        .ignore_then(name.clone())
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
         .then_ignore(just(Token::Ctrl(';')))
         .map(|(n, e)| Decl::InterfaceDecl(n, Box::new(e)));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
-        .ignore_then(name)
+        .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(expr_parser())
         .then_ignore(just(Token::Ctrl(';')));

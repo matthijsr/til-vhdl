@@ -14,7 +14,7 @@ use tydi_common::{
 };
 
 use crate::{
-    ident_expr::{ident_expr_parser, name_parser, IdentExpr},
+    ident_expr::{domain_name, ident_expr, name, IdentExpr},
     lex::{DeclKeyword, Token, TypeKeyword},
     struct_parse::{struct_parser, StructStat},
     Span, Spanned,
@@ -197,14 +197,15 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // IDENTITIES
     // ......
 
-    let name = name_parser().labelled("name");
+    let name = name();
 
-    let ident = ident_expr_parser().labelled("identifier");
+    let ident = ident_expr();
     let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
 
-    let label = name.clone().then_ignore(just(Token::Ctrl(':')));
-
-    let domain = just(Token::Ctrl('\'')).ignore_then(name);
+    let label = name
+        .clone()
+        .then_ignore(just(Token::Ctrl(':')))
+        .labelled("label");
 
     // ......
     // TYPE DEFINITIONS
@@ -274,7 +275,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     })
     .map_with_span(|mode, span| (mode, span))
     .then(typ.clone())
-    .then(domain.clone().or_not())
+    .then(domain_name().or_not())
     .map(|((mode, typ), dom)| PortProps {
         mode,
         typ: Box::new(typ),
@@ -295,9 +296,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         .map_with_span(|d, span| (d, span));
     let port_def = doc_port_def.or(port_def);
 
-    let domain_list = domain
-        .clone()
-        .chain(just(Token::Ctrl(',')).ignore_then(domain).repeated())
+    let domain_list = domain_name()
+        .chain(just(Token::Ctrl(',')).ignore_then(domain_name()).repeated())
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')));
 
