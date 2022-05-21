@@ -22,7 +22,8 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::{
-    expr::{Expr, LogicalTypeExpr, Value},
+    expr::{Expr, Value},
+    type_expr::{FieldsDef, LogicalTypeDef, StreamProp, StreamProps, TypeExpr},
     Span, Spanned,
 };
 
@@ -42,223 +43,292 @@ pub struct StreamTypeDef {
 
 pub fn eval_type_expr(
     db: &dyn Ir,
-    expr: &Spanned<Expr>,
+    expr: (&TypeExpr, &Span),
     types: &HashMap<Name, Id<LogicalType>>,
     type_imports: &HashMap<PathName, Id<LogicalType>>,
 ) -> Result<Id<LogicalType>, EvalError> {
-    let eval_group = |group: &Vec<(Spanned<String>, Spanned<Expr>)>| -> Result<Vec<(Name, Id<LogicalType>)>, EvalError> {
-        let mut dups = HashSet::new();
-        let mut result = vec![];
-        for ((name_string, name_span), el_expr) in group {
-            let name = eval_name(name_string, name_span)?;
-            if dups.contains(&name) {
-                return Err(EvalError {
-                    span: name_span.clone(),
-                    msg: format!("Duplicate label in Group or Union, \"{}\"", name)
-                })
-            } else {
-                dups.insert(name.clone());
-                result.push((name, eval_type_expr(db, el_expr, types, type_imports)?));
+    let eval_fields =
+        |fields: &Spanned<FieldsDef>| -> Result<Vec<(Name, Id<LogicalType>)>, EvalError> {
+            match &fields.0 {
+                FieldsDef::Error => Err(EvalError {
+                    span: fields.1.clone(),
+                    msg: "Invalid fields expression.".to_string(),
+                }),
+                FieldsDef::Fields(field_list) => {
+                    let mut dups = HashSet::new();
+                    let mut result = vec![];
+                    for ((name_string, name_span), el_expr) in field_list {
+                        let name = eval_name(name_string, name_span)?;
+                        if dups.contains(&name) {
+                            return Err(EvalError {
+                                span: name_span.clone(),
+                                msg: format!("Duplicate label in Group or Union, \"{}\"", name),
+                            });
+                        } else {
+                            dups.insert(name.clone());
+                            result.push((
+                                name,
+                                eval_type_expr(db, (&el_expr.0, &el_expr.1), types, type_imports)?,
+                            ));
+                        }
+                    }
+                    Ok(result)
+                }
             }
-        }
-        Ok(result)
-    };
-
-    let eval_stream = |span: &Span,
-                       stream_props: &Vec<(Spanned<String>, Spanned<Expr>)>|
-     -> Result<Id<Stream>, EvalError> {
-        let mut stream = StreamTypeDef {
-            data: None,
-            throughput: None,
-            dimensionality: None,
-            synchronicity: None,
-            complexity: None,
-            direction: None,
-            user: None,
-            keep: None,
         };
-        for ((name_string, name_span), el_expr) in stream_props {
-            let duplicate_error =
-                |label: &String, label_span: &Span| -> Result<Id<Stream>, EvalError> {
-                    Err(EvalError {
-                        span: label_span.clone(),
-                        msg: format!("Duplicate Stream property, \"{}\"", label),
-                    })
-                };
 
-            let invalid_expr =
-                |label: &str, prop_expr: &Spanned<Expr>| -> Result<Id<Stream>, EvalError> {
-                    Err(EvalError {
-                        span: prop_expr.1.clone(),
-                        msg: format!(
-                            "Invalid expression {:#?} for property \"{}\"",
-                            prop_expr.0, label
-                        ),
-                    })
-                };
-
-            let custom_error = |label: &str,
-                                err_span: &Spanned<Expr>,
-                                err: String|
-             -> Result<Id<Stream>, EvalError> {
-                Err(EvalError {
-                    span: err_span.1.clone(),
-                    msg: format!("Error assigning {}: {}", label, err),
-                })
-            };
-
-            match name_string.as_str() {
-                "data" => {
-                    if stream.data == None {
-                        stream.data = Some(eval_type_expr(db, el_expr, types, type_imports)?);
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "throughput" => {
-                    if stream.throughput == None {
-                        match &el_expr.0 {
-                            Expr::Value(Value::Int(i)) => match Throughput::try_new(*i) {
-                                Ok(t) => {
-                                    stream.throughput = Some(t);
-                                }
-                                Err(err) => {
-                                    return custom_error("throughput", el_expr, err.to_string())
-                                }
-                            },
-                            Expr::Value(Value::Float(f)) => {
-                                stream.throughput = Some(f.positive_real().into());
-                            }
-                            _ => return invalid_expr("throughput", el_expr),
-                        }
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "dimensionality" => {
-                    if stream.dimensionality == None {
-                        match &el_expr.0 {
-                            Expr::Value(Value::Int(i)) => {
-                                stream.dimensionality = Some(*i);
-                            }
-                            _ => return invalid_expr("dimensionality", el_expr),
-                        }
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "synchronicity" => {
-                    if stream.synchronicity == None {
-                        match &el_expr.0 {
-                            Expr::Value(Value::Synchronicity(s)) => {
-                                stream.synchronicity = Some(*s);
-                            }
-                            _ => return invalid_expr("synchronicity", el_expr),
-                        }
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "complexity" => {
-                    if stream.complexity == None {
-                        match &el_expr.0 {
-                            Expr::Value(Value::Int(i)) => {
-                                stream.complexity = Some(Complexity::from(*i));
-                            }
-                            Expr::Value(Value::Float(f)) => {
-                                match Complexity::try_from(f.positive_real()) {
-                                    Ok(c) => {
-                                        stream.complexity = Some(c);
-                                    }
-                                    Err(err) => {
-                                        return custom_error("complexity", el_expr, err.to_string())
-                                    }
-                                }
-                            }
-                            Expr::Value(Value::Version(ver)) => {
-                                match Complexity::from_str(ver.as_str()) {
-                                    Ok(c) => {
-                                        stream.complexity = Some(c);
-                                    }
-                                    Err(err) => {
-                                        return custom_error("complexity", el_expr, err.to_string())
-                                    }
-                                }
-                            }
-                            _ => return invalid_expr("complexity", el_expr),
-                        }
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "direction" => {
-                    if stream.direction == None {
-                        match &el_expr.0 {
-                            Expr::Value(Value::Direction(d)) => {
-                                stream.direction = Some(*d);
-                            }
-                            _ => return invalid_expr("direction", el_expr),
-                        }
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "user" => {
-                    if stream.user == None {
-                        stream.user = Some(eval_type_expr(db, el_expr, types, type_imports)?);
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                "keep" => {
-                    if stream.keep == None {
-                        match &el_expr.0 {
-                            Expr::Value(Value::Boolean(b)) => {
-                                stream.keep = Some(*b);
-                            }
-                            _ => return invalid_expr("keep", el_expr),
-                        }
-                    } else {
-                        return duplicate_error(name_string, name_span);
-                    }
-                }
-                _ => {
-                    return Err(EvalError {
-                        span: name_span.clone(),
-                        msg: format!("Invalid Stream property, \"{}\"", name_string),
-                    })
-                }
-            }
-        }
-
-        let missing_err = |f: &str| -> EvalError {
-            EvalError {
+    let eval_stream = |span: &Span, stream_props: &StreamProps| -> Result<Id<Stream>, EvalError> {
+        match &stream_props {
+            StreamProps::Error => Err(EvalError {
                 span: span.clone(),
-                msg: format!("Missing \"{}\" field.", f),
-            }
-        };
+                msg: "Invalid Stream properties".to_string(),
+            }),
+            StreamProps::Props(props) => {
+                let mut stream = StreamTypeDef {
+                    data: None,
+                    throughput: None,
+                    dimensionality: None,
+                    synchronicity: None,
+                    complexity: None,
+                    direction: None,
+                    user: None,
+                    keep: None,
+                };
+                for ((name_string, name_span), prop) in props {
+                    let duplicate_error =
+                        |label: &String, label_span: &Span| -> Result<Id<Stream>, EvalError> {
+                            Err(EvalError {
+                                span: label_span.clone(),
+                                msg: format!("Duplicate Stream property, \"{}\"", label),
+                            })
+                        };
 
-        eval_common_error(
-            Stream::try_new(
-                db,
-                stream.data.ok_or(missing_err("data"))?,
-                stream.throughput.unwrap_or_default(),
-                stream.dimensionality.ok_or(missing_err("dimensionality"))?,
-                stream.synchronicity.ok_or(missing_err("synchronicity"))?,
-                stream.complexity.ok_or(missing_err("complexity"))?,
-                stream.direction.ok_or(missing_err("direction"))?,
-                stream.user.unwrap_or(LogicalType::null_id(db)),
-                stream.keep.unwrap_or(false),
-            ),
-            span,
-        )
+                    let invalid_prop = |label: &str,
+                                        prop_expr: &Spanned<StreamProp>|
+                     -> Result<Id<Stream>, EvalError> {
+                        Err(EvalError {
+                            span: prop_expr.1.clone(),
+                            msg: format!(
+                                "Invalid expression {:#?} for property \"{}\"",
+                                prop_expr.0, label
+                            ),
+                        })
+                    };
+
+                    let custom_error = |label: &str,
+                                        err_span: &Span,
+                                        err: String|
+                     -> Result<Id<Stream>, EvalError> {
+                        Err(EvalError {
+                            span: err_span.clone(),
+                            msg: format!("Error assigning {}: {}", label, err),
+                        })
+                    };
+
+                    match name_string.as_str() {
+                        "data" => {
+                            if stream.data == None {
+                                match &prop.0 {
+                                    StreamProp::Type(typ) => {
+                                        stream.data = Some(eval_type_expr(
+                                            db,
+                                            (typ, &prop.1),
+                                            types,
+                                            type_imports,
+                                        )?);
+                                    }
+                                    _ => {
+                                        return custom_error(
+                                            "data",
+                                            &prop.1,
+                                            "Expected a type expression".to_string(),
+                                        )
+                                    }
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "throughput" => {
+                            if stream.throughput == None {
+                                match &prop.0 {
+                                    StreamProp::Value(Value::Int(i)) => {
+                                        match Throughput::try_new(*i) {
+                                            Ok(t) => {
+                                                stream.throughput = Some(t);
+                                            }
+                                            Err(err) => {
+                                                return custom_error(
+                                                    "throughput",
+                                                    &prop.1,
+                                                    err.to_string(),
+                                                )
+                                            }
+                                        }
+                                    }
+                                    StreamProp::Value(Value::Float(f)) => {
+                                        stream.throughput = Some(f.positive_real().into());
+                                    }
+                                    _ => return invalid_prop("throughput", prop),
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "dimensionality" => {
+                            if stream.dimensionality == None {
+                                match &prop.0 {
+                                    StreamProp::Value(Value::Int(i)) => {
+                                        stream.dimensionality = Some(*i);
+                                    }
+                                    _ => return invalid_prop("dimensionality", prop),
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "synchronicity" => {
+                            if stream.synchronicity == None {
+                                match &prop.0 {
+                                    StreamProp::Value(Value::Synchronicity(s)) => {
+                                        stream.synchronicity = Some(*s);
+                                    }
+                                    _ => return invalid_prop("synchronicity", prop),
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "complexity" => {
+                            if stream.complexity == None {
+                                match &prop.0 {
+                                    StreamProp::Value(Value::Int(i)) => {
+                                        stream.complexity = Some(Complexity::from(*i));
+                                    }
+                                    StreamProp::Value(Value::Float(f)) => {
+                                        match Complexity::try_from(f.positive_real()) {
+                                            Ok(c) => {
+                                                stream.complexity = Some(c);
+                                            }
+                                            Err(err) => {
+                                                return custom_error(
+                                                    "complexity",
+                                                    &prop.1,
+                                                    err.to_string(),
+                                                )
+                                            }
+                                        }
+                                    }
+                                    StreamProp::Value(Value::Version(ver)) => {
+                                        match Complexity::from_str(ver.as_str()) {
+                                            Ok(c) => {
+                                                stream.complexity = Some(c);
+                                            }
+                                            Err(err) => {
+                                                return custom_error(
+                                                    "complexity",
+                                                    &prop.1,
+                                                    err.to_string(),
+                                                )
+                                            }
+                                        }
+                                    }
+                                    _ => return invalid_prop("complexity", prop),
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "direction" => {
+                            if stream.direction == None {
+                                match &prop.0 {
+                                    StreamProp::Value(Value::Direction(d)) => {
+                                        stream.direction = Some(*d);
+                                    }
+                                    _ => return invalid_prop("direction", prop),
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "user" => {
+                            if stream.user == None {
+                                match &prop.0 {
+                                    StreamProp::Type(typ) => {
+                                        stream.user = Some(eval_type_expr(
+                                            db,
+                                            (typ, &prop.1),
+                                            types,
+                                            type_imports,
+                                        )?);
+                                    }
+                                    _ => {
+                                        return custom_error(
+                                            "user",
+                                            &prop.1,
+                                            "Expected a type expression".to_string(),
+                                        )
+                                    }
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        "keep" => {
+                            if stream.keep == None {
+                                match &prop.0 {
+                                    StreamProp::Value(Value::Boolean(b)) => {
+                                        stream.keep = Some(*b);
+                                    }
+                                    _ => return invalid_prop("keep", prop),
+                                }
+                            } else {
+                                return duplicate_error(name_string, name_span);
+                            }
+                        }
+                        _ => {
+                            return Err(EvalError {
+                                span: name_span.clone(),
+                                msg: format!("Invalid Stream property, \"{}\"", name_string),
+                            })
+                        }
+                    }
+                }
+
+                let missing_err = |f: &str| -> EvalError {
+                    EvalError {
+                        span: span.clone(),
+                        msg: format!("Missing \"{}\" field.", f),
+                    }
+                };
+
+                eval_common_error(
+                    Stream::try_new(
+                        db,
+                        stream.data.ok_or(missing_err("data"))?,
+                        stream.throughput.unwrap_or_default(),
+                        stream.dimensionality.ok_or(missing_err("dimensionality"))?,
+                        stream.synchronicity.ok_or(missing_err("synchronicity"))?,
+                        stream.complexity.ok_or(missing_err("complexity"))?,
+                        stream.direction.ok_or(missing_err("direction"))?,
+                        stream.user.unwrap_or(LogicalType::null_id(db)),
+                        stream.keep.unwrap_or(false),
+                    ),
+                    span,
+                )
+            }
+        }
     };
 
     match &expr.0 {
-        Expr::Ident(ident) => eval_ident(ident, &expr.1, types, type_imports, "type"),
-        Expr::TypeDef(typ_expr) => match typ_expr {
-            LogicalTypeExpr::Null => Ok(LogicalType::null_id(db)),
-            LogicalTypeExpr::Bits((num, num_span)) => {
+        TypeExpr::Error => Err(EvalError {
+            span: expr.1.clone(),
+            msg: format!("Invalid expression {:#?} for type definition", &expr.0),
+        }),
+        TypeExpr::Identifier(ident) => eval_ident(ident, &expr.1, types, type_imports, "type"),
+        TypeExpr::Definition(typ_def) => match &typ_def.as_ref().0 {
+            LogicalTypeDef::Null => Ok(LogicalType::null_id(db)),
+            LogicalTypeDef::Bits((num, num_span)) => {
                 if let Ok(p) = num.parse() {
                     Ok(LogicalType::Bits(p).intern(db))
                 } else {
@@ -268,24 +338,20 @@ pub fn eval_type_expr(
                     })
                 }
             }
-            LogicalTypeExpr::Group(group) => Ok(eval_common_error(
-                LogicalType::try_new_group(None, eval_group(group)?),
+            LogicalTypeDef::Group(fields) => Ok(eval_common_error(
+                LogicalType::try_new_group(None, eval_fields(fields)?),
                 &expr.1,
             )?
             .intern(db)),
-            LogicalTypeExpr::Union(group) => Ok(eval_common_error(
-                LogicalType::try_new_union(None, eval_group(group)?),
+            LogicalTypeDef::Union(fields) => Ok(eval_common_error(
+                LogicalType::try_new_union(None, eval_fields(fields)?),
                 &expr.1,
             )?
             .intern(db)),
-            LogicalTypeExpr::Stream(props) => {
-                Ok(LogicalType::Stream(eval_stream(&expr.1, props)?).intern(db))
+            LogicalTypeDef::Stream(props) => {
+                Ok(LogicalType::Stream(eval_stream(&props.1, &props.0)?).intern(db))
             }
         },
-        _ => Err(EvalError {
-            span: expr.1.clone(),
-            msg: format!("Invalid expression {:#?} for type definition", &expr.0),
-        }),
     }
 }
 
@@ -295,7 +361,7 @@ pub(crate) mod tests {
     use til_query::ir::{db::Database, traits::GetSelf};
     use tydi_common::error::TryResult;
 
-    use crate::{expr::expr_parser, lex::lexer, report::report_errors};
+    use crate::{lex::lexer, report::report_errors, type_expr::type_expr};
 
     use super::*;
 
@@ -314,10 +380,10 @@ pub(crate) mod tests {
             // println!("Tokens = {:?}", tokens);
             let len = src.chars().count();
             let (ast, parse_errs) =
-                expr_parser().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
+                type_expr().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
 
             if let Some(expr) = ast {
-                match eval_type_expr(db, &expr, types, &HashMap::new()) {
+                match eval_type_expr(db, (&expr.0, &expr.1), types, &HashMap::new()) {
                     Ok(def) => {
                         types.insert(name.try_result().unwrap(), def.clone());
                         println!("{}", def.get(db));

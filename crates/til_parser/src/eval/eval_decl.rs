@@ -42,7 +42,7 @@ pub fn eval_declaration(
     match decl {
         Decl::TypeDecl((n, s), expr) => {
             let name = eval_name(n, s)?;
-            let type_id = eval_type_expr(db, expr, types, type_imports)?;
+            let type_id = eval_type_expr(db, (&expr.0, &expr.1), types, type_imports)?;
             if let Some(_) = types.insert(name, type_id) {
                 Err(dup_id(n, s, "type"))
             } else {

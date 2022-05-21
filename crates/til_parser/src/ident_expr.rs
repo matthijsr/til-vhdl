@@ -24,6 +24,10 @@ pub fn domain_name() -> impl Parser<Token, Spanned<String>, Error = Simple<Token
     just(Token::Ctrl('\'')).ignore_then(name().labelled("domain name"))
 }
 
+pub fn label() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
+    name().then_ignore(just(Token::Ctrl(':'))).labelled("label")
+}
+
 pub fn path_name() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> + Clone {
     name()
         .chain(

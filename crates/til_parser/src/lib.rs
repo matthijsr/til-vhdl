@@ -6,5 +6,6 @@ pub mod namespace;
 pub mod query;
 pub mod report;
 pub mod struct_parse;
+pub mod type_expr;
 pub type Span = std::ops::Range<usize>;
 pub type Spanned<T> = (T, Span);

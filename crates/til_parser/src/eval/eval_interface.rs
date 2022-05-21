@@ -57,7 +57,7 @@ pub fn eval_interface_expr(
                     } else {
                         dups.insert(name.clone());
                         let stream_id: Id<Stream> = eval_common_error(
-                            eval_type_expr(db, &props.typ, types, type_imports)?
+                            eval_type_expr(db, (&props.typ.0, &props.typ.1), types, type_imports)?
                                 .get(db)
                                 .try_result(),
                             &props.typ.1,

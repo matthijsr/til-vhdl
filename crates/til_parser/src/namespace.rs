@@ -5,12 +5,13 @@ use crate::{
     expr::{doc_parser, expr_parser, Expr},
     ident_expr::{name, path_name},
     lex::{DeclKeyword, Operator, Token},
+    type_expr::{type_expr, TypeExpr},
     Span, Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
-    TypeDecl(Spanned<String>, Box<Spanned<Expr>>),
+    TypeDecl(Spanned<String>, Spanned<TypeExpr>),
     ImplDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
     InterfaceDecl(Spanned<String>, Box<Spanned<Expr>>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
@@ -45,9 +46,9 @@ pub fn namespaces_parser(
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
         .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
+        .then(type_expr())
         .then_ignore(just(Token::Ctrl(';')))
-        .map(|(n, e)| Decl::TypeDecl(n, Box::new(e)));
+        .map(|(n, e)| Decl::TypeDecl(n, e));
 
     let impl_decl = just(Token::Decl(DeclKeyword::Implementation))
         .ignore_then(name())

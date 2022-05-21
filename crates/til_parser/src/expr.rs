@@ -14,9 +14,10 @@ use tydi_common::{
 };
 
 use crate::{
-    ident_expr::{domain_name, ident_expr, name, IdentExpr},
+    ident_expr::{domain_name, ident_expr, label, name, IdentExpr},
     lex::{DeclKeyword, Token, TypeKeyword},
     struct_parse::{struct_parser, StructStat},
+    type_expr::{type_expr, TypeExpr},
     Span, Spanned,
 };
 
@@ -87,7 +88,7 @@ impl fmt::Display for Value {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PortProps {
     pub mode: Spanned<InterfaceDirection>,
-    pub typ: Box<Spanned<Expr>>,
+    pub typ: Spanned<TypeExpr>,
     pub domain: Option<Spanned<String>>,
 }
 
@@ -96,7 +97,6 @@ pub enum Expr {
     Error,
     Value(Value),
     Ident(IdentExpr),
-    TypeDef(LogicalTypeExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
     PortDef(Spanned<String>, Spanned<PortProps>),
     InterfaceDef(Vec<Spanned<String>>, Vec<Spanned<Self>>),
@@ -115,38 +115,6 @@ pub enum RawImpl {
     Link(String),
 }
 
-// Before eval
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum LogicalTypeExpr {
-    Null,
-    Bits(Spanned<String>),
-    Group(Vec<(Spanned<String>, Spanned<Expr>)>),
-    Union(Vec<(Spanned<String>, Spanned<Expr>)>),
-    Stream(Vec<(Spanned<String>, Spanned<Expr>)>),
-}
-
-// After eval
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum LogicalType {
-    Null,
-    Bits(Positive),
-    Group(Vec<(Spanned<Name>, Spanned<LogicalTypeExpr>)>),
-    Union(Vec<(Spanned<Name>, Spanned<LogicalTypeExpr>)>),
-    Stream(StreamType),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StreamType {
-    data: Box<Spanned<Expr>>,
-    throughput: Spanned<Throughput>,
-    dimensionality: Spanned<NonNegative>,
-    synchronicity: Spanned<Synchronicity>,
-    complexity: Spanned<Complexity>,
-    direction: Spanned<StreamDirection>,
-    user: Box<Spanned<Expr>>,
-    keep: Spanned<bool>,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StreamletProperty {
     Implementation(Box<Spanned<Expr>>),
@@ -161,12 +129,8 @@ pub fn doc_parser() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>
     .labelled("documentation")
 }
 
-pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
-    // ......
-    // VALUES
-    // ......
-
-    let val = filter_map(|span: Span, tok| match tok {
+pub fn val() -> impl Parser<Token, Spanned<Value>, Error = Simple<Token>> + Clone {
+    filter_map(|span: Span, tok| match tok {
         Token::Num(num) => {
             if let Ok(i) = num.parse() {
                 Ok(Value::Int(i))
@@ -190,8 +154,15 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         Token::Boolean(boolean) => Ok(Value::Boolean(boolean)),
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
-    .map(Expr::Value)
-    .map_with_span(|v, span| (v, span));
+    .map_with_span(|v, span| (v, span))
+}
+
+pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
+    // ......
+    // VALUES
+    // ......
+
+    let val = val().map(|(val, span)| (Expr::Value(val), span));
 
     // ......
     // IDENTITIES
@@ -202,69 +173,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let ident = ident_expr();
     let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
 
-    let label = name
-        .clone()
-        .then_ignore(just(Token::Ctrl(':')))
-        .labelled("label");
-
-    // ......
-    // TYPE DEFINITIONS
-    // ......
-
-    // Type definitions are recursive, as they can contain other type definitions
-    let typ = recursive(|type_def| {
-        let typ_el = label.clone().then(type_def.clone());
-
-        // A group of types
-        let group_def = typ_el
-            .clone()
-            .chain(
-                just(Token::Ctrl(','))
-                    .ignore_then(typ_el.clone())
-                    .repeated(),
-            )
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
-
-        let bits_def = filter_map(|span, tok| match tok {
-            Token::Num(num) => Ok((num, span)),
-            _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-        })
-        .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
-
-        // Stream properties are either values or types
-        let stream_prop = typ_el.or(label.clone().then(val));
-
-        let stream_def = stream_prop
-            .clone()
-            .chain(just(Token::Ctrl(',')).ignore_then(stream_prop).repeated())
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
-            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
-
-        just(Token::Type(TypeKeyword::Null))
-            .to(LogicalTypeExpr::Null)
-            .or(just(Token::Type(TypeKeyword::Bits))
-                .ignore_then(bits_def)
-                .map(|n| LogicalTypeExpr::Bits(n)))
-            .or(just(Token::Type(TypeKeyword::Group))
-                .ignore_then(group_def.clone())
-                .map(|g| LogicalTypeExpr::Group(g)))
-            .or(just(Token::Type(TypeKeyword::Union))
-                .ignore_then(group_def)
-                .map(|g| LogicalTypeExpr::Union(g)))
-            .or(just(Token::Type(TypeKeyword::Stream))
-                .ignore_then(stream_def)
-                .map(|g| LogicalTypeExpr::Stream(g)))
-            .map(Expr::TypeDef)
-            .map_with_span(|t, span| (t, span))
-            // Type defs can be declared with identities
-            .or(ident_expr.clone())
-    });
-
     // ......
     // INTERFACE DEFINITIONS
     // ......
@@ -274,17 +182,17 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
     .map_with_span(|mode, span| (mode, span))
-    .then(typ.clone())
+    .then(type_expr())
     .then(domain_name().or_not())
     .map(|((mode, typ), dom)| PortProps {
         mode,
-        typ: Box::new(typ),
+        typ,
         domain: dom,
     })
     .map_with_span(|p, span| (p, span))
     .labelled("port properties");
 
-    let port_def = label
+    let port_def = label()
         .then(port_props)
         .map(|(l, p)| Expr::PortDef(l, p))
         .map_with_span(|p, span| (p, span));
@@ -411,7 +319,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     impl_def
         .or(streamlet_def)
         .or(interface_def)
-        .or(typ)
         .or(ident_expr)
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),
