@@ -92,10 +92,8 @@ pub struct PortProps {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Error,
-    Value(Value),
     Ident(IdentExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    PortDef(Spanned<String>, Spanned<PortProps>),
     RawImpl(RawImpl),
     ImplDef(Spanned<InterfaceExpr>, Box<Spanned<Self>>),
     StreamletProps(Vec<(Spanned<Token>, StreamletProperty)>),
