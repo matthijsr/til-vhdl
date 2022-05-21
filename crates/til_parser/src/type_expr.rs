@@ -4,7 +4,7 @@ use crate::{
     expr::{val, Value},
     ident_expr::{ident_expr, label, IdentExpr},
     lex::{Token, TypeKeyword},
-    Span, Spanned,
+    Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

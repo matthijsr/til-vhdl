@@ -1,6 +1,8 @@
+pub mod doc_expr;
 pub mod eval;
 pub mod expr;
 pub mod ident_expr;
+pub mod interface_expr;
 pub mod lex;
 pub mod namespace;
 pub mod query;

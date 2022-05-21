@@ -3,19 +3,15 @@ use std::{fmt, hash::Hash};
 use til_query::{
     common::{
         logical::logicaltype::stream::{Synchronicity, Throughput},
-        physical::complexity::Complexity,
         stream_direction::StreamDirection,
     },
     ir::physical_properties::InterfaceDirection,
 };
-use tydi_common::{
-    name::Name,
-    numbers::{NonNegative, Positive, PositiveReal},
-};
+use tydi_common::numbers::{NonNegative, Positive, PositiveReal};
 
 use crate::{
     ident_expr::{domain_name, ident_expr, label, name, IdentExpr},
-    lex::{DeclKeyword, Token, TypeKeyword},
+    lex::{DeclKeyword, Token},
     struct_parse::{struct_parser, StructStat},
     type_expr::{type_expr, TypeExpr},
     Span, Spanned,
@@ -159,16 +155,8 @@ pub fn val() -> impl Parser<Token, Spanned<Value>, Error = Simple<Token>> + Clon
 
 pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> + Clone {
     // ......
-    // VALUES
-    // ......
-
-    let val = val().map(|(val, span)| (Expr::Value(val), span));
-
-    // ......
     // IDENTITIES
     // ......
-
-    let name = name();
 
     let ident = ident_expr();
     let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
