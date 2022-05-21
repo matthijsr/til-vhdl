@@ -14,7 +14,6 @@ use crate::{
     impl_expr::{streamlet_impl_expr, StreamletImplExpr},
     interface_expr::{interface_expr, InterfaceExpr},
     lex::{DeclKeyword, Token},
-    struct_parse::{struct_parser, StructStat},
     type_expr::TypeExpr,
     Span, Spanned,
 };
@@ -84,30 +83,12 @@ impl fmt::Display for Value {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PortProps {
-    pub mode: Spanned<InterfaceDirection>,
-    pub typ: Spanned<TypeExpr>,
-    pub domain: Option<Spanned<String>>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Error,
     Ident(IdentExpr),
     Documentation(Spanned<String>, Box<Spanned<Self>>),
-    RawImpl(RawImpl),
-    ImplDef(Spanned<InterfaceExpr>, Box<Spanned<Self>>),
     StreamletProps(Vec<(Spanned<Token>, StreamletProperty)>),
     StreamletDef(Spanned<InterfaceExpr>, Option<Box<Spanned<Self>>>),
-}
-
-// Implementation definitions without ports. Used when defining an implementation on a streamlet directly.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum RawImpl {
-    // Structural
-    Struct(Vec<Spanned<StructStat>>),
-    // Path
-    Link(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -161,45 +142,6 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
 
     // ......
-    // IMPLEMENTATION DEFINITIONS
-    // ......
-
-    let behav = filter_map(|span, tok| match tok {
-        Token::Path(pth) => Ok(RawImpl::Link(pth)),
-        _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-    })
-    .labelled("behavioural impl path")
-    .map(Expr::RawImpl)
-    .map_with_span(|ri, span| (ri, span));
-
-    let struct_bod = struct_parser()
-        .repeated()
-        .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
-        .map(|stats| RawImpl::Struct(stats))
-        .map(Expr::RawImpl)
-        .map_with_span(|ri, span| (ri, span))
-        .recover_with(nested_delimiters(
-            Token::Ctrl('{'),
-            Token::Ctrl('}'),
-            [],
-            |span| (Expr::Error, span),
-        ));
-
-    let raw_impl = behav.or(struct_bod);
-    // Implementations can have documentation set on their raw definition, or on their overall declaration.
-    let doc_raw_impl = doc_parser()
-        .then(raw_impl.clone())
-        .map(|(body, subj)| Expr::Documentation(body, Box::new(subj)))
-        .map_with_span(|d, span| (d, span));
-    let raw_impl = doc_raw_impl.or(raw_impl);
-
-    // Implementations consist of an interface definition and a structural or behavioural implementation
-    let impl_def = interface_expr()
-        .then(raw_impl.clone())
-        .map(|(e, ri)| Expr::ImplDef(e, Box::new(ri)))
-        .map_with_span(|i, span| (i, span));
-
-    // ......
     // STREAMLET DEFINITIONS
     // ......
 
@@ -247,8 +189,7 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // All of which can be identities
     // ......
 
-    impl_def
-        .or(streamlet_def)
+    streamlet_def
         .or(ident_expr)
         .recover_with(nested_delimiters(
             Token::Ctrl('{'),
