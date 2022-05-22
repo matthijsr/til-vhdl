@@ -1,0 +1,118 @@
+namespace evaluation {
+    type axi4stream = Stream (
+        data: Union (
+            data: Bits(8),
+            null: Null, // Equivalent to TSTRB
+        ),
+        throughput: 128.0, // Data bus width
+        dimensionality: 1, // Equivalent to TLAST
+        synchronicity: Sync,
+        complexity: 7, // Tydi's strobe is equivalent to TKEEP
+        user: Group (
+            TID: Bits(8),
+            TDEST: Bits(4),
+            TUSER: Bits(1),
+        ),
+    );
+
+    type axi4_address = Stream (
+        data: Group (
+            ADDR: Bits(32),
+            SIZE: Bits(3),
+            BURST: Bits(2),
+            CACHE: Bits(4),
+            PROT: Bits(3),
+            ID: Bits(4),
+            LEN: Bits(8),
+            LOCK: Bits(1),
+            QOS: Bits(4),
+            REGION: Bits(4),
+        ),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 1,
+        user: Bits(4),
+    );
+    type axi4_write_data = Stream (
+        data: Bits(8),
+        throughput: 256.0, // Max transfers
+        dimensionality: 1, // Equivalent to LAST
+        synchronicity: Sync,
+        complexity: 7, // Adds a strobe
+        user: Bits(4),
+    );
+    type axi4_read_data = Stream (
+        data: Bits(8),
+        throughput: 256.0, // Max transfers
+        dimensionality: 1, // Equivalent to LAST
+        synchronicity: Sync,
+        complexity: 7, // Adds a strobe
+        user: Group (
+            RESP: Bits(2),
+            ID: Bits(4),
+            USER: Bits(4),
+        ),
+    );
+    type axi4_response = Stream (
+        data: Group (
+            RESP: Bits(2),
+            ID: Bits(4),
+        ),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 1,
+        user: Bits(4),
+    );
+
+    type axi4 = Stream (
+        data: Group (
+            AW: axi4_address,
+            W: Stream (
+                data: Bits(8),
+                throughput: 256.0, // Max transfers
+                dimensionality: 1, // Equivalent to LAST
+                synchronicity: Sync,
+                complexity: 7, // Adds a strobe
+                user: Bits(4),
+            ),
+            B: Stream (
+                direction: Reverse,
+                data: Group (
+                    RESP: Bits(2),
+                    ID: Bits(4),
+                ),
+                dimensionality: 0,
+                synchronicity: Sync,
+                complexity: 1,
+                user: Bits(4),
+            ),
+            AR: axi4_address,
+            R: Stream (
+                direction: Reverse,
+                data: Bits(8),
+                throughput: 256.0, // Max transfers
+                dimensionality: 1, // Equivalent to LAST
+                synchronicity: Sync,
+                complexity: 7, // Adds a strobe
+                user: Group (
+                    RESP: Bits(2),
+                    ID: Bits(4),
+                    USER: Bits(4),
+                ),
+            ),
+        ),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 1,
+    );
+
+    streamlet example = (
+        axi4stream: in axi4stream,
+        axi4_aw: out axi4_address,
+        axi4_w: out axi4_write_data,
+        axi4_b: in axi4_response,
+        axi4_ar: out axi4_address,
+        axi4_r: in axi4_read_data,
+        axi4: out axi4,
+    );
+}
