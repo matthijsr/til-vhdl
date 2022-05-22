@@ -80,4 +80,68 @@ newline documentation#
     streamlet comp4 = comp1 { impl: struct };
 
     streamlet comp5 = comp1 { impl: "./vhdl_dir" };
+
+    // 'domains represent combined clock and reset domains, and how they relate
+    // to a port's stream.
+    streamlet dom_example = <
+     'domain1,
+     'domain2,
+    >(
+        a: in stream 'domain1, 
+        b: out stream 'domain2,
+        c: in stream 'domain2, 
+        d: out stream 'domain1,
+    );
+
+    streamlet blank_doms = <'a, 'b, 'c>();
+
+    // In the above example, the domains of ports a and b are different, making them incompatible
+    // despite having the same type. a and d, and b and c can be connected, however.
+    //
+    // However, a structural implementation can assign the same domain twice,
+    // making a and b, and c and d compatible again.
+    streamlet struct_dom_example = <
+      'parent_domain1,
+      'parent_domain2,
+    > () {
+        impl: {
+            different_domains = dom_example<'parent_domain1, 'parent_domain2>;
+
+            // Try changing these to <'parent_domain1, 'parent_domain2>
+            // to see what happens when domains don't match.
+            same_domains = dom_example<'parent_domain1, 'parent_domain1>;
+
+            different_domains.a -- different_domains.d;
+            different_domains.b -- different_domains.c;
+
+            same_domains.a -- same_domains.b;
+            same_domains.c -- same_domains.d;
+
+            // For clarity, when assigning domains it's also possible to specify
+            // which domain of the instance is being assigned to, rather than using their order.
+            explicit_doms = blank_doms<'c = 'parent_domain1, 'a = 'parent_domain2, 'b = 'parent_domain2>;
+
+            // It's also possible to mix named assignments with ordered assignments,
+            // provided the named assignments succeed all ordered assignments.
+            mixed_assignments = blank_doms<'parent_domain2, 'c = 'parent_domain1, 'b = 'parent_domain2>;
+        }
+    };
+
+    // When a parent interface has no explicit domains, it is instead given a "default" domain.
+    // This default domain is also automatically assigned to any instances which do have explicit domains.
+    streamlet default_domains = (
+        a: in stream,
+        b: out stream,
+        c: in stream,
+        d: out stream
+    ) {
+        impl: {
+            explicit_domains_instance = dom_example;
+
+            explicit_domains_instance.a -- a;
+            explicit_domains_instance.b -- b;
+            explicit_domains_instance.c -- c;
+            explicit_domains_instance.d -- d;
+        }
+    };
 }
