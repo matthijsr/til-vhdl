@@ -1,0 +1,9 @@
+[package]
+name = "til-demo"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+tydi-common = { path = "../crates/common" }
+til-parser = { path = "../crates/til_parser" }
+til-vhdl = { path = "../crates/til_vhdl" }
