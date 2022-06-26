@@ -233,13 +233,13 @@ multiline#
             .unwrap();
         let stream_proc_sink = PhysicalStreamProcess::from(stream_obj.clone());
 
-        let mut source = stream_proc_source.with_db(&arch_db);
-        source.open_transfer()?;
-        source.transfer(transfer_1.clone(), false, "test message source 1")?;
-        source.transfer(transfer_2.clone(), false, "test message source 2")?;
-        source.transfer(transfer_3.clone(), false, "test message source 3")?;
-        source.close_transfer()?;
-        let proc = source.get();
+        let mut drive_stream = stream_proc_source.with_db(&arch_db);
+        drive_stream.open_transfer()?;
+        drive_stream.transfer(transfer_1.clone(), false, "test message drive 1")?;
+        drive_stream.transfer(transfer_2.clone(), false, "test message drive 2")?;
+        drive_stream.transfer(transfer_3.clone(), false, "test message drive 3")?;
+        drive_stream.close_transfer()?;
+        let proc = drive_stream.get();
         assert_eq!(
             r#"process is
 begin
@@ -274,42 +274,42 @@ end process a__x;"#,
             proc.process().declare(&arch_db)?
         );
 
-        let mut sink = stream_proc_sink.with_db(&arch_db);
-        sink.open_transfer()?;
-        sink.transfer(transfer_1.clone(), false, "test message sink 1")?;
-        sink.transfer(transfer_2.clone(), false, "test message sink 2")?;
-        sink.transfer(transfer_3.clone(), false, "test message sink 3")?;
-        sink.close_transfer()?;
-        let proc = sink.get();
+        let mut compare_stream = stream_proc_sink.with_db(&arch_db);
+        compare_stream.open_transfer()?;
+        compare_stream.transfer(transfer_1.clone(), false, "test message compare 1")?;
+        compare_stream.transfer(transfer_2.clone(), false, "test message compare 2")?;
+        compare_stream.transfer(transfer_3.clone(), false, "test message compare 3")?;
+        compare_stream.close_transfer()?;
+        let proc = compare_stream.get();
         assert_eq!(
             r#"process is
 begin
   wait until rising_edge(clk) and a__y_valid = '1';
-  assert a__y_data(1 downto 0) = "11" report "test message sink 1";
-  assert a__y_data(5 downto 4) = "11" report "test message sink 1";
-  assert a__y_last(2 downto 0) = (others => '0') report "test message sink 1";
-  assert a__y_last(5 downto 3) = (others => '0') report "test message sink 1";
-  assert a__y_last(8 downto 6) = (others => '0') report "test message sink 1";
-  assert a__y_strb = "101" report "test message sink 1";
-  assert a__y_user(2 downto 0) = "101" report "test message sink 1";
+  assert a__y_data(1 downto 0) = "11" report "test message compare 1";
+  assert a__y_data(5 downto 4) = "11" report "test message compare 1";
+  assert a__y_last(2 downto 0) = (others => '0') report "test message compare 1";
+  assert a__y_last(5 downto 3) = (others => '0') report "test message compare 1";
+  assert a__y_last(8 downto 6) = (others => '0') report "test message compare 1";
+  assert a__y_strb = "101" report "test message compare 1";
+  assert a__y_user(2 downto 0) = "101" report "test message compare 1";
   a__y_ready <= '1';
   wait until rising_edge(clk) and a__y_valid = '1';
-  assert a__y_data(1 downto 0) = "10" report "test message sink 2";
-  assert a__y_data(3 downto 2) = "01" report "test message sink 2";
-  assert a__y_data(5 downto 4) = "00" report "test message sink 2";
-  assert a__y_last(2 downto 0) = "001" report "test message sink 2";
-  assert a__y_last(5 downto 3) = (others => '0') report "test message sink 2";
-  assert a__y_last(8 downto 6) = (others => '0') report "test message sink 2";
-  assert a__y_strb = "111" report "test message sink 2";
-  assert a__y_stai = std_logic_vector(to_unsigned(0, 2)) report "test message sink 2";
-  assert a__y_endi = std_logic_vector(to_unsigned(2, 2)) report "test message sink 2";
+  assert a__y_data(1 downto 0) = "10" report "test message compare 2";
+  assert a__y_data(3 downto 2) = "01" report "test message compare 2";
+  assert a__y_data(5 downto 4) = "00" report "test message compare 2";
+  assert a__y_last(2 downto 0) = "001" report "test message compare 2";
+  assert a__y_last(5 downto 3) = (others => '0') report "test message compare 2";
+  assert a__y_last(8 downto 6) = (others => '0') report "test message compare 2";
+  assert a__y_strb = "111" report "test message compare 2";
+  assert a__y_stai = std_logic_vector(to_unsigned(0, 2)) report "test message compare 2";
+  assert a__y_endi = std_logic_vector(to_unsigned(2, 2)) report "test message compare 2";
   a__y_ready <= '1';
   wait until rising_edge(clk) and a__y_valid = '1';
-  assert a__y_data(1 downto 0) = "10" report "test message sink 3";
-  assert a__y_last(2 downto 0) = "011" report "test message sink 3";
-  assert a__y_last(5 downto 3) = "100" report "test message sink 3";
-  assert a__y_last(8 downto 6) = (others => '0') report "test message sink 3";
-  assert a__y_strb = "100" report "test message sink 3";
+  assert a__y_data(1 downto 0) = "10" report "test message compare 3";
+  assert a__y_last(2 downto 0) = "011" report "test message compare 3";
+  assert a__y_last(5 downto 3) = "100" report "test message compare 3";
+  assert a__y_last(8 downto 6) = (others => '0') report "test message compare 3";
+  assert a__y_strb = "100" report "test message compare 3";
   a__y_ready <= '1';
   wait until rising_edge(clk) and a__y_valid = '1';
   a__y_ready <= '0';
