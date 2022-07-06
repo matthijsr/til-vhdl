@@ -1,0 +1,37 @@
+namespace my::example::space {
+    type stream = Stream (
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+    );
+
+    #Streamlet documentation#
+    streamlet comp1 = (
+        a: in stream,
+        b: out stream,
+        #Port
+documentation#
+        c: in stream,
+        d: out stream,
+    );
+
+    streamlet comp2 = comp1 {
+        impl: "./vhdl_dir"
+    };
+
+    streamlet domains_only = <'a, 'b, 'c>();
+
+    streamlet comp3 = <'x, 'y>(
+        q: in stream 'x,
+        r: out stream 'x,
+    ) {
+        impl: {
+            dom_ex = domains_only<'x, 'y, 'y>;
+            inst = comp2<'x>;
+            q -- inst.a;
+            r -- inst.b;
+            inst.c -- inst.d;
+        }
+    };
+}

@@ -1,0 +1,80 @@
+namespace evaluation {
+    type axi4_address = Stream (
+        data: Group (
+            ADDR: Bits(32),
+            SIZE: Bits(3),
+            BURST: Bits(2),
+            CACHE: Bits(4),
+            PROT: Bits(3),
+            ID: Bits(4),
+            LEN: Bits(8),
+            LOCK: Bits(1),
+            QOS: Bits(4),
+            REGION: Bits(4),
+        ),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 1,
+        user: Bits(4),
+    );
+
+    type axi4 = Stream (
+        data: Group (
+            AW: axi4_address,
+            W: Stream (
+                data: Bits(8),
+                throughput: 256.0, // Max transfers
+                dimensionality: 1, // Equivalent to LAST
+                synchronicity: Sync,
+                complexity: 7, // Adds a strobe
+                user: Bits(4),
+            ),
+            B: Stream (
+                direction: Reverse,
+                data: Group (
+                    RESP: Bits(2),
+                    ID: Bits(4),
+                ),
+                dimensionality: 0,
+                synchronicity: Sync,
+                complexity: 1,
+                user: Bits(4),
+            ),
+            AR: axi4_address,
+            R: Stream (
+                direction: Reverse,
+                data: Bits(8),
+                throughput: 256.0, // Max transfers
+                dimensionality: 1, // Equivalent to LAST
+                synchronicity: Sync,
+                complexity: 7, // Adds a strobe
+                user: Group (
+                    RESP: Bits(2),
+                    ID: Bits(4),
+                    USER: Bits(4),
+                ),
+            ),
+        ),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 1,
+    );
+
+    streamlet child = (
+        axi4_in: in axi4,
+        axi4_out: out axi4,
+    );
+
+    streamlet example = (
+        axi4_in: in axi4,
+        axi4_out: out axi4,
+    ) {
+        impl: {
+            a = child;
+            b = child;
+            axi4_in -- a.axi4_in;
+            a.axi4_out -- b.axi4_in;
+            b.axi4_out -- axi4_out;
+        }
+    };
+}
