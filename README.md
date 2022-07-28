@@ -18,3 +18,7 @@ This application was verified in a Linux environment, using `rustc` version `1.6
 1. Switch to the `demo-cmd` directory. (`cd demo-cmd`)
 2. Build the application: `cargo build`
 3. Run the application with arguments for the input file and the desired output directory. E.g., `cargo run ./til_samples/paper_example.til ./output`
+
+# Note for Anonymous Repository
+
+As anonymous.4open.science does not allow for cloning or otherwise downloading complete repositories, we have included a ZIP archive of the repository at `./til-vhdl-main.zip`
