@@ -41,10 +41,24 @@ impl Project {
         location: impl TryResult<PathBuf>,
         output_path: Option<impl TryResult<PathBuf>>,
     ) -> Result<Self> {
+        let location = location.try_result()?;
+        let output_path = match output_path {
+            Some(some) => {
+                let output_path_result = some.try_result()?;
+                if output_path_result.is_absolute() {
+                    Some(output_path_result)
+                } else {
+                    let mut output_path_out = location.clone();
+                    output_path_out.push(output_path_result);
+                    Some(output_path_out)
+                }
+            }
+            None => None,
+        };
         Ok(Project {
             name: name.try_result()?,
-            location: location.try_result()?,
-            output_path: output_path.map(|x| x.try_result()).transpose()?,
+            location,
+            output_path,
             namespaces: BTreeMap::new(),
             imports: BTreeMap::new(),
         })
