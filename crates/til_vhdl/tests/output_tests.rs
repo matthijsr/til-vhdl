@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use til_parser::query::into_query_storage;
+use til_parser::project::into_query_storage;
 use til_query::{
     common::{
         logical::logicaltype::{
@@ -28,24 +28,30 @@ use tydi_common::error::Result;
 
 extern crate til_vhdl;
 
-fn source(path: impl AsRef<Path>) -> String {
-    std::fs::read_to_string(path).unwrap()
-}
+fn parse_to_output(file_path: &str, name: &str) -> Result<()> {
+    let db = into_query_storage(
+        format!(
+            r#"name = "{}"
 
-fn parse_to_output(src: impl Into<String>, name: &str) -> Result<()> {
-    let db = into_query_storage(src, Project::new("proj", ".", Some(format!("../../test_output/{}/", name)))?)?;
+files = ["{}"]
+ 
+output_path = "../../test_output/""#,
+            name, file_path
+        ),
+        ".",
+    )?;
 
     canonical(&db)
 }
 
 #[test]
 fn from_til_parse() -> Result<()> {
-    parse_to_output(source("tests/til_files/test_nspace.til"), "test_nspace")
+    parse_to_output("tests/til_files/test_nspace.til", "test_nspace")
 }
 
 #[test]
 fn evaluation_parse() -> Result<()> {
-    parse_to_output(source("tests/til_files/evaluation.til"), "evaluation")
+    parse_to_output("tests/til_files/evaluation.til", "evaluation")
 }
 
 #[test]
@@ -53,7 +59,7 @@ fn playground() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
 
-    let mut project = Project::new("proj", ".", Some("../../test_output/playground/"))?;
+    let mut project = Project::new("playground", ".", Some("../../test_output/"))?;
     let mut namespace = Namespace::new("root.sub")?;
     namespace.define_type(db, "bits", 4)?;
     namespace.define_type(db, "null", LogicalType::Null)?;
