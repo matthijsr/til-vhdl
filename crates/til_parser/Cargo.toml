@@ -14,7 +14,9 @@ chumsky = "0.8.0"
 tydi-common = { path = "../common" }
 tydi-intern = { path = "../intern" }
 til-query = { path = "../til_query" }
-criterion = { version="0.3", optional=true }
+criterion = { version="0.4", optional=true }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5.9"
 
 [features]
 benchmark=["criterion"]

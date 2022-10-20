@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use chumsky::{Parser, Stream};
 use til_query::ir::{
@@ -16,12 +19,20 @@ use crate::{
 };
 
 pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<Database> {
-    let mut _db = Database::default();
-    let db = &mut _db;
+    let mut db = Database::default();
+    db.set_project(Arc::new(Mutex::new(Project::new("proj", ".", None::<&str>)?)));
 
+    file_to_project(src, &mut db)?;
+
+    Ok(db)
+}
+
+pub fn file_to_project(
+    src: impl Into<String>,
+    db: &mut Database,
+) -> tydi_common::error::Result<()> {
     let src = src.into();
     let (tokens, errs) = lexer().parse_recovery(src.as_str());
-
     let (ast, parse_errs) = if let Some(tokens) = tokens {
         let len = src.chars().count();
         let (ast, parse_errs) =
@@ -31,16 +42,14 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
     } else {
         (None, Vec::new())
     };
-
     if errs.len() > 0 || parse_errs.len() > 0 {
         report_errors(&src, errs, parse_errs);
         return Err(Error::ParsingError(
             "Errors during parsing, see report.".to_string(),
         ));
     }
-
     let mut eval_errors = vec![];
-    let mut project = Project::new("proj", ".")?;
+
     if let Some(ast) = ast {
         for (name_vec, parsed_namespace) in ast.into_iter() {
             match PathName::try_new(name_vec) {
@@ -102,7 +111,7 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                             namespace.import_streamlet(name, streamlet_id)?;
                         }
 
-                        project.add_namespace(db, namespace)?;
+                        db.add_namespace(namespace)?;
                     }
                 }
                 Err(err) => eval_errors.push(EvalError::new(
@@ -112,15 +121,11 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
             }
         }
     }
-
     if eval_errors.len() > 0 {
         report_eval_errors(&src, eval_errors.clone());
         return Err(Error::ProjectError(
             "Errors during evaluation, see report.".to_string(),
         ));
     }
-
-    db.set_project(Arc::new(project));
-
-    Ok(_db)
+    Ok(())
 }

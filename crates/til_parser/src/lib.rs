@@ -6,6 +6,7 @@ pub mod impl_expr;
 pub mod interface_expr;
 pub mod lex;
 pub mod namespace;
+pub mod project;
 pub mod query;
 pub mod report;
 pub mod struct_parse;

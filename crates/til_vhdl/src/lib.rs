@@ -40,15 +40,13 @@ pub trait IntoVhdl<T> {
 ///
 /// The `indent_style` determines whether to use tabs or spaces, and how many.
 pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
-    let project = db.project();
-
     let mut dir = output_folder.as_ref().to_path_buf();
-    dir.push(project.identifier());
+    dir.push(db.project_identifier());
     std::fs::create_dir_all(dir.as_path())?;
 
     let streamlets = db.all_streamlets();
 
-    let mut package = Package::new_named(project.identifier())?;
+    let mut package = Package::new_named(db.project_identifier())?;
     let mut streamlet_component_names = vec![];
 
     for streamlet in streamlets.iter() {

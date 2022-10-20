@@ -1,4 +1,8 @@
-use std::{convert::TryInto, path::Path, sync::Arc};
+use std::{
+    convert::TryInto,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use til_parser::query::into_query_storage;
 use til_query::{
@@ -49,7 +53,7 @@ fn playground() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
 
-    let mut project = Project::new("proj", ".")?;
+    let mut project = Project::new("proj", ".", Some("../../test_output/playground/"))?;
     let mut namespace = Namespace::new("root.sub")?;
     namespace.define_type(db, "bits", 4)?;
     namespace.define_type(db, "null", LogicalType::Null)?;
@@ -115,7 +119,7 @@ fn playground() -> Result<()> {
             .with_implementation(Some(namespace.get_implementation_id("implementation")?)),
     )?;
     project.add_namespace(db, namespace)?;
-    db.set_project(Arc::new(project));
+    db.set_project(Arc::new(Mutex::new(project)));
 
     canonical(db, "../../test_output/playground/")?;
 

@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tydi_common::{
     error::{Error, Result, WrapError},
     map::InsertionOrderedMap,
     name::PathName,
-    traits::Reverse,
+    traits::{Identify, Reverse},
 };
 
 use tydi_intern::Id;
@@ -27,7 +27,7 @@ use crate::{
 
 use self::{
     implementation::Implementation, interface_port::InterfacePort, interner::Interner,
-    project::Project, streamlet::Streamlet, traits::GetSelf,
+    project::{Project, namespace::Namespace}, streamlet::Streamlet, traits::GetSelf,
 };
 
 pub mod annotation_keys;
@@ -49,17 +49,32 @@ pub trait Ir: Interner {
     fn annotation(&self, intern_id: salsa::InternId, key: String) -> String;
 
     #[salsa::input]
-    fn project(&self) -> Arc<Project>;
+    fn project(&self) -> Arc<Mutex<Project>>;
 
     fn all_streamlets(&self) -> Arc<Vec<Arc<Streamlet>>>;
 
     fn logical_type_split_streams(&self, key: Id<LogicalType>) -> Result<SplitStreams>;
 
     fn stream_split_streams(&self, key: Id<Stream>) -> Result<SplitStreams>;
+
+    fn project_identifier(&self) -> String;
+
+    fn add_namespace(&self, namespace: Namespace) -> Result<()>;
+}
+
+fn project_identifier(db: &dyn Ir) -> String {
+    let project = db.project();
+    let project = project.lock().unwrap();
+    project.identifier()
+}
+
+fn add_namespace(db: &dyn Ir, namespace: Namespace) -> Result<()> {
+    db.project().lock().unwrap().add_namespace(db, namespace)
 }
 
 fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Arc<Streamlet>>> {
     let project = db.project();
+    let project = project.lock().unwrap();
 
     Arc::new(
         project
@@ -190,7 +205,7 @@ mod tests {
     fn get_all_streamlets() -> Result<()> {
         let mut _db = Database::default();
         let db = &mut _db;
-        let mut project = Project::new("proj", ".")?;
+        let mut project = Project::new("proj", ".", None::<&str>)?;
         let mut namespace = Namespace::new("root.sub")?;
         namespace.define_type(db, "bits", 4)?;
         namespace.define_type(db, "null", LogicalType::Null)?;
@@ -231,7 +246,7 @@ mod tests {
                 .with_implementation(None),
         )?;
         project.add_namespace(db, namespace)?;
-        db.set_project(Arc::new(project));
+        db.set_project(Arc::new(Mutex::new(project)));
 
         assert_eq!(db.all_streamlets().len(), 2);
 

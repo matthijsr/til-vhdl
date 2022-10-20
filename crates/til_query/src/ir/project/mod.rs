@@ -4,7 +4,7 @@ use std::{
 };
 
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryOptional, TryResult},
     name::{Name, NameSelf, PathName, PathNameSelf},
     traits::Identify,
 };
@@ -27,6 +27,8 @@ pub struct Project {
     /// The root folder of the project.
     /// Relevant for links to behavioural implementations, and for determining the output folder.
     location: PathBuf,
+    /// The expected output directory
+    output_path: Option<PathBuf>,
     /// Namespaces within the project
     namespaces: BTreeMap<PathName, Id<Namespace>>,
     /// External dependencies
@@ -34,10 +36,15 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn new(name: impl TryResult<Name>, location: impl TryResult<PathBuf>) -> Result<Self> {
+    pub fn new(
+        name: impl TryResult<Name>,
+        location: impl TryResult<PathBuf>,
+        output_path: Option<impl TryResult<PathBuf>>,
+    ) -> Result<Self> {
         Ok(Project {
             name: name.try_result()?,
             location: location.try_result()?,
+            output_path: output_path.map(|x| x.try_result()).transpose()?,
             namespaces: BTreeMap::new(),
             imports: BTreeMap::new(),
         })
@@ -45,6 +52,10 @@ impl Project {
 
     pub fn location(&self) -> &Path {
         self.location.as_path()
+    }
+
+    pub fn output_path(&self) -> Option<&PathBuf> {
+        self.output_path.as_ref()
     }
 
     pub fn namespaces(&self) -> &BTreeMap<PathName, Id<Namespace>> {
@@ -96,6 +107,7 @@ impl Project {
             Project {
                 name: project.name.clone(),
                 location: project.location.clone(),
+                output_path: project.output_path.clone(),
                 namespaces,
                 imports: BTreeMap::new(),
             },
