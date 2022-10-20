@@ -1,0 +1,18 @@
+namespace file1 {
+    type stream = Stream (
+        data: Bits(8),
+        dimensionality: 0,
+        synchronicity: Sync,
+        complexity: 4,
+    );
+
+    #Streamlet documentation#
+    streamlet comp1 = (
+        a: in stream,
+        b: out stream,
+        #Port
+documentation#
+        c: in stream,
+        d: out stream,
+    );
+}

@@ -1,4 +1,7 @@
-use std::{sync::{Arc, Mutex}, path::PathBuf};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use tydi_common::{
     error::{Error, Result, WrapError},
@@ -26,8 +29,12 @@ use crate::{
 };
 
 use self::{
-    implementation::Implementation, interface_port::InterfacePort, interner::Interner,
-    project::{Project, namespace::Namespace}, streamlet::Streamlet, traits::GetSelf,
+    implementation::Implementation,
+    interface_port::InterfacePort,
+    interner::Interner,
+    project::{namespace::Namespace, Project},
+    streamlet::Streamlet,
+    traits::GetSelf,
 };
 
 pub mod annotation_keys;
@@ -60,8 +67,6 @@ pub trait Ir: Interner {
     fn project_identifier(&self) -> String;
 
     fn project_output_path(&self) -> Option<PathBuf>;
-
-    fn add_namespace(&self, namespace: Namespace) -> Result<()>;
 }
 
 fn project_identifier(db: &dyn Ir) -> String {
@@ -74,10 +79,6 @@ fn project_output_path(db: &dyn Ir) -> Option<PathBuf> {
     let project = db.project();
     let project = project.lock().unwrap();
     project.output_path().clone()
-}
-
-fn add_namespace(db: &dyn Ir, namespace: Namespace) -> Result<()> {
-    db.project().lock().unwrap().add_namespace(db, namespace)
 }
 
 fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Arc<Streamlet>>> {

@@ -1,6 +1,5 @@
 use std::{
     convert::TryInto,
-    path::Path,
     sync::{Arc, Mutex},
 };
 

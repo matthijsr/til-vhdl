@@ -5,7 +5,7 @@ use std::{
 
 use serde::Deserialize;
 use til_query::ir::{db::Database, project::Project, Ir};
-use tydi_common::error::{Error, Result, TryResult};
+use tydi_common::error::{Error, Result, TryResult, WrapError};
 
 use crate::query::file_to_project;
 
@@ -85,10 +85,11 @@ pub fn into_query_storage(
                 let mut root = file_location.clone();
                 root.pop();
                 root
-            },
+            }
             false => location.clone(),
         };
-        file_to_project(file_src, &mut db, link_root)?;
+        file_to_project(file_src, &mut db, link_root)
+            .wrap_err(Error::ProjectError(format!("Error in file \"{}\"", file)))?;
     }
 
     Ok(db)

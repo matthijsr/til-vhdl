@@ -4,7 +4,8 @@ use std::{
 };
 
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryResult, WrapError},
+    map::InsertionOrderedMap,
     name::{Name, NameSelf, PathName, PathNameSelf},
     traits::Identify,
 };
@@ -30,7 +31,7 @@ pub struct Project {
     /// The expected output directory
     output_path: Option<PathBuf>,
     /// Namespaces within the project
-    namespaces: BTreeMap<PathName, Id<Namespace>>,
+    namespaces: InsertionOrderedMap<PathName, Id<Namespace>>,
     /// External dependencies
     imports: BTreeMap<Name, Project>,
 }
@@ -59,7 +60,7 @@ impl Project {
             name: name.try_result()?,
             location,
             output_path,
-            namespaces: BTreeMap::new(),
+            namespaces: InsertionOrderedMap::new(),
             imports: BTreeMap::new(),
         })
     }
@@ -72,7 +73,7 @@ impl Project {
         &self.output_path
     }
 
-    pub fn namespaces(&self) -> &BTreeMap<PathName, Id<Namespace>> {
+    pub fn namespaces(&self) -> &InsertionOrderedMap<PathName, Id<Namespace>> {
         &self.namespaces
     }
 
@@ -113,9 +114,8 @@ impl Project {
 
         let namespaces = project
             .namespaces()
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), v.move_db(proj_db, db, &prefix)?)))
-            .collect::<Result<_>>()?;
+            .clone()
+            .try_map_convert(|v| v.move_db(proj_db, db, &prefix))?;
         self.imports.insert(
             alias_name,
             Project {
@@ -178,14 +178,12 @@ impl Project {
         }
 
         let namespace_id = namespace.intern(db);
-        if self.namespaces.insert(namespace_path.clone(), namespace_id) == None {
-            Ok(())
-        } else {
-            Err(Error::InvalidArgument(format!(
+        self.namespaces
+            .try_insert(namespace_path.clone(), namespace_id)
+            .wrap_err(Error::InvalidArgument(format!(
                 "A namespace with name {} was already declared",
                 namespace_path
             )))
-        }
     }
 }
 

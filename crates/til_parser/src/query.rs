@@ -151,7 +151,9 @@ pub fn file_to_project(
                             namespace.import_streamlet(name, streamlet_id)?;
                         }
 
-                        db.add_namespace(namespace)?;
+                        {
+                            db.project().lock().unwrap().add_namespace(db, namespace)?;
+                        }
                     }
                 }
                 Err(err) => eval_errors.push(EvalError::new(

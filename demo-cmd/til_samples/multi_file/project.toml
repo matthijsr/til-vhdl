@@ -1,0 +1,5 @@
+name = "multi_file"
+
+files = [ "file1.til", "file2.til", "file3.til" ]
+
+output_path = "../../../test_output"
