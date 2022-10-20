@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
@@ -30,6 +30,7 @@ use super::{eval_ident, eval_name, eval_type::eval_type_expr, EvalError};
 
 pub fn eval_declaration(
     db: &dyn Ir,
+    link_root: &PathBuf,
     decl: &Decl,
     namespace: &PathName,
     streamlets: &mut HashMap<Name, Id<Arc<Streamlet>>>,
@@ -88,6 +89,7 @@ pub fn eval_declaration(
                     )?;
                     eval_implementation_expr(
                         db,
+                        link_root,
                         body,
                         &namespace.with_child(name.clone()),
                         doc,
@@ -126,6 +128,7 @@ pub fn eval_declaration(
             let name = eval_name(n, s)?;
             let (streamlet_id, interface_id) = eval_streamlet_expr(
                 db,
+                link_root,
                 expr,
                 &namespace.with_child(name.clone()),
                 doc,

@@ -1,0 +1,8 @@
+name = "alt_link"
+
+files = [ "src/alt_link.til" ]
+
+output_path = "../../../test_output"
+
+[config]
+link_relative_to_file = true

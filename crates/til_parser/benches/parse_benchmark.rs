@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use til_parser::query::into_query_storage;
+use til_parser::query::into_query_storage_default;
 
 const TEST_STRING: &str = "namespace my::test::space {
     type byte = Bits(8);
@@ -141,7 +141,7 @@ Newline.# {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("parse namespace", |b| {
-        b.iter(|| into_query_storage(TEST_STRING).unwrap())
+        b.iter(|| into_query_storage_default(TEST_STRING).unwrap())
     });
 }
 

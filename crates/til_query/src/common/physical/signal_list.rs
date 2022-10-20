@@ -390,7 +390,7 @@ mod tests {
             .with_user(0)?;
 
         let mut one_removed = full.clone();
-        one_removed.set_user(None)?;
+        one_removed.set_user(None::<i32>)?;
 
         let full_iter = (&full).into_iter();
         assert_eq!(full_iter.len(), 8);

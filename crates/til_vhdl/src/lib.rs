@@ -1,11 +1,11 @@
 extern crate tydi_vhdl;
 
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use log::debug;
 use til_query::ir::Ir;
 use tydi_common::{
-    error::{Result, TryOptional},
+    error::{Error, Result, TryOptional},
     traits::Identify,
 };
 use tydi_vhdl::{
@@ -39,16 +39,16 @@ pub trait IntoVhdl<T> {
 /// The `output_folder` is defined relative to the base Project's folder.
 ///
 /// The `indent_style` determines whether to use tabs or spaces, and how many.
-pub fn canonical(db: &dyn Ir, output_folder: impl AsRef<Path>) -> Result<()> {
-    let project = db.project();
-
-    let mut dir = output_folder.as_ref().to_path_buf();
-    dir.push(project.identifier());
+pub fn canonical(db: &dyn Ir) -> Result<()> {
+    let mut dir = db.project_output_path().ok_or(Error::ProjectError(
+        "VHDL project requires an output path, project output path is None".to_string(),
+    ))?;
+    dir.push(db.project_identifier());
     std::fs::create_dir_all(dir.as_path())?;
 
     let streamlets = db.all_streamlets();
 
-    let mut package = Package::new_named(project.identifier())?;
+    let mut package = Package::new_named(db.project_identifier())?;
     let mut streamlet_component_names = vec![];
 
     for streamlet in streamlets.iter() {

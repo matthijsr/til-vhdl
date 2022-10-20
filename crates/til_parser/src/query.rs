@@ -1,4 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use chumsky::{Parser, Stream};
 use til_query::ir::{
@@ -6,7 +10,10 @@ use til_query::ir::{
     project::{namespace::Namespace, Project},
     Ir,
 };
-use tydi_common::{error::Error, name::PathName};
+use tydi_common::{
+    error::{Error, TryResult},
+    name::PathName,
+};
 
 use crate::{
     eval::{eval_decl::eval_declaration, EvalError},
@@ -15,13 +22,56 @@ use crate::{
     report::{report_errors, report_eval_errors},
 };
 
-pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<Database> {
-    let mut _db = Database::default();
-    let db = &mut _db;
+pub fn into_query_storage_default(src: impl Into<String>) -> tydi_common::error::Result<Database> {
+    let mut db = Database::default();
+    db.set_project(Arc::new(Mutex::new(Project::new(
+        "proj",
+        ".",
+        None::<&str>,
+    )?)));
 
+    file_to_project(src, &mut db, ".")?;
+
+    Ok(db)
+}
+
+pub fn into_query_storage_default_with_output(
+    src: impl Into<String>,
+    output_path: impl TryResult<PathBuf>,
+) -> tydi_common::error::Result<Database> {
+    let mut db = Database::default();
+    db.set_project(Arc::new(Mutex::new(Project::new(
+        "proj",
+        ".",
+        Some(output_path),
+    )?)));
+
+    file_to_project(src, &mut db, ".")?;
+
+    Ok(db)
+}
+
+pub fn into_query_storage(
+    src: impl Into<String>,
+    project: impl TryResult<Project>,
+    link_root: impl TryResult<PathBuf>,
+) -> tydi_common::error::Result<Database> {
+    let mut db = Database::default();
+    db.set_project(Arc::new(Mutex::new(project.try_result()?)));
+
+    file_to_project(src, &mut db, link_root)?;
+
+    Ok(db)
+}
+
+pub fn file_to_project(
+    src: impl Into<String>,
+    db: &mut Database,
+    link_root: impl TryResult<PathBuf>,
+) -> tydi_common::error::Result<()> {
     let src = src.into();
+    let link_root = link_root.try_result()?;
     let (tokens, errs) = lexer().parse_recovery(src.as_str());
-
     let (ast, parse_errs) = if let Some(tokens) = tokens {
         let len = src.chars().count();
         let (ast, parse_errs) =
@@ -31,16 +81,14 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
     } else {
         (None, Vec::new())
     };
-
     if errs.len() > 0 || parse_errs.len() > 0 {
         report_errors(&src, errs, parse_errs);
         return Err(Error::ParsingError(
             "Errors during parsing, see report.".to_string(),
         ));
     }
-
     let mut eval_errors = vec![];
-    let mut project = Project::new("proj", ".")?;
+
     if let Some(ast) = ast {
         for (name_vec, parsed_namespace) in ast.into_iter() {
             match PathName::try_new(name_vec) {
@@ -66,6 +114,7 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                             Statement::Decl(decl) => {
                                 let eval_result = eval_declaration(
                                     db,
+                                    &link_root,
                                     decl,
                                     &namespace_name,
                                     &mut streamlets,
@@ -102,7 +151,9 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
                             namespace.import_streamlet(name, streamlet_id)?;
                         }
 
-                        project.add_namespace(db, namespace)?;
+                        {
+                            db.project().lock().unwrap().add_namespace(db, namespace)?;
+                        }
                     }
                 }
                 Err(err) => eval_errors.push(EvalError::new(
@@ -112,15 +163,11 @@ pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<
             }
         }
     }
-
     if eval_errors.len() > 0 {
         report_eval_errors(&src, eval_errors.clone());
         return Err(Error::ProjectError(
             "Errors during evaluation, see report.".to_string(),
         ));
     }
-
-    db.set_project(Arc::new(project));
-
-    Ok(_db)
+    Ok(())
 }

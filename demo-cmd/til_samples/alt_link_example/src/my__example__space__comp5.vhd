@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 library work;
-use work.proj.all;
+use work.alt_link.all;
 
 entity my__example__space__comp5_com is
   port (

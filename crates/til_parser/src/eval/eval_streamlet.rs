@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, path::PathBuf};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
@@ -27,6 +27,7 @@ use super::{eval_ident, eval_interface::eval_interface_expr, EvalError};
 
 pub fn eval_streamlet_expr(
     db: &dyn Ir,
+    link_root: &PathBuf,
     expr: &Spanned<Expr>,
     name: &PathName,
     doc: &Option<String>,
@@ -108,6 +109,7 @@ pub fn eval_streamlet_expr(
                                             StreamletImplExpr::Def(impl_expr) => {
                                                 eval_implementation_expr(
                                                     db,
+                                                    link_root,
                                                     impl_expr,
                                                     name,
                                                     &None,
