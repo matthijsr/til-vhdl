@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bitvec::prelude::*;
 
-use til_parser::query::into_query_storage;
+use til_parser::query::into_query_storage_default;
 use til_query::{
     common::{
         physical::complexity::Complexity,
@@ -36,7 +36,7 @@ use tydi_vhdl::{
 
 #[test]
 fn process_playground() -> Result<()> {
-    let db = into_query_storage(
+    let db = into_query_storage_default(
         "
 namespace my::test::space {
     type stream1 = Stream(
@@ -141,7 +141,7 @@ multiline#
 
 #[test]
 fn process_transfer_playground() -> Result<()> {
-    let db = into_query_storage(
+    let db = into_query_storage_default(
         "
 namespace my::test::space {
     type stream1 = Stream(

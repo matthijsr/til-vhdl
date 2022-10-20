@@ -33,9 +33,9 @@ fn source(path: impl AsRef<Path>) -> String {
 }
 
 fn parse_to_output(src: impl Into<String>, name: &str) -> Result<()> {
-    let db = into_query_storage(src)?;
+    let db = into_query_storage(src, Project::new("proj", ".", Some(format!("../../test_output/{}/", name)))?)?;
 
-    canonical(&db, format!("../../test_output/{}/", name))
+    canonical(&db)
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn playground() -> Result<()> {
     project.add_namespace(db, namespace)?;
     db.set_project(Arc::new(Mutex::new(project)));
 
-    canonical(db, "../../test_output/playground/")?;
+    canonical(db)?;
 
     Ok(())
 }

@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use til_parser::query::into_query_storage;
+use til_parser::query::into_query_storage_default;
 use til_query::{
     common::{
         logical::{
@@ -222,7 +222,7 @@ end component;"#,
 
 #[test]
 fn split_streams_path_names() -> Result<()> {
-    let db = into_query_storage(
+    let db = into_query_storage_default(
         "
 namespace my::test::space {
     type stream_base1 = Stream(
@@ -299,7 +299,7 @@ end component;"#,
 
 #[test]
 fn type_reference() -> Result<()> {
-    let db = into_query_storage(
+    let db = into_query_storage_default(
         "
 namespace my::test::space {
     type stream_base1 = Stream(
@@ -440,7 +440,7 @@ namespace my::test::space {
 
 #[test]
 fn component_and_port_documentation() -> Result<()> {
-    let db = into_query_storage(
+    let db = into_query_storage_default(
         "
 namespace my::test::space {
     type stream1 = Stream(

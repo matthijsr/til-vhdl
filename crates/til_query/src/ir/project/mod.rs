@@ -4,7 +4,7 @@ use std::{
 };
 
 use tydi_common::{
-    error::{Error, Result, TryOptional, TryResult},
+    error::{Error, Result, TryResult},
     name::{Name, NameSelf, PathName, PathNameSelf},
     traits::Identify,
 };
@@ -54,8 +54,8 @@ impl Project {
         self.location.as_path()
     }
 
-    pub fn output_path(&self) -> Option<&PathBuf> {
-        self.output_path.as_ref()
+    pub fn output_path(&self) -> &Option<PathBuf> {
+        &self.output_path
     }
 
     pub fn namespaces(&self) -> &BTreeMap<PathName, Id<Namespace>> {

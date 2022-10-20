@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex}, path::PathBuf,
 };
 
 use chumsky::{Parser, Stream};
@@ -9,7 +9,7 @@ use til_query::ir::{
     project::{namespace::Namespace, Project},
     Ir,
 };
-use tydi_common::{error::Error, name::PathName};
+use tydi_common::{error::{Error, TryResult}, name::PathName};
 
 use crate::{
     eval::{eval_decl::eval_declaration, EvalError},
@@ -18,9 +18,35 @@ use crate::{
     report::{report_errors, report_eval_errors},
 };
 
-pub fn into_query_storage(src: impl Into<String>) -> tydi_common::error::Result<Database> {
+pub fn into_query_storage_default(src: impl Into<String>) -> tydi_common::error::Result<Database> {
     let mut db = Database::default();
-    db.set_project(Arc::new(Mutex::new(Project::new("proj", ".", None::<&str>)?)));
+    db.set_project(Arc::new(Mutex::new(Project::new(
+        "proj",
+        ".",
+        None::<&str>,
+    )?)));
+
+    file_to_project(src, &mut db)?;
+
+    Ok(db)
+}
+
+pub fn into_query_storage_default_with_output(src: impl Into<String>, output_path: impl TryResult<PathBuf>) -> tydi_common::error::Result<Database> {
+    let mut db = Database::default();
+    db.set_project(Arc::new(Mutex::new(Project::new(
+        "proj",
+        ".",
+        Some(output_path),
+    )?)));
+
+    file_to_project(src, &mut db)?;
+
+    Ok(db)
+}
+
+pub fn into_query_storage(src: impl Into<String>, project: impl TryResult<Project>) -> tydi_common::error::Result<Database> {
+    let mut db = Database::default();
+    db.set_project(Arc::new(Mutex::new(project.try_result()?)));
 
     file_to_project(src, &mut db)?;
 

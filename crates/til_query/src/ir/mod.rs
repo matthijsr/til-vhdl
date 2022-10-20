@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{sync::{Arc, Mutex}, path::PathBuf};
 
 use tydi_common::{
     error::{Error, Result, WrapError},
@@ -59,6 +59,8 @@ pub trait Ir: Interner {
 
     fn project_identifier(&self) -> String;
 
+    fn project_output_path(&self) -> Option<PathBuf>;
+
     fn add_namespace(&self, namespace: Namespace) -> Result<()>;
 }
 
@@ -66,6 +68,12 @@ fn project_identifier(db: &dyn Ir) -> String {
     let project = db.project();
     let project = project.lock().unwrap();
     project.identifier()
+}
+
+fn project_output_path(db: &dyn Ir) -> Option<PathBuf> {
+    let project = db.project();
+    let project = project.lock().unwrap();
+    project.output_path().clone()
 }
 
 fn add_namespace(db: &dyn Ir, namespace: Namespace) -> Result<()> {
