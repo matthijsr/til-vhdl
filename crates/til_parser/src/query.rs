@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex}, path::PathBuf,
+    path::PathBuf,
+    sync::{Arc, Mutex},
 };
 
 use chumsky::{Parser, Stream};
@@ -9,7 +10,10 @@ use til_query::ir::{
     project::{namespace::Namespace, Project},
     Ir,
 };
-use tydi_common::{error::{Error, TryResult}, name::PathName};
+use tydi_common::{
+    error::{Error, TryResult},
+    name::PathName,
+};
 
 use crate::{
     eval::{eval_decl::eval_declaration, EvalError},
@@ -26,12 +30,15 @@ pub fn into_query_storage_default(src: impl Into<String>) -> tydi_common::error:
         None::<&str>,
     )?)));
 
-    file_to_project(src, &mut db)?;
+    file_to_project(src, &mut db, ".")?;
 
     Ok(db)
 }
 
-pub fn into_query_storage_default_with_output(src: impl Into<String>, output_path: impl TryResult<PathBuf>) -> tydi_common::error::Result<Database> {
+pub fn into_query_storage_default_with_output(
+    src: impl Into<String>,
+    output_path: impl TryResult<PathBuf>,
+) -> tydi_common::error::Result<Database> {
     let mut db = Database::default();
     db.set_project(Arc::new(Mutex::new(Project::new(
         "proj",
@@ -39,16 +46,20 @@ pub fn into_query_storage_default_with_output(src: impl Into<String>, output_pat
         Some(output_path),
     )?)));
 
-    file_to_project(src, &mut db)?;
+    file_to_project(src, &mut db, ".")?;
 
     Ok(db)
 }
 
-pub fn into_query_storage(src: impl Into<String>, project: impl TryResult<Project>) -> tydi_common::error::Result<Database> {
+pub fn into_query_storage(
+    src: impl Into<String>,
+    project: impl TryResult<Project>,
+    link_root: impl TryResult<PathBuf>,
+) -> tydi_common::error::Result<Database> {
     let mut db = Database::default();
     db.set_project(Arc::new(Mutex::new(project.try_result()?)));
 
-    file_to_project(src, &mut db)?;
+    file_to_project(src, &mut db, link_root)?;
 
     Ok(db)
 }
@@ -56,8 +67,10 @@ pub fn into_query_storage(src: impl Into<String>, project: impl TryResult<Projec
 pub fn file_to_project(
     src: impl Into<String>,
     db: &mut Database,
+    link_root: impl TryResult<PathBuf>,
 ) -> tydi_common::error::Result<()> {
     let src = src.into();
+    let link_root = link_root.try_result()?;
     let (tokens, errs) = lexer().parse_recovery(src.as_str());
     let (ast, parse_errs) = if let Some(tokens) = tokens {
         let len = src.chars().count();
@@ -101,6 +114,7 @@ pub fn file_to_project(
                             Statement::Decl(decl) => {
                                 let eval_result = eval_declaration(
                                     db,
+                                    &link_root,
                                     decl,
                                     &namespace_name,
                                     &mut streamlets,

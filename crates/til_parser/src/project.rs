@@ -14,6 +14,12 @@ pub struct ProjectFile {
     name: String,
     files: Vec<String>,
     output_path: String,
+    config: Option<ConfigKeys>,
+}
+
+#[derive(Deserialize)]
+pub struct ConfigKeys {
+    link_relative_to_file: bool,
 }
 
 impl ProjectFile {
@@ -27,6 +33,17 @@ impl ProjectFile {
 
     pub fn output_path(&self) -> &str {
         self.output_path.as_ref()
+    }
+
+    pub fn config(&self) -> &Option<ConfigKeys> {
+        &self.config
+    }
+
+    pub fn config_link_relative_to_file(&self) -> bool {
+        match self.config() {
+            Some(config) => config.link_relative_to_file,
+            None => false,
+        }
     }
 }
 
@@ -47,6 +64,7 @@ pub fn into_query_storage(
         .map_err(|err| Error::ProjectError(format!("Unable to parse the project file: {}", err)))?;
     let mut db = Database::default();
     let location: PathBuf = location.try_result()?;
+
     db.set_project(Arc::new(Mutex::new(Project::new(
         project_info.name(),
         location.clone(),
@@ -62,7 +80,15 @@ pub fn into_query_storage(
                 err.to_string()
             ))
         })?;
-        file_to_project(file_src, &mut db)?;
+        let link_root = match project_info.config_link_relative_to_file() {
+            true => {
+                let mut root = file_location.clone();
+                root.pop();
+                root
+            },
+            false => location.clone(),
+        };
+        file_to_project(file_src, &mut db, link_root)?;
     }
 
     Ok(db)

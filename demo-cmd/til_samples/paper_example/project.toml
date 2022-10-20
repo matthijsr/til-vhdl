@@ -2,4 +2,4 @@ name = "paper_example"
 
 files = [ "src/paper_example.til" ]
 
-output_path = "../../test_output"
+output_path = "../../../test_output"

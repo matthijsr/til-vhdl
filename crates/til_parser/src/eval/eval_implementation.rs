@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use til_query::{
     common::logical::logicaltype::LogicalType,
@@ -130,6 +130,7 @@ pub fn eval_struct_stat(
 
 pub fn eval_implementation_expr(
     db: &dyn Ir,
+    link_root: &PathBuf,
     expr: &Spanned<ImplBodyExpr>,
     name: &PathName,
     doc: &DocExpr,
@@ -190,7 +191,9 @@ pub fn eval_implementation_expr(
             }
         }
         ImplBodyExpr::Link(pth) => {
-            let link = eval_common_error(Link::try_new(pth), &expr.1)?;
+            let mut link_pth = link_root.clone();
+            link_pth.push(pth);
+            let link = eval_common_error(Link::try_new(link_pth), &expr.1)?;
             let mut implementation = Implementation::from(link).with_name(name.clone());
             if let Some(doc) = doc {
                 implementation.set_doc(&doc.0);
