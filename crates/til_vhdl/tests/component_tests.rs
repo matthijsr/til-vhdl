@@ -254,8 +254,7 @@ namespace my::test::space {
     ",
     )?;
 
-    let proj = db.project();
-    let proj = proj.lock().unwrap();
+    let proj = db.project_ref();
     let streamlet = proj
         .namespaces()
         .get(&("my::test::space".try_into()?))
@@ -338,8 +337,7 @@ namespace my::test::space {
     ",
     )?;
 
-    let proj = db.project();
-    let proj = proj.lock().unwrap();
+    let proj = db.project_ref();
     let namespace = proj
         .namespaces()
         .get(&("my::test::space".try_into()?))
@@ -465,8 +463,7 @@ multiline#
     ",
     )?;
 
-    let proj = db.project();
-    let proj = proj.lock().unwrap();
+    let proj = db.project_ref();
     let streamlet = proj
         .namespaces()
         .get(&("my::test::space".try_into()?))
