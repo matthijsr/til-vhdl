@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use chumsky::{Parser, Stream};
 use til_query::ir::{
@@ -24,11 +20,7 @@ use crate::{
 
 pub fn into_query_storage_default(src: impl Into<String>) -> tydi_common::error::Result<Database> {
     let mut db = Database::default();
-    db.set_project(Arc::new(Mutex::new(Project::new(
-        "proj",
-        ".",
-        None::<&str>,
-    )?)));
+    db.set_project(Project::new("proj", ".", None::<&str>)?);
 
     file_to_project(src, &mut db, ".")?;
 
@@ -40,11 +32,7 @@ pub fn into_query_storage_default_with_output(
     output_path: impl TryResult<PathBuf>,
 ) -> tydi_common::error::Result<Database> {
     let mut db = Database::default();
-    db.set_project(Arc::new(Mutex::new(Project::new(
-        "proj",
-        ".",
-        Some(output_path),
-    )?)));
+    db.set_project(Project::new("proj", ".", Some(output_path))?);
 
     file_to_project(src, &mut db, ".")?;
 
@@ -57,7 +45,7 @@ pub fn into_query_storage(
     link_root: impl TryResult<PathBuf>,
 ) -> tydi_common::error::Result<Database> {
     let mut db = Database::default();
-    db.set_project(Arc::new(Mutex::new(project.try_result()?)));
+    db.set_project(project.try_result()?);
 
     file_to_project(src, &mut db, link_root)?;
 
@@ -151,9 +139,9 @@ pub fn file_to_project(
                             namespace.import_streamlet(name, streamlet_id)?;
                         }
 
-                        {
-                            db.project().lock().unwrap().add_namespace(db, namespace)?;
-                        }
+                        let mut project = db.project();
+                        project.add_namespace(db, namespace)?;
+                        db.set_project(project);
                     }
                 }
                 Err(err) => eval_errors.push(EvalError::new(

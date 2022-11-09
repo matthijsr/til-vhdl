@@ -1,7 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::path::PathBuf;
 
 use serde::Deserialize;
 use til_query::ir::{db::Database, project::Project, Ir};
@@ -65,11 +62,11 @@ pub fn into_query_storage(
     let mut db = Database::default();
     let location: PathBuf = location.try_result()?;
 
-    db.set_project(Arc::new(Mutex::new(Project::new(
+    db.set_project(Project::new(
         project_info.name(),
         location.clone(),
         Some(project_info.output_path()),
-    )?)));
+    )?);
 
     for file in project_info.files() {
         let mut file_location = location.clone();

@@ -1,7 +1,4 @@
-use std::{
-    convert::TryInto,
-    sync::{Arc, Mutex},
-};
+use std::convert::TryInto;
 
 use til_parser::project::into_query_storage;
 use til_query::{
@@ -124,7 +121,7 @@ fn playground() -> Result<()> {
             .with_implementation(Some(namespace.get_implementation_id("implementation")?)),
     )?;
     project.add_namespace(db, namespace)?;
-    db.set_project(Arc::new(Mutex::new(project)));
+    db.set_project(project);
 
     canonical(db)?;
 
