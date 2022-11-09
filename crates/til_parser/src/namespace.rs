@@ -7,7 +7,7 @@ use crate::{
     ident_expr::{name, path_name},
     impl_expr::{impl_def_expr, ImplDefExpr},
     interface_expr::{interface_expr, InterfaceExpr},
-    lex::{DeclKeyword, Operator, Token},
+    lex::{DeclKeyword, ImportKeyword, Operator, Token},
     type_expr::{type_expr, TypeExpr},
     Span, Spanned,
 };
@@ -21,8 +21,14 @@ pub enum Decl {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Import {
+    /// Import an entire namespace
+    FullImport(Spanned<Vec<Spanned<String>>>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Statement {
-    Import,
+    Import(Import),
     Decl(Decl),
 }
 
@@ -45,6 +51,11 @@ impl Namespace {
 pub fn namespaces_parser(
 ) -> impl Parser<Token, HashMap<Vec<String>, Namespace>, Error = Simple<Token>> + Clone {
     let namespace_name = path_name().map_with_span(|p, span| (p, span));
+
+    let import_stat = just(Token::Import(ImportKeyword::Import))
+        .ignore_then(path_name().map_with_span(|p, span| (p, span)))
+        .then_ignore(just(Token::Ctrl(';')))
+        .map_with_span(|n, span| (Statement::Import(Import::FullImport(n)), span));
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
         .ignore_then(name())
@@ -84,7 +95,7 @@ pub fn namespaces_parser(
         .or(streamlet_decl)
         .map_with_span(|d, span| (Statement::Decl(d), span));
 
-    let stat = decl; // TODO: Or import
+    let stat = import_stat.or(decl); // TODO: Or import
 
     let namespace = just(Token::Decl(DeclKeyword::Namespace))
         .ignore_then(namespace_name)

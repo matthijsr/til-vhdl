@@ -1,0 +1,7 @@
+namespace imported::space {
+
+}
+
+namespace my::test::space {
+    import imported::space;
+}

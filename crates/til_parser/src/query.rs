@@ -92,7 +92,7 @@ pub fn file_to_project(
                     let streamlet_imports = HashMap::new();
                     for stat in parsed_namespace.stats().iter() {
                         match &stat.0 {
-                            Statement::Import => {
+                            Statement::Import(_) => {
                                 // TODO
                                 eval_errors.push(EvalError::new(
                                     &stat.1,
