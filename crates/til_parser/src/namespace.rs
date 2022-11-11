@@ -34,11 +34,15 @@ pub enum Statement {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Namespace {
-    name: Spanned<Vec<Spanned<String>>>,
+    name: Spanned<Vec<String>>,
     stats: Vec<Spanned<Statement>>,
 }
 
 impl Namespace {
+    pub fn name(&self) -> &Vec<String> {
+        &self.name.0
+    }
+
     pub fn name_span(&self) -> &Span {
         &self.name.1
     }
@@ -48,9 +52,9 @@ impl Namespace {
     }
 }
 
-pub fn namespaces_parser(
-) -> impl Parser<Token, HashMap<Vec<String>, Namespace>, Error = Simple<Token>> + Clone {
-    let namespace_name = path_name().map_with_span(|p, span| (p, span));
+pub fn namespaces_parser() -> impl Parser<Token, Vec<Namespace>, Error = Simple<Token>> + Clone {
+    let namespace_name =
+        path_name().map_with_span(|p, span| (p.into_iter().map(|(n, s)| n).collect(), span));
 
     let import_stat = just(Token::Import(ImportKeyword::Import))
         .ignore_then(path_name().map_with_span(|p, span| (p, span)))
@@ -103,32 +107,9 @@ pub fn namespaces_parser(
             stat.repeated()
                 .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}'))),
         )
-        .map(|(name, stats)| {
-            let (n, span) = name.clone();
-            (
-                (
-                    n.into_iter().map(|(part, _)| part).collect::<Vec<String>>(),
-                    span,
-                ),
-                Namespace { name, stats },
-            )
-        });
+        .map(|(name, stats)| Namespace { name, stats });
 
-    namespace
-        .repeated()
-        .try_map(|ns, _| {
-            let mut namespaces = HashMap::new();
-            for ((name, name_span), n) in ns {
-                if namespaces.insert(name.clone(), n).is_some() {
-                    return Err(Simple::custom(
-                        name_span.clone(),
-                        format!("Namespace '{}' already exists", name.join("::")),
-                    ));
-                }
-            }
-            Ok(namespaces)
-        })
-        .then_ignore(end())
+    namespace.repeated().then_ignore(end())
 }
 
 #[cfg(test)]

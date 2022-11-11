@@ -78,8 +78,8 @@ pub fn file_to_project(
     let mut eval_errors = vec![];
 
     if let Some(ast) = ast {
-        for (name_vec, parsed_namespace) in ast.into_iter() {
-            match PathName::try_new(name_vec) {
+        for parsed_namespace in ast.into_iter() {
+            match PathName::try_new(parsed_namespace.name()) {
                 Ok(namespace_name) => {
                     // TODO: Imports currently left immutable as they are unused.
                     let mut types = HashMap::new();
