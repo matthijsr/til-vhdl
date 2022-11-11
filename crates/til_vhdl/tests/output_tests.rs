@@ -51,6 +51,11 @@ fn test_import() -> Result<()> {
 }
 
 #[test]
+fn test_cyclical() -> Result<()> {
+    parse_to_output("tests/til_files/test_cyclical.til", "test_cyclical")
+}
+
+#[test]
 fn evaluation_parse() -> Result<()> {
     parse_to_output("tests/til_files/evaluation.til", "evaluation")
 }

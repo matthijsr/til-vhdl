@@ -12,7 +12,7 @@ use tydi_common::{
 };
 
 use crate::{
-    eval::{eval_decl::eval_declaration, EvalError},
+    eval::{eval_decl::eval_declaration, eval_import::resolve_dependency_graph, EvalError},
     lex::lexer,
     namespace::{namespaces_parser, Statement},
     report::{report_errors, report_eval_errors},
@@ -77,6 +77,10 @@ pub fn file_to_project(
     }
     let mut eval_errors = vec![];
 
+    if let Some(ast) = ast.clone() {
+        resolve_dependency_graph(ast);
+    }
+
     if let Some(ast) = ast {
         for parsed_namespace in ast.into_iter() {
             match PathName::try_new(parsed_namespace.name()) {
@@ -94,10 +98,10 @@ pub fn file_to_project(
                         match &stat.0 {
                             Statement::Import(_) => {
                                 // TODO
-                                eval_errors.push(EvalError::new(
-                                    &stat.1,
-                                    "Imports are not currently supported",
-                                ));
+                                // eval_errors.push(EvalError::new(
+                                //     &stat.1,
+                                //     "Imports are not currently supported",
+                                // ));
                             }
                             Statement::Decl(decl) => {
                                 let eval_result = eval_declaration(

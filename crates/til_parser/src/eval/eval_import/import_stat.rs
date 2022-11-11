@@ -11,7 +11,7 @@ pub enum ImportStatement {
 impl PathNameSelf for ImportStatement {
     fn path_name(&self) -> &PathName {
         match &self {
-            ImportStatement::Full(name) => todo!(),
+            ImportStatement::Full(name) => name,
         }
     }
 }

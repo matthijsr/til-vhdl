@@ -96,6 +96,26 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
     }
 
     let graph = DependencyGraph::from(namespace_nodes.as_slice());
+    for unresolved in graph.unresolved_dependencies() {
+        println!("Unable to resolve {}", unresolved.0);
+    }
+
+    if !graph.is_internally_resolvable() {
+        println!("Not internally resolvable");
+    } else {
+        println!("Is internally resolvable");
+    }
+
+    for namespace_node in graph {
+        match namespace_node {
+            dependency_graph::Step::Resolved(resolved_node) => {
+                println!("Resolved {}", resolved_node.path_name())
+            }
+            dependency_graph::Step::Unresolved(unresolved_dep) => {
+                println!("Unable to resolve {}", unresolved_dep.0)
+            }
+        }
+    }
 
     Ok(((), eval_errors))
 }
