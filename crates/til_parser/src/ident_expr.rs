@@ -41,6 +41,6 @@ pub fn path_name() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<To
 pub fn ident_expr() -> impl Parser<Token, IdentExpr, Error = Simple<Token>> + Clone {
     name()
         .map(IdentExpr::Name)
-        .or(path_name().map(|pth| IdentExpr::PathName(pth)))
+        .or(path_name().map(IdentExpr::PathName))
         .labelled("identifier")
 }
