@@ -3,7 +3,12 @@ pub mod nodes;
 
 use std::collections::{BTreeMap, HashMap};
 
-use petgraph::{algo::toposort, visit::IntoNodeIdentifiers, Graph};
+use petgraph::{
+    algo::toposort,
+    prelude::{DiGraph, GraphMap},
+    visit::IntoNodeIdentifiers,
+    Graph,
+};
 use tydi_common::{
     error::Result,
     name::{PathName, PathNameSelf},
@@ -18,9 +23,12 @@ use self::{import_stat::ImportStatement, nodes::NamespaceNode};
 
 use super::EvalError;
 
-pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<EvalError>)> {
+pub fn build_dependency_graph(
+    namespaces: Vec<Namespace>,
+    eval_errors: &mut Vec<EvalError>,
+) -> Result<DiGraph<NamespaceNode, ()>> {
+    let mut di_graph: DiGraph<NamespaceNode, ()> = Graph::new();
     let mut unique_namespaces = HashMap::new();
-    let mut eval_errors = vec![];
 
     for parsed_namespace in namespaces.into_iter() {
         match PathName::try_new(parsed_namespace.name()) {
@@ -50,7 +58,7 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
     }
 
     if eval_errors.len() > 0 {
-        return Ok(((), eval_errors));
+        return Ok(di_graph);
     }
 
     let mut namespace_nodes = vec![];
@@ -97,10 +105,8 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
     }
 
     if eval_errors.len() > 0 {
-        return Ok(((), eval_errors));
+        return Ok(di_graph);
     }
-
-    let mut di_graph: Graph<NamespaceNode, ()> = Graph::new();
 
     let mut node_ids = HashMap::new();
 
@@ -116,13 +122,14 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
         let deps = di_graph[node_idx]
             .imports
             .keys()
-            .map(|dep| *node_ids.get(dep).unwrap());
+            .map(|dep| *node_ids.get(dep).unwrap())
+            .collect::<Vec<_>>();
         for dep in deps {
             di_graph.add_edge(node_idx, dep, ());
         }
     }
 
-    Ok(((), eval_errors))
+    Ok(di_graph)
 }
 
 pub fn eval_import_stat(

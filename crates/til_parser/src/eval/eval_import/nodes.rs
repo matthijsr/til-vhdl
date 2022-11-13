@@ -16,6 +16,12 @@ pub struct NamespaceNode {
     pub namespace: Namespace,
 }
 
+impl NamespaceNode {
+    pub fn imports(&self) -> &BTreeMap<PathName, Vec<Spanned<ImportStatement>>> {
+        &self.imports
+    }
+}
+
 impl PathNameSelf for NamespaceNode {
     fn path_name(&self) -> &PathName {
         &self.name
