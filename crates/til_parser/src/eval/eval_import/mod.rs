@@ -3,11 +3,10 @@ pub mod nodes;
 
 use std::collections::{BTreeMap, HashMap};
 
-use dependency_graph::DependencyGraph;
+use petgraph::{algo::toposort, visit::IntoNodeIdentifiers, Graph};
 use tydi_common::{
     error::Result,
     name::{PathName, PathNameSelf},
-    traits::Identify,
 };
 
 use crate::{
@@ -15,10 +14,7 @@ use crate::{
     Span, Spanned,
 };
 
-use self::{
-    import_stat::ImportStatement,
-    nodes::{GetNamespace, NamespaceNode},
-};
+use self::{import_stat::ImportStatement, nodes::NamespaceNode};
 
 use super::EvalError;
 
@@ -60,8 +56,7 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
     let mut namespace_nodes = vec![];
 
     for (name, namespace) in unique_namespaces.iter() {
-        let mut dependencies = vec![];
-        let mut imports = vec![];
+        let mut imports: BTreeMap<PathName, Vec<Spanned<ImportStatement>>> = BTreeMap::new();
         for stat in namespace.stats() {
             if let (Statement::Import(parsed_import), span) = stat {
                 match eval_import_stat((parsed_import, span)) {
@@ -71,10 +66,21 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
                                 &import_stat.1,
                                 format!("Namespace {} is trying to import itself", name),
                             ))
+                        } else if !unique_namespaces.contains_key(import_stat.0.path_name()) {
+                            eval_errors.push(EvalError::new(
+                                &import_stat.1,
+                                format!("Namespace {} does not exist", import_stat.0.path_name()),
+                            ))
                         } else {
-                            dependencies
-                                .push((import_stat.0.path_name().clone(), import_stat.1.clone()));
-                            imports.push(import_stat);
+                            match imports.get_mut(import_stat.0.path_name()) {
+                                Some(import_stats) => import_stats.push(import_stat),
+                                None => {
+                                    imports.insert(
+                                        import_stat.0.path_name().clone(),
+                                        vec![import_stat],
+                                    );
+                                }
+                            }
                         }
                     }
                     Err(eval_error) => {
@@ -85,7 +91,6 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
         }
         namespace_nodes.push(NamespaceNode {
             name: name.clone(),
-            dependencies,
             imports,
             namespace: namespace.clone(),
         });
@@ -95,25 +100,25 @@ pub fn resolve_dependency_graph(namespaces: Vec<Namespace>) -> Result<((), Vec<E
         return Ok(((), eval_errors));
     }
 
-    let graph = DependencyGraph::from(namespace_nodes.as_slice());
-    for unresolved in graph.unresolved_dependencies() {
-        println!("Unable to resolve {}", unresolved.0);
+    let mut di_graph: Graph<NamespaceNode, ()> = Graph::new();
+
+    let mut node_ids = HashMap::new();
+
+    // Add initial nodes
+    for node in namespace_nodes.into_iter() {
+        let key = node.path_name().clone();
+        let node_id = di_graph.add_node(node);
+        node_ids.insert(key, node_id);
     }
 
-    if !graph.is_internally_resolvable() {
-        println!("Not internally resolvable");
-    } else {
-        println!("Is internally resolvable");
-    }
-
-    for namespace_node in graph {
-        match namespace_node {
-            dependency_graph::Step::Resolved(resolved_node) => {
-                println!("Resolved {}", resolved_node.path_name())
-            }
-            dependency_graph::Step::Unresolved(unresolved_dep) => {
-                println!("Unable to resolve {}", unresolved_dep.0)
-            }
+    // Create edges between nodes (no weight)
+    for node_idx in di_graph.node_indices() {
+        let deps = di_graph[node_idx]
+            .imports
+            .keys()
+            .map(|dep| *node_ids.get(dep).unwrap());
+        for dep in deps {
+            di_graph.add_edge(node_idx, dep, ());
         }
     }
 
