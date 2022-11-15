@@ -8,5 +8,8 @@ namespace imported::space {
 namespace my::test::space {
     import imported::space;
 
+    type byte = imported::space::byte;
+    interface iface = imported::space::iface;
+    impl pathimpl = imported::space::pathimpl;
     streamlet str = imported::space::str;
 }
