@@ -33,14 +33,15 @@ pub fn path_name() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<To
         .chain(
             just(Token::Op(Operator::Path))
                 .ignore_then(name())
-                .repeated(),
+                .repeated()
+                .at_least(1),
         )
         .labelled("path name")
 }
 
 pub fn ident_expr() -> impl Parser<Token, IdentExpr, Error = Simple<Token>> + Clone {
-    name()
-        .map(IdentExpr::Name)
-        .or(path_name().map(IdentExpr::PathName))
+    path_name()
+        .map(IdentExpr::PathName)
+        .or(name().map(IdentExpr::Name))
         .labelled("identifier")
 }
