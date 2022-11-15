@@ -3,12 +3,7 @@ pub mod nodes;
 
 use std::collections::{BTreeMap, HashMap};
 
-use petgraph::{
-    algo::toposort,
-    prelude::{DiGraph, GraphMap},
-    visit::IntoNodeIdentifiers,
-    Graph,
-};
+use petgraph::{prelude::DiGraph, Graph};
 use tydi_common::{
     error::Result,
     name::{PathName, PathNameSelf},

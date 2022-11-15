@@ -1,5 +1,5 @@
 use chumsky::prelude::*;
-use std::{collections::HashMap, hash::Hash};
+use std::hash::Hash;
 
 use crate::{
     doc_expr::{doc_expr, DocExpr},

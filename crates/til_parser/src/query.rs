@@ -10,11 +10,11 @@ use til_query::ir::{
 };
 use tydi_common::{
     error::{Error, TryResult},
-    name::{PathName, PathNameSelf},
+    name::PathNameSelf,
 };
 
 use crate::{
-    eval::{eval_decl::eval_declaration, eval_import::build_dependency_graph, EvalError},
+    eval::{eval_decl::eval_declaration, eval_import::build_dependency_graph},
     lex::lexer,
     namespace::{namespaces_parser, Statement},
     report::{report_errors, report_eval_errors},
