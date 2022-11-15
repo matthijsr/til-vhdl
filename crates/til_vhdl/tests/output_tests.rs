@@ -46,6 +46,16 @@ fn from_til_parse() -> Result<()> {
 }
 
 #[test]
+fn test_import() -> Result<()> {
+    parse_to_output("tests/til_files/test_import.til", "test_import")
+}
+
+#[test]
+fn test_cyclical() -> Result<()> {
+    parse_to_output("tests/til_files/test_cyclical.til", "test_cyclical")
+}
+
+#[test]
 fn evaluation_parse() -> Result<()> {
     parse_to_output("tests/til_files/evaluation.til", "evaluation")
 }

@@ -134,8 +134,9 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
     // IDENTITIES
     // ......
 
-    let ident = ident_expr();
-    let ident_expr = ident.map(Expr::Ident).map_with_span(|i, span| (i, span));
+    let ident_expr = ident_expr()
+        .map(Expr::Ident)
+        .map_with_span(|i, span| (i, span));
 
     // ......
     // STREAMLET DEFINITIONS

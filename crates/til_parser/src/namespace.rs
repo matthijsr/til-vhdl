@@ -1,13 +1,13 @@
 use chumsky::prelude::*;
-use std::{collections::HashMap, hash::Hash};
+use std::hash::Hash;
 
 use crate::{
     doc_expr::{doc_expr, DocExpr},
     expr::{doc_parser, expr_parser, Expr},
-    ident_expr::{name, path_name},
+    ident_expr::{ident_expr, name, path_name, IdentExpr},
     impl_expr::{impl_def_expr, ImplDefExpr},
     interface_expr::{interface_expr, InterfaceExpr},
-    lex::{DeclKeyword, Operator, Token},
+    lex::{DeclKeyword, ImportKeyword, Operator, Token},
     type_expr::{type_expr, TypeExpr},
     Span, Spanned,
 };
@@ -21,18 +21,28 @@ pub enum Decl {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Import {
+    /// Import an entire namespace
+    FullImport(Spanned<Vec<Spanned<String>>>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Statement {
-    Import,
+    Import(Import),
     Decl(Decl),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Namespace {
-    name: Spanned<Vec<Spanned<String>>>,
+    name: Spanned<Vec<String>>,
     stats: Vec<Spanned<Statement>>,
 }
 
 impl Namespace {
+    pub fn name(&self) -> &Vec<String> {
+        &self.name.0
+    }
+
     pub fn name_span(&self) -> &Span {
         &self.name.1
     }
@@ -42,36 +52,41 @@ impl Namespace {
     }
 }
 
-pub fn namespaces_parser(
-) -> impl Parser<Token, HashMap<Vec<String>, Namespace>, Error = Simple<Token>> + Clone {
-    let namespace_name = path_name().map_with_span(|p, span| (p, span));
+pub fn namespaces_parser() -> impl Parser<Token, Vec<Namespace>, Error = Simple<Token>> + Clone {
+    let namespace_name = ident_expr()
+        .map(|i| match i {
+            IdentExpr::Name((n, _)) => vec![n],
+            IdentExpr::PathName(p) => p.into_iter().map(|(n, _)| n).collect(),
+        })
+        .map_with_span(|i, span| (i, span));
+
+    let import_stat = just(Token::Import(ImportKeyword::Import))
+        .ignore_then(path_name().map_with_span(|p, span| (p, span)))
+        .then_ignore(just(Token::Ctrl(';')))
+        .map_with_span(|n, span| (Statement::Import(Import::FullImport(n)), span));
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
         .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(type_expr())
-        .then_ignore(just(Token::Ctrl(';')))
         .map(|(n, e)| Decl::TypeDecl(n, e));
 
     let impl_decl = doc_expr()
         .then(just(Token::Decl(DeclKeyword::Implementation)).ignore_then(name()))
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(impl_def_expr())
-        .then_ignore(just(Token::Ctrl(';')))
         .map(|((doc, name), body)| Decl::ImplDecl(doc, name, body));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
         .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
         .then(interface_expr())
-        .then_ignore(just(Token::Ctrl(';')))
         .map(|(n, e)| Decl::InterfaceDecl(n, e));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
         .ignore_then(name())
         .then_ignore(just(Token::Op(Operator::Declare)))
-        .then(expr_parser())
-        .then_ignore(just(Token::Ctrl(';')));
+        .then(expr_parser());
     let doc_streamlet_decl = doc_parser()
         .then(streamlet_decl.clone())
         .map(|((doc, _), (n, e))| Decl::StreamletDecl(Some(doc), n, Box::new(e)));
@@ -82,9 +97,10 @@ pub fn namespaces_parser(
         .or(impl_decl)
         .or(interface_decl)
         .or(streamlet_decl)
+        .then_ignore(just(Token::Ctrl(';')))
         .map_with_span(|d, span| (Statement::Decl(d), span));
 
-    let stat = decl; // TODO: Or import
+    let stat = import_stat.or(decl);
 
     let namespace = just(Token::Decl(DeclKeyword::Namespace))
         .ignore_then(namespace_name)
@@ -92,32 +108,9 @@ pub fn namespaces_parser(
             stat.repeated()
                 .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}'))),
         )
-        .map(|(name, stats)| {
-            let (n, span) = name.clone();
-            (
-                (
-                    n.into_iter().map(|(part, _)| part).collect::<Vec<String>>(),
-                    span,
-                ),
-                Namespace { name, stats },
-            )
-        });
+        .map(|(name, stats)| Namespace { name, stats });
 
-    namespace
-        .repeated()
-        .try_map(|ns, _| {
-            let mut namespaces = HashMap::new();
-            for ((name, name_span), n) in ns {
-                if namespaces.insert(name.clone(), n).is_some() {
-                    return Err(Simple::custom(
-                        name_span.clone(),
-                        format!("Namespace '{}' already exists", name.join("::")),
-                    ));
-                }
-            }
-            Ok(namespaces)
-        })
-        .then_ignore(end())
+    namespace.repeated().then_ignore(end())
 }
 
 #[cfg(test)]

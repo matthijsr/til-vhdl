@@ -1,0 +1,15 @@
+namespace imported::space {
+    type byte = Bits(8);
+    interface iface = ();
+    impl pathimpl = iface "tests/til_files/test_nspace_src";
+    streamlet str = pathimpl;
+}
+
+namespace my::test::space {
+    import imported::space;
+
+    type byte = imported::space::byte;
+    interface iface = imported::space::iface;
+    impl pathimpl = imported::space::pathimpl;
+    streamlet str = imported::space::str;
+}

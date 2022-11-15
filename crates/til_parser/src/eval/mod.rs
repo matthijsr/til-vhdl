@@ -6,6 +6,7 @@ use crate::{ident_expr::IdentExpr, Span};
 
 pub mod eval_decl;
 pub mod eval_implementation;
+pub mod eval_import;
 pub mod eval_interface;
 pub mod eval_streamlet;
 pub mod eval_type;
