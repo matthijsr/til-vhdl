@@ -3,7 +3,7 @@ use tydi_common::error::{Error, Result};
 
 use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
 
-use super::{label::Label, Mapping, Statement};
+use super::{label::Label, mapping::Mapping, Statement};
 
 impl DeclareWithIndent for Mapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {

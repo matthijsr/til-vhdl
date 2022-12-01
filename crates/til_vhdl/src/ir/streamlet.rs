@@ -35,7 +35,7 @@ use tydi_vhdl::{
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
     port::Port,
-    statement::Mapping,
+    statement::mapping::Mapping,
 };
 
 use crate::IntoVhdl;
