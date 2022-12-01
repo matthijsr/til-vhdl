@@ -1,6 +1,7 @@
 use tydi_common::{
     error::{Error, Result, TryResult},
     map::InsertionOrderedMap,
+    traits::{Document, Documents, Identify},
 };
 use tydi_intern::Id;
 
@@ -75,6 +76,59 @@ impl From<Process> for Statement {
     fn from(process: Process) -> Self {
         Statement::Process(process)
     }
+}
+
+pub struct MapAssignStatement {
+    object: Id<ObjectDeclaration>,
+    assignment: Assignment,
+    doc: Option<String>,
+}
+
+impl MapAssignStatement {
+    pub fn new(object: Id<ObjectDeclaration>, assignment: Assignment) -> MapAssignStatement {
+        MapAssignStatement {
+            object,
+            assignment,
+            doc: None,
+        }
+    }
+
+    pub fn object(&self) -> Id<ObjectDeclaration> {
+        self.object
+    }
+
+    pub fn assignment(&self) -> &Assignment {
+        &self.assignment
+    }
+
+    /// The object declaration with any field selections on it
+    pub fn object_string(&self, db: &dyn Arch) -> String {
+        let mut result = db
+            .lookup_intern_object_declaration(self.object())
+            .identifier()
+            .to_string();
+        for field in self.assignment().to_field() {
+            result.push_str(&field.to_string());
+        }
+        result
+    }
+}
+
+impl Document for MapAssignStatement {
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for MapAssignStatement {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
+    }
+}
+
+pub enum MapAssignment {
+    Unassigned(Id<ObjectDeclaration>),
+    Assigned(MapAssignStatement),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
