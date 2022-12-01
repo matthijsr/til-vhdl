@@ -27,7 +27,7 @@ pub mod relation;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
     Assignment(AssignDeclaration),
-    PortMapping(PortMapping),
+    PortMapping(Mapping),
     Process(Process),
 }
 
@@ -65,8 +65,8 @@ impl From<AssignDeclaration> for Statement {
     }
 }
 
-impl From<PortMapping> for Statement {
-    fn from(portmapping: PortMapping) -> Self {
+impl From<Mapping> for Statement {
+    fn from(portmapping: Mapping) -> Self {
         Statement::PortMapping(portmapping)
     }
 }
@@ -78,32 +78,32 @@ impl From<Process> for Statement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PortMapping {
+pub struct Mapping {
     label: VhdlName,
     component_name: VhdlName,
     /// The ports, in the order they were declared on the component
     ports: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
     /// irrespective of the order they're mapped during generation.
-    mappings: InsertionOrderedMap<VhdlName, AssignDeclaration>,
+    port_mappings: InsertionOrderedMap<VhdlName, AssignDeclaration>,
 }
 
-impl PortMapping {
+impl Mapping {
     pub fn from_component(
         db: &mut dyn Arch,
         component: &Component,
         label: impl TryResult<VhdlName>,
-    ) -> Result<PortMapping> {
+    ) -> Result<Mapping> {
         let mut ports = InsertionOrderedMap::new();
         for port in component.ports() {
             let obj = ObjectDeclaration::from_port(db, port, false);
             ports.try_insert(port.vhdl_name().clone(), obj)?;
         }
-        Ok(PortMapping {
+        Ok(Mapping {
             label: label.try_result()?,
             component_name: component.vhdl_name().clone(),
             ports,
-            mappings: InsertionOrderedMap::new(),
+            port_mappings: InsertionOrderedMap::new(),
         })
     }
 
@@ -111,8 +111,8 @@ impl PortMapping {
         &self.ports
     }
 
-    pub fn mappings(&self) -> &InsertionOrderedMap<VhdlName, AssignDeclaration> {
-        &self.mappings
+    pub fn port_mappings(&self) -> &InsertionOrderedMap<VhdlName, AssignDeclaration> {
+        &self.port_mappings
     }
 
     pub fn map_port(
@@ -130,20 +130,20 @@ impl PortMapping {
                 identifier
             )))?;
         let assigned = port.assign(db, assignment)?;
-        self.mappings.try_insert(identifier, assigned)?;
+        self.port_mappings.try_insert(identifier, assigned)?;
         Ok(())
     }
 
     pub fn finish(self) -> Result<Self> {
-        if self.ports().len() == self.mappings().len() {
+        if self.ports().len() == self.port_mappings().len() {
             Ok(self)
         } else {
             Err(Error::BackEndError(format!(
                 "The number of mappings ({}) does not match the number of ports ({}).\nExpected: {}\nActual: {}",
-                self.mappings().len(),
+                self.port_mappings().len(),
                 self.ports().len(),
                 self.ports().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
-                self.mappings().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
+                self.port_mappings().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
             )))
         }
     }
@@ -153,7 +153,7 @@ impl PortMapping {
     }
 }
 
-impl Label for PortMapping {
+impl Label for Mapping {
     fn label(&self) -> Option<&VhdlName> {
         Some(&self.label)
     }
@@ -163,13 +163,13 @@ impl Label for PortMapping {
     }
 }
 
-impl VhdlNameSelf for PortMapping {
+impl VhdlNameSelf for Mapping {
     fn vhdl_name(&self) -> &VhdlName {
         &self.label
     }
 }
 
-impl ListUsingsDb for PortMapping {
+impl ListUsingsDb for Mapping {
     fn list_usings_db(&self, db: &dyn Arch) -> Result<crate::usings::Usings> {
         let mut usings = Usings::new_empty();
         for (_, object) in self.ports() {

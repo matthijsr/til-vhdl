@@ -3,15 +3,15 @@ use tydi_common::error::{Error, Result};
 
 use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
 
-use super::{label::Label, PortMapping, Statement};
+use super::{label::Label, Mapping, Statement};
 
-impl DeclareWithIndent for PortMapping {
+impl DeclareWithIndent for Mapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(&format!("{} port map(\n", self.component_name()));
         let mut port_maps = vec![];
         for (port, _) in self.ports() {
-            if let Some(port_assign) = self.mappings().get(port) {
+            if let Some(port_assign) = self.port_mappings().get(port) {
                 port_maps.push(port_assign.declare_with_indent(db, indent_style)?);
             } else {
                 return Err(Error::BackEndError(format!(

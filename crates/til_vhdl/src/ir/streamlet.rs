@@ -35,7 +35,7 @@ use tydi_vhdl::{
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
     port::Port,
-    statement::PortMapping,
+    statement::Mapping,
 };
 
 use crate::IntoVhdl;
@@ -299,7 +299,7 @@ pub fn create_instance(
                     }
     };
 
-    let mut port_mapping = PortMapping::from_component(arch_db, &component, instance_name.clone())?;
+    let mut port_mapping = Mapping::from_component(arch_db, &component, instance_name.clone())?;
 
     let mut signals = InsertionOrderedMap::new();
 
@@ -358,7 +358,7 @@ pub fn create_instance(
             },
         )?;
     }
-    let map_domain = |port_mapping: &mut PortMapping,
+    let map_domain = |port_mapping: &mut Mapping,
                       base_domain: &VhdlDomain<Port>,
                       parent_domain: &VhdlDomain<Id<ObjectDeclaration>>|
      -> Result<()> {
