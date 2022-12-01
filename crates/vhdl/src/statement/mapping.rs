@@ -69,13 +69,13 @@ pub enum MapAssignment {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Mapping {
-    pub(crate) label: VhdlName,
-    pub(crate) component_name: VhdlName,
+    label: VhdlName,
+    component_name: VhdlName,
     /// The ports, in the order they were declared on the component
-    pub(crate) ports: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
+    ports: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
     /// Mappings for those ports, will be declared in the order of the original component declaration,
     /// irrespective of the order they're mapped during generation.
-    pub(crate) port_mappings: InsertionOrderedMap<VhdlName, AssignDeclaration>,
+    port_mappings: InsertionOrderedMap<VhdlName, AssignDeclaration>,
 }
 
 impl Mapping {
