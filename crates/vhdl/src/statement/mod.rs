@@ -17,7 +17,7 @@ pub mod relation;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
     Assignment(AssignDeclaration),
-    PortMapping(Mapping),
+    Mapping(Mapping),
     Process(Process),
 }
 
@@ -25,7 +25,7 @@ impl ListUsingsDb for Statement {
     fn list_usings_db(&self, db: &dyn Arch) -> Result<crate::usings::Usings> {
         match self {
             Statement::Assignment(a) => a.list_usings_db(db),
-            Statement::PortMapping(pm) => pm.list_usings_db(db),
+            Statement::Mapping(pm) => pm.list_usings_db(db),
             Statement::Process(p) => p.list_usings_db(db),
         }
     }
@@ -35,7 +35,7 @@ impl Label for Statement {
     fn label(&self) -> Option<&VhdlName> {
         match self {
             Statement::Assignment(a) => a.label(),
-            Statement::PortMapping(p) => p.label(),
+            Statement::Mapping(p) => p.label(),
             Statement::Process(p) => p.label(),
         }
     }
@@ -43,7 +43,7 @@ impl Label for Statement {
     fn set_label(&mut self, label: impl Into<VhdlName>) {
         match self {
             Statement::Assignment(a) => a.set_label(label),
-            Statement::PortMapping(p) => p.set_label(label),
+            Statement::Mapping(p) => p.set_label(label),
             Statement::Process(p) => p.set_label(label),
         }
     }
@@ -57,7 +57,7 @@ impl From<AssignDeclaration> for Statement {
 
 impl From<Mapping> for Statement {
     fn from(portmapping: Mapping) -> Self {
-        Statement::PortMapping(portmapping)
+        Statement::Mapping(portmapping)
     }
 }
 

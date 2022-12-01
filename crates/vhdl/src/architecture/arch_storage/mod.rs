@@ -1,10 +1,24 @@
 use std::sync::Arc;
 
-use tydi_common::error::{Error, Result};
+use tydi_common::{
+    error::{Error, Result},
+    traits::Identify,
+};
+use tydi_intern::Id;
 
-use crate::{common::vhdl_name::VhdlName, component::Component, package::Package};
+use crate::{
+    common::vhdl_name::VhdlName,
+    component::Component,
+    declaration::{ObjectDeclaration, ObjectKind},
+    package::Package,
+    port::Mode,
+    statement::relation::Relation,
+};
 
-use self::{interner::Interner, object_queries::ObjectQueries};
+use self::{
+    interner::{GetSelf, Interner},
+    object_queries::ObjectQueries,
+};
 
 use std::convert::TryInto;
 
@@ -36,6 +50,8 @@ pub trait Arch: Interner + ObjectQueries {
     fn subject_component(&self) -> Result<Arc<Component>>;
 
     fn can_assign(&self, to: ObjectKey, assignment: Assignment) -> Result<()>;
+
+    fn can_map<'a>(&self, target: Id<ObjectDeclaration>, assignment: AssignmentKind) -> Result<()>;
 }
 
 fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
@@ -150,5 +166,59 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                 }
             }
         }
+    }
+}
+
+fn can_map(
+    db: &dyn Arch,
+    target: Id<ObjectDeclaration>,
+    assignment_kind: AssignmentKind,
+) -> Result<()> {
+    let target_obj = target.get(db);
+    fn is_explicit_out(object_kind: &ObjectKind) -> Result<bool> {
+        match object_kind {
+            ObjectKind::Signal
+            | ObjectKind::Variable
+            | ObjectKind::Constant
+            | ObjectKind::ComponentPort(Mode::In) => Ok(false),
+            ObjectKind::ComponentPort(Mode::Out) => Ok(true),
+            ObjectKind::EntityPort(_) => Err(Error::BackEndError(
+                "Entity ports should not be included in mappings".to_string(),
+            )),
+            ObjectKind::Alias(_, alias_kind) => is_explicit_out(alias_kind),
+        }
+    }
+    fn is_explicit_in(object_kind: &ObjectKind) -> Result<bool> {
+        match object_kind {
+            ObjectKind::Variable | ObjectKind::Constant | ObjectKind::ComponentPort(Mode::In) => {
+                Ok(true)
+            }
+            ObjectKind::Signal | ObjectKind::ComponentPort(Mode::Out) => Ok(false),
+            ObjectKind::EntityPort(_) => Err(Error::BackEndError(
+                "Entity ports should not be included in mappings".to_string(),
+            )),
+            ObjectKind::Alias(_, alias_kind) => is_explicit_in(alias_kind),
+        }
+    }
+    match assignment_kind {
+        AssignmentKind::Relation(relation) => {
+            if is_explicit_out(target_obj.kind())? {
+                if let Relation::Object(o) = relation {
+                    let obj = db.get_object(o.as_object_key(db))?;
+                    obj.assignable.to_or_err()?;
+                    obj.typ(db).can_assign_type(&target_obj.typ(db)?)
+                } else {
+                    Err(Error::InvalidTarget(format!(
+                            "Cannot map an output object ({}) to a non-object relation",
+                            target_obj.identifier()
+                        )))
+                }
+            } else {
+                Ok(())
+            }
+        },
+        AssignmentKind::Direct(_) => Err(Error::BackEndError(
+            "Backend does not currently support direct assignment (full arrays or records) in mappings".to_string(),
+        )),
     }
 }

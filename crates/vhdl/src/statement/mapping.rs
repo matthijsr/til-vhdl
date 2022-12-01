@@ -1,10 +1,11 @@
 use super::label::Label;
 use crate::{
     architecture::arch_storage::Arch,
-    assignment::{Assign, AssignDeclaration, Assignment},
+    assignment::{Assignment, AssignmentKind},
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
-    declaration::ObjectDeclaration,
+    declaration::{DeclareWithIndent, ObjectDeclaration},
+    traits::VhdlDocument,
     usings::{ListUsingsDb, Usings},
 };
 use tydi_common::{
@@ -14,68 +15,92 @@ use tydi_common::{
 };
 use tydi_intern::Id;
 
-pub struct MapAssignStatement {
-    object: Id<ObjectDeclaration>,
-    assignment: Assignment,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MapAssignExpression {
+    target: Id<ObjectDeclaration>,
+    assignment: AssignmentKind,
     doc: Option<String>,
 }
 
-impl MapAssignStatement {
-    pub fn new(object: Id<ObjectDeclaration>, assignment: Assignment) -> MapAssignStatement {
-        MapAssignStatement {
-            object,
+impl MapAssignExpression {
+    pub fn try_new(
+        db: &dyn Arch,
+        target: Id<ObjectDeclaration>,
+        assignment: impl Into<AssignmentKind>,
+    ) -> Result<MapAssignExpression> {
+        let assignment = assignment.into();
+        db.can_map(target, assignment.clone())?;
+        Ok(MapAssignExpression {
+            target,
             assignment,
             doc: None,
-        }
+        })
     }
 
-    pub fn object(&self) -> Id<ObjectDeclaration> {
-        self.object
+    pub fn target(&self) -> Id<ObjectDeclaration> {
+        self.target
     }
 
-    pub fn assignment(&self) -> &Assignment {
+    pub fn assignment_kind(&self) -> &AssignmentKind {
         &self.assignment
     }
 
-    /// The object declaration with any field selections on it
+    /// The object declaration
     pub fn object_string(&self, db: &dyn Arch) -> String {
-        let mut result = db
-            .lookup_intern_object_declaration(self.object())
+        db.lookup_intern_object_declaration(self.target())
             .identifier()
-            .to_string();
-        for field in self.assignment().to_field() {
-            result.push_str(&field.to_string());
-        }
-        result
     }
 }
 
-impl Document for MapAssignStatement {
+impl Document for MapAssignExpression {
     fn doc(&self) -> Option<&String> {
         self.doc.as_ref()
     }
 }
 
-impl Documents for MapAssignStatement {
+impl Documents for MapAssignExpression {
     fn set_doc(&mut self, doc: impl Into<String>) {
         self.doc = Some(doc.into());
     }
 }
 
+impl DeclareWithIndent for MapAssignExpression {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        let mut result = String::new();
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(&doc);
+        }
+        result.push_str(&format!("{} => ", &self.object_string(db)));
+        result.push_str(&self.assignment_kind().declare_for(
+            db,
+            self.object_string(db),
+            indent_style,
+        )?);
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MapAssignment {
     Unassigned(Id<ObjectDeclaration>),
-    Assigned(MapAssignStatement),
+    Assigned(MapAssignExpression),
+}
+
+impl MapAssignment {
+    pub fn object(&self) -> Id<ObjectDeclaration> {
+        match self {
+            MapAssignment::Unassigned(obj) => *obj,
+            MapAssignment::Assigned(expr) => expr.target(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Mapping {
     label: VhdlName,
     component_name: VhdlName,
-    /// The ports, in the order they were declared on the component
-    ports: InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>,
-    /// Mappings for those ports, will be declared in the order of the original component declaration,
-    /// irrespective of the order they're mapped during generation.
-    port_mappings: InsertionOrderedMap<VhdlName, AssignDeclaration>,
+    /// The ports and their mappings, in the order they were declared on the component
+    port_mappings: InsertionOrderedMap<VhdlName, MapAssignment>,
 }
 
 impl Mapping {
@@ -84,24 +109,19 @@ impl Mapping {
         component: &Component,
         label: impl TryResult<VhdlName>,
     ) -> Result<Mapping> {
-        let mut ports = InsertionOrderedMap::new();
+        let mut port_mappings = InsertionOrderedMap::new();
         for port in component.ports() {
             let obj = ObjectDeclaration::from_port(db, port, false);
-            ports.try_insert(port.vhdl_name().clone(), obj)?;
+            port_mappings.try_insert(port.vhdl_name().clone(), MapAssignment::Unassigned(obj))?;
         }
         Ok(Mapping {
             label: label.try_result()?,
             component_name: component.vhdl_name().clone(),
-            ports,
-            port_mappings: InsertionOrderedMap::new(),
+            port_mappings,
         })
     }
 
-    pub fn ports(&self) -> &InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
-        &self.ports
-    }
-
-    pub fn port_mappings(&self) -> &InsertionOrderedMap<VhdlName, AssignDeclaration> {
+    pub fn port_mappings(&self) -> &InsertionOrderedMap<VhdlName, MapAssignment> {
         &self.port_mappings
     }
 
@@ -109,33 +129,39 @@ impl Mapping {
         &mut self,
         db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
-        assignment: impl Into<Assignment>,
+        assignment_kind: impl Into<AssignmentKind>,
     ) -> Result<()> {
         let identifier = identifier.try_result()?;
         let port = self
-            .ports()
+            .port_mappings()
             .get(&identifier)
             .ok_or(Error::InvalidArgument(format!(
                 "Port {} does not exist on this component",
                 identifier
             )))?;
-        let assigned = port.assign(db, assignment)?;
-        self.port_mappings.try_insert(identifier, assigned)?;
-        Ok(())
+        match port {
+            MapAssignment::Unassigned(obj) => {
+                let assigned = MapAssignExpression::try_new(db, *obj, assignment_kind)?;
+                self.port_mappings
+                    .try_replace(&identifier, MapAssignment::Assigned(assigned))
+            }
+            MapAssignment::Assigned(_) => Err(Error::InvalidArgument(format!(
+                "Port {} was already assigned",
+                identifier
+            ))),
+        }
     }
 
     pub fn finish(self) -> Result<Self> {
-        if self.ports().len() == self.port_mappings().len() {
-            Ok(self)
-        } else {
-            Err(Error::BackEndError(format!(
-                "The number of mappings ({}) does not match the number of ports ({}).\nExpected: {}\nActual: {}",
-                self.port_mappings().len(),
-                self.ports().len(),
-                self.ports().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
-                self.port_mappings().keys().map(|k| k.to_string()).collect::<Vec<String>>().join(", "),
-            )))
+        for (name, assignment) in self.port_mappings() {
+            if let MapAssignment::Unassigned(_) = assignment {
+                return Err(Error::BackEndError(format!(
+                    "Port {} was not mapped.",
+                    name
+                )));
+            }
         }
+        Ok(self)
     }
 
     pub fn component_name(&self) -> &VhdlName {
@@ -162,8 +188,8 @@ impl VhdlNameSelf for Mapping {
 impl ListUsingsDb for Mapping {
     fn list_usings_db(&self, db: &dyn Arch) -> Result<crate::usings::Usings> {
         let mut usings = Usings::new_empty();
-        for (_, object) in self.ports() {
-            usings.combine(&object.list_usings_db(db)?);
+        for (_, assignment) in self.port_mappings() {
+            usings.combine(&assignment.object().list_usings_db(db)?);
         }
         Ok(usings)
     }

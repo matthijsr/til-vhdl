@@ -136,6 +136,21 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         }
     }
 
+    /// Tries to replace the value associated with a key in the map.
+    ///
+    /// If an item with the given key does not exist in the map, this function
+    /// will return an `Error::InvalidArgument`.
+    pub fn try_replace(&mut self, key: &K, value: V) -> Result<()> {
+        let item = self.items.get_mut(key);
+        match item {
+            Some(mut_val) => Ok(*mut_val = value),
+            None => Err(Error::InvalidArgument(format!(
+                "No value associated with {}, nothing to replace",
+                key.to_string()
+            ))),
+        }
+    }
+
     /// Tries to insert a key and value into the map.
     ///
     /// If an item with the given key already exists in the map, it will replace

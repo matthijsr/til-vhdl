@@ -3,16 +3,16 @@ use tydi_common::error::{Error, Result};
 
 use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
 
-use super::{label::Label, mapping::Mapping, Statement};
+use super::{label::Label, mapping::{Mapping, MapAssignment}, Statement};
 
 impl DeclareWithIndent for Mapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(&format!("{} port map(\n", self.component_name()));
         let mut port_maps = vec![];
-        for (port, _) in self.ports() {
-            if let Some(port_assign) = self.port_mappings().get(port) {
-                port_maps.push(port_assign.declare_with_indent(db, indent_style)?);
+        for (port, assignment) in self.port_mappings() {
+            if let MapAssignment::Assigned(expr) = assignment {
+                port_maps.push(expr.declare_with_indent(db, indent_style)?);
             } else {
                 return Err(Error::BackEndError(format!(
                     "Error while declaring port mapping, port {} is not assigned",
@@ -30,9 +30,7 @@ impl DeclareWithIndent for Statement {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let result = match self {
             Statement::Assignment(assignment) => assignment.declare_with_indent(db, indent_style),
-            Statement::PortMapping(portmapping) => {
-                portmapping.declare_with_indent(db, indent_style)
-            }
+            Statement::Mapping(portmapping) => portmapping.declare_with_indent(db, indent_style),
             Statement::Process(process) => process.declare_with_indent(db, indent_style),
         };
         if let Some(label) = self.label() {
