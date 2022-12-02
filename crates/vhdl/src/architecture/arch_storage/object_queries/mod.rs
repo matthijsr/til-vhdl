@@ -4,7 +4,7 @@ use tydi_common::error::Result;
 use tydi_intern::Id;
 
 use crate::{
-    declaration::ObjectDeclaration,
+    declaration::{ObjectDeclaration, ObjectKind},
     object::{object_type::ObjectType, Object},
 };
 
@@ -25,6 +25,10 @@ pub trait ObjectQueries: Interner {
     fn get_object_type(&self, key: ObjectKey) -> Result<Arc<ObjectType>>;
 
     fn get_object_declaration_type(&self, key: Id<ObjectDeclaration>) -> Result<Arc<ObjectType>>;
+
+    fn get_object_kind(&self, key: Id<ObjectDeclaration>) -> Arc<ObjectKind>;
+
+    fn get_object_key(&self, key: Id<ObjectDeclaration>) -> ObjectKey;
 }
 
 fn get_object_type(db: &dyn ObjectQueries, key: ObjectKey) -> Result<Arc<ObjectType>> {
@@ -67,4 +71,14 @@ fn get_object(db: &dyn ObjectQueries, key: ObjectKey) -> Result<Object> {
         typ: db.intern_object_type(typ),
         assignable: obj.assignable,
     })
+}
+
+fn get_object_kind(db: &dyn ObjectQueries, key: Id<ObjectDeclaration>) -> Arc<ObjectKind> {
+    let obj = db.lookup_intern_object_declaration(key);
+    Arc::new(obj.kind().clone())
+}
+
+fn get_object_key(db: &dyn ObjectQueries, key: Id<ObjectDeclaration>) -> ObjectKey {
+    let obj = db.lookup_intern_object_declaration(key);
+    obj.object_key().clone()
 }

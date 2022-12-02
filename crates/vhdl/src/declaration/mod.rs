@@ -6,7 +6,7 @@ use tydi_intern::Id;
 
 use crate::architecture::arch_storage::interner::InternSelf;
 use crate::architecture::arch_storage::object_queries::object_key::ObjectKey;
-use crate::architecture::arch_storage::Arch;
+use crate::architecture::arch_storage::{Arch, AssignmentState};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::object::object_type::ObjectType;
 use crate::object::Object;
@@ -194,13 +194,13 @@ impl ObjectDeclaration {
         default: Option<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
         let kind = ObjectKind::Signal;
-        Ok(ObjectDeclaration {
+        ObjectDeclaration {
             identifier: identifier.try_result()?,
             obj: Object::try_new(db, typ, &kind)?,
             default,
             kind,
         }
-        .intern(db))
+        .test_default(db)
     }
 
     pub fn variable(
@@ -210,13 +210,13 @@ impl ObjectDeclaration {
         default: Option<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
         let kind = ObjectKind::Variable;
-        Ok(ObjectDeclaration {
+        ObjectDeclaration {
             identifier: identifier.try_result()?,
             obj: Object::try_new(db, typ, &kind)?,
             default,
             kind,
         }
-        .intern(db))
+        .test_default(db)
     }
 
     pub fn constant(
@@ -226,13 +226,13 @@ impl ObjectDeclaration {
         value: impl Into<AssignmentKind>,
     ) -> Result<Id<ObjectDeclaration>> {
         let kind = ObjectKind::Constant;
-        Ok(ObjectDeclaration {
+        ObjectDeclaration {
             identifier: identifier.try_result()?,
             obj: Object::try_new(db, typ, &kind)?,
             default: Some(value.into()),
             kind,
         }
-        .intern(db))
+        .test_default(db)
     }
 
     /// Entity Ports serve as a way to represent the ports of an entity the architecture is describing.
@@ -244,13 +244,13 @@ impl ObjectDeclaration {
         mode: Mode,
     ) -> Result<Id<ObjectDeclaration>> {
         let kind = ObjectKind::EntityPort(mode);
-        Ok(ObjectDeclaration {
+        ObjectDeclaration {
             identifier: identifier.try_result()?,
             obj: Object::try_new(db, typ, &kind)?,
             default: None,
             kind,
         }
-        .intern(db))
+        .test_default(db)
     }
 
     pub fn component_port(
@@ -260,13 +260,13 @@ impl ObjectDeclaration {
         mode: Mode,
     ) -> Result<Id<ObjectDeclaration>> {
         let kind = ObjectKind::ComponentPort(mode);
-        Ok(ObjectDeclaration {
+        ObjectDeclaration {
             identifier: identifier.try_result()?,
             obj: Object::try_new(db, typ, &kind)?,
             default: None,
             kind,
         }
-        .intern(db))
+        .test_default(db)
     }
 
     /// Aliases an existing object, with optional field constraint
@@ -277,7 +277,7 @@ impl ObjectDeclaration {
         selection: Vec<FieldSelection>,
     ) -> Result<Id<ObjectDeclaration>> {
         let object_declaration = db.lookup_intern_object_declaration(object_declaration);
-        Ok(ObjectDeclaration {
+        ObjectDeclaration {
             identifier: identifier.try_result()?,
             obj: object_declaration
                 .object_key()
@@ -289,7 +289,7 @@ impl ObjectDeclaration {
                 Box::new(object_declaration.kind().clone()),
             ),
         }
-        .intern(db))
+        .test_default(db)
     }
 
     /// Create a default "clk" entity port object
@@ -340,6 +340,17 @@ impl ObjectDeclaration {
             )
             .unwrap()
         }
+    }
+
+    fn test_default(self, db: &dyn Arch) -> Result<Id<ObjectDeclaration>> {
+        if let Some(default) = self.default() {
+            db.can_assign(
+                self.object_key().clone(),
+                default.clone().into(),
+                AssignmentState::Initialization,
+            )?;
+        }
+        Ok(self.intern(db))
     }
 }
 

@@ -1,10 +1,11 @@
 use super::label::Label;
 use crate::{
-    architecture::arch_storage::Arch,
-    assignment::{Assignment, AssignmentKind},
+    architecture::arch_storage::{Arch, AssignmentState},
+    assignment::AssignmentKind,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
-    declaration::{DeclareWithIndent, ObjectDeclaration},
+    declaration::{DeclareWithIndent, ObjectDeclaration, ObjectKind},
+    port::Mode,
     traits::VhdlDocument,
     usings::{ListUsingsDb, Usings},
 };
@@ -29,7 +30,34 @@ impl MapAssignExpression {
         assignment: impl Into<AssignmentKind>,
     ) -> Result<MapAssignExpression> {
         let assignment = assignment.into();
-        db.can_map(target, assignment.clone())?;
+        let kind = db.get_object_kind(target);
+        fn try_assign(
+            kind: impl AsRef<ObjectKind>,
+            db: &dyn Arch,
+            target: Id<ObjectDeclaration>,
+            assignment: &AssignmentKind,
+        ) -> Result<()> {
+            match kind.as_ref() {
+                ObjectKind::Signal | ObjectKind::Variable | ObjectKind::Constant => db.can_assign(
+                    db.get_object_key(target),
+                    assignment.clone().into(),
+                    AssignmentState::Initialization,
+                ),
+                ObjectKind::ComponentPort(mode) => db.can_assign(
+                    db.get_object_key(target),
+                    assignment.clone().into(),
+                    match mode {
+                        Mode::In => AssignmentState::Default,
+                        Mode::Out => AssignmentState::OutMapping,
+                    },
+                ),
+                ObjectKind::EntityPort(_) => Err(Error::InvalidTarget(
+                    "Cannot map to an entity port, it must use assign statements.".to_string(),
+                )),
+                ObjectKind::Alias(_, alias_kind) => try_assign(alias_kind, db, target, &assignment),
+            }
+        }
+        try_assign(kind, db, target, &assignment)?;
         Ok(MapAssignExpression {
             target,
             assignment,

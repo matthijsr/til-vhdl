@@ -365,6 +365,18 @@ impl From<BitVecValue> for Relation {
     }
 }
 
+impl fmt::Display for Relation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Relation::Value(_) => write!(f, "Value"),
+            Relation::Object(_) => write!(f, "Object"),
+            Relation::Combination(_) => write!(f, "Combination"),
+            Relation::Edge(_) => write!(f, "Edge"),
+            Relation::LogicalExpression(_) => write!(f, "LogicalExpression"),
+        }
+    }
+}
+
 impl Relation {
     pub fn is_bool(&self, db: &dyn Arch) -> Result<()> {
         self.can_assign(db, &ObjectType::Boolean)
@@ -382,6 +394,19 @@ impl Relation {
                 ObjectType::Boolean.can_assign_type(to_typ)
             }
             Relation::LogicalExpression(lex) => lex.can_assign(db, to_typ),
+        }
+    }
+
+    pub fn can_be_assigned(&self, db: &dyn Arch, from_typ: &ObjectType) -> Result<()> {
+        if let Relation::Object(o) = self {
+            let obj = db.get_object(o.as_object_key(db))?;
+            obj.assignable.to_or_err()?;
+            from_typ.can_assign_type(&obj.typ(db))
+        } else {
+            Err(Error::InvalidTarget(format!(
+                "Can only assign to objects, this relation is a {}",
+                self
+            )))
         }
     }
 
