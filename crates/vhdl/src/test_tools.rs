@@ -2,7 +2,9 @@ use indexmap::IndexMap;
 
 use tydi_common::error::Result;
 
-use crate::object::object_type::ObjectType;
+use crate::assignment::ValueAssignment;
+use crate::object::object_type::{IntegerType, ObjectType};
+use crate::port::GenericParameter;
 use crate::{
     common::vhdl_name::VhdlName,
     component::Component,
@@ -24,6 +26,36 @@ pub(crate) fn simple_component() -> Result<Component> {
     let port2 = Port::try_new("some_other_port", Mode::Out, 43..0)?;
     let clk = Port::clk();
     Component::try_new("test", vec![], vec![port1, port2, clk], None)
+}
+
+pub(crate) fn simple_component_with_generics() -> Result<Component> {
+    let port1 = Port::try_new_documented(
+        "some_port",
+        Mode::In,
+        ObjectType::Bit,
+        "This is port documentation\nNext line.",
+    )?;
+    let port2 = Port::try_new("some_other_port", Mode::Out, 43..0)?;
+    let clk = Port::clk();
+
+    let param1 = GenericParameter::try_new_documented(
+        "some_param",
+        Some(ValueAssignment::from(42).into()),
+        ObjectType::Integer(IntegerType::Positive),
+        "This is parameter documentation\nNext line.",
+    )?;
+    let param2 = GenericParameter::try_new("some_other_param", None, ObjectType::Bit)?;
+    let param3 = GenericParameter::try_new(
+        "some_other_param",
+        Some(ValueAssignment::from(-42).into()),
+        ObjectType::Integer(IntegerType::Integer),
+    )?;
+    Component::try_new(
+        "test",
+        vec![param1, param2, param3],
+        vec![port1, port2, clk],
+        None,
+    )
 }
 
 pub(crate) fn record_with_nested_type() -> Result<ObjectType> {

@@ -59,6 +59,12 @@ impl From<StdLogicValue> for ValueAssignment {
     }
 }
 
+impl From<i32> for ValueAssignment {
+    fn from(assignment: i32) -> Self {
+        ValueAssignment::Integer(assignment)
+    }
+}
+
 impl From<BitVecValue> for ValueAssignment {
     fn from(assignment: BitVecValue) -> Self {
         ValueAssignment::BitVec(assignment.into())

@@ -12,7 +12,7 @@ use crate::{
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::{Declare, DeclareWithIndent},
     object::object_type::DeclarationTypeName,
-    port::{Parameter, Port},
+    port::{GenericParameter, Port},
     properties::Analyze,
     traits::VhdlDocument,
 };
@@ -23,7 +23,7 @@ pub struct Component {
     /// Component identifier.
     identifier: VhdlName,
     /// The parameters of the component..
-    parameters: Vec<Parameter>,
+    parameters: Vec<GenericParameter>,
     /// The ports of the component.
     ports: Vec<Port>,
     /// Documentation.
@@ -34,7 +34,7 @@ impl Component {
     /// Create a new component.
     pub fn try_new(
         identifier: impl TryResult<VhdlName>,
-        parameters: Vec<Parameter>,
+        parameters: Vec<GenericParameter>,
         ports: Vec<Port>,
         doc: Option<String>,
     ) -> Result<Component> {
@@ -52,7 +52,7 @@ impl Component {
     }
 
     /// Return a reference to the parameters of this component.
-    pub fn parameters(&self) -> &Vec<Parameter> {
+    pub fn parameters(&self) -> &Vec<GenericParameter> {
         &self.parameters
     }
 
@@ -105,6 +105,19 @@ impl DeclareWithIndent for Component {
             result.push_str(doc.as_str());
         }
         result.push_str(format!("component {}\n", self.identifier()).as_str());
+        if self.parameters().len() > 0 {
+            let mut parameter_body = "generic (\n".to_string();
+            let parameters = self
+                .parameters()
+                .iter()
+                .map(|x| x.declare(db))
+                .collect::<Result<Vec<String>>>()?
+                .join(";\n");
+            parameter_body.push_str(&indent(&parameters, indent_style));
+            parameter_body.push_str("\n);\n");
+            result.push_str(&indent(&parameter_body, indent_style));
+        }
+
         let mut port_body = "port (\n".to_string();
         let ports = self
             .ports()
@@ -150,6 +163,33 @@ end component;"#,
         let comp = test_tools::simple_component()?;
         assert_eq!(
             r#"component test
+  port (
+    -- This is port documentation
+    -- Next line.
+    some_port : in std_logic;
+    some_other_port : out std_logic_vector(43 downto 0);
+    clk : in std_logic
+  );
+end component;"#,
+            comp.declare(&db)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_declare_generics() -> Result<()> {
+        let db = Database::default();
+        let comp = test_tools::simple_component_with_generics()?;
+        assert_eq!(
+            r#"component test
+  generic (
+    -- This is parameter documentation
+    -- Next line.
+    some_param : positive := 42;
+    some_other_param : std_logic;
+    some_other_param : integer := -42
+  );
   port (
     -- This is port documentation
     -- Next line.

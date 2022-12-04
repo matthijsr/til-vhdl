@@ -9,7 +9,7 @@ use crate::traits::VhdlDocument;
 use crate::{
     component::Component,
     declaration::Declare,
-    port::{Parameter, Port},
+    port::{GenericParameter, Port},
 };
 
 use super::Entity;
@@ -21,6 +21,20 @@ impl DeclareWithIndent for Entity {
             result.push_str(&doc);
         }
         result.push_str(format!("entity {} is\n", self.identifier()).as_str());
+
+        if self.parameters().len() > 0 {
+            let mut parameter_body = "generic (\n".to_string();
+            let parameters = self
+                .parameters()
+                .iter()
+                .map(|x| x.declare(db))
+                .collect::<Result<Vec<String>>>()?
+                .join(";\n");
+            parameter_body.push_str(&indent(&parameters, indent_style));
+            parameter_body.push_str("\n);\n");
+            result.push_str(&indent(&parameter_body, indent_style));
+        }
+
         let mut port_body = "port (\n".to_string();
         let ports = self
             .ports()
@@ -31,6 +45,7 @@ impl DeclareWithIndent for Entity {
         port_body.push_str(&indent(&ports, indent_style));
         port_body.push_str("\n);\n");
         result.push_str(&indent(&port_body, indent_style));
+
         result.push_str(format!("end {};\n", self.identifier()).as_str());
         Ok(result)
     }
@@ -58,7 +73,7 @@ impl Entity {
     /// Create a new entity.
     pub fn try_new(
         identifier: impl TryResult<VhdlName>,
-        parameters: Vec<Parameter>,
+        parameters: Vec<GenericParameter>,
         ports: Vec<Port>,
         doc: Option<String>,
     ) -> Result<Entity> {
@@ -76,7 +91,7 @@ impl Entity {
     }
 
     /// Return a reference to the parameters of this entity.
-    pub fn parameters(&self) -> &Vec<Parameter> {
+    pub fn parameters(&self) -> &Vec<GenericParameter> {
         &self.parameters
     }
 }
@@ -129,6 +144,34 @@ end empty_component;
         let entity = Entity::from(test_tools::simple_component()?);
         assert_eq!(
             r#"entity test is
+  port (
+    -- This is port documentation
+    -- Next line.
+    some_port : in std_logic;
+    some_other_port : out std_logic_vector(43 downto 0);
+    clk : in std_logic
+  );
+end test;
+"#,
+            entity.declare(&db)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_declare_generics() -> Result<()> {
+        let db = Database::default();
+        let entity = Entity::from(test_tools::simple_component_with_generics()?);
+        assert_eq!(
+            r#"entity test is
+  generic (
+    -- This is parameter documentation
+    -- Next line.
+    some_param : positive := 42;
+    some_other_param : std_logic;
+    some_other_param : integer := -42
+  );
   port (
     -- This is port documentation
     -- Next line.
