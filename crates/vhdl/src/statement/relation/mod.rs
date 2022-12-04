@@ -492,6 +492,7 @@ impl ListUsings for Relation {
                 },
                 ValueAssignment::Time(_) => (),
                 ValueAssignment::Boolean(_) => (),
+                ValueAssignment::Integer(_) => (),
             },
             Relation::Object(_) => (),
             Relation::Combination(comb) => {

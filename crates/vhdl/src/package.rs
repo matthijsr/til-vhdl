@@ -148,6 +148,7 @@ impl ListUsings for Package {
                     .any(|(_, typ)| uses_std_logic(&typ)),
                 ObjectType::Time => false,
                 ObjectType::Boolean => false,
+                ObjectType::Integer(_) => false,
             }
         }
 

@@ -615,6 +615,8 @@ pub enum ValueAssignment {
     Bit(StdLogicValue),
     /// Assigning a value to a (part of) a bit vector
     BitVec(BitVecValue),
+    /// Assigning a value to an integer
+    Integer(i32),
 }
 
 impl ValueAssignment {
@@ -624,6 +626,7 @@ impl ValueAssignment {
             ValueAssignment::BitVec(bv) => bv.declare(),
             ValueAssignment::Time(t) => t.declare(),
             ValueAssignment::Boolean(b) => Ok(b.to_string()),
+            ValueAssignment::Integer(i) => Ok(i.to_string()),
         }
     }
 
@@ -645,6 +648,10 @@ impl ValueAssignment {
                 ValueAssignment::BitVec(obv) => bv.matching_bitvec(obv),
                 _ => false,
             },
+            ValueAssignment::Integer(_) => match other {
+                ValueAssignment::Integer(_) => true,
+                _ => false,
+            },
         }
     }
 
@@ -655,7 +662,8 @@ impl ValueAssignment {
                 ObjectType::Array(_)
                 | ObjectType::Record(_)
                 | ObjectType::Time
-                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                | ObjectType::Boolean
+                | ObjectType::Integer(_) => Err(Error::InvalidTarget(format!(
                     "Cannot assign Bit to {}",
                     to_typ
                 ))),
@@ -668,7 +676,8 @@ impl ValueAssignment {
                 | ObjectType::Bit
                 | ObjectType::Record(_)
                 | ObjectType::Time
-                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                | ObjectType::Boolean
+                | ObjectType::Integer(_) => Err(Error::InvalidTarget(format!(
                     "Cannot assign Bit Vector to {}",
                     to_typ
                 ))),
@@ -678,7 +687,8 @@ impl ValueAssignment {
                 ObjectType::Bit
                 | ObjectType::Record(_)
                 | ObjectType::Array(_)
-                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
+                | ObjectType::Boolean
+                | ObjectType::Integer(_) => Err(Error::InvalidTarget(format!(
                     "Cannot assign Time to {}",
                     to_typ
                 ))),
@@ -688,7 +698,19 @@ impl ValueAssignment {
                 ObjectType::Bit
                 | ObjectType::Record(_)
                 | ObjectType::Array(_)
-                | ObjectType::Time => Err(Error::InvalidTarget(format!(
+                | ObjectType::Time
+                | ObjectType::Integer(_) => Err(Error::InvalidTarget(format!(
+                    "Cannot assign boolean to {}",
+                    to_typ
+                ))),
+            },
+            ValueAssignment::Integer(_) => match to_typ {
+                ObjectType::Integer(_) => Ok(()),
+                ObjectType::Bit
+                | ObjectType::Record(_)
+                | ObjectType::Array(_)
+                | ObjectType::Time
+                | ObjectType::Boolean => Err(Error::InvalidTarget(format!(
                     "Cannot assign boolean to {}",
                     to_typ
                 ))),

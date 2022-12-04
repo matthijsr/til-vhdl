@@ -58,6 +58,7 @@ impl FlatLength for ObjectType {
             }
             ObjectType::Time => todo!(),
             ObjectType::Boolean => todo!(),
+            ObjectType::Integer(_) => todo!(),
         })
     }
 
@@ -232,6 +233,7 @@ impl FlatAssignment for Id<ObjectDeclaration> {
                     }
                     ObjectType::Time => todo!(),
                     ObjectType::Boolean => todo!(),
+                    ObjectType::Integer(_) => todo!(),
                 }
                 Ok(result)
             }
