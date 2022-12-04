@@ -122,12 +122,12 @@ impl DeclareWithIndent for Component {
 
 #[cfg(test)]
 mod tests {
-    use crate::{architecture::arch_storage::db::Database, port::Mode, test_tools};
+    use crate::{architecture::arch_storage::db::Database, test_tools};
 
     use super::*;
 
     #[test]
-    fn test_declare() -> Result<()> {
+    fn test_declare_empty() -> Result<()> {
         let db = Database::default();
         let empty_comp = test_tools::empty_component().with_doc("test\ntest");
         assert_eq!(
@@ -140,15 +140,14 @@ component empty_component
 end component;"#,
             empty_comp.declare(&db)?
         );
-        let port1 = Port::try_new_documented(
-            "some_port",
-            Mode::In,
-            ObjectType::Bit,
-            "This is port documentation\nNext line.",
-        )?;
-        let port2 = Port::try_new("some_other_port", Mode::Out, 43..0)?;
-        let clk = Port::clk();
-        let comp = Component::try_new("test", vec![], vec![port1, port2, clk], None)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_declare_ports() -> Result<()> {
+        let db = Database::default();
+        let comp = test_tools::simple_component()?;
         assert_eq!(
             r#"component test
   port (

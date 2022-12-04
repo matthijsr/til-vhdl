@@ -100,30 +100,47 @@ impl From<Component> for Entity {
 
 #[cfg(test)]
 mod tests {
-    // TODO
+    use crate::{architecture::arch_storage::db::Database, test_tools};
 
-    //     use crate::generator::common::test::test_comp;
-    //     use crate::generator::vhdl::Declare;
-    //     use crate::stdlib::common::entity::*;
+    use super::*;
 
-    //     #[test]
-    //     fn entity_declare() {
-    //         let c = Entity::from(test_comp()).with_doc(" My awesome\n Entity".to_string());
-    //         assert_eq!(
-    //             c.declare().unwrap(),
-    //             concat!(
-    //                 "-- My awesome
-    // -- Entity
-    // entity test_comp is
-    //   port(
-    //     a_dn : in a_dn_type;
-    //     a_up : out a_up_type;
-    //     b_dn : out b_dn_type;
-    //     b_up : in b_up_type
-    //   );
-    // end test_comp;
-    // "
-    //             )
-    //         );
-    //     }
+    #[test]
+    fn test_declare_empty() -> Result<()> {
+        let db = Database::default();
+        let empty_entity = Entity::from(test_tools::empty_component().with_doc("test\ntest"));
+        assert_eq!(
+            r#"-- test
+-- test
+entity empty_component is
+  port (
+
+  );
+end empty_component;
+"#,
+            empty_entity.declare(&db)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_declare_ports() -> Result<()> {
+        let db = Database::default();
+        let entity = Entity::from(test_tools::simple_component()?);
+        assert_eq!(
+            r#"entity test is
+  port (
+    -- This is port documentation
+    -- Next line.
+    some_port : in std_logic;
+    some_other_port : out std_logic_vector(43 downto 0);
+    clk : in std_logic
+  );
+end test;
+"#,
+            entity.declare(&db)?
+        );
+
+        Ok(())
+    }
 }
