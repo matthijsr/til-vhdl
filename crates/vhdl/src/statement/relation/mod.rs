@@ -318,6 +318,7 @@ impl<T: TryResult<Relation>> CombineRelation for T {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
+    Parentheses(Box<Relation>),
     Value(Box<ValueAssignment>),
     Object(ObjectSelection),
     Combination(RelationalCombination),
@@ -368,9 +369,16 @@ impl From<BitVecValue> for Relation {
     }
 }
 
+impl From<MathExpression> for Relation {
+    fn from(mathexpr: MathExpression) -> Self {
+        Self::MathExpression(mathexpr)
+    }
+}
+
 impl fmt::Display for Relation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Relation::Parentheses(r) => write!(f, "Parentheses({})", r),
             Relation::Value(_) => write!(f, "Value"),
             Relation::Object(_) => write!(f, "Object"),
             Relation::Combination(_) => write!(f, "Combination"),
@@ -382,12 +390,22 @@ impl fmt::Display for Relation {
 }
 
 impl Relation {
+    pub fn parentheses(relation: impl TryResult<Relation>) -> Result<Relation> {
+        let relation = relation.try_result()?;
+        Ok(Relation::Parentheses(Box::new(relation)))
+    }
+
     pub fn is_bool(&self, db: &dyn Arch) -> Result<()> {
         self.can_assign(db, &ObjectType::Boolean)
     }
 
+    pub fn is_integer(&self, db: &dyn Arch) -> Result<()> {
+        self.can_assign(db, &ObjectType::Integer(IntegerType::Integer))
+    }
+
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
+            Relation::Parentheses(r) => r.can_assign(db, to_typ),
             Relation::Value(v) => v.can_assign(to_typ),
             Relation::Object(o) => {
                 let obj = db.get_object(o.as_object_key(db))?;
@@ -419,7 +437,9 @@ impl Relation {
 
     pub fn matching_relation(&self, db: &dyn Arch, other: &Relation) -> Result<()> {
         match self {
+            Relation::Parentheses(r) => r.matching_relation(db, other),
             Relation::Value(v) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(ov) => {
                     if v.matching_value(ov) {
                         Ok(())
@@ -445,6 +465,7 @@ impl Relation {
                 Relation::MathExpression(_) => todo!(),
             },
             Relation::Object(o) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(v) => {
                     v.can_assign(db.get_object_type(o.as_object_key(db))?.as_ref())
                 }
@@ -457,6 +478,7 @@ impl Relation {
                 Relation::MathExpression(_) => todo!(),
             },
             Relation::Combination(_) | Relation::Edge(_) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(v) => match v.as_ref() {
                     ValueAssignment::Boolean(_) => Ok(()),
                     _ => Err(Error::InvalidArgument(format!(
@@ -472,6 +494,7 @@ impl Relation {
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
             Relation::MathExpression(_) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(_) => todo!(),
                 Relation::Object(_) => todo!(),
                 Relation::Combination(_) => todo!(),
@@ -486,6 +509,9 @@ impl Relation {
 impl DeclareWithIndent for Relation {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
+            Relation::Parentheses(r) => {
+                Ok(format!("({})", r.declare_with_indent(db, indent_style)?))
+            }
             Relation::Value(v) => v.declare(),
             Relation::Object(obj) => obj.declare_with_indent(db, indent_style),
             Relation::Combination(c) => c.declare_with_indent(db, indent_style),
@@ -500,6 +526,7 @@ impl ListUsings for Relation {
     fn list_usings(&self) -> Result<Usings> {
         let mut usings = Usings::new_empty();
         match self {
+            Relation::Parentheses(r) => usings.combine(&r.list_usings()?),
             Relation::Value(value) => match value.as_ref() {
                 ValueAssignment::Bit(_) => (),
                 ValueAssignment::BitVec(bitvec) => match bitvec {
@@ -529,6 +556,17 @@ impl ListUsings for Relation {
     }
 }
 
+pub trait Parentheses {
+    fn parentheses(self) -> Relation;
+}
+
+impl<T: Into<Relation>> Parentheses for T {
+    fn parentheses(self) -> Relation {
+        let relation = self.into();
+        Relation::Parentheses(Box::new(relation))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -545,13 +583,21 @@ mod tests {
         let db = &_db;
         let lex = ValueAssignment::Boolean(true)
             .and(db, ValueAssignment::Boolean(true))?
-            .or(db, ValueAssignment::Boolean(true))?
-            .xor(db, ValueAssignment::Boolean(false))?
-            .nand(db, ValueAssignment::Boolean(false))?
-            .nor(db, ValueAssignment::Boolean(false))?
-            .xnor(db, ValueAssignment::Boolean(true))?;
+            .or(
+                db,
+                Relation::parentheses(
+                    ValueAssignment::Boolean(true).xor(db, ValueAssignment::Boolean(false))?,
+                )?,
+            )?
+            .nand(
+                db,
+                (ValueAssignment::Boolean(false)
+                    .nor(db, ValueAssignment::Boolean(false))?
+                    .xnor(db, ValueAssignment::Boolean(true))?)
+                .parentheses(),
+            )?;
         assert_eq!(
-            "true and true or true xor false nand false nor false xnor true",
+            "true and true or (true xor false) nand (false nor false xnor true)",
             lex.declare(db)?
         );
         let comb = lex
@@ -563,7 +609,7 @@ mod tests {
             .r_gt(db, ValueAssignment::Boolean(false))?
             .r_gteq(db, ValueAssignment::Boolean(false))?;
         assert_eq!(
-            "true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false",
+            "true and true or (true xor false) nand (false nor false xnor true) = true and true or (true xor false) nand (false nor false xnor true) /= false < false <= false > false >= false",
             comb.declare(db)?
         );
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;

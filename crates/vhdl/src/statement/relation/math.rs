@@ -17,6 +17,21 @@ pub enum MathExpression {
     Division(Box<Relation>, Box<Relation>),
 }
 
+impl MathExpression {
+    fn validate_integer(
+        db: &dyn Arch,
+        relation: impl TryResult<Relation>,
+    ) -> Result<Box<Relation>> {
+        let relation = relation.try_result()?;
+        relation.is_integer(db)?;
+        Ok(Box::new(relation))
+    }
+
+    pub fn negative(db: &dyn Arch, relation: impl TryResult<Relation>) -> Result<MathExpression> {
+        Ok(MathExpression::Negative(Self::validate_integer(db, relation)?))
+    }
+}
+
 impl DeclareWithIndent for MathExpression {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         Ok(match self {
@@ -48,36 +63,51 @@ impl DeclareWithIndent for MathExpression {
 }
 
 pub trait CreateMath: Sized {
-    fn validate_integer(db: &dyn Arch, relation: impl TryResult<Relation>) -> Result<Relation> {
+    fn validate_integer(
+        db: &dyn Arch,
+        relation: impl TryResult<Relation>,
+    ) -> Result<Box<Relation>> {
         let relation = relation.try_result()?;
-        relation.can_assign(db, &ObjectType::Integer(IntegerType::Integer))?;
-        Ok(relation)
+        relation.is_integer(db)?;
+        Ok(Box::new(relation))
     }
-    fn negative(self, db: &dyn Arch) -> Result<MathExpression>;
-    fn add(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
-    fn subtract(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
-    fn multiply(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
-    fn divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
+    fn r_negative(self, db: &dyn Arch) -> Result<MathExpression>;
+    fn r_add(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
+    fn r_subtract(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
+    fn r_multiply(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
+    fn r_divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
 }
 
 impl<T: TryResult<Relation>> CreateMath for T {
-    fn negative(self, db: &dyn Arch) -> Result<MathExpression> {
-        todo!()
+    fn r_negative(self, db: &dyn Arch) -> Result<MathExpression> {
+        MathExpression::negative(db, self)
     }
 
-    fn add(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        todo!()
+    fn r_add(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
+        Ok(MathExpression::Sum(
+            Self::validate_integer(db, self)?,
+            Self::validate_integer(db, right)?,
+        ))
     }
 
-    fn subtract(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        todo!()
+    fn r_subtract(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
+        Ok(MathExpression::Subtraction(
+            Self::validate_integer(db, self)?,
+            Self::validate_integer(db, right)?,
+        ))
     }
 
-    fn multiply(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        todo!()
+    fn r_multiply(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
+        Ok(MathExpression::Product(
+            Self::validate_integer(db, self)?,
+            Self::validate_integer(db, right)?,
+        ))
     }
 
-    fn divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        todo!()
+    fn r_divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
+        Ok(MathExpression::Division(
+            Self::validate_integer(db, self)?,
+            Self::validate_integer(db, right)?,
+        ))
     }
 }
