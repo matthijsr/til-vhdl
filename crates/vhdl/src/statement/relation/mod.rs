@@ -1,5 +1,4 @@
 use core::fmt;
-use std::sync::Arc;
 
 use tydi_common::error::{Error, Result, TryResult};
 
@@ -435,13 +434,18 @@ impl Relation {
         }
     }
 
+    // TODO: This really needs to be cleaned up and looked at again. Not sure it actually makes sense (or works as intended) as-is.
     pub fn matching_relation(&self, db: &dyn Arch, other: &Relation) -> Result<()> {
         match self {
             Relation::Parentheses(r) => r.matching_relation(db, other),
             Relation::Value(v) => match other {
                 Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(ov) => {
-                    if v.matching_value(ov) {
+                    if let ValueAssignment::Integer(_) = ov.as_ref() {
+                        Err(Error::InvalidArgument(
+                            "Cannot create a logical expression with an integer".to_string(),
+                        ))
+                    } else if v.matching_value(ov) {
                         Ok(())
                     } else {
                         Err(Error::InvalidArgument(format!(
@@ -462,7 +466,13 @@ impl Relation {
                     ))),
                 },
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
-                Relation::MathExpression(_) => todo!(),
+                Relation::MathExpression(_) => match v.as_ref() {
+                    ValueAssignment::Integer(_) => Ok(()),
+                    _ => Err(Error::InvalidArgument(format!(
+                        "Cannot create a relation between {} and an integer relation.",
+                        v.declare()?,
+                    ))),
+                },
             },
             Relation::Object(o) => match other {
                 Relation::Parentheses(r) => self.matching_relation(db, r),
@@ -475,7 +485,8 @@ impl Relation {
                 Relation::Combination(_) | Relation::Edge(_) => ValueAssignment::Boolean(false)
                     .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
-                Relation::MathExpression(_) => todo!(),
+                Relation::MathExpression(_) => ValueAssignment::Integer(1)
+                    .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
             },
             Relation::Combination(_) | Relation::Edge(_) => match other {
                 Relation::Parentheses(r) => self.matching_relation(db, r),
@@ -490,18 +501,15 @@ impl Relation {
                     .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::Combination(_) | Relation::Edge(_) => Ok(()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
-                Relation::MathExpression(_) => todo!(),
+                Relation::MathExpression(_) => Err(Error::InvalidArgument(
+                    "Cannot create a relation between a boolean relation and an integer relation."
+                        .to_string(),
+                )),
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
-            Relation::MathExpression(_) => match other {
-                Relation::Parentheses(r) => self.matching_relation(db, r),
-                Relation::Value(_) => todo!(),
-                Relation::Object(_) => todo!(),
-                Relation::Combination(_) => todo!(),
-                Relation::Edge(_) => todo!(),
-                Relation::LogicalExpression(_) => todo!(),
-                Relation::MathExpression(_) => todo!(),
-            },
+            Relation::MathExpression(_) => Err(Error::InvalidArgument(
+                "Cannot create a logical expression with an integer".to_string(),
+            )),
         }
     }
 }

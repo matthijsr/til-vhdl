@@ -28,7 +28,53 @@ impl MathExpression {
     }
 
     pub fn negative(db: &dyn Arch, relation: impl TryResult<Relation>) -> Result<MathExpression> {
-        Ok(MathExpression::Negative(Self::validate_integer(db, relation)?))
+        Ok(MathExpression::Negative(Self::validate_integer(
+            db, relation,
+        )?))
+    }
+
+    pub fn sum(
+        db: &dyn Arch,
+        left: impl TryResult<Relation>,
+        right: impl TryResult<Relation>,
+    ) -> Result<MathExpression> {
+        Ok(MathExpression::Sum(
+            Self::validate_integer(db, left)?,
+            Self::validate_integer(db, right)?,
+        ))
+    }
+
+    pub fn subtraction(
+        db: &dyn Arch,
+        left: impl TryResult<Relation>,
+        right: impl TryResult<Relation>,
+    ) -> Result<MathExpression> {
+        Ok(MathExpression::Subtraction(
+            Self::validate_integer(db, left)?,
+            Self::validate_integer(db, right)?,
+        ))
+    }
+
+    pub fn product(
+        db: &dyn Arch,
+        left: impl TryResult<Relation>,
+        right: impl TryResult<Relation>,
+    ) -> Result<MathExpression> {
+        Ok(MathExpression::Product(
+            Self::validate_integer(db, left)?,
+            Self::validate_integer(db, right)?,
+        ))
+    }
+
+    pub fn division(
+        db: &dyn Arch,
+        left: impl TryResult<Relation>,
+        right: impl TryResult<Relation>,
+    ) -> Result<MathExpression> {
+        Ok(MathExpression::Division(
+            Self::validate_integer(db, left)?,
+            Self::validate_integer(db, right)?,
+        ))
     }
 }
 
@@ -84,30 +130,18 @@ impl<T: TryResult<Relation>> CreateMath for T {
     }
 
     fn r_add(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        Ok(MathExpression::Sum(
-            Self::validate_integer(db, self)?,
-            Self::validate_integer(db, right)?,
-        ))
+        MathExpression::sum(db, self, right)
     }
 
     fn r_subtract(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        Ok(MathExpression::Subtraction(
-            Self::validate_integer(db, self)?,
-            Self::validate_integer(db, right)?,
-        ))
+        MathExpression::subtraction(db, self, right)
     }
 
     fn r_multiply(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        Ok(MathExpression::Product(
-            Self::validate_integer(db, self)?,
-            Self::validate_integer(db, right)?,
-        ))
+        MathExpression::product(db, self, right)
     }
 
     fn r_divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
-        Ok(MathExpression::Division(
-            Self::validate_integer(db, self)?,
-            Self::validate_integer(db, right)?,
-        ))
+        MathExpression::division(db, self, right)
     }
 }
