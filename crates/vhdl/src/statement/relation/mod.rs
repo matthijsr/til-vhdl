@@ -1,4 +1,5 @@
 use core::fmt;
+use std::sync::Arc;
 
 use tydi_common::error::{Error, Result, TryResult};
 
@@ -7,13 +8,14 @@ use crate::{
     assignment::{bitvec::BitVecValue, ObjectSelection, StdLogicValue, ValueAssignment},
     common::vhdl_name::VhdlName,
     declaration::DeclareWithIndent,
-    object::object_type::ObjectType,
+    object::object_type::{IntegerType, ObjectType},
     usings::{ListUsings, Usings},
 };
 
-use self::edge::Edge;
+use self::{edge::Edge, math::MathExpression};
 
 pub mod edge;
+pub mod math;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogicalOperator {
@@ -321,6 +323,7 @@ pub enum Relation {
     Combination(RelationalCombination),
     Edge(Edge),
     LogicalExpression(LogicalExpression),
+    MathExpression(MathExpression),
 }
 
 impl From<ValueAssignment> for Relation {
@@ -373,6 +376,7 @@ impl fmt::Display for Relation {
             Relation::Combination(_) => write!(f, "Combination"),
             Relation::Edge(_) => write!(f, "Edge"),
             Relation::LogicalExpression(_) => write!(f, "LogicalExpression"),
+            Relation::MathExpression(_) => write!(f, "MathExpression"),
         }
     }
 }
@@ -394,6 +398,9 @@ impl Relation {
                 ObjectType::Boolean.can_assign_type(to_typ)
             }
             Relation::LogicalExpression(lex) => lex.can_assign(db, to_typ),
+            Relation::MathExpression(_) => {
+                ObjectType::Integer(IntegerType::Integer).can_assign_type(to_typ)
+            }
         }
     }
 
@@ -435,6 +442,7 @@ impl Relation {
                     ))),
                 },
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => todo!(),
             },
             Relation::Object(o) => match other {
                 Relation::Value(v) => {
@@ -446,6 +454,7 @@ impl Relation {
                 Relation::Combination(_) | Relation::Edge(_) => ValueAssignment::Boolean(false)
                     .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => todo!(),
             },
             Relation::Combination(_) | Relation::Edge(_) => match other {
                 Relation::Value(v) => match v.as_ref() {
@@ -459,8 +468,17 @@ impl Relation {
                     .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::Combination(_) | Relation::Edge(_) => Ok(()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => todo!(),
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
+            Relation::MathExpression(_) => match other {
+                Relation::Value(_) => todo!(),
+                Relation::Object(_) => todo!(),
+                Relation::Combination(_) => todo!(),
+                Relation::Edge(_) => todo!(),
+                Relation::LogicalExpression(_) => todo!(),
+                Relation::MathExpression(_) => todo!(),
+            },
         }
     }
 }
@@ -473,6 +491,7 @@ impl DeclareWithIndent for Relation {
             Relation::Combination(c) => c.declare_with_indent(db, indent_style),
             Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
             Relation::Edge(e) => e.declare_with_indent(db, indent_style),
+            Relation::MathExpression(m) => m.declare_with_indent(db, indent_style),
         }
     }
 }
@@ -504,6 +523,7 @@ impl ListUsings for Relation {
                 usings.combine(&lex.left().list_usings()?);
                 usings.combine(&lex.right().list_usings()?);
             }
+            Relation::MathExpression(_) => (),
         }
         Ok(usings)
     }
