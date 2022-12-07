@@ -507,6 +507,8 @@ impl Relation {
                 )),
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
+            // TODO: This isn't just used for nor/xnor etc., but also for eq, gteq, etc. So it should support this.
+            // Just more indication that this needs a rewrite.
             Relation::MathExpression(_) => Err(Error::InvalidArgument(
                 "Cannot create a logical expression with an integer".to_string(),
             )),
