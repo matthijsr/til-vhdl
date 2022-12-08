@@ -11,6 +11,7 @@ pub enum MathExpression {
     Subtraction(Box<Relation>, Box<Relation>),
     Product(Box<Relation>, Box<Relation>),
     Division(Box<Relation>, Box<Relation>),
+    Modulo(Box<Relation>, Box<Relation>),
 }
 
 impl MathExpression {
@@ -72,6 +73,17 @@ impl MathExpression {
             Self::validate_integer(db, right)?,
         ))
     }
+
+    pub fn modulo(
+        db: &dyn Arch,
+        left: impl TryResult<Relation>,
+        right: impl TryResult<Relation>,
+    ) -> Result<MathExpression> {
+        Ok(MathExpression::Modulo(
+            Self::validate_integer(db, left)?,
+            Self::validate_integer(db, right)?,
+        ))
+    }
 }
 
 impl DeclareWithIndent for MathExpression {
@@ -100,6 +112,11 @@ impl DeclareWithIndent for MathExpression {
                 left.declare_with_indent(db, indent_style)?,
                 right.declare_with_indent(db, indent_style)?
             ),
+            MathExpression::Modulo(left, right) => format!(
+                "{} mod {}",
+                left.declare_with_indent(db, indent_style)?,
+                right.declare_with_indent(db, indent_style)?
+            ),
         })
     }
 }
@@ -118,6 +135,7 @@ pub trait CreateMath: Sized {
     fn r_subtract(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
     fn r_multiply(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
     fn r_divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
+    fn r_mod(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression>;
 }
 
 impl<T: TryResult<Relation>> CreateMath for T {
@@ -139,5 +157,9 @@ impl<T: TryResult<Relation>> CreateMath for T {
 
     fn r_divide_by(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
         MathExpression::division(db, self, right)
+    }
+
+    fn r_mod(self, db: &dyn Arch, right: impl TryResult<Relation>) -> Result<MathExpression> {
+        MathExpression::modulo(db, self, right)
     }
 }
