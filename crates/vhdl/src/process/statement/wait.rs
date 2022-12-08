@@ -31,7 +31,8 @@ impl TimeExpression {
             ObjectType::Bit
             | ObjectType::Array(_)
             | ObjectType::Record(_)
-            | ObjectType::Boolean => Err(Error::InvalidArgument(format!(
+            | ObjectType::Boolean
+            | ObjectType::Integer(_) => Err(Error::InvalidArgument(format!(
                 "Object with type {} cannot be used for a Time expression.",
                 typ
             ))),

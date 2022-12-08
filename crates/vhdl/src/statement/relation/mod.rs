@@ -7,13 +7,14 @@ use crate::{
     assignment::{bitvec::BitVecValue, ObjectSelection, StdLogicValue, ValueAssignment},
     common::vhdl_name::VhdlName,
     declaration::DeclareWithIndent,
-    object::object_type::ObjectType,
+    object::object_type::{IntegerType, ObjectType},
     usings::{ListUsings, Usings},
 };
 
-use self::edge::Edge;
+use self::{edge::Edge, math::MathExpression};
 
 pub mod edge;
+pub mod math;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogicalOperator {
@@ -88,6 +89,11 @@ pub trait CreateLogicalExpression: Sized {
     ) -> Result<(Box<Relation>, Box<Relation>)> {
         let left = left.try_result()?;
         let right = right.try_result()?;
+        if left.is_integer(db).is_ok() || right.is_integer(db).is_ok() {
+            return Err(Error::InvalidArgument(
+                "Cannot apply a logical operator to integers".to_string(),
+            ));
+        }
         left.matching_relation(db, &right)?;
         Ok((Box::new(left), Box::new(right)))
     }
@@ -316,11 +322,19 @@ impl<T: TryResult<Relation>> CombineRelation for T {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
+    Parentheses(Box<Relation>),
     Value(Box<ValueAssignment>),
     Object(ObjectSelection),
     Combination(RelationalCombination),
     Edge(Edge),
     LogicalExpression(LogicalExpression),
+    MathExpression(MathExpression),
+}
+
+impl<T: Into<Relation>> From<Parentheses<T>> for Relation {
+    fn from(val: Parentheses<T>) -> Self {
+        Self::Parentheses(Box::new(val.0.into()))
+    }
 }
 
 impl From<ValueAssignment> for Relation {
@@ -365,13 +379,43 @@ impl From<BitVecValue> for Relation {
     }
 }
 
+impl From<MathExpression> for Relation {
+    fn from(mathexpr: MathExpression) -> Self {
+        Self::MathExpression(mathexpr)
+    }
+}
+
+impl fmt::Display for Relation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Relation::Parentheses(r) => write!(f, "Parentheses({})", r),
+            Relation::Value(_) => write!(f, "Value"),
+            Relation::Object(_) => write!(f, "Object"),
+            Relation::Combination(_) => write!(f, "Combination"),
+            Relation::Edge(_) => write!(f, "Edge"),
+            Relation::LogicalExpression(_) => write!(f, "LogicalExpression"),
+            Relation::MathExpression(_) => write!(f, "MathExpression"),
+        }
+    }
+}
+
 impl Relation {
+    pub fn parentheses(relation: impl TryResult<Relation>) -> Result<Relation> {
+        let relation = relation.try_result()?;
+        Ok(Relation::Parentheses(Box::new(relation)))
+    }
+
     pub fn is_bool(&self, db: &dyn Arch) -> Result<()> {
         self.can_assign(db, &ObjectType::Boolean)
     }
 
+    pub fn is_integer(&self, db: &dyn Arch) -> Result<()> {
+        self.can_assign(db, &ObjectType::Integer(IntegerType::Integer))
+    }
+
     pub fn can_assign(&self, db: &dyn Arch, to_typ: &ObjectType) -> Result<()> {
         match self {
+            Relation::Parentheses(r) => r.can_assign(db, to_typ),
             Relation::Value(v) => v.can_assign(to_typ),
             Relation::Object(o) => {
                 let obj = db.get_object(o.as_object_key(db))?;
@@ -382,12 +426,31 @@ impl Relation {
                 ObjectType::Boolean.can_assign_type(to_typ)
             }
             Relation::LogicalExpression(lex) => lex.can_assign(db, to_typ),
+            Relation::MathExpression(_) => {
+                ObjectType::Integer(IntegerType::Integer).can_assign_type(to_typ)
+            }
         }
     }
 
+    pub fn can_be_assigned(&self, db: &dyn Arch, from_typ: &ObjectType) -> Result<()> {
+        if let Relation::Object(o) = self {
+            let obj = db.get_object(o.as_object_key(db))?;
+            obj.assignable.to_or_err()?;
+            from_typ.can_assign_type(&obj.typ(db))
+        } else {
+            Err(Error::InvalidTarget(format!(
+                "Can only assign to objects, this relation is a {}",
+                self
+            )))
+        }
+    }
+
+    // TODO: This really needs to be cleaned up and looked at again. Not sure it actually makes sense (or works as intended) as-is.
     pub fn matching_relation(&self, db: &dyn Arch, other: &Relation) -> Result<()> {
         match self {
+            Relation::Parentheses(r) => r.matching_relation(db, other),
             Relation::Value(v) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(ov) => {
                     if v.matching_value(ov) {
                         Ok(())
@@ -410,8 +473,16 @@ impl Relation {
                     ))),
                 },
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => match v.as_ref() {
+                    ValueAssignment::Integer(_) => Ok(()),
+                    _ => Err(Error::InvalidArgument(format!(
+                        "Cannot create a relation between {} and an integer relation.",
+                        v.declare()?,
+                    ))),
+                },
             },
             Relation::Object(o) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(v) => {
                     v.can_assign(db.get_object_type(o.as_object_key(db))?.as_ref())
                 }
@@ -421,8 +492,11 @@ impl Relation {
                 Relation::Combination(_) | Relation::Edge(_) => ValueAssignment::Boolean(false)
                     .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => ValueAssignment::Integer(1)
+                    .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
             },
             Relation::Combination(_) | Relation::Edge(_) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(v) => match v.as_ref() {
                     ValueAssignment::Boolean(_) => Ok(()),
                     _ => Err(Error::InvalidArgument(format!(
@@ -434,8 +508,30 @@ impl Relation {
                     .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
                 Relation::Combination(_) | Relation::Edge(_) => Ok(()),
                 Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => Err(Error::InvalidArgument(
+                    "Cannot create a relation between a boolean relation and an integer relation."
+                        .to_string(),
+                )),
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
+            Relation::MathExpression(_) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
+                Relation::Value(v) => match v.as_ref() {
+                    ValueAssignment::Integer(_) => Ok(()),
+                    _ => Err(Error::InvalidArgument(format!(
+                        "Cannot create a relation between {} and a integer relation.",
+                        v.declare()?,
+                    ))),
+                },
+                Relation::Object(o) => ValueAssignment::Integer(1)
+                    .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
+                Relation::Combination(_) | Relation::Edge(_) => Err(Error::InvalidArgument(
+                    "Cannot create a relation between an integer relation and a boolean relation."
+                        .to_string(),
+                )),
+                Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => Ok(()),
+            },
         }
     }
 }
@@ -443,11 +539,15 @@ impl Relation {
 impl DeclareWithIndent for Relation {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         match self {
+            Relation::Parentheses(r) => {
+                Ok(format!("({})", r.declare_with_indent(db, indent_style)?))
+            }
             Relation::Value(v) => v.declare(),
             Relation::Object(obj) => obj.declare_with_indent(db, indent_style),
             Relation::Combination(c) => c.declare_with_indent(db, indent_style),
             Relation::LogicalExpression(lex) => lex.declare_with_indent(db, indent_style),
             Relation::Edge(e) => e.declare_with_indent(db, indent_style),
+            Relation::MathExpression(m) => m.declare_with_indent(db, indent_style),
         }
     }
 }
@@ -456,6 +556,7 @@ impl ListUsings for Relation {
     fn list_usings(&self) -> Result<Usings> {
         let mut usings = Usings::new_empty();
         match self {
+            Relation::Parentheses(r) => usings.combine(&r.list_usings()?),
             Relation::Value(value) => match value.as_ref() {
                 ValueAssignment::Bit(_) => (),
                 ValueAssignment::BitVec(bitvec) => match bitvec {
@@ -467,6 +568,7 @@ impl ListUsings for Relation {
                 },
                 ValueAssignment::Time(_) => (),
                 ValueAssignment::Boolean(_) => (),
+                ValueAssignment::Integer(_) => (),
             },
             Relation::Object(_) => (),
             Relation::Combination(comb) => {
@@ -478,10 +580,13 @@ impl ListUsings for Relation {
                 usings.combine(&lex.left().list_usings()?);
                 usings.combine(&lex.right().list_usings()?);
             }
+            Relation::MathExpression(_) => (),
         }
         Ok(usings)
     }
 }
+
+pub struct Parentheses<T>(T);
 
 #[cfg(test)]
 mod tests {
@@ -489,6 +594,7 @@ mod tests {
         architecture::arch_storage::db::Database,
         assignment::SelectObject,
         declaration::{Declare, ObjectDeclaration},
+        statement::relation::math::CreateMath,
     };
 
     use super::*;
@@ -497,17 +603,28 @@ mod tests {
     fn test_declare() -> Result<()> {
         let _db = Database::default();
         let db = &_db;
+
         let lex = ValueAssignment::Boolean(true)
             .and(db, ValueAssignment::Boolean(true))?
-            .or(db, ValueAssignment::Boolean(true))?
-            .xor(db, ValueAssignment::Boolean(false))?
-            .nand(db, ValueAssignment::Boolean(false))?
-            .nor(db, ValueAssignment::Boolean(false))?
-            .xnor(db, ValueAssignment::Boolean(true))?;
+            .or(
+                db,
+                Relation::parentheses(
+                    ValueAssignment::Boolean(true).xor(db, ValueAssignment::Boolean(false))?,
+                )?,
+            )?
+            .nand(
+                db,
+                Parentheses(
+                    ValueAssignment::Boolean(false)
+                        .nor(db, ValueAssignment::Boolean(false))?
+                        .xnor(db, ValueAssignment::Boolean(true))?,
+                ),
+            )?;
         assert_eq!(
-            "true and true or true xor false nand false nor false xnor true",
+            "true and true or (true xor false) nand (false nor false xnor true)",
             lex.declare(db)?
         );
+
         let comb = lex
             .clone()
             .r_eq(db, lex)?
@@ -517,9 +634,10 @@ mod tests {
             .r_gt(db, ValueAssignment::Boolean(false))?
             .r_gteq(db, ValueAssignment::Boolean(false))?;
         assert_eq!(
-            "true and true or true xor false nand false nor false xnor true = true and true or true xor false nand false nor false xnor true /= false < false <= false > false >= false",
+            "true and true or (true xor false) nand (false nor false xnor true) = true and true or (true xor false) nand (false nor false xnor true) /= false < false <= false > false >= false",
             comb.declare(db)?
         );
+
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
         let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
             .select_nested([0])?;
@@ -528,6 +646,30 @@ mod tests {
         assert_eq!(
             "rising_edge(test_sig1) nand falling_edge(test_sig2(0))",
             rising_edge.nand(db, falling_edge)?.declare(db)?
+        );
+
+        let obj1 = ObjectDeclaration::signal(
+            db,
+            "test_sig1",
+            ObjectType::Integer(IntegerType::Integer),
+            None,
+        )?;
+        let obj2 = ObjectDeclaration::constant(
+            db,
+            "test_const",
+            ObjectType::Integer(IntegerType::Natural),
+            ValueAssignment::from(42),
+        )?;
+        let math = obj1
+            .r_add(
+                db,
+                Parentheses(ValueAssignment::from(30).r_subtract(db, obj2)?),
+            )?
+            .r_multiply(db, obj2)?
+            .r_divide_by(db, obj1.r_negative(db)?)?;
+        assert_eq!(
+            "test_sig1 + (30 - test_const) * test_const / -test_sig1",
+            math.declare(db)?
         );
 
         Ok(())

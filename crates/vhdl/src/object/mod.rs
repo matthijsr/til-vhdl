@@ -78,9 +78,7 @@ impl From<&ObjectKind> for Assignable {
                     from: false,
                 },
                 Mode::Out => Assignable {
-                    to: true, // TODO: This should be false, but since portmapping uses Assign and a portmapping puts
-                    // the port on the left side, always, this breaks that interaction.
-                    // Though really, this is just another example of why PortMapping needs a rework.
+                    to: false,
                     from: true,
                 },
             },

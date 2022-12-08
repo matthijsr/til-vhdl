@@ -52,7 +52,11 @@ fn test_import() -> Result<()> {
 
 #[test]
 fn test_cyclical() -> Result<()> {
-    parse_to_output("tests/til_files/test_cyclical.til", "test_cyclical")
+    assert_eq!(
+        parse_to_output("tests/til_files/test_cyclical.til", "test_cyclical").is_ok(),
+        false
+    );
+    Ok(())
 }
 
 #[test]

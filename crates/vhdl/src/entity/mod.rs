@@ -1,6 +1,6 @@
 use crate::{
     common::vhdl_name::VhdlName,
-    port::{Parameter, Port},
+    port::{GenericParameter, Port},
 };
 
 mod impls;
@@ -11,7 +11,7 @@ pub struct Entity {
     /// Component identifier.
     identifier: VhdlName,
     /// The parameters of the entity..
-    parameters: Vec<Parameter>,
+    parameters: Vec<GenericParameter>,
     /// The ports of the entity.
     ports: Vec<Port>,
     /// Documentation.

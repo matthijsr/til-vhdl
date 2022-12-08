@@ -5,14 +5,14 @@ use tydi_common::{
     traits::{Document, Documents, Identify, Reverse, Reversed},
 };
 
-use crate::object::object_type::ObjectType;
 use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
-    declaration::Declare,
+    declaration::{Declare, DeclareWithIndent},
     object::object_type::DeclarationTypeName,
     traits::VhdlDocument,
 };
+use crate::{assignment::AssignmentKind, object::object_type::ObjectType};
 
 /// A port.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -185,10 +185,103 @@ impl Display for Mode {
     }
 }
 
-/// A parameter for functions and components (generics).
-/// TODO: Add specific types.
+/// A parameter for components (generics).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Parameter {
+pub struct GenericParameter {
     /// Parameter identifier.
-    pub identifier: VhdlName,
+    identifier: VhdlName,
+    /// Default value assigned to the parameter
+    default: Option<AssignmentKind>,
+    /// Parameter type.
+    typ: ObjectType,
+    /// Parameter documentation.
+    doc: Option<String>,
+}
+
+impl GenericParameter {
+    /// Create a new parameter.
+    pub fn try_new(
+        name: impl TryResult<VhdlName>,
+        default: Option<AssignmentKind>,
+        typ: impl TryResult<ObjectType>,
+    ) -> Result<Self> {
+        Ok(GenericParameter {
+            identifier: name.try_result()?,
+            default: default,
+            typ: typ.try_result()?,
+            doc: None,
+        })
+    }
+
+    /// Create a new parameter with documentation.
+    pub fn try_new_documented(
+        name: impl TryResult<VhdlName>,
+        default: Option<AssignmentKind>,
+        typ: impl TryResult<ObjectType>,
+        doc: impl Into<String>,
+    ) -> Result<Self> {
+        Ok(GenericParameter {
+            identifier: name.try_result()?,
+            default,
+            typ: typ.try_result()?,
+            doc: Some(doc.into()),
+        })
+    }
+
+    /// Return the type of the parameter.
+    pub fn typ(&self) -> &ObjectType {
+        &self.typ
+    }
+
+    pub fn default(&self) -> &Option<AssignmentKind> {
+        &self.default
+    }
+}
+
+impl Identify for GenericParameter {
+    fn identifier(&self) -> String {
+        self.identifier.to_string()
+    }
+}
+
+impl VhdlNameSelf for GenericParameter {
+    fn vhdl_name(&self) -> &VhdlName {
+        &self.identifier
+    }
+}
+
+impl Document for GenericParameter {
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for GenericParameter {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into());
+    }
+}
+
+impl DeclareWithIndent for GenericParameter {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        let mut result = String::new();
+        if let Some(doc) = self.vhdl_doc() {
+            result.push_str(doc.as_str());
+        }
+        result.push_str(
+            format!(
+                "{} : {}",
+                self.identifier(),
+                self.typ().declaration_type_name()
+            )
+            .as_str(),
+        );
+        if let Some(default) = self.default() {
+            result.push_str(&format!(
+                " := {}",
+                default.declare_for(db, self.vhdl_name().clone(), indent_style)?
+            ));
+        }
+        Ok(result)
+    }
 }

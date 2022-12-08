@@ -35,7 +35,12 @@ pub trait Arch: Interner + ObjectQueries {
 
     fn subject_component(&self) -> Result<Arc<Component>>;
 
-    fn can_assign(&self, to: ObjectKey, assignment: Assignment) -> Result<()>;
+    fn can_assign(
+        &self,
+        to: ObjectKey,
+        assignment: Assignment,
+        state: AssignmentState,
+    ) -> Result<()>;
 }
 
 fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
@@ -43,13 +48,38 @@ fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
     package.get_subject_component(db)
 }
 
-fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AssignmentState {
+    /// Default behavior, trying to assign to an object from something else
+    Default,
+    /// Inverted behavior, required for mapping to out ports/signals
+    /// of components and procedures
+    OutMapping,
+    /// Default behavior, but omits the "to" check. Required for constants and
+    /// generic parameters.
+    Initialization,
+}
+
+fn can_assign(
+    db: &dyn Arch,
+    to: ObjectKey,
+    assignment: Assignment,
+    state: AssignmentState,
+) -> Result<()> {
     let to_key = to.with_nested(assignment.to_field().clone());
     let to = db.get_object(to_key.clone())?;
-    to.assignable.to_or_err()?;
+    match state {
+        AssignmentState::Default => to.assignable.to_or_err()?,
+        AssignmentState::OutMapping => to.assignable.from_or_err()?,
+        AssignmentState::Initialization => (),
+    };
     let to_typ = db.lookup_intern_object_type(to.typ);
     match assignment.kind() {
-        AssignmentKind::Relation(relation) => relation.can_assign(db, &to_typ),
+        AssignmentKind::Relation(relation) => match state {
+            AssignmentState::Default => relation.can_assign(db, &to_typ),
+            AssignmentState::OutMapping => relation.can_be_assigned(db, &to_typ),
+            AssignmentState::Initialization => relation.can_assign(db, &to_typ),
+        },
         AssignmentKind::Direct(direct) => {
             match direct {
                 DirectAssignment::FullRecord(record) => {
@@ -62,6 +92,7 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                                 db.can_assign(
                                     to_field_key,
                                     Assignment::from(ra.assignment().clone()),
+                                    state,
                                 )?;
                             }
                             Ok(())
@@ -89,6 +120,7 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                                         db.can_assign(
                                             to_array_elem_key.clone(),
                                             Assignment::from(value.clone()),
+                                            state,
                                         )?;
                                     }
                                     Ok(())
@@ -114,6 +146,7 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                                     db.can_assign(
                                         to_array_elem_key.clone(),
                                         Assignment::from(ra.assignment().clone()),
+                                        state,
                                     )?;
                                     ranges_assigned.push(range);
                                 }
@@ -130,6 +163,7 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                                         db.can_assign(
                                             to_array_elem_key,
                                             Assignment::from(value.as_ref().clone()),
+                                            state,
                                         )
                                     } else {
                                         Err(Error::InvalidArgument("Sliced array assignment does not assign all values directly, but does not contain an 'others' field.".to_string()))
@@ -139,6 +173,7 @@ fn can_assign(db: &dyn Arch, to: ObjectKey, assignment: Assignment) -> Result<()
                             ArrayAssignment::Others(others) => db.can_assign(
                                 to_array_elem_key,
                                 Assignment::from(others.as_ref().clone()),
+                                state,
                             ),
                         }
                     } else {

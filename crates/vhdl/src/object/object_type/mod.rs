@@ -22,10 +22,42 @@ pub trait DeclarationTypeName {
     fn declaration_type_name(&self) -> String;
 }
 
+/// Basic signed number type defined in the std package, typically 32 bits,
+/// but this depends on the implementation
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum IntegerType {
+    /// Supports both negative and positive values
+    Integer,
+    /// Supports values 0 and up, subset of Integer
+    Natural,
+    /// Supports values 1 and up, subset of Integer
+    Positive,
+}
+
+impl fmt::Display for IntegerType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IntegerType::Integer => write!(f, "Integer"),
+            IntegerType::Natural => write!(f, "Natural"),
+            IntegerType::Positive => write!(f, "Positive"),
+        }
+    }
+}
+
+impl DeclarationTypeName for IntegerType {
+    fn declaration_type_name(&self) -> String {
+        match self {
+            IntegerType::Integer => "integer".to_string(),
+            IntegerType::Natural => "natural".to_string(),
+            IntegerType::Positive => "positive".to_string(),
+        }
+    }
+}
+
 /// Types of VHDL objects, possibly referring to fields
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectType {
-    // TODO: Add Time, Delay_length, Boolean, Integer, Natural, Positive, Real, Character, String, Severity (Possibly combine into "Abstract")
+    // TODO: Add Time, Delay_length, Boolean, Real, Character, String, Severity (Possibly combine into "Abstract")
     // Note that Natural (>=0) and Positive (>=1) are just subtypes of Integer, Delay is a subtype (>=0) of Time, String is an array of Characters
     // File-related types are currently not necessary.
     //
@@ -47,6 +79,9 @@ pub enum ObjectType {
     Time,
     /// An std_logic bit object, can not contain further fields
     Bit,
+    /// Basic signed number type defined in the std package, typically 32 bits,
+    /// but this depends on the implementation
+    Integer(IntegerType),
     /// An array of fields, covers both conventional arrays, as well as bit vectors
     Array(ArrayObject),
     /// A record object, consisting of named fields
@@ -78,6 +113,7 @@ impl fmt::Display for ObjectType {
             }
             ObjectType::Time => write!(f, "Time"),
             ObjectType::Boolean => write!(f, "Boolean"),
+            ObjectType::Integer(int_typ) => write!(f, "Integer({})", int_typ),
         }
     }
 }
@@ -138,6 +174,9 @@ impl ObjectType {
             )),
             ObjectType::Boolean => Err(Error::InvalidTarget(
                 "Cannot select a field on a Boolean".to_string(),
+            )),
+            ObjectType::Integer(_) => Err(Error::InvalidTarget(
+                "Cannot select a field on an Integer".to_string(),
             )),
         }
     }
@@ -244,6 +283,20 @@ impl ObjectType {
                     )))
                 }
             }
+            ObjectType::Integer(_) => {
+                // All subsets of Integer can be assigned to one another, though
+                // this may result in unexpected behavior. The assumption being
+                // that people know what they're doing.
+                // TODO: May want to add some sort of "warn" here
+                if let ObjectType::Integer(_) = typ {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidTarget(format!(
+                        "Cannot assign {} to Integer",
+                        typ
+                    )))
+                }
+            }
         }
     }
 
@@ -265,6 +318,7 @@ impl DeclarationTypeName for ObjectType {
             ObjectType::Record(record) => record.declaration_type_name(),
             ObjectType::Time => "time".to_string(),
             ObjectType::Boolean => "boolean".to_string(),
+            ObjectType::Integer(int_typ) => int_typ.declaration_type_name(),
         }
     }
 }
@@ -292,6 +346,7 @@ impl Analyze for ObjectType {
             }
             ObjectType::Time => vec![],
             ObjectType::Boolean => vec![],
+            ObjectType::Integer(_) => vec![],
         }
     }
 }
@@ -304,13 +359,20 @@ impl DeclareWithIndent for ObjectType {
             )),
             ObjectType::Array(array_object) => array_object.declare(db),
             ObjectType::Record(_) => todo!(),
-            ObjectType::Time => Err(Error::BackEndError(
-                "Invalid type, Time (time) cannot be declared.".to_string(),
-            )),
-            ObjectType::Boolean => Err(Error::BackEndError(
-                "Invalid type, Boolean (boolean) cannot be declared.".to_string(),
-            )),
+            ObjectType::Time | ObjectType::Boolean | ObjectType::Integer(_) => {
+                Err(Error::BackEndError(format!(
+                    "Invalid type, {} ({}) cannot be declared.",
+                    self,
+                    self.declaration_type_name(),
+                )))
+            }
         }
+    }
+}
+
+impl From<IntegerType> for ObjectType {
+    fn from(integer_type: IntegerType) -> Self {
+        ObjectType::Integer(integer_type)
     }
 }
 

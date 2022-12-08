@@ -5,7 +5,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::{
-    architecture::arch_storage::Arch,
+    architecture::arch_storage::{Arch, AssignmentState},
     declaration::{ObjectDeclaration, ObjectKind},
 };
 
@@ -19,23 +19,24 @@ impl Assign for Id<ObjectDeclaration> {
     ) -> Result<AssignDeclaration> {
         let true_assignment = assignment.into();
         let self_obj = db.lookup_intern_object_declaration(*self);
-        match self_obj.kind() {
-            ObjectKind::ComponentPort(_) if !true_assignment.to_field().is_empty() => {
-                // TODO: Validating whether all fields are assigned, and assigned in order,
-                // is too complex to implement without a good use-case.
-                Err(Error::BackEndError(format!(
-                    "Back-end cannot assign a field of a component port ({}) directly, please use an indermediary signal.",
-                    self_obj.identifier()
-                )))
-            }
-            _ => match db.can_assign(self_obj.object_key().clone(), true_assignment.clone()) {
+        if let ObjectKind::ComponentPort(_) = self_obj.kind() {
+            Err(Error::BackEndError(format!(
+                "Component ports like \"{}\" should not be mapped, not assigned. This error should not occur.",
+                self_obj.identifier()
+            )))
+        } else {
+            match db.can_assign(
+                self_obj.object_key().clone(),
+                true_assignment.clone(),
+                AssignmentState::Default,
+            ) {
                 Ok(_) => Ok(AssignDeclaration::new(*self, true_assignment)),
                 Err(err) => Err(Error::InvalidArgument(format!(
                     "Cannot assign {}: {}",
                     self_obj.identifier(),
-                    err
+                    err,
                 ))),
-            },
+            }
         }
     }
 }
