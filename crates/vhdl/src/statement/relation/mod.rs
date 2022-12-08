@@ -660,15 +660,17 @@ mod tests {
             ObjectType::Integer(IntegerType::Natural),
             ValueAssignment::from(42),
         )?;
-        let math = obj1
-            .r_add(
+        let math = Parentheses(
+            obj1.r_add(
                 db,
                 Parentheses(ValueAssignment::from(30).r_subtract(db, obj2)?),
             )?
             .r_multiply(db, obj2)?
-            .r_divide_by(db, obj1.r_negative(db)?)?;
+            .r_divide_by(db, obj1.r_negative(db)?)?,
+        )
+        .r_mod(db, ValueAssignment::Integer(4))?;
         assert_eq!(
-            "test_sig1 + (30 - test_const) * test_const / -test_sig1",
+            "(test_sig1 + (30 - test_const) * test_const / -test_sig1) mod 4",
             math.declare(db)?
         );
 
