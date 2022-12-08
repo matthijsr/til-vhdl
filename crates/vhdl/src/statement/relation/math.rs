@@ -1,10 +1,6 @@
 use tydi_common::error::{Result, TryResult};
 
-use crate::{
-    architecture::arch_storage::Arch,
-    declaration::DeclareWithIndent,
-    object::object_type::{IntegerType, ObjectType},
-};
+use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
 
 use super::Relation;
 
