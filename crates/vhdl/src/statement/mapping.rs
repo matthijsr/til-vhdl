@@ -127,6 +127,8 @@ impl MapAssignment {
 pub struct Mapping {
     label: VhdlName,
     component_name: VhdlName,
+    /// The parameters and their mappings, in the order they were declared on the component
+    param_mappings: InsertionOrderedMap<VhdlName, MapAssignment>,
     /// The ports and their mappings, in the order they were declared on the component
     port_mappings: InsertionOrderedMap<VhdlName, MapAssignment>,
 }
@@ -137,6 +139,11 @@ impl Mapping {
         component: &Component,
         label: impl TryResult<VhdlName>,
     ) -> Result<Mapping> {
+        let mut param_mappings = InsertionOrderedMap::new();
+        for param in component.parameters() {
+            let obj = ObjectDeclaration::from_parameter(db, param)?;
+            param_mappings.try_insert(param.vhdl_name().clone(), MapAssignment::Unassigned(obj))?;
+        }
         let mut port_mappings = InsertionOrderedMap::new();
         for port in component.ports() {
             let obj = ObjectDeclaration::from_port(db, port, false);
@@ -145,12 +152,44 @@ impl Mapping {
         Ok(Mapping {
             label: label.try_result()?,
             component_name: component.vhdl_name().clone(),
+            param_mappings,
             port_mappings,
         })
     }
 
+    pub fn param_mappings(&self) -> &InsertionOrderedMap<VhdlName, MapAssignment> {
+        &self.param_mappings
+    }
+
     pub fn port_mappings(&self) -> &InsertionOrderedMap<VhdlName, MapAssignment> {
         &self.port_mappings
+    }
+
+    pub fn map_param(
+        &mut self,
+        db: &dyn Arch,
+        identifier: impl TryResult<VhdlName>,
+        assignment_kind: impl Into<AssignmentKind>,
+    ) -> Result<()> {
+        let identifier = identifier.try_result()?;
+        let param = self
+            .param_mappings()
+            .get(&identifier)
+            .ok_or(Error::InvalidArgument(format!(
+                "Parameter {} does not exist on this component",
+                identifier
+            )))?;
+        match param {
+            MapAssignment::Unassigned(obj) => {
+                let assigned = MapAssignExpression::try_new(db, *obj, assignment_kind)?;
+                self.param_mappings
+                    .try_replace(&identifier, MapAssignment::Assigned(assigned))
+            }
+            MapAssignment::Assigned(_) => Err(Error::InvalidArgument(format!(
+                "Parameter {} was already assigned",
+                identifier
+            ))),
+        }
     }
 
     pub fn map_port(
@@ -220,5 +259,150 @@ impl ListUsingsDb for Mapping {
             usings.combine(&assignment.object().list_usings_db(db)?);
         }
         Ok(usings)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        architecture::arch_storage::db::Database,
+        assignment::{StdLogicValue, ValueAssignment},
+        declaration::Declare,
+        object::object_type::IntegerType,
+        statement::{relation::math::CreateMath, Statement},
+        test_tools,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_empty_component_mapping_declare() -> Result<()> {
+        let mut _db = Database::default();
+        let db = &mut _db;
+        let empty_comp = test_tools::empty_component();
+        let mapping = Mapping::from_component(db, &empty_comp, "map_label")?;
+        assert_eq!(
+            r#"empty_component port map(
+
+)"#,
+            mapping.declare(db)?
+        );
+
+        let statement = Statement::from(mapping);
+        assert_eq!(
+            r#"map_label: empty_component port map(
+
+)"#,
+            statement.declare(db)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_simple_component_mapping_declare() -> Result<()> {
+        let mut _db = Database::default();
+        let db = &mut _db;
+        let simple_comp = test_tools::simple_component()?;
+        let mut mapping = Mapping::from_component(db, &simple_comp, "map_label2")?;
+
+        let clk = ObjectDeclaration::entity_clk(db);
+        let array_sig = ObjectDeclaration::signal(db, "array_sig", 43..0, None)?;
+
+        mapping.map_port(db, "some_port", StdLogicValue::U)?;
+        mapping.map_port(db, "some_other_port", array_sig)?;
+        mapping.map_port(db, "clk", clk)?;
+
+        assert_eq!(
+            r#"test port map(
+  some_port => 'U',
+  some_other_port => array_sig,
+  clk => clk
+)"#,
+            mapping.declare(db)?
+        );
+
+        let statement = Statement::from(mapping);
+        assert_eq!(
+            r#"map_label2: test port map(
+  some_port => 'U',
+  some_other_port => array_sig,
+  clk => clk
+)"#,
+            statement.declare(db)?
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_simple_component_with_generics_mapping_declare() -> Result<()> {
+        let mut _db = Database::default();
+        let db = &mut _db;
+        let param_comp = test_tools::simple_component_with_generics()?;
+        let mut mapping = Mapping::from_component(db, &param_comp, "map_label3")?;
+
+        let clk = ObjectDeclaration::entity_clk(db);
+        let array_sig = ObjectDeclaration::signal(db, "array_sig", 43..0, None)?;
+
+        mapping.map_param(db, "some_other_param", StdLogicValue::U)?;
+
+        mapping.map_port(db, "some_port", StdLogicValue::U)?;
+        mapping.map_port(db, "some_other_port", array_sig)?;
+        mapping.map_port(db, "clk", clk)?;
+
+        assert_eq!(
+            r#"test generic map(
+  some_other_param => 'U'
+) port map(
+  some_port => 'U',
+  some_other_port => array_sig,
+  clk => clk
+)"#,
+            mapping.declare(db)?
+        );
+
+        let outer_const = ObjectDeclaration::constant(
+            db,
+            "OUTER_CONST",
+            IntegerType::Integer,
+            ValueAssignment::from(1),
+        )?;
+
+        mapping.map_param(db, "some_param", ValueAssignment::from(20))?;
+        mapping.map_param(
+            db,
+            "some_other_param2",
+            outer_const.r_add(db, ValueAssignment::from(4))?,
+        )?;
+
+        assert_eq!(
+            r#"test generic map(
+  some_param => 20,
+  some_other_param => 'U',
+  some_other_param2 => OUTER_CONST + 4
+) port map(
+  some_port => 'U',
+  some_other_port => array_sig,
+  clk => clk
+)"#,
+            mapping.declare(db)?
+        );
+
+        let statement = Statement::from(mapping);
+        assert_eq!(
+            r#"map_label3: test generic map(
+  some_param => 20,
+  some_other_param => 'U',
+  some_other_param2 => OUTER_CONST + 4
+) port map(
+  some_port => 'U',
+  some_other_port => array_sig,
+  clk => clk
+)"#,
+            statement.declare(db)?
+        );
+
+        Ok(())
     }
 }

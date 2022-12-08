@@ -10,7 +10,7 @@ use crate::architecture::arch_storage::{Arch, AssignmentState};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::object::object_type::ObjectType;
 use crate::object::Object;
-use crate::port::{Mode, Port};
+use crate::port::{GenericParameter, Mode, Port};
 
 use super::assignment::{AssignmentKind, FieldSelection};
 
@@ -320,6 +320,21 @@ impl ObjectDeclaration {
 
     pub fn typ(&self, db: &dyn Arch) -> Result<ObjectType> {
         Ok(self.object(db)?.typ(db))
+    }
+
+    pub fn from_parameter(
+        db: &dyn Arch,
+        param: &GenericParameter,
+    ) -> Result<Id<ObjectDeclaration>> {
+        // Parameters are treated as constant objects, but don't need to be assigned a default value.
+        let kind = ObjectKind::Constant;
+        ObjectDeclaration {
+            identifier: param.vhdl_name().clone(),
+            obj: Object::new(db, param.typ().clone().intern(db), (&kind).into()),
+            default: param.default().clone(),
+            kind,
+        }
+        .test_default(db)
     }
 
     pub fn from_port(db: &dyn Arch, port: &Port, is_entity: bool) -> Id<ObjectDeclaration> {

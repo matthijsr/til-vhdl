@@ -12,10 +12,30 @@ use crate::{
     port::{Mode, Port},
 };
 
+/// Creates a component:
+/// ```vhdl
+/// component empty_component
+///   port (
+///
+///   );
+/// end component;
+/// ```
 pub(crate) fn empty_component() -> Component {
     Component::try_new("empty_component", vec![], vec![], None).unwrap()
 }
 
+/// Creates a component:
+/// ```vhdl
+/// component test
+///   port (
+///     -- This is port documentation
+///     -- Next line.
+///     some_port : in std_logic;
+///     some_other_port : out std_logic_vector(43 downto 0);
+///     clk : in std_logic
+///   );
+/// end component;
+/// ```
 pub(crate) fn simple_component() -> Result<Component> {
     let port1 = Port::try_new_documented(
         "some_port",
@@ -28,6 +48,25 @@ pub(crate) fn simple_component() -> Result<Component> {
     Component::try_new("test", vec![], vec![port1, port2, clk], None)
 }
 
+/// Creates a component:
+/// ```vhdl
+/// component test
+///   generic (
+///     -- This is parameter documentation
+///     -- Next line.
+///     some_param : positive := 42;
+///     some_other_param : std_logic;
+///     some_other_param : integer := -42
+///   );
+///   port (
+///     -- This is port documentation
+///     -- Next line.
+///     some_port : in std_logic;
+///     some_other_port : out std_logic_vector(43 downto 0);
+///     clk : in std_logic
+///   );
+/// end component;
+/// ```
 pub(crate) fn simple_component_with_generics() -> Result<Component> {
     let port1 = Port::try_new_documented(
         "some_port",
@@ -46,7 +85,7 @@ pub(crate) fn simple_component_with_generics() -> Result<Component> {
     )?;
     let param2 = GenericParameter::try_new("some_other_param", None, ObjectType::Bit)?;
     let param3 = GenericParameter::try_new(
-        "some_other_param",
+        "some_other_param2",
         Some(ValueAssignment::from(-42).into()),
         ObjectType::Integer(IntegerType::Integer),
     )?;

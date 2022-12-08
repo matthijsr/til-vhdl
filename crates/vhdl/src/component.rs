@@ -110,7 +110,7 @@ impl DeclareWithIndent for Component {
             let parameters = self
                 .parameters()
                 .iter()
-                .map(|x| x.declare(db))
+                .map(|x| x.declare_with_indent(db, indent_style))
                 .collect::<Result<Vec<String>>>()?
                 .join(";\n");
             parameter_body.push_str(&indent(&parameters, indent_style));
@@ -188,7 +188,7 @@ end component;"#,
     -- Next line.
     some_param : positive := 42;
     some_other_param : std_logic;
-    some_other_param : integer := -42
+    some_other_param2 : integer := -42
   );
   port (
     -- This is port documentation

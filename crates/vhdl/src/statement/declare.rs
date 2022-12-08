@@ -1,14 +1,46 @@
 use textwrap::indent;
 use tydi_common::error::{Error, Result};
 
-use crate::{architecture::arch_storage::Arch, declaration::DeclareWithIndent};
+use crate::{
+    architecture::arch_storage::{interner::GetSelf, Arch},
+    declaration::DeclareWithIndent,
+};
 
-use super::{label::Label, mapping::{Mapping, MapAssignment}, Statement};
+use super::{
+    label::Label,
+    mapping::{MapAssignment, Mapping},
+    Statement,
+};
 
 impl DeclareWithIndent for Mapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
-        result.push_str(&format!("{} port map(\n", self.component_name()));
+        result.push_str(&format!("{}", self.component_name()));
+        if self.param_mappings().len() > 0 {
+            result.push_str(" generic map(\n");
+            let mut param_maps = vec![];
+            for (param, assignment) in self.param_mappings() {
+                match assignment {
+                    MapAssignment::Unassigned(obj) => {
+                        let obj_val = obj.get(db);
+                        if let Some(_) = obj_val.default() {
+                            Ok(())
+                        } else {
+                            Err(Error::BackEndError(format!(
+                                "Error while declaring generic parameter mapping, parameter {} is not assigned and has no default",
+                                param
+                            )))
+                        }
+                    }
+                    MapAssignment::Assigned(expr) => {
+                        Ok(param_maps.push(expr.declare_with_indent(db, indent_style)?))
+                    }
+                }?;
+            }
+            result.push_str(&indent(&param_maps.join(",\n"), indent_style));
+            result.push_str("\n)");
+        }
+        result.push_str(" port map(\n");
         let mut port_maps = vec![];
         for (port, assignment) in self.port_mappings() {
             if let MapAssignment::Assigned(expr) = assignment {

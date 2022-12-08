@@ -170,7 +170,7 @@ end test;
     -- Next line.
     some_param : positive := 42;
     some_other_param : std_logic;
-    some_other_param : integer := -42
+    some_other_param2 : integer := -42
   );
   port (
     -- This is port documentation

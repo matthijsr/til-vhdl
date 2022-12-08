@@ -359,14 +359,20 @@ impl DeclareWithIndent for ObjectType {
             )),
             ObjectType::Array(array_object) => array_object.declare(db),
             ObjectType::Record(_) => todo!(),
-            ObjectType::Time |
-            ObjectType::Boolean |
-            ObjectType::Integer(_) => Err(Error::BackEndError(format!(
-                "Invalid type, {} ({}) cannot be declared.",
-                self,
-                self.declaration_type_name(),
-            ))),
+            ObjectType::Time | ObjectType::Boolean | ObjectType::Integer(_) => {
+                Err(Error::BackEndError(format!(
+                    "Invalid type, {} ({}) cannot be declared.",
+                    self,
+                    self.declaration_type_name(),
+                )))
+            }
         }
+    }
+}
+
+impl From<IntegerType> for ObjectType {
+    fn from(integer_type: IntegerType) -> Self {
+        ObjectType::Integer(integer_type)
     }
 }
 
