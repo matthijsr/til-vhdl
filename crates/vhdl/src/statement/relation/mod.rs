@@ -89,6 +89,11 @@ pub trait CreateLogicalExpression: Sized {
     ) -> Result<(Box<Relation>, Box<Relation>)> {
         let left = left.try_result()?;
         let right = right.try_result()?;
+        if left.is_integer(db).is_ok() || right.is_integer(db).is_ok() {
+            return Err(Error::InvalidArgument(
+                "Cannot apply a logical operator to integers".to_string(),
+            ));
+        }
         left.matching_relation(db, &right)?;
         Ok((Box::new(left), Box::new(right)))
     }
@@ -326,6 +331,12 @@ pub enum Relation {
     MathExpression(MathExpression),
 }
 
+impl<T: Into<Relation>> From<Parentheses<T>> for Relation {
+    fn from(val: Parentheses<T>) -> Self {
+        Self::Parentheses(Box::new(val.0.into()))
+    }
+}
+
 impl From<ValueAssignment> for Relation {
     fn from(val: ValueAssignment) -> Self {
         Self::Value(Box::new(val))
@@ -441,11 +452,7 @@ impl Relation {
             Relation::Value(v) => match other {
                 Relation::Parentheses(r) => self.matching_relation(db, r),
                 Relation::Value(ov) => {
-                    if let ValueAssignment::Integer(_) = ov.as_ref() {
-                        Err(Error::InvalidArgument(
-                            "Cannot create a logical expression with an integer".to_string(),
-                        ))
-                    } else if v.matching_value(ov) {
+                    if v.matching_value(ov) {
                         Ok(())
                     } else {
                         Err(Error::InvalidArgument(format!(
@@ -507,11 +514,24 @@ impl Relation {
                 )),
             },
             Relation::LogicalExpression(lex) => lex.right().matching_relation(db, other),
-            // TODO: This isn't just used for nor/xnor etc., but also for eq, gteq, etc. So it should support this.
-            // Just more indication that this needs a rewrite.
-            Relation::MathExpression(_) => Err(Error::InvalidArgument(
-                "Cannot create a logical expression with an integer".to_string(),
-            )),
+            Relation::MathExpression(_) => match other {
+                Relation::Parentheses(r) => self.matching_relation(db, r),
+                Relation::Value(v) => match v.as_ref() {
+                    ValueAssignment::Integer(_) => Ok(()),
+                    _ => Err(Error::InvalidArgument(format!(
+                        "Cannot create a relation between {} and a integer relation.",
+                        v.declare()?,
+                    ))),
+                },
+                Relation::Object(o) => ValueAssignment::Integer(1)
+                    .can_assign(db.get_object_type(o.as_object_key(db))?.as_ref()),
+                Relation::Combination(_) | Relation::Edge(_) => Err(Error::InvalidArgument(
+                    "Cannot create a relation between an integer relation and a boolean relation."
+                        .to_string(),
+                )),
+                Relation::LogicalExpression(lex) => self.matching_relation(db, lex.left()),
+                Relation::MathExpression(_) => Ok(()),
+            },
         }
     }
 }
@@ -566,16 +586,7 @@ impl ListUsings for Relation {
     }
 }
 
-pub trait Parentheses {
-    fn parentheses(self) -> Relation;
-}
-
-impl<T: Into<Relation>> Parentheses for T {
-    fn parentheses(self) -> Relation {
-        let relation = self.into();
-        Relation::Parentheses(Box::new(relation))
-    }
-}
+pub struct Parentheses<T>(T);
 
 #[cfg(test)]
 mod tests {
@@ -583,6 +594,7 @@ mod tests {
         architecture::arch_storage::db::Database,
         assignment::SelectObject,
         declaration::{Declare, ObjectDeclaration},
+        statement::relation::math::CreateMath,
     };
 
     use super::*;
@@ -591,6 +603,7 @@ mod tests {
     fn test_declare() -> Result<()> {
         let _db = Database::default();
         let db = &_db;
+
         let lex = ValueAssignment::Boolean(true)
             .and(db, ValueAssignment::Boolean(true))?
             .or(
@@ -601,15 +614,17 @@ mod tests {
             )?
             .nand(
                 db,
-                (ValueAssignment::Boolean(false)
-                    .nor(db, ValueAssignment::Boolean(false))?
-                    .xnor(db, ValueAssignment::Boolean(true))?)
-                .parentheses(),
+                Parentheses(
+                    ValueAssignment::Boolean(false)
+                        .nor(db, ValueAssignment::Boolean(false))?
+                        .xnor(db, ValueAssignment::Boolean(true))?,
+                ),
             )?;
         assert_eq!(
             "true and true or (true xor false) nand (false nor false xnor true)",
             lex.declare(db)?
         );
+
         let comb = lex
             .clone()
             .r_eq(db, lex)?
@@ -622,6 +637,7 @@ mod tests {
             "true and true or (true xor false) nand (false nor false xnor true) = true and true or (true xor false) nand (false nor false xnor true) /= false < false <= false > false >= false",
             comb.declare(db)?
         );
+
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
         let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
             .select_nested([0])?;
@@ -630,6 +646,30 @@ mod tests {
         assert_eq!(
             "rising_edge(test_sig1) nand falling_edge(test_sig2(0))",
             rising_edge.nand(db, falling_edge)?.declare(db)?
+        );
+
+        let obj1 = ObjectDeclaration::signal(
+            db,
+            "test_sig1",
+            ObjectType::Integer(IntegerType::Integer),
+            None,
+        )?;
+        let obj2 = ObjectDeclaration::constant(
+            db,
+            "test_const",
+            ObjectType::Integer(IntegerType::Natural),
+            ValueAssignment::from(42),
+        )?;
+        let math = obj1
+            .r_add(
+                db,
+                Parentheses(ValueAssignment::from(30).r_subtract(db, obj2)?),
+            )?
+            .r_multiply(db, obj2)?
+            .r_divide_by(db, obj1.r_negative(db)?)?;
+        assert_eq!(
+            "test_sig1 + (30 - test_const) * test_const / -test_sig1",
+            math.declare(db)?
         );
 
         Ok(())
