@@ -1,4 +1,5 @@
 use crate::ir::generics::VerifyConditions;
+use tydi_common::error::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NumberGenericKind {
@@ -11,7 +12,7 @@ impl VerifyConditions for NumberGenericKind {
     fn verify_conditions(
         &self,
         conditions: &[crate::ir::generics::condition::GenericCondition],
-    ) -> tydi_common::error::Result<()> {
+    ) -> Result<()> {
         todo!()
     }
 }

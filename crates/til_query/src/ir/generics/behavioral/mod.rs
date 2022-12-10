@@ -1,4 +1,5 @@
 use self::number::NumberGenericKind;
+use tydi_common::error::Result;
 
 use super::VerifyConditions;
 
@@ -10,10 +11,7 @@ pub enum BehavioralGenericKind {
 }
 
 impl VerifyConditions for BehavioralGenericKind {
-    fn verify_conditions(
-        &self,
-        conditions: &[super::condition::GenericCondition],
-    ) -> tydi_common::error::Result<()> {
+    fn verify_conditions(&self, conditions: &[super::condition::GenericCondition]) -> Result<()> {
         todo!()
     }
 }
