@@ -8,6 +8,8 @@ use super::TestValue;
 // Right now, the "and" is implicit, which makes this little more than a
 // glorified range. (Since only two conditions will ever be relevant.)
 // This could also let me add an "Eq" and "NotEq" (and an "In"/"NotIn")
+// This also introduces an alternative to the current "Vec<GenericCondtion" on
+// parameter, we could make an explicit "And", and only support 1 "Condition"
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GenericCondition {
     Gt(String),
