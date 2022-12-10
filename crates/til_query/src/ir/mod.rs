@@ -33,6 +33,7 @@ use self::{
 pub mod annotation_keys;
 pub mod connection;
 pub mod db;
+pub mod generics;
 pub mod get_self;
 pub mod implementation;
 pub mod interface_port;
