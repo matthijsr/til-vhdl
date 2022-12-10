@@ -1,11 +1,15 @@
+use std::str::FromStr;
+
 use tydi_common::{
-    error::{Result, TryResult},
+    error::{Error, Result, TryResult},
     name::{Name, NameSelf},
     traits::Identify,
 };
 
 use self::{
-    behavioral::BehavioralGenericKind, condition::GenericCondition, interface::InterfaceGenericKind,
+    behavioral::{number::NumberGenericKind, BehavioralGenericKind},
+    condition::GenericCondition,
+    interface::InterfaceGenericKind,
 };
 
 pub mod behavioral;
@@ -16,6 +20,38 @@ pub mod interface;
 pub enum GenericKind {
     Behavioral(BehavioralGenericKind),
     Interface(InterfaceGenericKind),
+}
+
+impl TryFrom<&str> for GenericKind {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        Self::from_str(value)
+    }
+}
+
+impl FromStr for GenericKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let val = s.to_lowercase();
+        match val.as_str() {
+            "integer" => Ok(Self::Behavioral(BehavioralGenericKind::Number(
+                NumberGenericKind::Integer,
+            ))),
+            "natural" => Ok(Self::Behavioral(BehavioralGenericKind::Number(
+                NumberGenericKind::Natural,
+            ))),
+            "positive" => Ok(Self::Behavioral(BehavioralGenericKind::Number(
+                NumberGenericKind::Positive,
+            ))),
+            "dimensionality" => Ok(Self::Interface(InterfaceGenericKind::Dimensionality)),
+            _ => Err(Error::InvalidArgument(format!(
+                "No GenericKind matching string \"{}\"",
+                val
+            ))),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -78,5 +114,16 @@ impl VerifyConditions for GenericKind {
             GenericKind::Behavioral(b) => b.verify_conditions(conditions),
             GenericKind::Interface(i) => i.verify_conditions(conditions),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name() -> Result<()> {
+        GenericParameter::try_new("a", "positive", ["<= 1", "> 1", ">= 1", "< 1"])?;
+        Ok(())
     }
 }

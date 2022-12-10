@@ -12,6 +12,8 @@ pub enum BehavioralGenericKind {
 
 impl VerifyConditions for BehavioralGenericKind {
     fn verify_conditions(&self, conditions: &[super::condition::GenericCondition]) -> Result<()> {
-        todo!()
+        match self {
+            BehavioralGenericKind::Number(n) => n.verify_conditions(conditions),
+        }
     }
 }
