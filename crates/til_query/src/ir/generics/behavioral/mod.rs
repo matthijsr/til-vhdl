@@ -1,7 +1,10 @@
 use self::number::NumberGenericKind;
 use tydi_common::error::Result;
 
-use super::VerifyConditions;
+use super::{
+    condition::{DefaultConditions, GenericCondition},
+    VerifyConditions,
+};
 
 pub mod number;
 
@@ -11,9 +14,17 @@ pub enum BehavioralGenericKind {
 }
 
 impl VerifyConditions for BehavioralGenericKind {
-    fn verify_conditions(&self, conditions: &[super::condition::GenericCondition]) -> Result<()> {
+    fn verify_conditions(&self, conditions: &[GenericCondition]) -> Result<()> {
         match self {
             BehavioralGenericKind::Number(n) => n.verify_conditions(conditions),
+        }
+    }
+}
+
+impl DefaultConditions for BehavioralGenericKind {
+    fn default_conditions(&self) -> Vec<GenericCondition> {
+        match self {
+            BehavioralGenericKind::Number(n) => n.default_conditions(),
         }
     }
 }

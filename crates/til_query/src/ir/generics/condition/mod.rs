@@ -1,6 +1,8 @@
 use std::{any::type_name, fmt, str::FromStr};
 use tydi_common::error::{Error, Result};
 
+use super::TestValue;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GenericCondition {
     Gt(String),
@@ -32,14 +34,15 @@ impl FromStr for GenericCondition {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if s.starts_with(">=") {
-            Ok(GenericCondition::GtEq(s[2..].trim().to_string()))
-        } else if s.starts_with("<=") {
-            Ok(GenericCondition::LtEq(s[2..].trim().to_string()))
-        } else if s.starts_with('>') {
-            Ok(GenericCondition::Gt(s[1..].trim().to_string()))
-        } else if s.starts_with('<') {
-            Ok(GenericCondition::Lt(s[1..].trim().to_string()))
+        let s_trimmed = s.trim();
+        if s_trimmed.starts_with(">=") {
+            Ok(GenericCondition::GtEq(s_trimmed[2..].trim().to_string()))
+        } else if s_trimmed.starts_with("<=") {
+            Ok(GenericCondition::LtEq(s_trimmed[2..].trim().to_string()))
+        } else if s_trimmed.starts_with('>') {
+            Ok(GenericCondition::Gt(s_trimmed[1..].trim().to_string()))
+        } else if s_trimmed.starts_with('<') {
+            Ok(GenericCondition::Lt(s_trimmed[1..].trim().to_string()))
         } else {
             Err(Error::InvalidArgument(format!("Cannot parse condition from string \"{}\". Conditions must start with >, <, >=, or <=.", s)))
         }
@@ -103,41 +106,38 @@ impl GenericCondition {
                 min, max, param_type
             )));
         }
-        let invalid_condition = || {
-            Err(Error::InvalidArgument(format!(
+        match self {
+            GenericCondition::Gt(_) if val < max => Ok(()),
+            GenericCondition::Lt(_) if val > min => Ok(()),
+            GenericCondition::GtEq(_) if val <= max => Ok(()),
+            GenericCondition::LtEq(_) if val >= min => Ok(()),
+            _ => Err(Error::InvalidArgument(format!(
                 "Condition ({}) is outside of the range of the given type ({}: {}..={})",
                 self, param_type, min, max
-            )))
-        };
-        match self {
-            GenericCondition::Gt(_) => {
-                if val >= max {
-                    invalid_condition()
-                } else {
-                    Ok(())
-                }
-            }
-            GenericCondition::Lt(_) => {
-                if val <= min {
-                    invalid_condition()
-                } else {
-                    Ok(())
-                }
-            }
-            GenericCondition::GtEq(_) => {
-                if val > max {
-                    invalid_condition()
-                } else {
-                    Ok(())
-                }
-            }
-            GenericCondition::LtEq(_) => {
-                if val < min {
-                    invalid_condition()
-                } else {
-                    Ok(())
-                }
-            }
+            ))),
         }
     }
+}
+
+impl TestValue for GenericCondition {
+    fn test_value<T: FromStr<Err = impl fmt::Display> + PartialOrd + fmt::Display>(
+        &self,
+        value: &T,
+    ) -> Result<()> {
+        let val = &self.parse_val::<T>()?;
+        match self {
+            GenericCondition::Gt(_) if value > val => Ok(()),
+            GenericCondition::Lt(_) if value < val => Ok(()),
+            GenericCondition::GtEq(_) if value >= val => Ok(()),
+            GenericCondition::LtEq(_) if value <= val => Ok(()),
+            _ => Err(Error::InvalidArgument(format!(
+                "Value ({}) fails condition {}",
+                value, self,
+            ))),
+        }
+    }
+}
+
+pub trait DefaultConditions {
+    fn default_conditions(&self) -> Vec<GenericCondition>;
 }
