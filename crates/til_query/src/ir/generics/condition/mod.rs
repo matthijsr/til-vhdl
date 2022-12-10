@@ -3,6 +3,11 @@ use tydi_common::error::{Error, Result};
 
 use super::TestValue;
 
+// TODO: Could add an "Or(Box<Condition>, Box<Condition>)", to allow for
+// things like "(> 1 and < 10) or (> 10 and < 100)"
+// Right now, the "and" is implicit, which makes this little more than a
+// glorified range. (Since only two conditions will ever be relevant.)
+// This could also let me add an "Eq" and "NotEq" (and an "In"/"NotIn")
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GenericCondition {
     Gt(String),
