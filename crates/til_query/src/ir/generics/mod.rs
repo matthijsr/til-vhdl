@@ -181,11 +181,28 @@ mod tests {
         assert_eq!(param_attempt.is_ok(), true);
 
         let mut param = GenericParameter::try_new("a", "positive")?;
-        assert_eq!(param.test_value(&0).is_err(), true);
+        assert_eq!(param.test_value(&0).is_ok(), false);
         assert_eq!(param.test_value(&1).is_ok(), true);
 
-        param.set_conditions(["> 1"])?;
-        assert_eq!(param.test_value(&1).is_err(), true);
+        assert_eq!(param.test_value(&2).is_ok(), true);
+        param.set_conditions(["> 2"])?;
+        assert_eq!(param.test_value(&1).is_ok(), false);
+        assert_eq!(param.test_value(&2).is_ok(), false);
+        assert_eq!(param.test_value(&3).is_ok(), true);
+
+        assert_eq!(param.test_value(&4).is_ok(), true);
+        param.set_conditions(["> 2", "< 4"])?;
+        assert_eq!(param.test_value(&1).is_ok(), false);
+        assert_eq!(param.test_value(&2).is_ok(), false);
+        assert_eq!(param.test_value(&3).is_ok(), true);
+        assert_eq!(param.test_value(&4).is_ok(), false);
+
+        param.set_conditions([">= 2", "<= 4"])?;
+        assert_eq!(param.test_value(&1).is_ok(), false);
+        assert_eq!(param.test_value(&2).is_ok(), true);
+        assert_eq!(param.test_value(&3).is_ok(), true);
+        assert_eq!(param.test_value(&4).is_ok(), true);
+        assert_eq!(param.test_value(&5).is_ok(), false);
 
         Ok(())
     }
