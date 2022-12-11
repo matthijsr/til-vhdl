@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use tydi_common::error::{Error, Result, TryResult};
 use tydi_common::traits::Identify;

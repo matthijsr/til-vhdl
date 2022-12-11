@@ -1,31 +1,26 @@
-use super::{
-    condition::{DefaultConditions, GenericCondition},
-    VerifyConditions,
-};
-use tydi_common::error::Result;
+use tydi_common::error::{Result, TryResult};
+
+use self::dimensionality::DimensionalityGeneric;
+
+use super::{condition::TestValue, param_value::GenericParamValue};
+
+pub mod dimensionality;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InterfaceGenericKind {
-    Dimensionality,
+    Dimensionality(DimensionalityGeneric),
 }
 
-impl VerifyConditions for InterfaceGenericKind {
-    fn verify_conditions(&self, conditions: &[GenericCondition]) -> Result<()> {
-        match self {
-            InterfaceGenericKind::Dimensionality => conditions
-                .iter()
-                .try_for_each(|c| c.verify_min_max("Dimensionality", 2, i32::MAX)),
-        }
+impl From<DimensionalityGeneric> for InterfaceGenericKind {
+    fn from(val: DimensionalityGeneric) -> Self {
+        Self::Dimensionality(val)
     }
 }
 
-impl DefaultConditions for InterfaceGenericKind {
-    fn default_conditions(&self) -> Vec<GenericCondition> {
+impl TestValue for InterfaceGenericKind {
+    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         match self {
-            InterfaceGenericKind::Dimensionality => vec![
-                GenericCondition::gteq("2"),
-                GenericCondition::lteq(i32::MAX.to_string()),
-            ],
+            InterfaceGenericKind::Dimensionality(dim) => dim.test_value(value),
         }
     }
 }

@@ -1,30 +1,25 @@
-use self::number::NumberGenericKind;
-use tydi_common::error::Result;
+use self::integer::{IntegerGeneric, IntegerGenericKind};
+use tydi_common::error::{Result, TryResult};
 
-use super::{
-    condition::{DefaultConditions, GenericCondition},
-    VerifyConditions,
-};
+use super::{condition::TestValue, param_value::GenericParamValue};
 
-pub mod number;
+pub mod integer;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BehavioralGenericKind {
-    Number(NumberGenericKind),
+    Integer(IntegerGeneric),
 }
 
-impl VerifyConditions for BehavioralGenericKind {
-    fn verify_conditions(&self, conditions: &[GenericCondition]) -> Result<()> {
-        match self {
-            BehavioralGenericKind::Number(n) => n.verify_conditions(conditions),
-        }
+impl From<IntegerGeneric> for BehavioralGenericKind {
+    fn from(val: IntegerGeneric) -> Self {
+        Self::Integer(val)
     }
 }
 
-impl DefaultConditions for BehavioralGenericKind {
-    fn default_conditions(&self) -> Vec<GenericCondition> {
+impl TestValue for BehavioralGenericKind {
+    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         match self {
-            BehavioralGenericKind::Number(n) => n.default_conditions(),
+            BehavioralGenericKind::Integer(integer) => integer.test_value(value),
         }
     }
 }

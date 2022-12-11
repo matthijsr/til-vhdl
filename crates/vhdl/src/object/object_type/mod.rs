@@ -1,8 +1,8 @@
 pub mod severity;
 pub mod time;
 
+use core::fmt;
 use std::convert::TryInto;
-use std::fmt;
 
 use tydi_common::error::Result;
 use tydi_common::error::{Error, TryResult};
