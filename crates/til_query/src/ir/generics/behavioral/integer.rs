@@ -62,7 +62,7 @@ impl AppliesCondition<IntegerCondition> for IntegerGeneric {
 }
 
 impl TestValue for IntegerGeneric {
-    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
+    fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         let generic_value: GenericParamValue = value.try_result()?;
         let value = match generic_value {
             GenericParamValue::Integer(val) => Ok(val),
@@ -74,7 +74,16 @@ impl TestValue for IntegerGeneric {
         match self.kind() {
             IntegerGenericKind::Natural if value < 0 => Ok(false),
             IntegerGenericKind::Positive if value < 1 => Ok(false),
-            _ => self.condition().test_value(value),
+            _ => self.condition().valid_value(value),
         }
+    }
+
+    fn describe_condition(&self) -> String {
+        let implicit_condition = match self.kind() {
+            IntegerGenericKind::Integer => "",
+            IntegerGenericKind::Natural => "(Natural, implicit: >= 0) and ",
+            IntegerGenericKind::Positive => "(Positive, implicit: >= 1) and ",
+        };
+        format!("{}{}", implicit_condition, self.condition())
     }
 }

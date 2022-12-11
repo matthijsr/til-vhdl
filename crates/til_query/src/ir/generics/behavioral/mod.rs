@@ -1,4 +1,4 @@
-use self::integer::{IntegerGeneric, IntegerGenericKind};
+use self::integer::IntegerGeneric;
 use tydi_common::error::{Result, TryResult};
 
 use super::{condition::TestValue, param_value::GenericParamValue};
@@ -17,9 +17,15 @@ impl From<IntegerGeneric> for BehavioralGenericKind {
 }
 
 impl TestValue for BehavioralGenericKind {
-    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
+    fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         match self {
-            BehavioralGenericKind::Integer(integer) => integer.test_value(value),
+            BehavioralGenericKind::Integer(integer) => integer.valid_value(value),
+        }
+    }
+
+    fn describe_condition(&self) -> String {
+        match self {
+            BehavioralGenericKind::Integer(integer) => integer.describe_condition(),
         }
     }
 }

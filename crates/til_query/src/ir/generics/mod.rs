@@ -1,15 +1,13 @@
-use std::{fmt, str::FromStr};
-
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Result, TryResult},
     name::{Name, NameSelf},
     traits::Identify,
 };
 
 use self::{
-    behavioral::{integer::IntegerGenericKind, BehavioralGenericKind},
-    condition::{GenericCondition, TestValue},
-    interface::InterfaceGenericKind,
+    behavioral::BehavioralGenericKind,
+    condition::TestValue,
+    interface::{dimensionality::DimensionalityGeneric, InterfaceGenericKind},
     param_value::GenericParamValue,
 };
 
@@ -24,9 +22,9 @@ pub enum GenericKind {
     Interface(InterfaceGenericKind),
 }
 
-impl From<BehavioralGenericKind> for GenericKind {
-    fn from(val: BehavioralGenericKind) -> Self {
-        Self::Behavioral(val)
+impl<B: Into<BehavioralGenericKind>> From<B> for GenericKind {
+    fn from(val: B) -> Self {
+        Self::Behavioral(val.into())
     }
 }
 
@@ -36,11 +34,24 @@ impl From<InterfaceGenericKind> for GenericKind {
     }
 }
 
+impl From<DimensionalityGeneric> for GenericKind {
+    fn from(val: DimensionalityGeneric) -> Self {
+        Self::Interface(val.into())
+    }
+}
+
 impl TestValue for GenericKind {
-    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
+    fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         match self {
-            GenericKind::Behavioral(behav) => behav.test_value(value),
-            GenericKind::Interface(iface) => iface.test_value(value),
+            GenericKind::Behavioral(behav) => behav.valid_value(value),
+            GenericKind::Interface(iface) => iface.valid_value(value),
+        }
+    }
+
+    fn describe_condition(&self) -> String {
+        match self {
+            GenericKind::Behavioral(behav) => behav.describe_condition(),
+            GenericKind::Interface(iface) => iface.describe_condition(),
         }
     }
 }
@@ -77,48 +88,44 @@ impl NameSelf for GenericParameter {
 }
 
 impl TestValue for GenericParameter {
-    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
-        self.kind().test_value(value)
+    fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
+        self.kind().valid_value(value)
+    }
+
+    fn describe_condition(&self) -> String {
+        self.kind().describe_condition()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::ir::generics::behavioral::integer::IntegerGeneric;
 
-    // #[test]
-    // fn test_conditions() -> Result<()> {
-    //     let param_attempt = GenericParameter::try_new("a", "positive")?
-    //         .with_conditions(["<= 1", ">1", " >= 1", "< 1"]);
-    //     assert_eq!(param_attempt.is_err(), true);
-    //     let param_attempt = GenericParameter::try_new("a", "positive")?
-    //         .with_conditions(["<= 1", ">1", " >= 1", "< 2"]);
-    //     assert_eq!(param_attempt.is_ok(), true);
+    use super::{
+        condition::{integer_condition::IntegerCondition, AppliesCondition, BuildsCondition},
+        *,
+    };
 
-    //     let mut param = GenericParameter::try_new("a", "positive")?;
-    //     assert_eq!(param.test_value(&0).is_ok(), false);
-    //     assert_eq!(param.test_value(&1).is_ok(), true);
+    #[test]
+    fn test_conditions() -> Result<()> {
+        let param = GenericParameter::try_new(
+            "a",
+            IntegerGeneric::natural()
+                .with_condition(IntegerCondition::Eq(2).or(IntegerCondition::Gt(5)).invert())?,
+        )?;
+        assert_eq!(
+            "(Natural, implicit: >= 0) and !(== 2 or > 5)",
+            param.describe_condition()
+        );
+        assert_eq!(param.valid_value(-1)?, false);
+        assert_eq!(param.valid_value(0)?, true);
+        assert_eq!(param.valid_value(1)?, true);
+        assert_eq!(param.valid_value(2)?, false);
+        assert_eq!(param.valid_value(3)?, true);
+        assert_eq!(param.valid_value(4)?, true);
+        assert_eq!(param.valid_value(5)?, true);
+        assert_eq!(param.valid_value(6)?, false);
 
-    //     assert_eq!(param.test_value(&2).is_ok(), true);
-    //     param.set_conditions(["> 2"])?;
-    //     assert_eq!(param.test_value(&1).is_ok(), false);
-    //     assert_eq!(param.test_value(&2).is_ok(), false);
-    //     assert_eq!(param.test_value(&3).is_ok(), true);
-
-    //     assert_eq!(param.test_value(&4).is_ok(), true);
-    //     param.set_conditions(["> 2", "< 4"])?;
-    //     assert_eq!(param.test_value(&1).is_ok(), false);
-    //     assert_eq!(param.test_value(&2).is_ok(), false);
-    //     assert_eq!(param.test_value(&3).is_ok(), true);
-    //     assert_eq!(param.test_value(&4).is_ok(), false);
-
-    //     param.set_conditions([">= 2", "<= 4"])?;
-    //     assert_eq!(param.test_value(&1).is_ok(), false);
-    //     assert_eq!(param.test_value(&2).is_ok(), true);
-    //     assert_eq!(param.test_value(&3).is_ok(), true);
-    //     assert_eq!(param.test_value(&4).is_ok(), true);
-    //     assert_eq!(param.test_value(&5).is_ok(), false);
-
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }

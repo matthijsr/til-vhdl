@@ -18,9 +18,15 @@ impl From<DimensionalityGeneric> for InterfaceGenericKind {
 }
 
 impl TestValue for InterfaceGenericKind {
-    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
+    fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         match self {
-            InterfaceGenericKind::Dimensionality(dim) => dim.test_value(value),
+            InterfaceGenericKind::Dimensionality(dim) => dim.valid_value(value),
+        }
+    }
+
+    fn describe_condition(&self) -> String {
+        match self {
+            InterfaceGenericKind::Dimensionality(dim) => dim.describe_condition(),
         }
     }
 }

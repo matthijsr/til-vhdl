@@ -27,7 +27,7 @@ impl AppliesCondition<IntegerCondition> for DimensionalityGeneric {
 }
 
 impl TestValue for DimensionalityGeneric {
-    fn test_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
+    fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         let generic_value: GenericParamValue = value.try_result()?;
         let value = match generic_value {
             GenericParamValue::Integer(val) => Ok(val),
@@ -39,7 +39,11 @@ impl TestValue for DimensionalityGeneric {
         if value < 2 {
             Ok(false)
         } else {
-            self.condition().test_value(value)
+            self.condition().valid_value(value)
         }
+    }
+
+    fn describe_condition(&self) -> String {
+        format!("(Dimensionality, implicit: >= 2) and {}", self.condition())
     }
 }
