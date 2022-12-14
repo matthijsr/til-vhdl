@@ -129,7 +129,9 @@ impl TestValue for GenericParameter {
 
 #[cfg(test)]
 mod tests {
-    use crate::ir::generics::behavioral::integer::IntegerGeneric;
+    use crate::ir::generics::{
+        behavioral::integer::IntegerGeneric, param_value::combination::GenericParamValueOps,
+    };
 
     use super::{
         condition::{integer_condition::IntegerCondition, AppliesCondition, BuildsCondition},
@@ -164,8 +166,17 @@ mod tests {
 
         assert_eq!(param.valid_value(param2_nat)?, true);
         assert_eq!(param.valid_value(param2_pos)?, true);
-        assert_eq!(param.valid_value(param2_int)?, true);
-        assert_eq!(param.valid_value(param2_dim)?, true);
+        assert_eq!(param.valid_value(param2_int.clone())?, true);
+        assert_eq!(param.valid_value(param2_dim.clone())?, true);
+
+        let math_combinaton = param2_dim
+            .g_add(2)?
+            .g_sub(1)?
+            .g_mul(param2_int)?
+            .g_mod(3)?
+            .g_negative()?;
+
+        assert_eq!(param.valid_value(math_combinaton)?, true);
 
         Ok(())
     }
