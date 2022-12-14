@@ -183,6 +183,10 @@ impl Interface {
     pub fn domains(&self) -> &Option<InsertionOrderedSet<Domain>> {
         &self.domains
     }
+
+    pub fn parameters(&self) -> &InsertionOrderedMap<Name, GenericParameter> {
+        &self.parameters
+    }
 }
 
 impl MoveDb<Id<Arc<Interface>>> for Arc<Interface> {

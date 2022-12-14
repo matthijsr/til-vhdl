@@ -9,6 +9,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
+    generics::GenericParameter,
     physical_properties::Domain,
     project::interface::Interface,
     traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
@@ -139,6 +140,10 @@ impl Streamlet {
 
     pub fn domains(&self, db: &dyn Ir) -> Option<InsertionOrderedSet<Domain>> {
         self.interface(db).domains().clone()
+    }
+
+    pub fn parameters(&self, db: &dyn Ir) -> InsertionOrderedMap<Name, GenericParameter> {
+        self.interface(db).parameters().clone()
     }
 }
 
