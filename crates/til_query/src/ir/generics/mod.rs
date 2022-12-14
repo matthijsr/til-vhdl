@@ -1,5 +1,5 @@
 use tydi_common::{
-    error::{Result, TryResult},
+    error::{Error, Result, TryResult},
     name::{Name, NameSelf},
     traits::Identify,
 };
@@ -74,8 +74,15 @@ impl GenericParameter {
             kind: kind.try_result()?,
             default_value: default_value.try_result()?,
         };
-        r.valid_value(r.default_value().clone())?;
-        Ok(r)
+        if r.valid_value(r.default_value().clone())? {
+            Ok(r)
+        } else {
+            Err(Error::InvalidArgument(format!(
+                "Default value ({}) is not valid for condition: {}",
+                r.default_value(),
+                r.describe_condition()
+            )))
+        }
     }
 
     pub fn kind(&self) -> &GenericKind {
@@ -124,7 +131,7 @@ mod tests {
             "a",
             IntegerGeneric::natural()
                 .with_condition(IntegerCondition::Eq(2).or(IntegerCondition::Gt(5)).invert())?,
-                0,
+            0,
         )?;
         assert_eq!(
             "(Natural, implicit: >= 0) and !(== 2 or > 5)",
