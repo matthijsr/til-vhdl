@@ -60,18 +60,30 @@ impl TestValue for GenericKind {
 pub struct GenericParameter {
     name: Name,
     kind: GenericKind,
+    default_value: GenericParamValue,
 }
 
 impl GenericParameter {
-    pub fn try_new(name: impl TryResult<Name>, kind: impl TryResult<GenericKind>) -> Result<Self> {
-        Ok(Self {
+    pub fn try_new(
+        name: impl TryResult<Name>,
+        kind: impl TryResult<GenericKind>,
+        default_value: impl TryResult<GenericParamValue>,
+    ) -> Result<Self> {
+        let r = Self {
             name: name.try_result()?,
             kind: kind.try_result()?,
-        })
+            default_value: default_value.try_result()?,
+        };
+        r.valid_value(r.default_value().clone())?;
+        Ok(r)
     }
 
     pub fn kind(&self) -> &GenericKind {
         &self.kind
+    }
+
+    pub fn default_value(&self) -> &GenericParamValue {
+        &self.default_value
     }
 }
 
@@ -112,6 +124,7 @@ mod tests {
             "a",
             IntegerGeneric::natural()
                 .with_condition(IntegerCondition::Eq(2).or(IntegerCondition::Gt(5)).invert())?,
+                0,
         )?;
         assert_eq!(
             "(Natural, implicit: >= 0) and !(== 2 or > 5)",
