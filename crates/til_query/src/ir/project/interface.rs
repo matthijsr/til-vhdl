@@ -13,6 +13,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::ir::{
+    generics::GenericParameter,
     implementation::structure::Structure,
     interface_port::InterfacePort,
     physical_properties::{Domain, InterfaceDirection},
@@ -24,6 +25,7 @@ use crate::ir::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {
     domains: Option<InsertionOrderedSet<Domain>>,
+    parameters: InsertionOrderedMap<Name, GenericParameter>,
     ports: InsertionOrderedMap<Name, InterfacePort>,
 }
 
@@ -31,6 +33,7 @@ impl Interface {
     pub fn new_empty() -> Self {
         Interface {
             domains: None,
+            parameters: InsertionOrderedMap::new(),
             ports: InsertionOrderedMap::new(),
         }
     }
@@ -40,6 +43,12 @@ impl Interface {
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
         Self::new_domains(domains)?.with_ports(ports)
+    }
+
+    pub fn new_parameters(
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+    ) -> Result<Self> {
+        Self::new_empty().with_parameters(parameters)
     }
 
     pub fn new_domains(domains: impl IntoIterator<Item = impl TryResult<Name>>) -> Result<Self> {
@@ -57,6 +66,7 @@ impl Interface {
 
         Ok(Interface {
             domains: domain_set,
+            parameters: InsertionOrderedMap::new(),
             ports: InsertionOrderedMap::new(),
         })
     }
@@ -118,6 +128,20 @@ impl Interface {
         }
 
         self.ports = port_map;
+        Ok(self)
+    }
+
+    pub fn with_parameters(
+        mut self,
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+    ) -> Result<Self> {
+        let mut param_map = InsertionOrderedMap::new();
+        for param in parameters {
+            let param = param.try_result()?;
+            param_map.try_insert(param.name().clone(), param)?
+        }
+
+        self.parameters = param_map;
         Ok(self)
     }
 
