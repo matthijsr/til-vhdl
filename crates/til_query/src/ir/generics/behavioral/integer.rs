@@ -6,12 +6,8 @@ use crate::ir::generics::{
     condition::{
         integer_condition::IntegerCondition, AppliesCondition, GenericCondition, TestValue,
     },
-    interface::InterfaceGenericKind,
     param_value::GenericParamValue,
-    GenericKind,
 };
-
-use super::BehavioralGenericKind;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum IntegerGenericKind {
@@ -86,29 +82,19 @@ impl AppliesCondition<IntegerCondition> for IntegerGeneric {
 impl TestValue for IntegerGeneric {
     fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         let generic_value: GenericParamValue = value.try_result()?;
-        let value = match &generic_value {
-            GenericParamValue::Integer(val) => Ok(*val),
-            GenericParamValue::Ref(val) => match val.kind() {
-                GenericKind::Behavioral(b) => match b {
-                    BehavioralGenericKind::Integer(_) => return Ok(true),
-                    _ => Err(Error::InvalidArgument(format!(
-                        "Expected an Integer value, got a {}",
-                        generic_value
-                    ))),
-                },
-                GenericKind::Interface(i) => match i {
-                    InterfaceGenericKind::Dimensionality(_) => return Ok(true),
-                },
-            },
-            _ => Err(Error::InvalidArgument(format!(
+        if let GenericParamValue::Integer(value) = generic_value {
+            match self.kind() {
+                IntegerGenericKind::Natural if value < 0 => Ok(false),
+                IntegerGenericKind::Positive if value < 1 => Ok(false),
+                _ => self.condition().valid_value(value),
+            }
+        } else if generic_value.is_integer() {
+            Ok(true)
+        } else {
+            Err(Error::InvalidArgument(format!(
                 "Expected an Integer value, got a {}",
                 generic_value
-            ))),
-        }?;
-        match self.kind() {
-            IntegerGenericKind::Natural if value < 0 => Ok(false),
-            IntegerGenericKind::Positive if value < 1 => Ok(false),
-            _ => self.condition().valid_value(value),
+            )))
         }
     }
 

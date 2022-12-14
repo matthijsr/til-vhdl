@@ -1,15 +1,37 @@
 use core::fmt;
 
-use self::ref_value::RefValue;
+use self::{
+    combination::{Combination, MathCombination},
+    ref_value::RefValue,
+};
 
+use super::{behavioral::BehavioralGenericKind, interface::InterfaceGenericKind, GenericKind};
+
+pub mod combination;
 pub mod ref_value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GenericParamValue {
     Integer(i32),
     Ref(RefValue),
-    // Todo: Combinations (mainly mathematical ones, for now)
-    Combination,
+    Combination(Combination),
+}
+
+impl GenericParamValue {
+    pub fn is_integer(&self) -> bool {
+        match &self {
+            GenericParamValue::Integer(_) => true,
+            GenericParamValue::Ref(r) => match r.kind() {
+                GenericKind::Behavioral(b) => match b {
+                    BehavioralGenericKind::Integer(_) => true,
+                },
+                GenericKind::Interface(i) => match i {
+                    InterfaceGenericKind::Dimensionality(_) => true,
+                },
+            },
+            GenericParamValue::Combination(c) => c.left_val().is_integer(),
+        }
+    }
 }
 
 impl fmt::Display for GenericParamValue {
@@ -17,7 +39,7 @@ impl fmt::Display for GenericParamValue {
         match self {
             GenericParamValue::Integer(val) => write!(f, "Integer({})", val),
             GenericParamValue::Ref(val) => write!(f, "Ref({})", val),
-            GenericParamValue::Combination => todo!(),
+            GenericParamValue::Combination(c) => write!(f, "Combination({})", c),
         }
     }
 }
@@ -31,5 +53,17 @@ impl From<i32> for GenericParamValue {
 impl<I: Into<RefValue>> From<I> for GenericParamValue {
     fn from(i: I) -> Self {
         GenericParamValue::Ref(i.into())
+    }
+}
+
+impl From<Combination> for GenericParamValue {
+    fn from(combination: Combination) -> Self {
+        GenericParamValue::Combination(combination)
+    }
+}
+
+impl From<MathCombination> for GenericParamValue {
+    fn from(math: MathCombination) -> Self {
+        GenericParamValue::Combination(math.into())
     }
 }
