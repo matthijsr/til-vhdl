@@ -1,3 +1,5 @@
+use core::fmt;
+
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, NameSelf},
@@ -20,6 +22,15 @@ pub mod param_value;
 pub enum GenericKind {
     Behavioral(BehavioralGenericKind),
     Interface(InterfaceGenericKind),
+}
+
+impl fmt::Display for GenericKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GenericKind::Behavioral(b) => write!(f, "Behavioral({})", b),
+            GenericKind::Interface(i) => write!(f, "Interface({})", i),
+        }
+    }
 }
 
 impl<B: Into<BehavioralGenericKind>> From<B> for GenericKind {
@@ -145,6 +156,16 @@ mod tests {
         assert_eq!(param.valid_value(4)?, true);
         assert_eq!(param.valid_value(5)?, true);
         assert_eq!(param.valid_value(6)?, false);
+
+        let param2_nat = GenericParameter::try_new("b", IntegerGeneric::natural(), 0)?;
+        let param2_pos = GenericParameter::try_new("b", IntegerGeneric::positive(), 1)?;
+        let param2_int = GenericParameter::try_new("b", IntegerGeneric::integer(), 0)?;
+        let param2_dim = GenericParameter::try_new("b", InterfaceGenericKind::dimensionality(), 2)?;
+
+        assert_eq!(param.valid_value(param2_nat)?, true);
+        assert_eq!(param.valid_value(param2_pos)?, true);
+        assert_eq!(param.valid_value(param2_int)?, true);
+        assert_eq!(param.valid_value(param2_dim)?, true);
 
         Ok(())
     }

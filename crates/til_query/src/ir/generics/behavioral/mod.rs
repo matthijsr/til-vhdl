@@ -1,3 +1,5 @@
+use core::fmt;
+
 use self::integer::IntegerGeneric;
 use tydi_common::error::{Result, TryResult};
 
@@ -8,6 +10,14 @@ pub mod integer;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BehavioralGenericKind {
     Integer(IntegerGeneric),
+}
+
+impl fmt::Display for BehavioralGenericKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BehavioralGenericKind::Integer(i) => write!(f, "Integer({})", i),
+        }
+    }
 }
 
 impl From<IntegerGeneric> for BehavioralGenericKind {

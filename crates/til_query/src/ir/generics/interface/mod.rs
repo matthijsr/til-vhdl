@@ -1,3 +1,5 @@
+use core::fmt;
+
 use tydi_common::error::{Result, TryResult};
 
 use self::dimensionality::DimensionalityGeneric;
@@ -9,6 +11,20 @@ pub mod dimensionality;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InterfaceGenericKind {
     Dimensionality(DimensionalityGeneric),
+}
+
+impl InterfaceGenericKind {
+    pub fn dimensionality() -> Self {
+        DimensionalityGeneric::new().into()
+    }
+}
+
+impl fmt::Display for InterfaceGenericKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InterfaceGenericKind::Dimensionality(_) => write!(f, "Dimensionality",),
+        }
+    }
 }
 
 impl From<DimensionalityGeneric> for InterfaceGenericKind {
