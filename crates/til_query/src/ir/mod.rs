@@ -137,7 +137,7 @@ fn stream_split_streams(db: &dyn Ir, key: Id<Stream>) -> Result<SplitStreams> {
             Stream::new(
                 element,
                 this_stream.throughput(),
-                this_stream.dimensionality(),
+                this_stream.dimensionality().clone(),
                 this_stream.synchronicity(),
                 this_stream.complexity().clone(),
                 this_stream.direction(),

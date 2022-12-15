@@ -11,7 +11,7 @@ use tydi_intern::Id;
 use crate::{
     common::{
         logical::{
-            logicaltype::stream::{Stream, Synchronicity},
+            logicaltype::stream::{Dimensionality, Stream, Synchronicity},
             split_streams::SplitStreams,
             type_hierarchy::TypeHierarchy,
         },
@@ -29,7 +29,7 @@ pub struct StreamReference {
     data: Box<TypeReference>,
     direction: StreamDirection,
     complexity: Complexity,
-    dimensionality: NonNegative,
+    dimensionality: Dimensionality,
     transfer_scope: TransferScope,
     element_lanes: Positive,
     user: ElementManipulatingReference,
@@ -47,7 +47,7 @@ impl StreamReference {
         let physical_stream = path_name.clone();
         let direction = stream.direction();
         let complexity = stream.complexity();
-        let dimensionality = stream.dimensionality();
+        let dimensionality = stream.dimensionality().clone();
         let transfer_scope = if path_name.is_empty() {
             TransferScope::Root
         } else {
@@ -90,7 +90,7 @@ impl StreamReference {
     pub fn complexity(&self) -> &Complexity {
         &self.complexity
     }
-    pub fn dimensionality(&self) -> &NonNegative {
+    pub fn dimensionality(&self) -> &Dimensionality {
         &self.dimensionality
     }
     pub fn transfer_scope(&self) -> &TransferScope {

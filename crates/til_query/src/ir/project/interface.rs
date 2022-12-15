@@ -40,6 +40,16 @@ impl Interface {
 
     pub fn new(
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Self> {
+        Self::new_domains(domains)?
+            .with_parameters(parameters)?
+            .with_ports(ports)
+    }
+
+    pub fn new_ports_domains(
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
         Self::new_domains(domains)?.with_ports(ports)

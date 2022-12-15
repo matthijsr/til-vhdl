@@ -1,5 +1,10 @@
 use core::fmt;
-use std::{convert::TryFrom, hash::Hash, ops::Mul, str::FromStr};
+use std::{
+    convert::TryFrom,
+    hash::Hash,
+    ops::{Add, Div, Mul, Sub},
+    str::FromStr,
+};
 
 use tydi_common::{
     error::{Error, Result, TryResult},
@@ -117,6 +122,84 @@ impl Default for Throughput {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum StreamPropertyOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
+
+impl fmt::Display for StreamPropertyOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamPropertyOperator::Add => write!(f, "+"),
+            StreamPropertyOperator::Subtract => write!(f, "-"),
+            StreamPropertyOperator::Multiply => write!(f, "*"),
+            StreamPropertyOperator::Divide => write!(f, "/"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StreamProperty<T: fmt::Display> {
+    Combination(
+        Box<StreamProperty<T>>,
+        StreamPropertyOperator,
+        Box<StreamProperty<T>>,
+    ),
+    Fixed(T),
+    Parameterized(Name),
+}
+
+impl<T: fmt::Display + Add + Sub + Mul + Div> StreamProperty<T> {
+    pub fn try_eval(self) -> Option<T> {
+        match self {
+            StreamProperty::Combination(_, _, _) => todo!(),
+            StreamProperty::Fixed(f) => Some(f),
+            StreamProperty::Parameterized(_) => None,
+        }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for StreamProperty<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamProperty::Combination(l, op, r) => write!(f, "({}) {} {}", l, op, r),
+            StreamProperty::Fixed(val) => write!(f, "Fixed({})", val),
+            StreamProperty::Parameterized(p) => write!(f, "Parameterized({})", p),
+        }
+    }
+}
+
+impl From<NonNegative> for StreamProperty<NonNegative> {
+    fn from(val: NonNegative) -> Self {
+        Self::Fixed(val)
+    }
+}
+
+impl<T: fmt::Display> From<Name> for StreamProperty<T> {
+    fn from(val: Name) -> Self {
+        Self::Parameterized(val)
+    }
+}
+
+impl<T: fmt::Display> From<&Name> for StreamProperty<T> {
+    fn from(val: &Name) -> Self {
+        Self::Parameterized(val.clone())
+    }
+}
+
+impl<T: fmt::Display> TryFrom<&str> for StreamProperty<T> {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        Ok(Self::Parameterized(Name::try_new(value)?))
+    }
+}
+
+pub type Dimensionality = StreamProperty<NonNegative>;
+
 /// The stream-manipulating logical stream type.
 ///
 /// Defines a new physical stream.
@@ -141,7 +224,7 @@ pub struct Stream {
     /// Nonnegative integer specifying the dimensionality of the child
     /// stream with respect to the parent stream (with no parent, it is the
     /// initial value).
-    dimensionality: NonNegative,
+    dimensionality: Dimensionality,
     /// Synchronicity of the stream.
     ///
     /// The synchronicity of the d-dimensional elements in the child stream
@@ -181,7 +264,7 @@ impl Stream {
         db: &dyn Ir,
         data: Id<LogicalType>,
         throughput: impl TryResult<Throughput>,
-        dimensionality: NonNegative,
+        dimensionality: impl TryResult<Dimensionality>,
         synchronicity: Synchronicity,
         complexity: impl TryResult<Complexity>,
         direction: StreamDirection,
@@ -193,7 +276,7 @@ impl Stream {
             Ok(db.intern_stream(Stream {
                 data: data,
                 throughput: throughput.try_result()?,
-                dimensionality,
+                dimensionality: dimensionality.try_result()?,
                 synchronicity,
                 complexity: complexity.try_result()?,
                 direction,
@@ -209,7 +292,7 @@ impl Stream {
     pub(crate) fn new(
         data: Id<LogicalType>,
         throughput: Throughput,
-        dimensionality: NonNegative,
+        dimensionality: impl Into<Dimensionality>,
         synchronicity: Synchronicity,
         complexity: impl Into<Complexity>,
         direction: StreamDirection,
@@ -219,7 +302,7 @@ impl Stream {
         Stream {
             data: data,
             throughput: throughput,
-            dimensionality,
+            dimensionality: dimensionality.into(),
             synchronicity,
             complexity: complexity.into(),
             direction,
@@ -261,8 +344,8 @@ impl Stream {
     }
 
     /// Returns the dimensionality of this stream.
-    pub fn dimensionality(&self) -> NonNegative {
-        self.dimensionality
+    pub fn dimensionality(&self) -> &Dimensionality {
+        &self.dimensionality
     }
 
     /// Returns the throughput ratio of this stream.
@@ -285,7 +368,7 @@ impl Stream {
         PhysicalStream::new(
             self.data(db).fields(db),
             self.throughput().positive(),
-            self.dimensionality(),
+            self.dimensionality().clone(),
             self.complexity(),
             self.user(db).fields(db),
             self.direction(),
@@ -303,7 +386,7 @@ impl Stream {
     }
 
     /// Set the dimensionality of this stream.
-    pub(crate) fn set_dimensionality(&mut self, dimensionality: NonNegative) {
+    pub(crate) fn set_dimensionality(&mut self, dimensionality: Dimensionality) {
         self.dimensionality = dimensionality;
     }
 }
@@ -434,7 +517,7 @@ impl MoveDb<Id<Stream>> for Stream {
         Ok(Stream::new(
             self.data_id().move_db(original_db, target_db, prefix)?,
             self.throughput(),
-            self.dimensionality(),
+            self.dimensionality().clone(),
             self.synchronicity(),
             self.complexity(),
             self.direction(),
