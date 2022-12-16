@@ -297,13 +297,11 @@ impl PhysicalStream {
     /// Returns the number of `stai` (start index) bits in this physical
     /// stream.
     pub fn stai_bit_count(&self) -> Option<PhysicalBitCount> {
-        PhysicalBitCount::fixed(
-            if self.complexity.major() >= 6 && self.element_lanes.get() > 1 {
-                log2_ceil(self.element_lanes)
-            } else {
-                0
-            },
-        )
+        if self.complexity.major() >= 6 && self.element_lanes.get() > 1 {
+            PhysicalBitCount::fixed(log2_ceil(self.element_lanes))
+        } else {
+            None
+        }
     }
 
     fn has_dimensions(&self) -> bool {
@@ -319,24 +317,20 @@ impl PhysicalStream {
 
     /// Returns the number of `endi` (end index) bits in this physical stream.
     pub fn endi_bit_count(&self) -> Option<PhysicalBitCount> {
-        PhysicalBitCount::fixed(
-            if (self.complexity.major() >= 5 || self.has_dimensions())
-                && self.element_lanes.get() > 1
-            {
-                log2_ceil(self.element_lanes)
-            } else {
-                0
-            },
-        )
+        if (self.complexity.major() >= 5 || self.has_dimensions()) && self.element_lanes.get() > 1 {
+            PhysicalBitCount::fixed(log2_ceil(self.element_lanes))
+        } else {
+            None
+        }
     }
 
     /// Returns the number of `strb` (strobe) bits in this physical stream.
     pub fn strb_bit_count(&self) -> Option<PhysicalBitCount> {
-        PhysicalBitCount::fixed(if self.complexity.major() >= 7 || self.has_dimensions() {
-            self.element_lanes.get()
+        if self.complexity.major() >= 7 || self.has_dimensions() {
+            PhysicalBitCount::fixed(self.element_lanes.get())
         } else {
-            0
-        })
+            None
+        }
     }
 
     /// Returns the bit count of the user fields in this physical stream.
