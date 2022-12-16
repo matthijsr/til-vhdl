@@ -1,4 +1,7 @@
-use std::convert::TryInto;
+use std::{
+    convert::TryInto,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use tydi_common::{
     error::{Error, Result, TryOptional, TryResult},
@@ -16,52 +19,57 @@ use crate::common::{
 use super::{complexity::Complexity, signal_list::SignalList};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum PhysicalBitCountBase {
+pub enum PhysicalBitCount {
     Combination(Box<Self>, StreamPropertyOperator, Box<Self>),
     Fixed(Positive),
     Parameterized(Name),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct PhysicalBitCount {
-    base: PhysicalBitCountBase,
-    multipliers: Vec<Positive>,
-}
-
 impl PhysicalBitCount {
     pub fn parameterized(name: impl Into<Name>) -> Self {
-        PhysicalBitCount {
-            base: PhysicalBitCountBase::Parameterized(name.into()),
-            multipliers: vec![],
-        }
+        PhysicalBitCount::Parameterized(name.into())
     }
 
     pub fn fixed(val: NonNegative) -> Option<Self> {
         if let Some(val) = Positive::new(val) {
-            Some(Self {
-                base: PhysicalBitCountBase::Fixed(val),
-                multipliers: vec![],
-            })
+            Some(PhysicalBitCount::Fixed(val))
         } else {
             None
         }
     }
 
-    pub fn with_multiplier(mut self, m: NonNegative) -> Self {
+    pub fn with_multiplier(self, m: NonNegative) -> Self {
         if let Some(mul) = Positive::new(m) {
-            self.multipliers.push(mul);
+            if mul > Positive::new(1).unwrap() {
+                return PhysicalBitCount::Combination(
+                    Box::new(self),
+                    StreamPropertyOperator::Multiply,
+                    Box::new(PhysicalBitCount::Fixed(mul)),
+                );
+            }
         }
 
         self
     }
 
-    pub fn base(&self) -> &PhysicalBitCountBase {
-        &self.base
-    }
-
-    /// Multipliers. If empty, there are no multipliers (i.e., multiplier is 1)
-    pub fn multipliers(&self) -> &Vec<Positive> {
-        &self.multipliers
+    pub fn try_eval(&self) -> Option<Positive> {
+        match self {
+            PhysicalBitCount::Combination(l, op, r) => {
+                if let Some(lv) = l.try_eval() {
+                    if let Some(rv) = r.try_eval() {
+                        return match op {
+                            StreamPropertyOperator::Add => lv.checked_add(rv.get()),
+                            StreamPropertyOperator::Subtract => Positive::new(lv.get() - rv.get()),
+                            StreamPropertyOperator::Multiply => lv.checked_mul(rv),
+                            StreamPropertyOperator::Divide => Positive::new(lv.get() / rv.get()),
+                        };
+                    }
+                }
+                None
+            }
+            PhysicalBitCount::Fixed(f) => Some(*f),
+            PhysicalBitCount::Parameterized(_) => None,
+        }
     }
 }
 
@@ -75,19 +83,60 @@ impl From<StreamProperty<NonNegative>> for Option<PhysicalBitCount> {
                     (None, None) => None,
                     (None, Some(rv)) => Some(rv),
                     (Some(lv), None) => Some(lv),
-                    (Some(lv), Some(rv)) => Some(PhysicalBitCount {
-                        base: PhysicalBitCountBase::Combination(
-                            Box::new(lv.base),
-                            op,
-                            Box::new(rv.base),
-                        ),
-                        multipliers: vec![],
-                    }),
+                    (Some(lv), Some(rv)) => Some(PhysicalBitCount::Combination(
+                        Box::new(lv),
+                        op,
+                        Box::new(rv),
+                    )),
                 }
             }
             StreamProperty::Fixed(f) => PhysicalBitCount::fixed(f),
             StreamProperty::Parameterized(n) => Some(PhysicalBitCount::parameterized(n)),
         }
+    }
+}
+
+impl Add for PhysicalBitCount {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(Box::new(self), StreamPropertyOperator::Add, Box::new(rhs))
+    }
+}
+
+impl Sub for PhysicalBitCount {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Subtract,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl Mul for PhysicalBitCount {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Multiply,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl Div for PhysicalBitCount {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Divide,
+            Box::new(rhs),
+        )
     }
 }
 

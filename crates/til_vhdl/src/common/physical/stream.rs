@@ -1,5 +1,5 @@
 use til_query::common::logical::logicaltype::stream::StreamProperty;
-use til_query::common::physical::stream::{PhysicalBitCount, PhysicalBitCountBase};
+use til_query::common::physical::stream::PhysicalBitCount;
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
 use til_query::ir::generics::interface::dimensionality;
@@ -44,57 +44,47 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
         };
 
         // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-        let bitcount_to_size = |bitcount: Option<PhysicalBitCount>| match bitcount {
-            Some(u) => match u.base() {
-                PhysicalBitCountBase::Combination(_, _, _) => todo!(),
-                PhysicalBitCountBase::Fixed(f) => {
-                    let mut f = *f;
-                    for mul in u.multipliers() {
-                        let mul = *mul;
-                        if let Some(f_result) = f.checked_mul(mul) {
-                            f = f_result;
-                        }
-                        // Overflow can happen here? Should thrown an error
-                    }
-                    f.get()
-                }
-                PhysicalBitCountBase::Parameterized(_) => todo!(),
-            },
-            None => 0,
-        };
 
         let signal_list: SignalList<PhysicalBitCount> = self.into();
         let mut signal_list = signal_list.map_named(|n, x| {
-            // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-            // As the prefix is either a VhdlName or empty, and all signal names are valid
-            match x.base() {
-                PhysicalBitCountBase::Combination(_, _, _) => todo!(),
-                PhysicalBitCountBase::Fixed(f) => {
-                    let mut f = *f;
-                    for mul in x.multipliers() {
-                        let mul = *mul;
-                        if let Some(f_result) = f.checked_mul(mul) {
-                            f = f_result;
-                        }
-                        // Overflow can happen here? Should thrown an error
-                    }
-                    Port::try_new(cat!(prefix, n), mode, f).unwrap()
-                }
-                PhysicalBitCountBase::Parameterized(_) => todo!(),
+            if let Some(f) = x.try_eval() {
+                // As the prefix is either a VhdlName or empty, and all signal names are valid
+                Port::try_new(cat!(prefix, n), mode, f).unwrap()
+            } else {
+                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+                todo!()
             }
         });
 
         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
-        let user_bit_count = bitcount_to_size(self.user_bit_count());
+        let user_bit_count = if let Some(u) = self.user_bit_count() {
+            if let Some(f) = u.try_eval() {
+                f.get()
+            } else {
+                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+                todo!()
+            }
+        } else {
+            0
+        };
 
-        let data_element_bit_count = bitcount_to_size(self.data_element_bit_count());
+        let data_element_bit_count = if let Some(d) = self.data_element_bit_count() {
+            if let Some(f) = d.try_eval() {
+                f.get()
+            } else {
+                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+                todo!()
+            }
+        } else {
+            0
+        };
 
         // TODO: ALLOW FOR PARAMETERIZED DIMENSIONALITY
-        let dimensionality = match self.dimensionality() {
-            StreamProperty::Combination(_, _, _) => todo!(),
-            StreamProperty::Fixed(f) => *f,
-            StreamProperty::Parameterized(_) => todo!(),
+        let dimensionality = if let Some(f) = self.dimensionality().try_eval() {
+            f
+        } else {
+            todo!()
         };
 
         Ok(VhdlPhysicalStream::new(

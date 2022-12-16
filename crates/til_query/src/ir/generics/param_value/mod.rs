@@ -32,6 +32,14 @@ impl GenericParamValue {
             GenericParamValue::Combination(c) => c.left_val().is_integer(),
         }
     }
+
+    pub fn is_fixed(&self) -> bool {
+        match self {
+            GenericParamValue::Integer(_) => true,
+            GenericParamValue::Ref(_) => false,
+            GenericParamValue::Combination(_) => false,
+        }
+    }
 }
 
 impl fmt::Display for GenericParamValue {

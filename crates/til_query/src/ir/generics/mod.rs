@@ -85,7 +85,12 @@ impl GenericParameter {
             kind: kind.try_result()?,
             default_value: default_value.try_result()?,
         };
-        if r.valid_value(r.default_value().clone())? {
+        if !r.default_value().is_fixed() {
+            Err(Error::InvalidArgument(format!(
+                "Default value ({}) is not fixed.",
+                r.default_value(),
+            )))
+        } else if r.valid_value(r.default_value().clone())? {
             Ok(r)
         } else {
             Err(Error::InvalidArgument(format!(
