@@ -3,7 +3,7 @@ use core::fmt;
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{Name, NameSelf},
-    traits::Identify,
+    traits::{Document, Documents, Identify},
 };
 
 use self::{
@@ -72,6 +72,7 @@ pub struct GenericParameter {
     name: Name,
     kind: GenericKind,
     default_value: GenericParamValue,
+    doc: Option<String>,
 }
 
 impl GenericParameter {
@@ -84,6 +85,7 @@ impl GenericParameter {
             name: name.try_result()?,
             kind: kind.try_result()?,
             default_value: default_value.try_result()?,
+            doc: None,
         };
         if !r.default_value().is_fixed() {
             Err(Error::InvalidArgument(format!(
@@ -129,6 +131,18 @@ impl TestValue for GenericParameter {
 
     fn describe_condition(&self) -> String {
         self.kind().describe_condition()
+    }
+}
+
+impl Document for GenericParameter {
+    fn doc(&self) -> Option<&String> {
+        self.doc.as_ref()
+    }
+}
+
+impl Documents for GenericParameter {
+    fn set_doc(&mut self, doc: impl Into<String>) {
+        self.doc = Some(doc.into())
     }
 }
 

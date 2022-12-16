@@ -34,13 +34,14 @@ use tydi_vhdl::{
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
-    port::Port,
+    port::{GenericParameter, Port},
     statement::mapping::Mapping,
 };
 
 use crate::IntoVhdl;
 
 use super::{
+    generics::param_to_param,
     interface_port::VhdlInterface,
     physical_properties::{VhdlDomain, VhdlDomainListOrDefault},
 };
@@ -252,6 +253,7 @@ pub struct VhdlStreamlet {
     prefix: Option<VhdlName>,
     name: PathName,
     implementation: Option<Id<Implementation>>,
+    parameters: InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
     domains: VhdlDomainListOrDefault<Port>,
     interface: InsertionOrderedMap<Name, VhdlInterface>,
     doc: Option<String>,
@@ -756,10 +758,19 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
 
         let domains = self.domains(ir_db).into();
 
+        let no_parent_params = InsertionOrderedMap::new();
+        let parameters = self.parameters(ir_db).try_map_convert(|p| {
+            ObjectDeclaration::from_parameter(
+                arch_db,
+                &param_to_param(arch_db, &p, &no_parent_params)?,
+            )
+        })?;
+
         Ok(VhdlStreamlet {
             prefix,
             name: self.path_name().clone(),
             implementation: self.implementation_id(),
+            parameters,
             domains,
             interface,
             doc: self.doc().cloned(),

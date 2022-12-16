@@ -176,6 +176,18 @@ impl Architecture {
         Ok(result)
     }
 
+    pub fn entity_parameters(
+        &self,
+        db: &mut dyn Arch,
+    ) -> Result<IndexMap<String, Id<ObjectDeclaration>>> {
+        let mut result = IndexMap::new();
+        for param in self.entity.parameters() {
+            let obj = ObjectDeclaration::from_parameter(db, param)?;
+            result.insert(param.identifier().to_string(), obj);
+        }
+        Ok(result)
+    }
+
     pub fn add_body(&mut self, db: &dyn Arch, body: &ArchitectureBody) -> Result<()> {
         for declaration in body.declarations() {
             self.add_declaration(db, declaration.clone())?;
