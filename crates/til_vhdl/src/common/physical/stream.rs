@@ -1,11 +1,11 @@
 use til_query::common::logical::logicaltype::stream::StreamProperty;
-use til_query::common::physical::stream::PhysicalBitCount;
+use til_query::common::physical::stream::{PhysicalBitCount, PhysicalBitCountBase};
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
 use til_query::ir::generics::interface::dimensionality;
 use til_query::ir::physical_properties::InterfaceDirection;
 use til_query::ir::Ir;
-use tydi_common::error::TryOptional;
+use tydi_common::error::{Error, TryOptional};
 use tydi_common::numbers::Positive;
 use tydi_common::{
     cat,
@@ -43,25 +43,52 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             StreamDirection::Reverse => Mode::Out,
         };
 
+        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+        let bitcount_to_size = |bitcount: Option<PhysicalBitCount>| match bitcount {
+            Some(u) => match u.base() {
+                PhysicalBitCountBase::Combination(_, _, _) => todo!(),
+                PhysicalBitCountBase::Fixed(f) => {
+                    let mut f = *f;
+                    for mul in u.multipliers() {
+                        let mul = *mul;
+                        if let Some(f_result) = f.checked_mul(mul) {
+                            f = f_result;
+                        }
+                        // Overflow can happen here? Should thrown an error
+                    }
+                    f.get()
+                }
+                PhysicalBitCountBase::Parameterized(_) => todo!(),
+            },
+            None => 0,
+        };
+
         let signal_list: SignalList<PhysicalBitCount> = self.into();
         let mut signal_list = signal_list.map_named(|n, x| {
             // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-            Port::try_new(cat!(prefix, n), mode, ObjectType::Bit).unwrap() // As the prefix is either a VhdlName or empty, and all signal names are valid
+            // As the prefix is either a VhdlName or empty, and all signal names are valid
+            match x.base() {
+                PhysicalBitCountBase::Combination(_, _, _) => todo!(),
+                PhysicalBitCountBase::Fixed(f) => {
+                    let mut f = *f;
+                    for mul in x.multipliers() {
+                        let mul = *mul;
+                        if let Some(f_result) = f.checked_mul(mul) {
+                            f = f_result;
+                        }
+                        // Overflow can happen here? Should thrown an error
+                    }
+                    Port::try_new(cat!(prefix, n), mode, f).unwrap()
+                }
+                PhysicalBitCountBase::Parameterized(_) => todo!(),
+            }
         });
 
         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
-        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-        let user_bit_count = match self.user_bit_count() {
-            Some(_) => 1,
-            None => 0,
-        };
+        let user_bit_count = bitcount_to_size(self.user_bit_count());
 
-        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-        let data_element_bit_count = match self.data_element_bit_count() {
-            Some(_) => 1,
-            None => 0,
-        };
+        let data_element_bit_count = bitcount_to_size(self.data_element_bit_count());
 
         // TODO: ALLOW FOR PARAMETERIZED DIMENSIONALITY
         let dimensionality = match self.dimensionality() {

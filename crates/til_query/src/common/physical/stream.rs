@@ -25,7 +25,7 @@ pub enum PhysicalBitCountBase {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhysicalBitCount {
     base: PhysicalBitCountBase,
-    multipliers: Vec<NonNegative>,
+    multipliers: Vec<Positive>,
 }
 
 impl PhysicalBitCount {
@@ -48,7 +48,10 @@ impl PhysicalBitCount {
     }
 
     pub fn with_multiplier(mut self, m: NonNegative) -> Self {
-        self.multipliers.push(m);
+        if let Some(mul) = Positive::new(m) {
+            self.multipliers.push(mul);
+        }
+
         self
     }
 
@@ -57,7 +60,7 @@ impl PhysicalBitCount {
     }
 
     /// Multipliers. If empty, there are no multipliers (i.e., multiplier is 1)
-    pub fn multipliers(&self) -> &Vec<NonNegative> {
+    pub fn multipliers(&self) -> &Vec<Positive> {
         &self.multipliers
     }
 }
