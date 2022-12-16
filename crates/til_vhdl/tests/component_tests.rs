@@ -356,7 +356,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -366,7 +366,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -376,7 +376,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Reverse,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -396,7 +396,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -406,7 +406,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -416,7 +416,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Reverse,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -425,7 +425,7 @@ namespace my::test::space {
   ),
   direction: Forward,
   complexity: 4,
-  dimensionality: 0,
+  dimensionality: Fixed(0),
   transfer_scope: Root,
   element_lanes: 3,
   user: Null
