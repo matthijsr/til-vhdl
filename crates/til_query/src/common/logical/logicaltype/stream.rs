@@ -152,11 +152,26 @@ pub enum StreamProperty<T: fmt::Display> {
     Parameterized(Name),
 }
 
-impl<T: fmt::Display + Add + Sub + Mul + Div> StreamProperty<T> {
-    pub fn try_eval(self) -> Option<T> {
+impl<
+        T: fmt::Display + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Copy,
+    > StreamProperty<T>
+{
+    pub fn try_eval(&self) -> Option<T> {
         match self {
-            StreamProperty::Combination(_, _, _) => todo!(),
-            StreamProperty::Fixed(f) => Some(f),
+            StreamProperty::Combination(l, op, r) => {
+                if let Some(lv) = l.try_eval() {
+                    if let Some(rv) = r.try_eval() {
+                        return match op {
+                            StreamPropertyOperator::Add => Some(lv + rv),
+                            StreamPropertyOperator::Subtract => Some(lv - rv),
+                            StreamPropertyOperator::Multiply => Some(lv * rv),
+                            StreamPropertyOperator::Divide => Some(lv / rv),
+                        };
+                    }
+                }
+                None
+            }
+            StreamProperty::Fixed(f) => Some(*f),
             StreamProperty::Parameterized(_) => None,
         }
     }
@@ -169,6 +184,50 @@ impl<T: fmt::Display> fmt::Display for StreamProperty<T> {
             StreamProperty::Fixed(val) => write!(f, "Fixed({})", val),
             StreamProperty::Parameterized(p) => write!(f, "Parameterized({})", p),
         }
+    }
+}
+
+impl<T: fmt::Display> Add for StreamProperty<T> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        StreamProperty::Combination(Box::new(self), StreamPropertyOperator::Add, Box::new(rhs))
+    }
+}
+
+impl<T: fmt::Display> Sub for StreamProperty<T> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        StreamProperty::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Subtract,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl<T: fmt::Display> Mul for StreamProperty<T> {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        StreamProperty::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Multiply,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl<T: fmt::Display> Div for StreamProperty<T> {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        StreamProperty::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Divide,
+            Box::new(rhs),
+        )
     }
 }
 

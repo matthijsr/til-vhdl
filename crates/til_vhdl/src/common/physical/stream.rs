@@ -1,5 +1,8 @@
+use til_query::common::logical::logicaltype::stream::StreamProperty;
+use til_query::common::physical::stream::PhysicalBitCount;
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
+use til_query::ir::generics::interface::dimensionality;
 use til_query::ir::physical_properties::InterfaceDirection;
 use til_query::ir::Ir;
 use tydi_common::error::TryOptional;
@@ -11,6 +14,7 @@ use tydi_common::{
     traits::{Reverse, Reversed},
 };
 use tydi_vhdl::architecture::arch_storage::Arch;
+use tydi_vhdl::object::object_type::ObjectType;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
     port::{Mode, Port},
@@ -39,20 +43,40 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             StreamDirection::Reverse => Mode::Out,
         };
 
-        let signal_list: SignalList<Positive> = self.into();
+        let signal_list: SignalList<PhysicalBitCount> = self.into();
         let mut signal_list = signal_list.map_named(|n, x| {
-            Port::try_new(cat!(prefix, n), mode, x).unwrap() // As the prefix is either a VhdlName or empty, and all signal names are valid
+            // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+            Port::try_new(cat!(prefix, n), mode, ObjectType::Bit).unwrap() // As the prefix is either a VhdlName or empty, and all signal names are valid
         });
 
         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
+        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+        let user_bit_count = match self.user_bit_count() {
+            Some(_) => 1,
+            None => 0,
+        };
+
+        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+        let data_element_bit_count = match self.data_element_bit_count() {
+            Some(_) => 1,
+            None => 0,
+        };
+
+        // TODO: ALLOW FOR PARAMETERIZED DIMENSIONALITY
+        let dimensionality = match self.dimensionality() {
+            StreamProperty::Combination(_, _, _) => todo!(),
+            StreamProperty::Fixed(f) => *f,
+            StreamProperty::Parameterized(_) => todo!(),
+        };
+
         Ok(VhdlPhysicalStream::new(
             signal_list,
             self.element_lanes().clone(),
-            self.dimensionality(),
+            dimensionality,
             self.complexity().clone(),
-            self.data_element_bit_count(),
-            self.user_bit_count(),
+            data_element_bit_count,
+            user_bit_count,
             InterfaceDirection::In,
             self.stream_direction(),
         ))

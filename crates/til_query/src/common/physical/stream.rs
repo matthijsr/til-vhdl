@@ -9,14 +9,16 @@ use tydi_common::{
 };
 
 use crate::common::{
-    logical::logicaltype::stream::{Dimensionality, StreamProperty}, stream_direction::StreamDirection,
+    logical::logicaltype::stream::{Dimensionality, StreamProperty, StreamPropertyOperator},
+    stream_direction::StreamDirection,
 };
 
 use super::{complexity::Complexity, signal_list::SignalList};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhysicalBitCountBase {
-    Fixed(NonNegative),
+    Combination(Box<Self>, StreamPropertyOperator, Box<Self>),
+    Fixed(Positive),
     Parameterized(Name),
 }
 
@@ -27,10 +29,21 @@ pub struct PhysicalBitCount {
 }
 
 impl PhysicalBitCount {
-    pub fn fixed(val: NonNegative) -> Self {
-        Self {
-            base: PhysicalBitCountBase::Fixed(val),
+    pub fn parameterized(name: impl Into<Name>) -> Self {
+        PhysicalBitCount {
+            base: PhysicalBitCountBase::Parameterized(name.into()),
             multipliers: vec![],
+        }
+    }
+
+    pub fn fixed(val: NonNegative) -> Option<Self> {
+        if let Some(val) = Positive::new(val) {
+            Some(Self {
+                base: PhysicalBitCountBase::Fixed(val),
+                multipliers: vec![],
+            })
+        } else {
+            None
         }
     }
 
@@ -49,34 +62,28 @@ impl PhysicalBitCount {
     }
 }
 
-impl From<StreamProperty<NonNegative>> for PhysicalBitCount {
-    fn from(d: Dimensionality) -> Self {
-        let base = match d {
-            StreamProperty::Combination(_, _, _) => todo!(),
-            StreamProperty::Fixed(_) => todo!(),
-            StreamProperty::Parameterized(_) => todo!(),
-        };
-        Self {
-            base,
-            multipliers: vec![],
-        }
-    }
-}
-
-impl TryOptional<PhysicalBitCount> for PhysicalBitCount {
-    fn try_optional(self) -> Result<Option<PhysicalBitCount>> {
-        match self.base() {
-            PhysicalBitCountBase::Fixed(f) if *f == 0 => Ok(None),
-            _ => Ok(Some(self)),
-        }
-    }
-}
-
-impl TryOptional<PhysicalBitCount> for &PhysicalBitCount {
-    fn try_optional(self) -> Result<Option<PhysicalBitCount>> {
-        match self.base() {
-            PhysicalBitCountBase::Fixed(f) if *f == 0 => Ok(None),
-            _ => Ok(Some(self.clone())),
+impl From<StreamProperty<NonNegative>> for Option<PhysicalBitCount> {
+    fn from(d: StreamProperty<NonNegative>) -> Option<PhysicalBitCount> {
+        match d {
+            StreamProperty::Combination(l, op, r) => {
+                let lv = Option::<PhysicalBitCount>::from(l.as_ref().clone());
+                let rv = Option::<PhysicalBitCount>::from(l.as_ref().clone());
+                match (lv, rv) {
+                    (None, None) => None,
+                    (None, Some(rv)) => Some(rv),
+                    (Some(lv), None) => Some(lv),
+                    (Some(lv), Some(rv)) => Some(PhysicalBitCount {
+                        base: PhysicalBitCountBase::Combination(
+                            Box::new(lv.base),
+                            op,
+                            Box::new(rv.base),
+                        ),
+                        multipliers: vec![],
+                    }),
+                }
+            }
+            StreamProperty::Fixed(f) => PhysicalBitCount::fixed(f),
+            StreamProperty::Parameterized(n) => Some(PhysicalBitCount::parameterized(n)),
         }
     }
 }
@@ -200,7 +207,7 @@ impl PhysicalStream {
 
     /// Returns the bit count of a single data element in this physical
     /// stream. The bit count is equal to the combined bit count of all fields.
-    pub fn data_element_bit_count(&self) -> PhysicalBitCount {
+    pub fn data_element_bit_count(&self) -> Option<PhysicalBitCount> {
         PhysicalBitCount::fixed(
             self.element_fields
                 .values()
@@ -212,26 +219,32 @@ impl PhysicalStream {
     /// Returns the bit count of the data (element) fields in this physical
     /// stream. The bit count is equal to the combined bit count of all fields
     /// multiplied by the number of lanes.
-    pub fn data_bit_count(&self) -> PhysicalBitCount {
-        self.data_element_bit_count()
-            .clone()
-            .with_multiplier(self.element_lanes.get())
+    pub fn data_bit_count(&self) -> Option<PhysicalBitCount> {
+        if let Some(d) = self.data_element_bit_count() {
+            Some(d.with_multiplier(self.element_lanes.get()))
+        } else {
+            None
+        }
     }
 
     /// Returns the number of last bits in this physical stream. The number of
     /// last bits equals the dimensionality.
-    pub fn last_bit_count(&self) -> PhysicalBitCount {
-        let mut bitcount = PhysicalBitCount::from(self.dimensionality().clone());
-        if self.complexity().major() >= 8 {
-            bitcount.with_multiplier(self.element_lanes().get())
+    pub fn last_bit_count(&self) -> Option<PhysicalBitCount> {
+        let bitcount = Option::<PhysicalBitCount>::from(self.dimensionality().clone());
+        if let Some(bitcount) = bitcount {
+            Some(if self.complexity().major() >= 8 {
+                bitcount.with_multiplier(self.element_lanes().get())
+            } else {
+                bitcount
+            })
         } else {
-            bitcount
+            None
         }
     }
 
     /// Returns the number of `stai` (start index) bits in this physical
     /// stream.
-    pub fn stai_bit_count(&self) -> PhysicalBitCount {
+    pub fn stai_bit_count(&self) -> Option<PhysicalBitCount> {
         PhysicalBitCount::fixed(
             if self.complexity.major() >= 6 && self.element_lanes.get() > 1 {
                 log2_ceil(self.element_lanes)
@@ -243,13 +256,17 @@ impl PhysicalStream {
 
     fn has_dimensions(&self) -> bool {
         match self.dimensionality() {
-            Dimensionality::Fixed(f) => *f >= 1,
-            Dimensionality::Parameterized(_) => true,
+            StreamProperty::Combination(_, _, _) => match self.dimensionality().try_eval() {
+                Some(f) => f >= 1,
+                None => true,
+            },
+            StreamProperty::Fixed(f) => *f >= 1,
+            StreamProperty::Parameterized(_) => true,
         }
     }
 
     /// Returns the number of `endi` (end index) bits in this physical stream.
-    pub fn endi_bit_count(&self) -> PhysicalBitCount {
+    pub fn endi_bit_count(&self) -> Option<PhysicalBitCount> {
         PhysicalBitCount::fixed(
             if (self.complexity.major() >= 5 || self.has_dimensions())
                 && self.element_lanes.get() > 1
@@ -262,7 +279,7 @@ impl PhysicalStream {
     }
 
     /// Returns the number of `strb` (strobe) bits in this physical stream.
-    pub fn strb_bit_count(&self) -> PhysicalBitCount {
+    pub fn strb_bit_count(&self) -> Option<PhysicalBitCount> {
         PhysicalBitCount::fixed(if self.complexity.major() >= 7 || self.has_dimensions() {
             self.element_lanes.get()
         } else {
@@ -271,7 +288,7 @@ impl PhysicalStream {
     }
 
     /// Returns the bit count of the user fields in this physical stream.
-    pub fn user_bit_count(&self) -> PhysicalBitCount {
+    pub fn user_bit_count(&self) -> Option<PhysicalBitCount> {
         PhysicalBitCount::fixed(self.user.values().map(|b| b.get()).sum::<NonNegative>())
     }
 

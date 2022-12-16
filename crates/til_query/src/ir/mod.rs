@@ -156,7 +156,9 @@ fn stream_split_streams(db: &dyn Ir, key: Id<Stream>) -> Result<SplitStreams> {
         if this_stream.flattens() {
             stream.set_synchronicity(Synchronicity::FlatDesync);
         } else {
-            stream.set_dimensionality(stream.dimensionality() + this_stream.dimensionality());
+            stream.set_dimensionality(
+                stream.dimensionality().clone() + this_stream.dimensionality().clone(),
+            );
         }
         stream.set_throughput(stream.throughput() * this_stream.throughput());
 
