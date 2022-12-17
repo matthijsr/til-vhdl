@@ -159,6 +159,15 @@ impl Mapping {
         &self.param_mappings
     }
 
+    pub fn has_param_assignments(&self) -> bool {
+        for (_, param) in self.param_mappings() {
+            if let MapAssignment::Assigned(_) = param {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn port_mappings(&self) -> &InsertionOrderedMap<VhdlName, MapAssignment> {
         &self.port_mappings
     }

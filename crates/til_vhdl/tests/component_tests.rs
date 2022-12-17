@@ -25,7 +25,8 @@ use til_query::{
     },
     test_utils::{
         simple_structural_streamlet, simple_structural_streamlet_with_behav_params,
-        streamlet_without_impl, test_stream_id, test_stream_id_custom,
+        streamlet_without_impl, streamlet_without_impl_with_behav_params, test_stream_id,
+        test_stream_id_custom,
     },
 };
 use til_vhdl::IntoVhdl;
@@ -806,6 +807,42 @@ begin
 end structural;"#,
         streamlet_arch.declare(arch_db)?
     );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_instance_and_behav_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let instance_streamlet = streamlet_without_impl_with_behav_params(db, "inner")?;
+    let parent_streamlet = streamlet_without_impl_with_behav_params(db, "parent")?;
+    let mut structure = Structure::try_from(&parent_streamlet)?;
+    let instance =
+        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
+    instance.assign_parameter("pa", 20)?;
+    instance.assign_parameter(
+        "pb",
+        parent_streamlet.try_get_parameter(db, &Name::try_new("pb")?)?,
+    )?;
+    structure.try_add_connection(db, "a", ("a", "a"))?;
+    structure.try_add_connection(db, "b", ("a", "b"))?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    println!("{}", streamlet_arch.declare(arch_db)?);
 
     Ok(())
 }

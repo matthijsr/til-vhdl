@@ -171,7 +171,7 @@ impl Structure {
         name: impl TryResult<Name>,
         streamlet: Id<Arc<Streamlet>>,
         assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
-    ) -> Result<()> {
+    ) -> Result<&mut StreamletInstance> {
         let name = name.try_result()?;
         if self.streamlet_instances().contains_key(&name) {
             Err(Error::InvalidArgument(format!(
@@ -181,9 +181,9 @@ impl Structure {
         } else {
             self.streamlet_instances.insert(
                 name.clone(),
-                StreamletInstance::new(db, name, streamlet, assignments)?,
+                StreamletInstance::new(db, name.clone(), streamlet, assignments)?,
             );
-            Ok(())
+            Ok(self.streamlet_instances.get_mut(&name).unwrap())
         }
     }
 
@@ -192,7 +192,7 @@ impl Structure {
         db: &dyn Ir,
         name: impl TryResult<Name>,
         streamlet: Id<Arc<Streamlet>>,
-    ) -> Result<()> {
+    ) -> Result<&mut StreamletInstance> {
         let name = name.try_result()?;
         if self.streamlet_instances().contains_key(&name) {
             Err(Error::InvalidArgument(format!(
@@ -202,27 +202,14 @@ impl Structure {
         } else {
             self.streamlet_instances.insert(
                 name.clone(),
-                StreamletInstance::new_assign_default(db, name, streamlet)?,
+                StreamletInstance::new_assign_default(db, name.clone(), streamlet)?,
             );
-            Ok(())
+            Ok(self.streamlet_instances.get_mut(&name).unwrap())
         }
     }
 
     pub fn try_get_streamlet_instance(&self, name: &Name) -> Result<&StreamletInstance> {
         match self.streamlet_instances().get(name) {
-            Some(streamlet) => Ok(streamlet),
-            None => Err(Error::InvalidArgument(format!(
-                "A streamlet instance with name {} does not exist in this structure",
-                name
-            ))),
-        }
-    }
-
-    pub fn try_get_streamlet_instance_mut(
-        &mut self,
-        name: &Name,
-    ) -> Result<&mut StreamletInstance> {
-        match self.streamlet_instances.get_mut(name) {
             Some(streamlet) => Ok(streamlet),
             None => Err(Error::InvalidArgument(format!(
                 "A streamlet instance with name {} does not exist in this structure",

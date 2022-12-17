@@ -189,6 +189,16 @@ impl Interface {
         }
     }
 
+    pub fn try_get_parameter(&self, name: &Name) -> Result<GenericParameter> {
+        match self.parameters().get(name) {
+            Some(param) => Ok(param.clone()),
+            None => Err(Error::InvalidArgument(format!(
+                "No parameter with name {} exists on this interface",
+                name
+            ))),
+        }
+    }
+
     /// When `None`, this Interface only has a Default domain.
     pub fn domains(&self) -> &Option<InsertionOrderedSet<Domain>> {
         &self.domains

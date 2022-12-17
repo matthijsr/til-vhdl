@@ -81,7 +81,9 @@ pub fn eval_struct_stat(
                     msg: "Invalid domain assignments (ERROR)".to_string(),
                 }),
                 DomainAssignments::None => eval_common_error(
-                    structure.try_add_streamlet_instance_default(db, name, streamlet),
+                    structure
+                        .try_add_streamlet_instance_default(db, name, streamlet)
+                        .map(|_| ()),
                     name_span,
                 ),
                 DomainAssignments::List(list) => {
@@ -96,7 +98,9 @@ pub fn eval_struct_stat(
                         name_list.push((left, right));
                     }
                     eval_common_error(
-                        structure.try_add_streamlet_instance(db, name, streamlet, name_list),
+                        structure
+                            .try_add_streamlet_instance(db, name, streamlet, name_list)
+                            .map(|_| ()),
                         name_span,
                     )
                 }

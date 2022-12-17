@@ -158,6 +158,17 @@ impl Streamlet {
         }
     }
 
+    pub fn try_get_parameter(&self, db: &dyn Ir, name: &Name) -> Result<GenericParameter> {
+        match self.interface(db).try_get_parameter(name) {
+            Ok(param) => Ok(param),
+            Err(_) => Err(Error::InvalidArgument(format!(
+                "No parameter with name {} exists on Streamlet {}",
+                name,
+                self.identifier()
+            ))),
+        }
+    }
+
     pub fn domains(&self, db: &dyn Ir) -> Option<InsertionOrderedSet<Domain>> {
         self.interface(db).domains().clone()
     }
