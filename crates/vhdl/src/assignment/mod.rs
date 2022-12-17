@@ -778,12 +778,6 @@ impl From<VhdlName> for FieldSelection {
     }
 }
 
-impl From<i32> for FieldSelection {
-    fn from(i: i32) -> Self {
-        FieldSelection::index(i)
-    }
-}
-
 /// A VHDL range constraint
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RangeConstraint {

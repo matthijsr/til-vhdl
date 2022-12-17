@@ -1,12 +1,13 @@
 use core::fmt;
 
 use tydi_common::error::{Error, Result, TryResult};
+use tydi_intern::Id;
 
 use crate::{
     architecture::arch_storage::Arch,
-    assignment::{bitvec::BitVecValue, ObjectSelection, StdLogicValue, ValueAssignment},
+    assignment::{bitvec::BitVecValue, ObjectSelection, ValueAssignment},
     common::vhdl_name::VhdlName,
-    declaration::DeclareWithIndent,
+    declaration::{DeclareWithIndent, ObjectDeclaration},
     object::object_type::{IntegerType, ObjectType},
     usings::{ListUsings, Usings},
 };
@@ -337,14 +338,14 @@ impl<T: Into<Relation>> From<Parentheses<T>> for Relation {
     }
 }
 
-impl From<ValueAssignment> for Relation {
-    fn from(val: ValueAssignment) -> Self {
-        Self::Value(Box::new(val))
+impl From<ObjectSelection> for Relation {
+    fn from(val: ObjectSelection) -> Self {
+        Self::Object(val)
     }
 }
 
-impl<T: Into<ObjectSelection>> From<T> for Relation {
-    fn from(val: T) -> Self {
+impl From<Id<ObjectDeclaration>> for Relation {
+    fn from(val: Id<ObjectDeclaration>) -> Self {
         Self::Object(val.into())
     }
 }
@@ -367,21 +368,15 @@ impl From<Edge> for Relation {
     }
 }
 
-impl From<StdLogicValue> for Relation {
-    fn from(assignment: StdLogicValue) -> Self {
-        Relation::from(ValueAssignment::from(assignment))
-    }
-}
-
-impl From<BitVecValue> for Relation {
-    fn from(assignment: BitVecValue) -> Self {
-        Relation::from(ValueAssignment::from(assignment))
-    }
-}
-
 impl From<MathExpression> for Relation {
     fn from(mathexpr: MathExpression) -> Self {
         Self::MathExpression(mathexpr)
+    }
+}
+
+impl<T: Into<ValueAssignment>> From<T> for Relation {
+    fn from(val: T) -> Self {
+        Relation::Value(Box::new(val.into()))
     }
 }
 
@@ -592,7 +587,7 @@ pub struct Parentheses<T>(T);
 mod tests {
     use crate::{
         architecture::arch_storage::db::Database,
-        assignment::SelectObject,
+        assignment::{FieldSelection, SelectObject},
         declaration::{Declare, ObjectDeclaration},
         statement::relation::math::CreateMath,
     };
@@ -640,7 +635,7 @@ mod tests {
 
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
         let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
-            .select_nested([0])?;
+            .select_nested([FieldSelection::index(0)])?;
         let rising_edge = Edge::rising_edge(db, obj1)?;
         let falling_edge = Edge::falling_edge(db, obj2)?;
         assert_eq!(
@@ -658,15 +653,12 @@ mod tests {
             db,
             "test_const",
             ObjectType::Integer(IntegerType::Natural),
-            ValueAssignment::from(42),
+            42,
         )?;
         let math = Parentheses(
-            obj1.r_add(
-                db,
-                Parentheses(ValueAssignment::from(30).r_subtract(db, obj2)?),
-            )?
-            .r_multiply(db, obj2)?
-            .r_divide_by(db, obj1.r_negative(db)?)?,
+            obj1.r_add(db, Parentheses(30.r_subtract(db, obj2)?))?
+                .r_multiply(db, obj2)?
+                .r_divide_by(db, obj1.r_negative(db)?)?,
         )
         .r_mod(db, ValueAssignment::Integer(4))?;
         assert_eq!(
