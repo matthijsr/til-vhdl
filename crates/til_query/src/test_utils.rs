@@ -21,6 +21,7 @@ use crate::{
 
 use tydi_common::{
     error::{Result, TryResult},
+    name::PathName,
     numbers::NonNegative,
 };
 
@@ -62,7 +63,10 @@ pub fn test_stream_id_custom(
     )
 }
 
-pub fn simple_structural_streamlet(db: &mut Database) -> Result<Streamlet> {
+pub fn simple_structural_streamlet(
+    db: &mut Database,
+    name: impl TryResult<PathName>,
+) -> Result<Streamlet> {
     let bits = LogicalType::try_new_bits(4)?.intern(db);
     let data_type = LogicalType::try_new_union(None, vec![("a", bits), ("b", bits)])?.intern(db);
     let null_type = LogicalType::null_id(db);
@@ -77,7 +81,7 @@ pub fn simple_structural_streamlet(db: &mut Database) -> Result<Streamlet> {
         null_type,
         false,
     )?;
-    let streamlet = Streamlet::new().try_with_name("test")?.with_ports(
+    let streamlet = Streamlet::new().try_with_name(name)?.with_ports(
         db,
         vec![
             ("a", stream, InterfaceDirection::In),
@@ -93,8 +97,11 @@ pub fn simple_structural_streamlet(db: &mut Database) -> Result<Streamlet> {
     Ok(streamlet)
 }
 
-pub fn simple_structural_streamlet_with_behav_params(db: &mut Database) -> Result<Streamlet> {
-    let streamlet = simple_structural_streamlet(db)?;
+pub fn simple_structural_streamlet_with_behav_params(
+    db: &mut Database,
+    name: impl TryResult<PathName>,
+) -> Result<Streamlet> {
+    let streamlet = simple_structural_streamlet(db, name)?;
     streamlet.with_parameters(
         db,
         vec![

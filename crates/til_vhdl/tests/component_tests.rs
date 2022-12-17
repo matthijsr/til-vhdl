@@ -506,7 +506,7 @@ fn basic_comp_arch() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
 
-    let streamlet = simple_structural_streamlet(db)?;
+    let streamlet = simple_structural_streamlet(db, "test")?;
 
     let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let arch_db = &mut _arch_db;
@@ -607,7 +607,7 @@ fn basic_comp_arch_with_behav_params() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
 
-    let streamlet = simple_structural_streamlet_with_behav_params(db)?;
+    let streamlet = simple_structural_streamlet_with_behav_params(db, "test")?;
 
     let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let arch_db = &mut _arch_db;
