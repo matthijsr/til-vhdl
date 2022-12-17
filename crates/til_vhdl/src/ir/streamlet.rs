@@ -253,7 +253,7 @@ pub struct VhdlStreamlet {
     prefix: Option<VhdlName>,
     name: PathName,
     implementation: Option<Id<Implementation>>,
-    parameters: InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
+    parameters: InsertionOrderedMap<Name, GenericParameter>,
     domains: VhdlDomainListOrDefault<Port>,
     interface: InsertionOrderedMap<Name, VhdlInterface>,
     doc: Option<String>,
@@ -419,6 +419,10 @@ impl VhdlStreamlet {
         &self.domains
     }
 
+    pub fn parameters(&self) -> &InsertionOrderedMap<Name, GenericParameter> {
+        &self.parameters
+    }
+
     pub fn to_component(&mut self) -> Arc<Component> {
         if let Some(component) = &self.component {
             component.clone()
@@ -434,6 +438,12 @@ impl VhdlStreamlet {
                 ports.push(domain.clock().clone());
                 ports.push(domain.reset().clone());
             }
+
+            let parameters = self
+                .parameters()
+                .iter()
+                .map(|(_, p)| p.clone())
+                .collect::<Vec<_>>();
 
             for (_, vhdl_interface) in self.interface() {
                 let logical_stream = vhdl_interface.typed_stream().logical_stream();
@@ -455,7 +465,7 @@ impl VhdlStreamlet {
                 ports.extend(result_ports);
             }
 
-            let mut component = Component::try_new(n, vec![], ports, None).unwrap();
+            let mut component = Component::try_new(n, parameters, ports, None).unwrap();
             if let Some(doc) = self.doc() {
                 component.set_doc(doc);
             }
@@ -467,10 +477,6 @@ impl VhdlStreamlet {
         }
     }
 
-    // TODO: For now, assume architecture output will be a string.
-    // The architecture for Structural and None is stored in the arch_db.
-    // Might make more sense/be safer if we could either parse Linked architectures to an object,
-    // or have some enclosing type which returns either an architecture or a string.
     pub fn to_architecture(
         &self,
         ir_db: &dyn Ir,
@@ -759,12 +765,9 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
         let domains = self.domains(ir_db).into();
 
         let no_parent_params = InsertionOrderedMap::new();
-        let parameters = self.parameters(ir_db).try_map_convert(|p| {
-            ObjectDeclaration::from_parameter(
-                arch_db,
-                &param_to_param(arch_db, &p, &no_parent_params)?,
-            )
-        })?;
+        let parameters = self
+            .parameters(ir_db)
+            .try_map_convert(|p| param_to_param(arch_db, &p, &no_parent_params))?;
 
         Ok(VhdlStreamlet {
             prefix,

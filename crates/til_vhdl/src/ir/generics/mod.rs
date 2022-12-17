@@ -5,7 +5,9 @@ use til_query::ir::generics::GenericKind;
 use tydi_common::map::InsertionOrderedMap;
 use tydi_common::name::{Name, NameSelf};
 use tydi_common::{error::Result, traits::Document};
-use tydi_vhdl::object::object_type::{IntegerType, ObjectType};
+use tydi_intern::Id;
+use tydi_vhdl::declaration::ObjectDeclaration;
+use tydi_vhdl::object::object_type::IntegerType;
 use tydi_vhdl::{architecture::arch_storage::Arch, port::GenericParameter};
 
 use self::param_value::param_value_to_vhdl;
@@ -15,7 +17,7 @@ pub mod param_value;
 pub fn param_to_param(
     arch_db: &dyn Arch,
     val: &til_query::ir::generics::GenericParameter,
-    parent_params: &InsertionOrderedMap<Name, GenericParameter>,
+    parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
 ) -> Result<GenericParameter> {
     let default = param_value_to_vhdl(arch_db, val.default_value(), parent_params)?;
     let typ = match val.kind() {
@@ -31,8 +33,8 @@ pub fn param_to_param(
         },
     };
     if let Some(doc) = val.doc() {
-        GenericParameter::try_new_documented(val.name().clone(), Some(default), typ, doc)
+        GenericParameter::try_new_documented(val.name().clone(), Some(default.into()), typ, doc)
     } else {
-        GenericParameter::try_new(val.name().clone(), Some(default), typ)
+        GenericParameter::try_new(val.name().clone(), Some(default.into()), typ)
     }
 }

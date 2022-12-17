@@ -64,6 +64,26 @@ impl Streamlet {
         Ok(self)
     }
 
+    pub fn with_parameters(
+        mut self,
+        db: &dyn Ir,
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+    ) -> Result<Streamlet> {
+        if let Some(interface) = self.interface {
+            let new_interface = interface
+                .get(db)
+                .as_ref()
+                .clone()
+                .with_parameters(parameters)?;
+            self.interface = Some(new_interface.intern_arc(db));
+        } else {
+            let interface = Interface::new_parameters(parameters)?.intern_arc(db);
+            self.interface = Some(interface);
+        }
+
+        Ok(self)
+    }
+
     pub fn with_interface(
         mut self,
         db: &dyn Ir,

@@ -23,7 +23,7 @@ use til_query::{
         traits::{GetSelf, InternSelf},
         Ir,
     },
-    test_utils::{test_stream_id, test_stream_id_custom},
+    test_utils::{simple_structural_streamlet, test_stream_id, test_stream_id_custom},
 };
 use til_vhdl::IntoVhdl;
 use tydi_common::{error::Result, name::Name, numbers::NonNegative};
@@ -33,6 +33,10 @@ use tydi_vhdl::{
     declaration::Declare,
     package::Package,
 };
+
+use crate::common::ir_streamlet_to_vhdl;
+
+mod common;
 
 extern crate til_vhdl;
 
@@ -489,6 +493,107 @@ component my__test__space__doc_streamlet_com
   );
 end component;"#,
         comp.declare(&arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let streamlet = simple_structural_streamlet(db)?;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let mut streamlet = ir_streamlet_to_vhdl(streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end component;"#,
+        streamlet.to_component().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+package default is
+
+  component test_com
+    port (
+      clk : in std_logic;
+      rst : in std_logic;
+      a_valid : in std_logic;
+      a_ready : out std_logic;
+      a_data : in std_logic_vector(4 downto 0);
+      a_last : in std_logic;
+      a_strb : in std_logic;
+      b_valid : out std_logic;
+      b_ready : in std_logic;
+      b_data : out std_logic_vector(4 downto 0);
+      b_last : out std_logic;
+      b_strb : out std_logic
+    );
+  end component;
+
+end default;"#,
+        arch_db.default_package().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity test_com is
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end test_com;
+
+architecture structural of test_com is
+begin
+  b_valid <= a_valid;
+  a_ready <= b_ready;
+  b_data <= a_data;
+  b_last <= a_last;
+  b_strb <= a_strb;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
     );
 
     Ok(())
