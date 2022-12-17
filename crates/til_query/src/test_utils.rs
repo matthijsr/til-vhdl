@@ -105,6 +105,21 @@ pub fn streamlet_without_impl(
     Ok(streamlet)
 }
 
+pub fn streamlet_without_impl_with_behav_params(
+    db: &mut Database,
+    name: impl TryResult<PathName>,
+) -> Result<Streamlet> {
+    let streamlet = streamlet_without_impl(db, name)?;
+    streamlet.with_parameters(
+        db,
+        vec![
+            GenericParameter::try_new("pa", IntegerGeneric::natural(), 0)?,
+            GenericParameter::try_new("pb", IntegerGeneric::positive(), 2)?,
+            GenericParameter::try_new("pc", IntegerGeneric::integer(), -2)?,
+        ],
+    )
+}
+
 pub fn simple_structural_streamlet_with_behav_params(
     db: &mut Database,
     name: impl TryResult<PathName>,

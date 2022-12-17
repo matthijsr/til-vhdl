@@ -218,6 +218,19 @@ impl Structure {
         }
     }
 
+    pub fn try_get_streamlet_instance_mut(
+        &mut self,
+        name: &Name,
+    ) -> Result<&mut StreamletInstance> {
+        match self.streamlet_instances.get_mut(name) {
+            Some(streamlet) => Ok(streamlet),
+            None => Err(Error::InvalidArgument(format!(
+                "A streamlet instance with name {} does not exist in this structure",
+                name
+            ))),
+        }
+    }
+
     pub fn connections(&self) -> &Vec<Connection> {
         &self.connections
     }
