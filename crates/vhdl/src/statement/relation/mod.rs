@@ -395,6 +395,87 @@ impl fmt::Display for Relation {
 }
 
 impl Relation {
+    pub fn try_eval(&self) -> Result<Option<ValueAssignment>> {
+        fn eval_lr(
+            l: &Relation,
+            r: &Relation,
+        ) -> Result<Option<(ValueAssignment, ValueAssignment)>> {
+            let l = l.try_eval()?;
+            let r = r.try_eval()?;
+            match (l, r) {
+                (Some(l), Some(r)) => Ok(Some((l, r))),
+                _ => Ok(None),
+            }
+        }
+        fn eval_lr_math(l: &Relation, r: &Relation) -> Result<Option<(i32, i32)>> {
+            match eval_lr(l, r)? {
+                Some((ValueAssignment::Integer(li), ValueAssignment::Integer(ri))) => {
+                    Ok(Some((li, ri)))
+                }
+                None => Ok(None),
+                _ => Err(Error::InvalidArgument(format!(
+                    "Can't apply a math expression to values ({}) and ({})",
+                    l, r
+                ))),
+            }
+        }
+        match self {
+            Relation::Parentheses(p) => p.try_eval(),
+            Relation::Value(v) => Ok(Some(v.as_ref().clone())),
+            Relation::Object(_) => Ok(None),
+            Relation::Combination(_) => todo!(),
+            Relation::Edge(_) => Ok(None),
+            Relation::LogicalExpression(_) => todo!(),
+            Relation::MathExpression(math) => match math {
+                MathExpression::Negative(n) => {
+                    if let Some(v) = n.try_eval()? {
+                        match v {
+                            ValueAssignment::Boolean(_)
+                            | ValueAssignment::Bit(_)
+                            | ValueAssignment::BitVec(_) => Err(Error::ProjectError(format!(
+                                "Cannot apply Negative to a value {}",
+                                v.declare()?
+                            ))),
+                            ValueAssignment::Time(t) => {
+                                Ok(Some(ValueAssignment::Time(t.negative())))
+                            }
+                            ValueAssignment::Integer(i) => Ok(Some((-i).into())),
+                        }
+                    } else {
+                        Ok(None)
+                    }
+                }
+                MathExpression::Sum(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l + r).into())
+                } else {
+                    None
+                }),
+                MathExpression::Subtraction(l, r) => {
+                    Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                        Some((l - r).into())
+                    } else {
+                        None
+                    })
+                }
+                MathExpression::Product(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l * r).into())
+                } else {
+                    None
+                }),
+                MathExpression::Division(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l / r).into())
+                } else {
+                    None
+                }),
+                MathExpression::Modulo(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l % r).into())
+                } else {
+                    None
+                }),
+            },
+        }
+    }
+
     pub fn parentheses(relation: impl TryResult<Relation>) -> Result<Relation> {
         let relation = relation.try_result()?;
         Ok(Relation::Parentheses(Box::new(relation)))
@@ -634,7 +715,7 @@ mod tests {
         );
 
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
-        let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
+        let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(db, 1, 0)?, None)?
             .select_nested([FieldSelection::index(0)])?;
         let rising_edge = Edge::rising_edge(db, obj1)?;
         let falling_edge = Edge::falling_edge(db, obj2)?;

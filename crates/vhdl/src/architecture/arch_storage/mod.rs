@@ -111,7 +111,7 @@ fn can_assign(
                         // As each element is the same and we only really care about the type, using a single ObjectKey to represent all queries
                         // will be more efficient. (As this means Salsa is more likely to reuse previous results.)
                         let to_array_elem_key = to_key.clone().with_selection(
-                            FieldSelection::Range(RangeConstraint::Index(to_array.high())),
+                            FieldSelection::Range(RangeConstraint::Index(to_array.high().clone())),
                         );
                         match array {
                             ArrayAssignment::Direct(direct) => {

@@ -29,7 +29,7 @@ pub mod assign;
 pub mod assignment_from;
 pub mod bitvec;
 pub mod declare;
-pub mod flatten;
+// pub mod flatten;
 pub mod impls;
 
 pub trait Assign {
@@ -751,7 +751,7 @@ impl FieldSelection {
         )?))
     }
 
-    pub fn index(index: impl Into<i32>) -> FieldSelection {
+    pub fn index(index: impl Into<Relation>) -> FieldSelection {
         FieldSelection::Range(RangeConstraint::Index(index.into()))
     }
 
@@ -782,11 +782,11 @@ impl From<VhdlName> for FieldSelection {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RangeConstraint {
     /// A range [start] to [end]
-    To { start: i32, end: i32 },
+    To { start: Relation, end: Relation },
     /// A range [start] downto [end]
-    Downto { start: i32, end: i32 },
+    Downto { start: Relation, end: Relation },
     /// An index within a range
-    Index(i32),
+    Index(Relation),
 }
 
 impl fmt::Display for RangeConstraint {

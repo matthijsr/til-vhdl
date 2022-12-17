@@ -16,6 +16,7 @@ use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::array::ArrayObject;
 use crate::object::record::RecordObject;
 use crate::properties::Analyze;
+use crate::statement::relation::Relation;
 
 pub trait DeclarationTypeName {
     /// Returns the type name for use in object declaration
@@ -119,7 +120,7 @@ impl fmt::Display for ObjectType {
 }
 
 impl ObjectType {
-    pub fn get_field(&self, field: &FieldSelection) -> Result<ObjectType> {
+    pub fn get_field(&self, db: &dyn Arch, field: &FieldSelection) -> Result<ObjectType> {
         match self {
             ObjectType::Bit => Err(Error::InvalidTarget(
                 "Cannot select a field on a Bit".to_string(),
@@ -140,9 +141,10 @@ impl ObjectType {
                     } else {
                         if range.is_between(array.high(), array.low())? {
                             if array.is_std_logic_vector() {
-                                ObjectType::bit_vector(range.high(), range.low())
+                                ObjectType::bit_vector(db, range.high(), range.low())
                             } else {
                                 ObjectType::array(
+                                    db,
                                     range.high(),
                                     range.low(),
                                     array.typ().clone(),
@@ -191,19 +193,24 @@ impl ObjectType {
 
     /// Create an array of a specific field type
     pub fn array(
-        high: i32,
-        low: i32,
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
         object: ObjectType,
         type_name: impl TryResult<VhdlName>,
     ) -> Result<ObjectType> {
         Ok(ObjectType::Array(ArrayObject::array(
-            high, low, object, type_name,
+            db, high, low, object, type_name,
         )?))
     }
 
     /// Create a bit vector object
-    pub fn bit_vector(high: i32, low: i32) -> Result<ObjectType> {
-        Ok(ArrayObject::bit_vector(high, low)?.into())
+    pub fn bit_vector(
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
+    ) -> Result<ObjectType> {
+        Ok(ArrayObject::bit_vector(db, high, low)?.into())
     }
 
     /// Test whether two `ObjectType`s can be assigned to one another
@@ -404,17 +411,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::object::*;
+    use crate::{architecture::arch_storage::db::Database, object::*};
 
     #[test]
     fn bit_vector_from_range() {
+        let _db = Database::default();
+        let db = &db;
         assert_eq!(
             ObjectType::from(0..2),
-            ObjectType::bit_vector(2, 0).unwrap()
+            ObjectType::bit_vector(db, 2, 0).unwrap()
         );
         assert_eq!(
             ObjectType::from(2..0),
-            ObjectType::bit_vector(2, 0).unwrap()
+            ObjectType::bit_vector(db, 2, 0).unwrap()
         );
     }
 }

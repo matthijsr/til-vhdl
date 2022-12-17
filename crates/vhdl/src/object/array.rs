@@ -9,6 +9,7 @@ use tydi_common::{
 use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
+    statement::relation::Relation,
 };
 use crate::{declaration::DeclareWithIndent, object::object_type::ObjectType};
 
@@ -17,8 +18,8 @@ use super::object_type::DeclarationTypeName;
 /// An array object, arrays contain a single type of object, but can contain nested objects
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrayObject {
-    high: i32,
-    low: i32,
+    high: Relation,
+    low: Relation,
     typ: Box<ObjectType>,
     type_name: VhdlName,
     is_std_logic_vector: bool,
@@ -26,56 +27,55 @@ pub struct ArrayObject {
 
 impl ArrayObject {
     /// Create a bit vector object
-    pub fn bit_vector(high: i32, low: i32) -> Result<ArrayObject> {
-        if low > high {
-            Err(Error::InvalidArgument(format!(
-                "{} > {}! Low must be lower than high",
-                low, high
-            )))
-        } else {
-            Ok(ArrayObject {
-                high,
-                low,
-                typ: Box::new(ObjectType::Bit),
-                type_name: VhdlName::try_new("std_logic_vector")?,
-                is_std_logic_vector: true,
-            })
-        }
+    pub fn bit_vector(
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
+    ) -> Result<ArrayObject> {
+        let high = high.into();
+        let low = low.into();
+        high.is_integer(db)?;
+        low.is_integer(db)?;
+        Ok(ArrayObject {
+            high,
+            low,
+            typ: Box::new(ObjectType::Bit),
+            type_name: VhdlName::try_new("std_logic_vector")?,
+            is_std_logic_vector: true,
+        })
     }
 
     /// Create an array of a specific field type
     pub fn array(
-        high: i32,
-        low: i32,
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
         object: ObjectType,
         type_name: impl TryResult<VhdlName>,
     ) -> Result<ArrayObject> {
-        if low > high {
-            Err(Error::InvalidArgument(format!(
-                "{} > {}! Low must be lower than high",
-                low, high
-            )))
-        } else {
-            Ok(ArrayObject {
-                high,
-                low,
-                typ: Box::new(object),
-                type_name: type_name.try_result()?,
-                is_std_logic_vector: false,
-            })
-        }
+        let high = high.into();
+        let low = low.into();
+        high.is_integer(db)?;
+        low.is_integer(db)?;
+        Ok(ArrayObject {
+            high,
+            low,
+            typ: Box::new(object),
+            type_name: type_name.try_result()?,
+            is_std_logic_vector: false,
+        })
     }
 
     pub fn typ(&self) -> &ObjectType {
         &self.typ
     }
 
-    pub fn high(&self) -> i32 {
-        self.high
+    pub fn high(&self) -> &Relation {
+        &self.high
     }
 
-    pub fn low(&self) -> i32 {
-        self.low
+    pub fn low(&self) -> &Relation {
+        &self.low
     }
 
     pub fn width(&self) -> u32 {
