@@ -12,7 +12,7 @@ use tydi_common::{
 };
 
 use crate::common::{
-    logical::logicaltype::stream::{Dimensionality, StreamProperty, StreamPropertyOperator},
+    logical::logicaltype::genericproperty::{GenericProperty, GenericPropertyOperator},
     stream_direction::StreamDirection,
 };
 
@@ -20,7 +20,7 @@ use super::{complexity::Complexity, signal_list::SignalList};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhysicalBitCount {
-    Combination(Box<Self>, StreamPropertyOperator, Box<Self>),
+    Combination(Box<Self>, GenericPropertyOperator, Box<Self>),
     Fixed(Positive),
     Parameterized(Name),
 }
@@ -43,7 +43,7 @@ impl PhysicalBitCount {
             if mul > Positive::new(1).unwrap() {
                 return PhysicalBitCount::Combination(
                     Box::new(self),
-                    StreamPropertyOperator::Multiply,
+                    GenericPropertyOperator::Multiply,
                     Box::new(PhysicalBitCount::Fixed(mul)),
                 );
             }
@@ -58,10 +58,10 @@ impl PhysicalBitCount {
                 if let Some(lv) = l.try_eval() {
                     if let Some(rv) = r.try_eval() {
                         return match op {
-                            StreamPropertyOperator::Add => lv.checked_add(rv.get()),
-                            StreamPropertyOperator::Subtract => Positive::new(lv.get() - rv.get()),
-                            StreamPropertyOperator::Multiply => lv.checked_mul(rv),
-                            StreamPropertyOperator::Divide => Positive::new(lv.get() / rv.get()),
+                            GenericPropertyOperator::Add => lv.checked_add(rv.get()),
+                            GenericPropertyOperator::Subtract => Positive::new(lv.get() - rv.get()),
+                            GenericPropertyOperator::Multiply => lv.checked_mul(rv),
+                            GenericPropertyOperator::Divide => Positive::new(lv.get() / rv.get()),
                         };
                     }
                 }
@@ -73,10 +73,10 @@ impl PhysicalBitCount {
     }
 }
 
-impl From<StreamProperty<NonNegative>> for Option<PhysicalBitCount> {
-    fn from(d: StreamProperty<NonNegative>) -> Option<PhysicalBitCount> {
+impl From<GenericProperty<NonNegative>> for Option<PhysicalBitCount> {
+    fn from(d: GenericProperty<NonNegative>) -> Option<PhysicalBitCount> {
         match d {
-            StreamProperty::Combination(l, op, r) => {
+            GenericProperty::Combination(l, op, r) => {
                 let lv = Option::<PhysicalBitCount>::from(l.as_ref().clone());
                 let rv = Option::<PhysicalBitCount>::from(r.as_ref().clone());
                 match (lv, rv) {
@@ -90,8 +90,8 @@ impl From<StreamProperty<NonNegative>> for Option<PhysicalBitCount> {
                     )),
                 }
             }
-            StreamProperty::Fixed(f) => PhysicalBitCount::fixed(f),
-            StreamProperty::Parameterized(n) => Some(PhysicalBitCount::parameterized(n)),
+            GenericProperty::Fixed(f) => PhysicalBitCount::fixed(f),
+            GenericProperty::Parameterized(n) => Some(PhysicalBitCount::parameterized(n)),
         }
     }
 }
@@ -100,7 +100,7 @@ impl Add for PhysicalBitCount {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        PhysicalBitCount::Combination(Box::new(self), StreamPropertyOperator::Add, Box::new(rhs))
+        PhysicalBitCount::Combination(Box::new(self), GenericPropertyOperator::Add, Box::new(rhs))
     }
 }
 
@@ -110,7 +110,7 @@ impl Sub for PhysicalBitCount {
     fn sub(self, rhs: Self) -> Self::Output {
         PhysicalBitCount::Combination(
             Box::new(self),
-            StreamPropertyOperator::Subtract,
+            GenericPropertyOperator::Subtract,
             Box::new(rhs),
         )
     }
@@ -122,7 +122,7 @@ impl Mul for PhysicalBitCount {
     fn mul(self, rhs: Self) -> Self::Output {
         PhysicalBitCount::Combination(
             Box::new(self),
-            StreamPropertyOperator::Multiply,
+            GenericPropertyOperator::Multiply,
             Box::new(rhs),
         )
     }
@@ -134,7 +134,7 @@ impl Div for PhysicalBitCount {
     fn div(self, rhs: Self) -> Self::Output {
         PhysicalBitCount::Combination(
             Box::new(self),
-            StreamPropertyOperator::Divide,
+            GenericPropertyOperator::Divide,
             Box::new(rhs),
         )
     }
@@ -154,7 +154,7 @@ pub struct PhysicalStream {
     /// Number of element lanes.
     element_lanes: Positive,
     /// Dimensionality.
-    dimensionality: Dimensionality,
+    dimensionality: GenericProperty<NonNegative>,
     /// Complexity.
     complexity: Complexity,
     /// User-defined transfer content.
@@ -167,7 +167,7 @@ impl PhysicalStream {
     pub fn try_new<T, U>(
         element_fields: T,
         element_lanes: usize,
-        dimensionality: impl TryResult<Dimensionality>,
+        dimensionality: impl TryResult<GenericProperty<NonNegative>>,
         complexity: impl Into<Complexity>,
         user: T,
         stream_direction: StreamDirection,
@@ -217,7 +217,7 @@ impl PhysicalStream {
     pub fn new(
         element_fields: impl Into<InsertionOrderedMap<PathName, BitCount>>,
         element_lanes: Positive,
-        dimensionality: impl Into<Dimensionality>,
+        dimensionality: impl Into<GenericProperty<NonNegative>>,
         complexity: impl Into<Complexity>,
         user: impl Into<InsertionOrderedMap<PathName, BitCount>>,
         stream_direction: StreamDirection,
@@ -243,7 +243,7 @@ impl PhysicalStream {
     }
 
     /// Returns the dimensionality of this physical stream.
-    pub fn dimensionality(&self) -> &Dimensionality {
+    pub fn dimensionality(&self) -> &GenericProperty<NonNegative> {
         &self.dimensionality
     }
 
@@ -306,12 +306,12 @@ impl PhysicalStream {
 
     fn has_dimensions(&self) -> bool {
         match self.dimensionality() {
-            StreamProperty::Combination(_, _, _) => match self.dimensionality().try_eval() {
+            GenericProperty::Combination(_, _, _) => match self.dimensionality().try_eval() {
                 Some(f) => f >= 1,
                 None => true,
             },
-            StreamProperty::Fixed(f) => *f >= 1,
-            StreamProperty::Parameterized(_) => true,
+            GenericProperty::Fixed(f) => *f >= 1,
+            GenericProperty::Parameterized(_) => true,
         }
     }
 
