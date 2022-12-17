@@ -128,25 +128,30 @@ impl ObjectType {
             ObjectType::Array(array) => match field {
                 FieldSelection::Range(range) => {
                     if let RangeConstraint::Index(index) = range {
-                        if *index <= array.high() && *index >= array.low() {
-                            Ok(array.typ().clone())
-                        } else {
-                            Err(Error::InvalidArgument(format!(
-                                "Cannot select index {} on array with high: {}, low: {}",
-                                index,
-                                array.high(),
-                                array.low()
-                            )))
-                        }
+                        todo!()
+                        // if *index <= array.high() && *index >= array.low() {
+                        //     Ok(array.typ().clone())
+                        // } else {
+                        //     Err(Error::InvalidArgument(format!(
+                        //         "Cannot select index {} on array with high: {}, low: {}",
+                        //         index,
+                        //         array.high(),
+                        //         array.low()
+                        //     )))
+                        // }
                     } else {
                         if range.is_between(array.high(), array.low())? {
                             if array.is_std_logic_vector() {
-                                ObjectType::bit_vector(db, range.high(), range.low())
-                            } else {
-                                ObjectType::array(
+                                ObjectType::relation_bit_vector(
                                     db,
-                                    range.high(),
-                                    range.low(),
+                                    range.high().clone(),
+                                    range.low().clone(),
+                                )
+                            } else {
+                                ObjectType::relation_array(
+                                    db,
+                                    range.high().clone(),
+                                    range.low().clone(),
                                     array.typ().clone(),
                                     array.vhdl_name().clone(),
                                 )
@@ -183,34 +188,51 @@ impl ObjectType {
         }
     }
 
-    pub fn get_nested(&self, nested: &Vec<FieldSelection>) -> Result<ObjectType> {
+    pub fn get_nested(&self, db: &dyn Arch, nested: &Vec<FieldSelection>) -> Result<ObjectType> {
         let mut result = self.clone();
         for field in nested {
-            result = result.get_field(field)?;
+            result = result.get_field(db, field)?;
         }
         Ok(result)
     }
 
     /// Create an array of a specific field type
     pub fn array(
+        high: i32,
+        low: i32,
+        object: ObjectType,
+        type_name: impl TryResult<VhdlName>,
+    ) -> Result<ObjectType> {
+        Ok(ObjectType::Array(ArrayObject::array(
+            high, low, object, type_name,
+        )?))
+    }
+
+    /// Create an array of a specific field type
+    pub fn relation_array(
         db: &dyn Arch,
         high: impl Into<Relation>,
         low: impl Into<Relation>,
         object: ObjectType,
         type_name: impl TryResult<VhdlName>,
     ) -> Result<ObjectType> {
-        Ok(ObjectType::Array(ArrayObject::array(
+        Ok(ObjectType::Array(ArrayObject::relation_array(
             db, high, low, object, type_name,
         )?))
     }
 
     /// Create a bit vector object
-    pub fn bit_vector(
+    pub fn bit_vector(high: i32, low: i32) -> Result<ObjectType> {
+        Ok(ArrayObject::bit_vector(high, low)?.into())
+    }
+
+    /// Create a bit vector object
+    pub fn relation_bit_vector(
         db: &dyn Arch,
         high: impl Into<Relation>,
         low: impl Into<Relation>,
     ) -> Result<ObjectType> {
-        Ok(ArrayObject::bit_vector(db, high, low)?.into())
+        Ok(ArrayObject::relation_bit_vector(db, high, low)?.into())
     }
 
     /// Test whether two `ObjectType`s can be assigned to one another
@@ -415,15 +437,13 @@ mod tests {
 
     #[test]
     fn bit_vector_from_range() {
-        let _db = Database::default();
-        let db = &db;
         assert_eq!(
             ObjectType::from(0..2),
-            ObjectType::bit_vector(db, 2, 0).unwrap()
+            ObjectType::bit_vector(2, 0).unwrap()
         );
         assert_eq!(
             ObjectType::from(2..0),
-            ObjectType::bit_vector(db, 2, 0).unwrap()
+            ObjectType::bit_vector(2, 0).unwrap()
         );
     }
 }

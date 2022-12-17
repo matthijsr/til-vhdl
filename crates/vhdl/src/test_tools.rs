@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 
 use tydi_common::error::Result;
 
+use crate::architecture::arch_storage::db::Database;
 use crate::object::object_type::{IntegerType, ObjectType};
 use crate::port::GenericParameter;
 use crate::{
@@ -97,7 +98,12 @@ pub(crate) fn simple_component_with_generics() -> Result<Component> {
 }
 
 pub(crate) fn record_with_nested_type() -> Result<ObjectType> {
-    let nested = ObjectType::array(3, 0, ObjectType::Bit, VhdlName::try_new("nested_type")?)?;
+    let nested = ObjectType::array(
+        3,
+        0,
+        ObjectType::Bit,
+        VhdlName::try_new("nested_type")?,
+    )?;
     let mut fields = IndexMap::new();
     fields.insert(VhdlName::try_new("nested")?, nested);
     Ok(RecordObject::new(VhdlName::try_new("record_type")?, fields).into())

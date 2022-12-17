@@ -27,7 +27,48 @@ pub struct ArrayObject {
 
 impl ArrayObject {
     /// Create a bit vector object
-    pub fn bit_vector(
+    pub fn bit_vector(high: i32, low: i32) -> Result<ArrayObject> {
+        if low > high {
+            Err(Error::InvalidArgument(format!(
+                "{} > {}! Low must be lower than high",
+                low, high
+            )))
+        } else {
+            Ok(ArrayObject {
+                high: high.into(),
+                low: low.into(),
+                typ: Box::new(ObjectType::Bit),
+                type_name: VhdlName::try_new("std_logic_vector")?,
+                is_std_logic_vector: true,
+            })
+        }
+    }
+
+    /// Create an array of a specific field type
+    pub fn array(
+        high: i32,
+        low: i32,
+        object: ObjectType,
+        type_name: impl TryResult<VhdlName>,
+    ) -> Result<ArrayObject> {
+        if low > high {
+            Err(Error::InvalidArgument(format!(
+                "{} > {}! Low must be lower than high",
+                low, high
+            )))
+        } else {
+            Ok(ArrayObject {
+                high: high.into(),
+                low: low.into(),
+                typ: Box::new(object),
+                type_name: type_name.try_result()?,
+                is_std_logic_vector: false,
+            })
+        }
+    }
+
+    /// Create a bit vector object
+    pub fn relation_bit_vector(
         db: &dyn Arch,
         high: impl Into<Relation>,
         low: impl Into<Relation>,
@@ -46,7 +87,7 @@ impl ArrayObject {
     }
 
     /// Create an array of a specific field type
-    pub fn array(
+    pub fn relation_array(
         db: &dyn Arch,
         high: impl Into<Relation>,
         low: impl Into<Relation>,
@@ -79,7 +120,8 @@ impl ArrayObject {
     }
 
     pub fn width(&self) -> u32 {
-        (1 + self.high - self.low).try_into().unwrap()
+        todo!()
+        // (1 + self.high - self.low).try_into().unwrap()
     }
 
     pub fn is_bitvector(&self) -> bool {

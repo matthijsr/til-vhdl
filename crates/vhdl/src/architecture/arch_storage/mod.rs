@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use tydi_common::error::{Error, Result};
+use tydi_intern::Id;
 
-use crate::{common::vhdl_name::VhdlName, component::Component, package::Package};
+use crate::{
+    common::vhdl_name::VhdlName, component::Component, declaration::ObjectDeclaration,
+    object::Object, package::Package,
+};
 
 use self::{interner::Interner, object_queries::ObjectQueries};
 
@@ -41,6 +45,41 @@ pub trait Arch: Interner + ObjectQueries {
         assignment: Assignment,
         state: AssignmentState,
     ) -> Result<()>;
+
+    /// Get an object based on its key
+    fn get_object(&self, key: ObjectKey) -> Result<Object>;
+
+    fn get_object_type(&self, key: ObjectKey) -> Result<Arc<ObjectType>>;
+
+    fn get_object_declaration_type(&self, key: Id<ObjectDeclaration>) -> Result<Arc<ObjectType>>;
+}
+
+fn get_object(db: &dyn Arch, key: ObjectKey) -> Result<Object> {
+    let obj = db.lookup_intern_object(key.obj());
+    let typ = db
+        .lookup_intern_object_type(obj.typ)
+        .get_nested(db, key.selection())?;
+    Ok(Object {
+        typ: db.intern_object_type(typ),
+        assignable: obj.assignable,
+    })
+}
+
+fn get_object_type(db: &dyn Arch, key: ObjectKey) -> Result<Arc<ObjectType>> {
+    Ok(Arc::new(
+        db.lookup_intern_object_type(db.get_object(key)?.typ_id()),
+    ))
+}
+
+fn get_object_declaration_type(
+    db: &dyn Arch,
+    key: Id<ObjectDeclaration>,
+) -> Result<Arc<ObjectType>> {
+    db.get_object_type(
+        db.lookup_intern_object_declaration(key)
+            .object_key()
+            .clone(),
+    )
 }
 
 fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {

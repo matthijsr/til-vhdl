@@ -204,7 +204,7 @@ impl Assignment {
 
     /// Append a to range field selection
     pub fn to_index(self, index: i32) -> Self {
-        self.to_range(RangeConstraint::Index(index))
+        self.to_range(RangeConstraint::Index(index.into()))
     }
 
     /// Returns the fields selected
@@ -808,7 +808,10 @@ impl RangeConstraint {
                 start, end
             )))
         } else {
-            Ok(RangeConstraint::To { start, end })
+            Ok(RangeConstraint::To {
+                start: start.into(),
+                end: end.into(),
+            })
         }
     }
 
@@ -820,21 +823,25 @@ impl RangeConstraint {
                 end, start
             )))
         } else {
-            Ok(RangeConstraint::Downto { start, end })
+            Ok(RangeConstraint::Downto {
+                start: start.into(),
+                end: end.into(),
+            })
         }
     }
 
     /// Returns the width of the range
     pub fn width(&self) -> Width {
-        match self {
-            RangeConstraint::To { start, end } => {
-                Width::Vector((1 + end - start).try_into().unwrap())
-            }
-            RangeConstraint::Downto { start, end } => {
-                Width::Vector((1 + start - end).try_into().unwrap())
-            }
-            RangeConstraint::Index(_) => Width::Scalar,
-        }
+        todo!()
+        // match self {
+        //     RangeConstraint::To { start, end } => {
+        //         Width::Vector((1 + end - start).try_into().unwrap())
+        //     }
+        //     RangeConstraint::Downto { start, end } => {
+        //         Width::Vector((1 + start - end).try_into().unwrap())
+        //     }
+        //     RangeConstraint::Index(_) => Width::Scalar,
+        // }
     }
 
     /// Returns the width of the range
@@ -846,43 +853,46 @@ impl RangeConstraint {
     }
 
     /// Returns the greatest index within the range constraint
-    pub fn high(&self) -> i32 {
+    pub fn high(&self) -> &Relation {
         match self {
-            RangeConstraint::To { start: _, end } => *end,
-            RangeConstraint::Downto { start, end: _ } => *start,
-            RangeConstraint::Index(index) => *index,
+            RangeConstraint::To { start: _, end } => end,
+            RangeConstraint::Downto { start, end: _ } => start,
+            RangeConstraint::Index(index) => index,
         }
     }
 
     /// Returns the smallest index within the range constraint
-    pub fn low(&self) -> i32 {
+    pub fn low(&self) -> &Relation {
         match self {
-            RangeConstraint::To { start, end: _ } => *start,
-            RangeConstraint::Downto { start: _, end } => *end,
-            RangeConstraint::Index(index) => *index,
+            RangeConstraint::To { start, end: _ } => start,
+            RangeConstraint::Downto { start: _, end } => end,
+            RangeConstraint::Index(index) => index,
         }
     }
 
     /// Verifies whether a range constraint overlaps with this range constraint
     pub fn overlaps(&self, other: &RangeConstraint) -> bool {
-        self.low() <= other.high() && other.low() <= self.high()
+        todo!()
+        // self.low() <= other.high() && other.low() <= self.high()
     }
 
     /// Verifies whether a range constraint is inside of this range constraint
     pub fn contains(&self, other: &RangeConstraint) -> bool {
-        self.high() >= other.high() && self.low() <= other.low()
+        todo!()
+        // self.high() >= other.high() && self.low() <= other.low()
     }
 
     /// Verifies whether this range constraint is between `high` and `low`
-    pub fn is_between(&self, high: i32, low: i32) -> Result<bool> {
-        if low > high {
-            Err(Error::InvalidArgument(format!(
-                "{} > {}! Low cannot be greater than high",
-                low, high
-            )))
-        } else {
-            Ok(high >= self.high() && low <= self.low())
-        }
+    pub fn is_between(&self, high: &Relation, low: &Relation) -> Result<bool> {
+        todo!()
+        // if low > high {
+        //     Err(Error::InvalidArgument(format!(
+        //         "{} > {}! Low cannot be greater than high",
+        //         low, high
+        //     )))
+        // } else {
+        //     Ok(high >= self.high() && low <= self.low())
+        // }
     }
 
     pub fn as_slice_index(&self) -> String {
