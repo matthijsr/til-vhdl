@@ -4,7 +4,7 @@ use std::{
 };
 
 use tydi_common::{
-    error::{Error, Result, TryOptional, TryResult},
+    error::{Error, Result, TryResult},
     map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
@@ -78,7 +78,7 @@ impl From<StreamProperty<NonNegative>> for Option<PhysicalBitCount> {
         match d {
             StreamProperty::Combination(l, op, r) => {
                 let lv = Option::<PhysicalBitCount>::from(l.as_ref().clone());
-                let rv = Option::<PhysicalBitCount>::from(l.as_ref().clone());
+                let rv = Option::<PhysicalBitCount>::from(r.as_ref().clone());
                 match (lv, rv) {
                     (None, None) => None,
                     (None, Some(rv)) => Some(rv),

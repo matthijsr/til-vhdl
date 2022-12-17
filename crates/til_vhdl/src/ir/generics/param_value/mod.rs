@@ -10,9 +10,8 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
-    assignment::{AssignmentKind, ValueAssignment},
+    assignment::ValueAssignment,
     declaration::ObjectDeclaration,
-    port::GenericParameter,
     statement::relation::{
         math::{CreateMath, MathExpression},
         Relation,

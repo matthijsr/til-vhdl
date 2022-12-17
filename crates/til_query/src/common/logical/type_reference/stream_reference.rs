@@ -1,11 +1,7 @@
 use core::fmt;
 
 use textwrap::indent;
-use tydi_common::{
-    error::Result,
-    name::PathName,
-    numbers::{NonNegative, Positive},
-};
+use tydi_common::{error::Result, name::PathName, numbers::Positive};
 use tydi_intern::Id;
 
 use crate::{

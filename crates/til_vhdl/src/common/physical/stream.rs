@@ -1,11 +1,9 @@
-use til_query::common::logical::logicaltype::stream::StreamProperty;
 use til_query::common::physical::stream::PhysicalBitCount;
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
-use til_query::ir::generics::interface::dimensionality;
 use til_query::ir::physical_properties::InterfaceDirection;
 use til_query::ir::Ir;
-use tydi_common::error::{Error, TryOptional};
+use tydi_common::error::TryOptional;
 use tydi_common::numbers::Positive;
 use tydi_common::{
     cat,
@@ -14,7 +12,6 @@ use tydi_common::{
     traits::{Reverse, Reversed},
 };
 use tydi_vhdl::architecture::arch_storage::Arch;
-use tydi_vhdl::object::object_type::ObjectType;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
     port::{Mode, Port},

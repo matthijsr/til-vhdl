@@ -2,7 +2,8 @@ use itertools::Itertools;
 use textwrap::indent;
 
 use tydi_common::{
-    error::{Result, TryResult},
+    error::{Error, Result, TryResult},
+    map::InsertionOrderedMap,
     traits::{Document, Documents, Identify},
 };
 
@@ -22,10 +23,10 @@ use crate::{
 pub struct Component {
     /// Component identifier.
     identifier: VhdlName,
-    /// The parameters of the component..
-    parameters: Vec<GenericParameter>,
+    /// The parameters of the component.
+    parameters: InsertionOrderedMap<VhdlName, GenericParameter>,
     /// The ports of the component.
-    ports: Vec<Port>,
+    ports: InsertionOrderedMap<VhdlName, Port>,
     /// Documentation.
     doc: Option<String>,
 }
@@ -38,21 +39,35 @@ impl Component {
         ports: Vec<Port>,
         doc: Option<String>,
     ) -> Result<Component> {
+        let mut ports_map = InsertionOrderedMap::new();
+        for port in ports {
+            ports_map.try_insert(port.vhdl_name().clone(), port)?;
+        }
+        let mut parameters_map = InsertionOrderedMap::new();
+        for param in parameters {
+            if ports_map.contains(param.vhdl_name()) {
+                return Err(Error::InvalidArgument(format!(
+                    "Cannot add parameter \"{}\", there is already a port with the same name.",
+                    param.vhdl_name()
+                )));
+            }
+            parameters_map.try_insert(param.vhdl_name().clone(), param)?;
+        }
         Ok(Component {
             identifier: identifier.try_result()?,
-            parameters,
-            ports,
+            parameters: parameters_map,
+            ports: ports_map,
             doc,
         })
     }
 
     /// Return a reference to the ports of this component.
-    pub fn ports(&self) -> &Vec<Port> {
+    pub fn ports(&self) -> &InsertionOrderedMap<VhdlName, Port> {
         &self.ports
     }
 
     /// Return a reference to the parameters of this component.
-    pub fn parameters(&self) -> &Vec<GenericParameter> {
+    pub fn parameters(&self) -> &InsertionOrderedMap<VhdlName, GenericParameter> {
         &self.parameters
     }
 
@@ -88,7 +103,7 @@ impl Documents for Component {
 impl Analyze for Component {
     fn list_nested_types(&self) -> Vec<ObjectType> {
         let mut result: Vec<ObjectType> = vec![];
-        for p in self.ports().iter() {
+        for (_, p) in self.ports().iter() {
             result.append(&mut p.typ().list_nested_types())
         }
         result
@@ -110,7 +125,7 @@ impl DeclareWithIndent for Component {
             let parameters = self
                 .parameters()
                 .iter()
-                .map(|x| x.declare_with_indent(db, indent_style))
+                .map(|(_, x)| x.declare_with_indent(db, indent_style))
                 .collect::<Result<Vec<String>>>()?
                 .join(";\n");
             parameter_body.push_str(&indent(&parameters, indent_style));
@@ -122,7 +137,7 @@ impl DeclareWithIndent for Component {
         let ports = self
             .ports()
             .iter()
-            .map(|x| x.declare(db))
+            .map(|(_, x)| x.declare(db))
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
         port_body.push_str(&indent(&ports, indent_style));

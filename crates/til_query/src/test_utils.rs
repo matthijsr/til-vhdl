@@ -10,6 +10,7 @@ use crate::{
     },
     ir::{
         db::Database,
+        generics::{behavioral::integer::IntegerGeneric, GenericParameter},
         implementation::{structure::Structure, Implementation},
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
@@ -90,4 +91,16 @@ pub fn simple_structural_streamlet(db: &mut Database) -> Result<Streamlet> {
         .intern(db);
     let streamlet = streamlet.with_implementation(Some(implementation));
     Ok(streamlet)
+}
+
+pub fn simple_structural_streamlet_with_behav_params(db: &mut Database) -> Result<Streamlet> {
+    let streamlet = simple_structural_streamlet(db)?;
+    streamlet.with_parameters(
+        db,
+        vec![
+            GenericParameter::try_new("pa", IntegerGeneric::natural(), 0)?,
+            GenericParameter::try_new("pb", IntegerGeneric::positive(), 2)?,
+            GenericParameter::try_new("pc", IntegerGeneric::integer(), -2)?,
+        ],
+    )
 }
