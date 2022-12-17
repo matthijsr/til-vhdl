@@ -33,19 +33,19 @@ impl DeclareWithIndent for ObjectDeclaration {
             ObjectKind::Signal => format!(
                 "signal {} : {}{}",
                 self.identifier(),
-                self.object(db)?.typ(db).declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(db)?,
                 default_string
             ),
             ObjectKind::Variable => format!(
                 "variable {} : {}{}",
                 self.identifier(),
-                self.object(db)?.typ(db).declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(db)?,
                 default_string
             ),
             ObjectKind::Constant => format!(
                 "constant {} : {}{}",
                 self.identifier(),
-                self.object(db)?.typ(db).declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(db)?,
                 default_string
             ),
             ObjectKind::EntityPort(_) => "".to_string(), // Entity ports are part of the architecture, but aren't declared in the declaration part
@@ -53,7 +53,7 @@ impl DeclareWithIndent for ObjectDeclaration {
                 "{} : {} {}{}",
                 self.identifier(),
                 mode,
-                self.object(db)?.typ(db).declaration_type_name(),
+                self.object(db)?.typ(db).declaration_type_name(db)?,
                 default_string
             ),
             ObjectKind::Alias(obj, _) => {
@@ -67,7 +67,7 @@ impl DeclareWithIndent for ObjectDeclaration {
                 format!(
                     "alias {} : {} is {}{}",
                     self.identifier(),
-                    self.object(db)?.typ(db).declaration_type_name(),
+                    self.object(db)?.typ(db).declaration_type_name(db)?,
                     obj,
                     field_selection_string
                 )

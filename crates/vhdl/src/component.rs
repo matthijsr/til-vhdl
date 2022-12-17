@@ -101,14 +101,14 @@ impl Documents for Component {
 }
 
 impl Analyze for Component {
-    fn list_nested_types(&self) -> Vec<ObjectType> {
+    fn list_nested_types(&self, db: &dyn Arch) -> Vec<ObjectType> {
         let mut result: Vec<ObjectType> = vec![];
         for (_, p) in self.ports().iter() {
-            result.append(&mut p.typ().list_nested_types())
+            result.append(&mut p.typ().list_nested_types(db))
         }
         result
             .into_iter()
-            .unique_by(|x| x.declaration_type_name())
+            .unique_by(|x| x.declaration_type_name(db))
             .collect()
     }
 }

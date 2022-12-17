@@ -206,8 +206,9 @@ mod tests {
 
     use super::*;
 
-    pub(crate) fn test_package() -> Result<Package> {
+    pub(crate) fn test_package(db: &dyn Arch) -> Result<Package> {
         Package::try_new(
+            db,
             "pak",
             &vec![
                 Arc::new(test_tools::empty_component()),
@@ -220,7 +221,7 @@ mod tests {
     #[test]
     fn test_architecture() -> Result<()> {
         let db = Database::default();
-        let package = test_package()?;
+        let package = test_package(&db)?;
         let architecture = Architecture::new_default(&package, "component_with_nested_types")?;
         assert_eq!(
             r#"library ieee;

@@ -42,13 +42,14 @@ impl Package {
     }
 
     pub fn try_new(
+        db: &dyn Arch,
         identifier: impl TryResult<VhdlName>,
         components: &Vec<Arc<Component>>,
         types: &Vec<ObjectType>,
     ) -> Result<Self> {
         let mut all_types: Vec<ObjectType> = types.clone();
         for component in components {
-            all_types.append(&mut component.list_nested_types());
+            all_types.append(&mut component.list_nested_types(db));
         }
         Ok(Package {
             identifier: identifier.try_result()?,
@@ -58,14 +59,18 @@ impl Package {
                 .collect(),
             types: all_types
                 .into_iter()
-                .unique_by(|x| x.declaration_type_name())
+                .unique_by(|x| x.declaration_type_name(db))
                 .collect(),
         })
     }
 
     /// Creates an empty "default" library
     pub fn new_default_empty() -> Self {
-        Package::try_new("default", &vec![], &vec![]).unwrap()
+        Package {
+            identifier: "default".try_into().unwrap(),
+            components: IndexMap::new(),
+            types: vec![],
+        }
     }
 
     pub fn get_subject_component(&self, db: &dyn Arch) -> Result<Arc<Component>> {

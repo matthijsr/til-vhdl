@@ -9,6 +9,7 @@ use tydi_common::{
 use crate::{
     architecture::arch_storage::Arch,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
+    declaration::Declare,
     statement::relation::Relation,
 };
 use crate::{declaration::DeclareWithIndent, object::object_type::ObjectType};
@@ -169,11 +170,15 @@ impl VhdlNameSelf for ArrayObject {
 }
 
 impl DeclarationTypeName for ArrayObject {
-    fn declaration_type_name(&self) -> String {
-        if self.is_std_logic_vector() {
-            format!("std_logic_vector({} downto {})", self.high(), self.low())
+    fn declaration_type_name(&self, db: &dyn Arch) -> Result<String> {
+        Ok(if self.is_std_logic_vector() {
+            format!(
+                "std_logic_vector({} downto {})",
+                self.high().declare(db)?,
+                self.low().declare(db)?
+            )
         } else {
             self.identifier()
-        }
+        })
     }
 }

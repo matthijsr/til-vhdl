@@ -20,7 +20,7 @@ use crate::statement::relation::Relation;
 
 pub trait DeclarationTypeName {
     /// Returns the type name for use in object declaration
-    fn declaration_type_name(&self) -> String;
+    fn declaration_type_name(&self, db: &dyn Arch) -> Result<String>;
 }
 
 /// Basic signed number type defined in the std package, typically 32 bits,
@@ -46,12 +46,12 @@ impl fmt::Display for IntegerType {
 }
 
 impl DeclarationTypeName for IntegerType {
-    fn declaration_type_name(&self) -> String {
-        match self {
+    fn declaration_type_name(&self, _db: &dyn Arch) -> Result<String> {
+        Ok(match self {
             IntegerType::Integer => "integer".to_string(),
             IntegerType::Natural => "natural".to_string(),
             IntegerType::Positive => "positive".to_string(),
-        }
+        })
     }
 }
 
@@ -108,7 +108,7 @@ impl fmt::Display for ObjectType {
                 write!(
                     f,
                     "Record (type name: {}) with fields: ( {})",
-                    record.declaration_type_name(),
+                    record.identifier(),
                     fields
                 )
             }
@@ -340,27 +340,27 @@ impl ObjectType {
 }
 
 impl DeclarationTypeName for ObjectType {
-    fn declaration_type_name(&self) -> String {
+    fn declaration_type_name(&self, db: &dyn Arch) -> Result<String> {
         match self {
-            ObjectType::Bit => "std_logic".to_string(),
-            ObjectType::Array(array) => array.declaration_type_name(),
-            ObjectType::Record(record) => record.declaration_type_name(),
-            ObjectType::Time => "time".to_string(),
-            ObjectType::Boolean => "boolean".to_string(),
-            ObjectType::Integer(int_typ) => int_typ.declaration_type_name(),
+            ObjectType::Bit => Ok("std_logic".to_string()),
+            ObjectType::Array(array) => array.declaration_type_name(db),
+            ObjectType::Record(record) => record.declaration_type_name(db),
+            ObjectType::Time => Ok("time".to_string()),
+            ObjectType::Boolean => Ok("boolean".to_string()),
+            ObjectType::Integer(int_typ) => int_typ.declaration_type_name(db),
         }
     }
 }
 
 impl Analyze for ObjectType {
-    fn list_nested_types(&self) -> Vec<ObjectType> {
+    fn list_nested_types(&self, db: &dyn Arch) -> Vec<ObjectType> {
         match self {
             ObjectType::Bit => vec![],
             ObjectType::Array(array_object) => {
                 if array_object.is_std_logic_vector() {
                     vec![]
                 } else {
-                    let mut result = array_object.typ().list_nested_types();
+                    let mut result = array_object.typ().list_nested_types(db);
                     result.push(self.clone());
                     result
                 }
@@ -368,7 +368,7 @@ impl Analyze for ObjectType {
             ObjectType::Record(record_object) => {
                 let mut result = vec![];
                 for (_, typ) in record_object.fields() {
-                    result.append(&mut typ.list_nested_types())
+                    result.append(&mut typ.list_nested_types(db))
                 }
                 result.push(self.clone());
                 result
@@ -392,7 +392,7 @@ impl DeclareWithIndent for ObjectType {
                 Err(Error::BackEndError(format!(
                     "Invalid type, {} ({}) cannot be declared.",
                     self,
-                    self.declaration_type_name(),
+                    self.declaration_type_name(db)?,
                 )))
             }
         }
