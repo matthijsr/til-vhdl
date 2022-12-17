@@ -67,6 +67,20 @@ pub fn simple_structural_streamlet(
     db: &mut Database,
     name: impl TryResult<PathName>,
 ) -> Result<Streamlet> {
+    let streamlet = streamlet_without_impl(db, name)?;
+    let mut structure = Structure::try_from(&streamlet)?;
+    structure.try_add_connection(db, "a", "b")?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let streamlet = streamlet.with_implementation(Some(implementation));
+    Ok(streamlet)
+}
+
+pub fn streamlet_without_impl(
+    db: &mut Database,
+    name: impl TryResult<PathName>,
+) -> Result<Streamlet> {
     let bits = LogicalType::try_new_bits(4)?.intern(db);
     let data_type = LogicalType::try_new_union(None, vec![("a", bits), ("b", bits)])?.intern(db);
     let null_type = LogicalType::null_id(db);
@@ -88,12 +102,6 @@ pub fn simple_structural_streamlet(
             ("b", stream, InterfaceDirection::Out),
         ],
     )?;
-    let mut structure = Structure::try_from(&streamlet)?;
-    structure.try_add_connection(db, "a", "b")?;
-    let implementation = Implementation::structural(structure)?
-        .try_with_name("structural")?
-        .intern(db);
-    let streamlet = streamlet.with_implementation(Some(implementation));
     Ok(streamlet)
 }
 
