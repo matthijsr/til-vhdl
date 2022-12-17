@@ -135,7 +135,7 @@ impl ListUsings for Package {
         let mut types = self
             .components
             .iter()
-            .flat_map(|(_, x)| x.ports().iter().map(|p| p.typ()));
+            .flat_map(|(_, x)| x.ports().iter().map(|(_, p)| p.typ()));
         fn uses_std_logic(t: &ObjectType) -> bool {
             match t {
                 ObjectType::Bit => true,

@@ -1,3 +1,4 @@
+use til_query::common::physical::stream::PhysicalBitCount;
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
 use til_query::ir::physical_properties::InterfaceDirection;
@@ -39,20 +40,57 @@ impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
             StreamDirection::Reverse => Mode::Out,
         };
 
-        let signal_list: SignalList<Positive> = self.into();
+        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+
+        let signal_list: SignalList<PhysicalBitCount> = self.into();
         let mut signal_list = signal_list.map_named(|n, x| {
-            Port::try_new(cat!(prefix, n), mode, x).unwrap() // As the prefix is either a VhdlName or empty, and all signal names are valid
+            if let Some(f) = x.try_eval() {
+                // As the prefix is either a VhdlName or empty, and all signal names are valid
+                Port::try_new(cat!(prefix, n), mode, f).unwrap()
+            } else {
+                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+                todo!()
+            }
         });
 
         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
+        let user_bit_count = if let Some(u) = self.user_bit_count() {
+            if let Some(f) = u.try_eval() {
+                f.get()
+            } else {
+                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+                todo!()
+            }
+        } else {
+            0
+        };
+
+        let data_element_bit_count = if let Some(d) = self.data_element_bit_count() {
+            if let Some(f) = d.try_eval() {
+                f.get()
+            } else {
+                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+                todo!()
+            }
+        } else {
+            0
+        };
+
+        // TODO: ALLOW FOR PARAMETERIZED DIMENSIONALITY
+        let dimensionality = if let Some(f) = self.dimensionality().try_eval() {
+            f
+        } else {
+            todo!()
+        };
+
         Ok(VhdlPhysicalStream::new(
             signal_list,
             self.element_lanes().clone(),
-            self.dimensionality(),
+            dimensionality,
             self.complexity().clone(),
-            self.data_element_bit_count(),
-            self.user_bit_count(),
+            data_element_bit_count,
+            user_bit_count,
             InterfaceDirection::In,
             self.stream_direction(),
         ))

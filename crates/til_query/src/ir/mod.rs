@@ -33,6 +33,7 @@ use self::{
 pub mod annotation_keys;
 pub mod connection;
 pub mod db;
+pub mod generics;
 pub mod get_self;
 pub mod implementation;
 pub mod interface_port;
@@ -136,7 +137,7 @@ fn stream_split_streams(db: &dyn Ir, key: Id<Stream>) -> Result<SplitStreams> {
             Stream::new(
                 element,
                 this_stream.throughput(),
-                this_stream.dimensionality(),
+                this_stream.dimensionality().clone(),
                 this_stream.synchronicity(),
                 this_stream.complexity().clone(),
                 this_stream.direction(),
@@ -155,7 +156,9 @@ fn stream_split_streams(db: &dyn Ir, key: Id<Stream>) -> Result<SplitStreams> {
         if this_stream.flattens() {
             stream.set_synchronicity(Synchronicity::FlatDesync);
         } else {
-            stream.set_dimensionality(stream.dimensionality() + this_stream.dimensionality());
+            stream.set_dimensionality(
+                stream.dimensionality().clone() + this_stream.dimensionality().clone(),
+            );
         }
         stream.set_throughput(stream.throughput() * this_stream.throughput());
 

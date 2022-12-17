@@ -1,5 +1,5 @@
+use core::fmt;
 use std::convert::TryInto;
-use std::fmt;
 
 use indexmap::map::IndexMap;
 

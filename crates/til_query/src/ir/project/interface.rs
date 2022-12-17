@@ -13,6 +13,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::ir::{
+    generics::GenericParameter,
     implementation::structure::Structure,
     interface_port::InterfacePort,
     physical_properties::{Domain, InterfaceDirection},
@@ -24,6 +25,7 @@ use crate::ir::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Interface {
     domains: Option<InsertionOrderedSet<Domain>>,
+    parameters: InsertionOrderedMap<Name, GenericParameter>,
     ports: InsertionOrderedMap<Name, InterfacePort>,
 }
 
@@ -31,15 +33,32 @@ impl Interface {
     pub fn new_empty() -> Self {
         Interface {
             domains: None,
+            parameters: InsertionOrderedMap::new(),
             ports: InsertionOrderedMap::new(),
         }
     }
 
     pub fn new(
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+        ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
+    ) -> Result<Self> {
+        Self::new_domains(domains)?
+            .with_parameters(parameters)?
+            .with_ports(ports)
+    }
+
+    pub fn new_ports_domains(
+        domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Self> {
         Self::new_domains(domains)?.with_ports(ports)
+    }
+
+    pub fn new_parameters(
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+    ) -> Result<Self> {
+        Self::new_empty().with_parameters(parameters)
     }
 
     pub fn new_domains(domains: impl IntoIterator<Item = impl TryResult<Name>>) -> Result<Self> {
@@ -57,6 +76,7 @@ impl Interface {
 
         Ok(Interface {
             domains: domain_set,
+            parameters: InsertionOrderedMap::new(),
             ports: InsertionOrderedMap::new(),
         })
     }
@@ -121,6 +141,20 @@ impl Interface {
         Ok(self)
     }
 
+    pub fn with_parameters(
+        mut self,
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+    ) -> Result<Self> {
+        let mut param_map = InsertionOrderedMap::new();
+        for param in parameters {
+            let param = param.try_result()?;
+            param_map.try_insert(param.name().clone(), param)?
+        }
+
+        self.parameters = param_map;
+        Ok(self)
+    }
+
     pub fn push_port(&mut self, port: impl TryResult<InterfacePort>) -> Result<()> {
         let port = port.try_result()?;
         self.verify_port(&port)?;
@@ -155,9 +189,23 @@ impl Interface {
         }
     }
 
+    pub fn try_get_parameter(&self, name: &Name) -> Result<GenericParameter> {
+        match self.parameters().get(name) {
+            Some(param) => Ok(param.clone()),
+            None => Err(Error::InvalidArgument(format!(
+                "No parameter with name {} exists on this interface",
+                name
+            ))),
+        }
+    }
+
     /// When `None`, this Interface only has a Default domain.
     pub fn domains(&self) -> &Option<InsertionOrderedSet<Domain>> {
         &self.domains
+    }
+
+    pub fn parameters(&self) -> &InsertionOrderedMap<Name, GenericParameter> {
+        &self.parameters
     }
 }
 

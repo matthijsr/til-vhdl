@@ -1,3 +1,5 @@
+use tydi_common::map::InsertionOrderedMap;
+
 use crate::{
     common::vhdl_name::VhdlName,
     port::{GenericParameter, Port},
@@ -11,9 +13,9 @@ pub struct Entity {
     /// Component identifier.
     identifier: VhdlName,
     /// The parameters of the entity..
-    parameters: Vec<GenericParameter>,
+    parameters: InsertionOrderedMap<VhdlName, GenericParameter>,
     /// The ports of the entity.
-    ports: Vec<Port>,
+    ports: InsertionOrderedMap<VhdlName, Port>,
     /// Documentation.
     doc: Option<String>,
 }

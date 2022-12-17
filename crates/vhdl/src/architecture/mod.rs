@@ -1,7 +1,6 @@
-use indexmap::IndexMap;
-
 use arch_storage::interner::GetSelf;
 use tydi_common::error::TryResult;
+use tydi_common::map::InsertionOrderedMap;
 use tydi_common::{error::Result, traits::Identify};
 use tydi_intern::Id;
 
@@ -167,13 +166,21 @@ impl Architecture {
     pub fn entity_ports(
         &self,
         db: &mut dyn Arch,
-    ) -> Result<IndexMap<String, Id<ObjectDeclaration>>> {
-        let mut result = IndexMap::new();
-        for port in self.entity.ports() {
-            let obj = ObjectDeclaration::from_port(db, port, true);
-            result.insert(port.identifier().to_string(), obj);
-        }
-        Ok(result)
+    ) -> InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>> {
+        self.entity
+            .ports()
+            .clone()
+            .map_convert(|p| ObjectDeclaration::from_port(db, &p, true))
+    }
+
+    pub fn entity_parameters(
+        &self,
+        db: &mut dyn Arch,
+    ) -> Result<InsertionOrderedMap<VhdlName, Id<ObjectDeclaration>>> {
+        self.entity
+            .parameters()
+            .clone()
+            .try_map_convert(|p| ObjectDeclaration::from_parameter(db, &p))
     }
 
     pub fn add_body(&mut self, db: &dyn Arch, body: &ArchitectureBody) -> Result<()> {

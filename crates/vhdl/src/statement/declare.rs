@@ -16,7 +16,7 @@ impl DeclareWithIndent for Mapping {
     fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = String::new();
         result.push_str(&format!("{}", self.component_name()));
-        if self.param_mappings().len() > 0 {
+        if self.has_param_assignments() {
             result.push_str(" generic map(\n");
             let mut param_maps = vec![];
             for (param, assignment) in self.param_mappings() {

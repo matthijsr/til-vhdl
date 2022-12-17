@@ -17,13 +17,18 @@ use til_query::{
     },
     ir::{
         db::Database,
+        generics::param_value::combination::GenericParamValueOps,
         implementation::{structure::Structure, Implementation},
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
-        traits::{GetSelf, InternSelf},
+        traits::{GetSelf, InternArc, InternSelf},
         Ir,
     },
-    test_utils::{test_stream_id, test_stream_id_custom},
+    test_utils::{
+        simple_structural_streamlet, simple_structural_streamlet_with_behav_params,
+        streamlet_without_impl, streamlet_without_impl_with_behav_params, test_stream_id,
+        test_stream_id_custom,
+    },
 };
 use til_vhdl::IntoVhdl;
 use tydi_common::{error::Result, name::Name, numbers::NonNegative};
@@ -33,6 +38,10 @@ use tydi_vhdl::{
     declaration::Declare,
     package::Package,
 };
+
+use crate::common::ir_streamlet_to_vhdl;
+
+mod common;
 
 extern crate til_vhdl;
 
@@ -356,7 +365,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -366,7 +375,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -376,7 +385,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Reverse,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -396,7 +405,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -406,7 +415,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -416,7 +425,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Reverse,
       complexity: 4,
-      dimensionality: 0,
+      dimensionality: (Fixed(0)) + Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -425,7 +434,7 @@ namespace my::test::space {
   ),
   direction: Forward,
   complexity: 4,
-  dimensionality: 0,
+  dimensionality: Fixed(0),
   transfer_scope: Root,
   element_lanes: 3,
   user: Null
@@ -489,6 +498,428 @@ component my__test__space__doc_streamlet_com
   );
 end component;"#,
         comp.declare(&arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let streamlet = simple_structural_streamlet(db, "test")?;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let mut streamlet = ir_streamlet_to_vhdl(streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"component test_com
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end component;"#,
+        streamlet.to_component().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+package default is
+
+  component test_com
+    port (
+      clk : in std_logic;
+      rst : in std_logic;
+      a_valid : in std_logic;
+      a_ready : out std_logic;
+      a_data : in std_logic_vector(4 downto 0);
+      a_last : in std_logic;
+      a_strb : in std_logic;
+      b_valid : out std_logic;
+      b_ready : in std_logic;
+      b_data : out std_logic_vector(4 downto 0);
+      b_last : out std_logic;
+      b_strb : out std_logic
+    );
+  end component;
+
+end default;"#,
+        arch_db.default_package().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity test_com is
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end test_com;
+
+architecture structural of test_com is
+begin
+  b_valid <= a_valid;
+  a_ready <= b_ready;
+  b_data <= a_data;
+  b_last <= a_last;
+  b_strb <= a_strb;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_behav_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let streamlet = simple_structural_streamlet_with_behav_params(db, "test")?;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let mut streamlet = ir_streamlet_to_vhdl(streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"component test_com
+  generic (
+    pa : natural := 0;
+    pb : positive := 2;
+    pc : integer := -2
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end component;"#,
+        streamlet.to_component().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+package default is
+
+  component test_com
+    generic (
+      pa : natural := 0;
+      pb : positive := 2;
+      pc : integer := -2
+    );
+    port (
+      clk : in std_logic;
+      rst : in std_logic;
+      a_valid : in std_logic;
+      a_ready : out std_logic;
+      a_data : in std_logic_vector(4 downto 0);
+      a_last : in std_logic;
+      a_strb : in std_logic;
+      b_valid : out std_logic;
+      b_ready : in std_logic;
+      b_data : out std_logic_vector(4 downto 0);
+      b_last : out std_logic;
+      b_strb : out std_logic
+    );
+  end component;
+
+end default;"#,
+        arch_db.default_package().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity test_com is
+  generic (
+    pa : natural := 0;
+    pb : positive := 2;
+    pc : integer := -2
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end test_com;
+
+architecture structural of test_com is
+begin
+  b_valid <= a_valid;
+  a_ready <= b_ready;
+  b_data <= a_data;
+  b_last <= a_last;
+  b_strb <= a_strb;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_instance() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let instance_streamlet = streamlet_without_impl(db, "inner")?;
+    let parent_streamlet = streamlet_without_impl(db, "parent")?;
+    let mut structure = Structure::try_from(&parent_streamlet)?;
+    structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
+    structure.try_add_connection(db, "a", ("a", "a"))?;
+    structure.try_add_connection(db, "b", ("a", "b"))?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity parent_com is
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end parent_com;
+
+architecture structural of parent_com is
+  signal a__a_valid : std_logic;
+  signal a__a_ready : std_logic;
+  signal a__a_data : std_logic_vector(4 downto 0);
+  signal a__a_last : std_logic;
+  signal a__a_strb : std_logic;
+  signal a__b_valid : std_logic;
+  signal a__b_ready : std_logic;
+  signal a__b_data : std_logic_vector(4 downto 0);
+  signal a__b_last : std_logic;
+  signal a__b_strb : std_logic;
+begin
+  a: inner_com port map(
+    clk => clk,
+    rst => rst,
+    a_valid => a__a_valid,
+    a_ready => a__a_ready,
+    a_data => a__a_data,
+    a_last => a__a_last,
+    a_strb => a__a_strb,
+    b_valid => a__b_valid,
+    b_ready => a__b_ready,
+    b_data => a__b_data,
+    b_last => a__b_last,
+    b_strb => a__b_strb
+  );
+  a__a_valid <= a_valid;
+  a_ready <= a__a_ready;
+  a__a_data <= a_data;
+  a__a_last <= a_last;
+  a__a_strb <= a_strb;
+  b_valid <= a__b_valid;
+  a__b_ready <= b_ready;
+  b_data <= a__b_data;
+  b_last <= a__b_last;
+  b_strb <= a__b_strb;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_instance_and_behav_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let instance_streamlet = streamlet_without_impl_with_behav_params(db, "inner")?;
+    let parent_streamlet = streamlet_without_impl_with_behav_params(db, "parent")?;
+    let mut structure = Structure::try_from(&parent_streamlet)?;
+    let instance =
+        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
+    instance.assign_parameter("pa", 20)?;
+    instance.assign_parameter(
+        "pb",
+        parent_streamlet.try_get_parameter(db, &Name::try_new("pb")?)?,
+    )?;
+    instance.assign_parameter(
+        "pc",
+        parent_streamlet
+            .try_get_parameter(db, &Name::try_new("pa")?)?
+            .g_add(1)?,
+    )?;
+    structure.try_add_connection(db, "a", ("a", "a"))?;
+    structure.try_add_connection(db, "b", ("a", "b"))?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity parent_com is
+  generic (
+    pa : natural := 0;
+    pb : positive := 2;
+    pc : integer := -2
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic;
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic;
+    b_strb : out std_logic
+  );
+end parent_com;
+
+architecture structural of parent_com is
+  signal a__a_valid : std_logic;
+  signal a__a_ready : std_logic;
+  signal a__a_data : std_logic_vector(4 downto 0);
+  signal a__a_last : std_logic;
+  signal a__a_strb : std_logic;
+  signal a__b_valid : std_logic;
+  signal a__b_ready : std_logic;
+  signal a__b_data : std_logic_vector(4 downto 0);
+  signal a__b_last : std_logic;
+  signal a__b_strb : std_logic;
+begin
+  a: inner_com generic map(
+    pa => 20,
+    pb => pb,
+    pc => pa + 1
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => a__a_valid,
+    a_ready => a__a_ready,
+    a_data => a__a_data,
+    a_last => a__a_last,
+    a_strb => a__a_strb,
+    b_valid => a__b_valid,
+    b_ready => a__b_ready,
+    b_data => a__b_data,
+    b_last => a__b_last,
+    b_strb => a__b_strb
+  );
+  a__a_valid <= a_valid;
+  a_ready <= a__a_ready;
+  a__a_data <= a_data;
+  a__a_last <= a_last;
+  a__a_strb <= a_strb;
+  b_valid <= a__b_valid;
+  a__b_ready <= b_ready;
+  b_data <= a__b_data;
+  b_last <= a__b_last;
+  b_strb <= a__b_strb;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
     );
 
     Ok(())

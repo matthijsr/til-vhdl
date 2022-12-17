@@ -139,16 +139,14 @@ impl Mapping {
         component: &Component,
         label: impl TryResult<VhdlName>,
     ) -> Result<Mapping> {
-        let mut param_mappings = InsertionOrderedMap::new();
-        for param in component.parameters() {
-            let obj = ObjectDeclaration::from_parameter(db, param)?;
-            param_mappings.try_insert(param.vhdl_name().clone(), MapAssignment::Unassigned(obj))?;
-        }
-        let mut port_mappings = InsertionOrderedMap::new();
-        for port in component.ports() {
-            let obj = ObjectDeclaration::from_port(db, port, false);
-            port_mappings.try_insert(port.vhdl_name().clone(), MapAssignment::Unassigned(obj))?;
-        }
+        let param_mappings = component.parameters().clone().try_map_convert(|p| {
+            Ok(MapAssignment::Unassigned(
+                ObjectDeclaration::from_parameter(db, &p)?,
+            ))
+        })?;
+        let port_mappings = component.ports().clone().map_convert(|p| {
+            MapAssignment::Unassigned(ObjectDeclaration::from_port(db, &p, false))
+        });
         Ok(Mapping {
             label: label.try_result()?,
             component_name: component.vhdl_name().clone(),
@@ -159,6 +157,15 @@ impl Mapping {
 
     pub fn param_mappings(&self) -> &InsertionOrderedMap<VhdlName, MapAssignment> {
         &self.param_mappings
+    }
+
+    pub fn has_param_assignments(&self) -> bool {
+        for (_, param) in self.param_mappings() {
+            if let MapAssignment::Assigned(_) = param {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn port_mappings(&self) -> &InsertionOrderedMap<VhdlName, MapAssignment> {

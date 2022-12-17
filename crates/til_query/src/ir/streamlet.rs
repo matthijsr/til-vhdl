@@ -9,6 +9,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use super::{
+    generics::GenericParameter,
     physical_properties::Domain,
     project::interface::Interface,
     traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
@@ -41,7 +42,7 @@ impl Streamlet {
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = Interface::new(domains, ports)?.intern_arc(db);
+        let interface = Interface::new_ports_domains(domains, ports)?.intern_arc(db);
         self.interface = Some(interface);
 
         Ok(self)
@@ -57,6 +58,26 @@ impl Streamlet {
             self.interface = Some(new_interface.intern_arc(db));
         } else {
             let interface = Interface::new_ports(ports)?.intern_arc(db);
+            self.interface = Some(interface);
+        }
+
+        Ok(self)
+    }
+
+    pub fn with_parameters(
+        mut self,
+        db: &dyn Ir,
+        parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
+    ) -> Result<Streamlet> {
+        if let Some(interface) = self.interface {
+            let new_interface = interface
+                .get(db)
+                .as_ref()
+                .clone()
+                .with_parameters(parameters)?;
+            self.interface = Some(new_interface.intern_arc(db));
+        } else {
+            let interface = Interface::new_parameters(parameters)?.intern_arc(db);
             self.interface = Some(interface);
         }
 
@@ -137,8 +158,23 @@ impl Streamlet {
         }
     }
 
+    pub fn try_get_parameter(&self, db: &dyn Ir, name: &Name) -> Result<GenericParameter> {
+        match self.interface(db).try_get_parameter(name) {
+            Ok(param) => Ok(param),
+            Err(_) => Err(Error::InvalidArgument(format!(
+                "No parameter with name {} exists on Streamlet {}",
+                name,
+                self.identifier()
+            ))),
+        }
+    }
+
     pub fn domains(&self, db: &dyn Ir) -> Option<InsertionOrderedSet<Domain>> {
         self.interface(db).domains().clone()
+    }
+
+    pub fn parameters(&self, db: &dyn Ir) -> InsertionOrderedMap<Name, GenericParameter> {
+        self.interface(db).parameters().clone()
     }
 }
 

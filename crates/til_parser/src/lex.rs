@@ -1,7 +1,7 @@
 use super::Span;
 
 use chumsky::prelude::*;
-use std::fmt;
+use core::fmt;
 use til_query::{
     common::{logical::logicaltype::stream::Synchronicity, stream_direction::StreamDirection},
     ir::physical_properties::InterfaceDirection,

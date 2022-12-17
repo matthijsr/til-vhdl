@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use core::fmt::Display;
 
 use tydi_common::{
     error::{Result, TryResult},
@@ -177,7 +177,7 @@ impl Reversed for Mode {
 }
 
 impl Display for Mode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Mode::In => write!(f, "in"),
             Mode::Out => write!(f, "out"),

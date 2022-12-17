@@ -40,9 +40,13 @@ pub trait IntoVhdl<T> {
 ///
 /// The `indent_style` determines whether to use tabs or spaces, and how many.
 pub fn canonical(db: &dyn Ir) -> Result<()> {
-    let mut dir = db.project_ref().output_path().clone().ok_or(Error::ProjectError(
-        "VHDL project requires an output path, project output path is None".to_string(),
-    ))?;
+    let mut dir = db
+        .project_ref()
+        .output_path()
+        .clone()
+        .ok_or(Error::ProjectError(
+            "VHDL project requires an output path, project output path is None".to_string(),
+        ))?;
     dir.push(db.project_ref().identifier());
     std::fs::create_dir_all(dir.as_path())?;
 

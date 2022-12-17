@@ -1,16 +1,144 @@
-use std::convert::TryInto;
+use std::{
+    convert::TryInto,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use tydi_common::{
-    error::{Error, Result},
+    error::{Error, Result, TryResult},
     map::InsertionOrderedMap,
-    name::PathName,
+    name::{Name, PathName},
     numbers::{BitCount, NonNegative, Positive},
     util::log2_ceil,
 };
 
-use crate::common::stream_direction::StreamDirection;
+use crate::common::{
+    logical::logicaltype::stream::{Dimensionality, StreamProperty, StreamPropertyOperator},
+    stream_direction::StreamDirection,
+};
 
 use super::{complexity::Complexity, signal_list::SignalList};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PhysicalBitCount {
+    Combination(Box<Self>, StreamPropertyOperator, Box<Self>),
+    Fixed(Positive),
+    Parameterized(Name),
+}
+
+impl PhysicalBitCount {
+    pub fn parameterized(name: impl Into<Name>) -> Self {
+        PhysicalBitCount::Parameterized(name.into())
+    }
+
+    pub fn fixed(val: NonNegative) -> Option<Self> {
+        if let Some(val) = Positive::new(val) {
+            Some(PhysicalBitCount::Fixed(val))
+        } else {
+            None
+        }
+    }
+
+    pub fn with_multiplier(self, m: NonNegative) -> Self {
+        if let Some(mul) = Positive::new(m) {
+            if mul > Positive::new(1).unwrap() {
+                return PhysicalBitCount::Combination(
+                    Box::new(self),
+                    StreamPropertyOperator::Multiply,
+                    Box::new(PhysicalBitCount::Fixed(mul)),
+                );
+            }
+        }
+
+        self
+    }
+
+    pub fn try_eval(&self) -> Option<Positive> {
+        match self {
+            PhysicalBitCount::Combination(l, op, r) => {
+                if let Some(lv) = l.try_eval() {
+                    if let Some(rv) = r.try_eval() {
+                        return match op {
+                            StreamPropertyOperator::Add => lv.checked_add(rv.get()),
+                            StreamPropertyOperator::Subtract => Positive::new(lv.get() - rv.get()),
+                            StreamPropertyOperator::Multiply => lv.checked_mul(rv),
+                            StreamPropertyOperator::Divide => Positive::new(lv.get() / rv.get()),
+                        };
+                    }
+                }
+                None
+            }
+            PhysicalBitCount::Fixed(f) => Some(*f),
+            PhysicalBitCount::Parameterized(_) => None,
+        }
+    }
+}
+
+impl From<StreamProperty<NonNegative>> for Option<PhysicalBitCount> {
+    fn from(d: StreamProperty<NonNegative>) -> Option<PhysicalBitCount> {
+        match d {
+            StreamProperty::Combination(l, op, r) => {
+                let lv = Option::<PhysicalBitCount>::from(l.as_ref().clone());
+                let rv = Option::<PhysicalBitCount>::from(r.as_ref().clone());
+                match (lv, rv) {
+                    (None, None) => None,
+                    (None, Some(rv)) => Some(rv),
+                    (Some(lv), None) => Some(lv),
+                    (Some(lv), Some(rv)) => Some(PhysicalBitCount::Combination(
+                        Box::new(lv),
+                        op,
+                        Box::new(rv),
+                    )),
+                }
+            }
+            StreamProperty::Fixed(f) => PhysicalBitCount::fixed(f),
+            StreamProperty::Parameterized(n) => Some(PhysicalBitCount::parameterized(n)),
+        }
+    }
+}
+
+impl Add for PhysicalBitCount {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(Box::new(self), StreamPropertyOperator::Add, Box::new(rhs))
+    }
+}
+
+impl Sub for PhysicalBitCount {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Subtract,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl Mul for PhysicalBitCount {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Multiply,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl Div for PhysicalBitCount {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        PhysicalBitCount::Combination(
+            Box::new(self),
+            StreamPropertyOperator::Divide,
+            Box::new(rhs),
+        )
+    }
+}
 
 /// Physical stream.
 ///
@@ -26,7 +154,7 @@ pub struct PhysicalStream {
     /// Number of element lanes.
     element_lanes: Positive,
     /// Dimensionality.
-    dimensionality: NonNegative,
+    dimensionality: Dimensionality,
     /// Complexity.
     complexity: Complexity,
     /// User-defined transfer content.
@@ -39,7 +167,7 @@ impl PhysicalStream {
     pub fn try_new<T, U>(
         element_fields: T,
         element_lanes: usize,
-        dimensionality: usize,
+        dimensionality: impl TryResult<Dimensionality>,
         complexity: impl Into<Complexity>,
         user: T,
         stream_direction: StreamDirection,
@@ -62,7 +190,6 @@ impl PhysicalStream {
         }
         let element_lanes = Positive::new(element_lanes as NonNegative)
             .ok_or_else(|| Error::InvalidArgument("element lanes cannot be zero".to_string()))?;
-        let dimensionality = dimensionality as NonNegative;
         let complexity = complexity.into();
         let mut user_result = InsertionOrderedMap::new();
         for (path_name, bit_count) in user.into_iter() {
@@ -79,7 +206,7 @@ impl PhysicalStream {
         Ok(PhysicalStream::new(
             element_fields_result,
             element_lanes,
-            dimensionality,
+            dimensionality.try_result()?,
             complexity,
             user_result,
             stream_direction,
@@ -90,7 +217,7 @@ impl PhysicalStream {
     pub fn new(
         element_fields: impl Into<InsertionOrderedMap<PathName, BitCount>>,
         element_lanes: Positive,
-        dimensionality: NonNegative,
+        dimensionality: impl Into<Dimensionality>,
         complexity: impl Into<Complexity>,
         user: impl Into<InsertionOrderedMap<PathName, BitCount>>,
         stream_direction: StreamDirection,
@@ -98,7 +225,7 @@ impl PhysicalStream {
         PhysicalStream {
             element_fields: element_fields.into(),
             element_lanes,
-            dimensionality,
+            dimensionality: dimensionality.into(),
             complexity: complexity.into(),
             user: user.into(),
             stream_direction,
@@ -116,8 +243,8 @@ impl PhysicalStream {
     }
 
     /// Returns the dimensionality of this physical stream.
-    pub fn dimensionality(&self) -> NonNegative {
-        self.dimensionality
+    pub fn dimensionality(&self) -> &Dimensionality {
+        &self.dimensionality
     }
 
     /// Returns the complexity of this physical stream.
@@ -132,63 +259,83 @@ impl PhysicalStream {
 
     /// Returns the bit count of a single data element in this physical
     /// stream. The bit count is equal to the combined bit count of all fields.
-    pub fn data_element_bit_count(&self) -> NonNegative {
-        self.element_fields
-            .values()
-            .map(|b| b.get())
-            .sum::<NonNegative>()
+    pub fn data_element_bit_count(&self) -> Option<PhysicalBitCount> {
+        PhysicalBitCount::fixed(
+            self.element_fields
+                .values()
+                .map(|b| b.get())
+                .sum::<NonNegative>(),
+        )
     }
 
     /// Returns the bit count of the data (element) fields in this physical
     /// stream. The bit count is equal to the combined bit count of all fields
     /// multiplied by the number of lanes.
-    pub fn data_bit_count(&self) -> NonNegative {
-        self.data_element_bit_count() * self.element_lanes.get()
+    pub fn data_bit_count(&self) -> Option<PhysicalBitCount> {
+        if let Some(d) = self.data_element_bit_count() {
+            Some(d.with_multiplier(self.element_lanes.get()))
+        } else {
+            None
+        }
     }
 
     /// Returns the number of last bits in this physical stream. The number of
     /// last bits equals the dimensionality.
-    pub fn last_bit_count(&self) -> NonNegative {
-        if self.complexity().major() >= 8 {
-            self.dimensionality * self.element_lanes().get()
+    pub fn last_bit_count(&self) -> Option<PhysicalBitCount> {
+        let bitcount = Option::<PhysicalBitCount>::from(self.dimensionality().clone());
+        if let Some(bitcount) = bitcount {
+            Some(if self.complexity().major() >= 8 {
+                bitcount.with_multiplier(self.element_lanes().get())
+            } else {
+                bitcount
+            })
         } else {
-            self.dimensionality
+            None
         }
     }
 
     /// Returns the number of `stai` (start index) bits in this physical
     /// stream.
-    pub fn stai_bit_count(&self) -> NonNegative {
+    pub fn stai_bit_count(&self) -> Option<PhysicalBitCount> {
         if self.complexity.major() >= 6 && self.element_lanes.get() > 1 {
-            log2_ceil(self.element_lanes)
+            PhysicalBitCount::fixed(log2_ceil(self.element_lanes))
         } else {
-            0
+            None
+        }
+    }
+
+    fn has_dimensions(&self) -> bool {
+        match self.dimensionality() {
+            StreamProperty::Combination(_, _, _) => match self.dimensionality().try_eval() {
+                Some(f) => f >= 1,
+                None => true,
+            },
+            StreamProperty::Fixed(f) => *f >= 1,
+            StreamProperty::Parameterized(_) => true,
         }
     }
 
     /// Returns the number of `endi` (end index) bits in this physical stream.
-    pub fn endi_bit_count(&self) -> NonNegative {
-        if (self.complexity.major() >= 5 || self.dimensionality >= 1)
-            && self.element_lanes.get() > 1
-        {
-            log2_ceil(self.element_lanes)
+    pub fn endi_bit_count(&self) -> Option<PhysicalBitCount> {
+        if (self.complexity.major() >= 5 || self.has_dimensions()) && self.element_lanes.get() > 1 {
+            PhysicalBitCount::fixed(log2_ceil(self.element_lanes))
         } else {
-            0
+            None
         }
     }
 
     /// Returns the number of `strb` (strobe) bits in this physical stream.
-    pub fn strb_bit_count(&self) -> NonNegative {
-        if self.complexity.major() >= 7 || self.dimensionality >= 1 {
-            self.element_lanes.get()
+    pub fn strb_bit_count(&self) -> Option<PhysicalBitCount> {
+        if self.complexity.major() >= 7 || self.has_dimensions() {
+            PhysicalBitCount::fixed(self.element_lanes.get())
         } else {
-            0
+            None
         }
     }
 
     /// Returns the bit count of the user fields in this physical stream.
-    pub fn user_bit_count(&self) -> NonNegative {
-        self.user.values().map(|b| b.get()).sum::<NonNegative>()
+    pub fn user_bit_count(&self) -> Option<PhysicalBitCount> {
+        PhysicalBitCount::fixed(self.user.values().map(|b| b.get()).sum::<NonNegative>())
     }
 
     /// The Stream's direction.
@@ -197,23 +344,23 @@ impl PhysicalStream {
     }
 }
 
-impl From<&PhysicalStream> for SignalList<Positive> {
+impl From<&PhysicalStream> for SignalList<PhysicalBitCount> {
     fn from(phys: &PhysicalStream) -> Self {
         SignalList::try_new(
-            Positive::new(1),
-            Positive::new(1),
-            Positive::new(phys.data_bit_count()),
-            Positive::new(phys.last_bit_count()),
-            Positive::new(phys.stai_bit_count()),
-            Positive::new(phys.endi_bit_count()),
-            Positive::new(phys.strb_bit_count()),
-            Positive::new(phys.user_bit_count()),
+            PhysicalBitCount::fixed(1),
+            PhysicalBitCount::fixed(1),
+            phys.data_bit_count(),
+            phys.last_bit_count(),
+            phys.stai_bit_count(),
+            phys.endi_bit_count(),
+            phys.strb_bit_count(),
+            phys.user_bit_count(),
         )
         .unwrap()
     }
 }
 
-impl From<PhysicalStream> for SignalList<Positive> {
+impl From<PhysicalStream> for SignalList<PhysicalBitCount> {
     fn from(phys: PhysicalStream) -> Self {
         (&phys).into()
     }

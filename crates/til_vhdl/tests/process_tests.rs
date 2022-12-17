@@ -25,7 +25,7 @@ use til_vhdl::{
     },
     IntoVhdl,
 };
-use tydi_common::{error::Result, name::PathName, numbers::Positive};
+use tydi_common::{error::Result, map::InsertionOrderedMap, name::PathName, numbers::Positive};
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
@@ -96,6 +96,7 @@ multiline#
             &streamlet_instance,
             arch,
             &domain_list,
+            &InsertionOrderedMap::new(),
             None,
         )?;
         let iref = InterfaceReference::try_from(("a", "x"))?;
@@ -211,6 +212,7 @@ multiline#
             &streamlet_instance,
             arch,
             &domain_list,
+            &InsertionOrderedMap::new(),
             None,
         )?;
         let iref = InterfaceReference::try_from(("a", "x"))?;

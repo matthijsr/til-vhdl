@@ -11,7 +11,10 @@ use til_query::{
         connection::InterfaceReference,
         implementation::{
             link::Link,
-            structure::{streamlet_instance::StreamletInstance, Structure},
+            structure::{
+                streamlet_instance::{GenericParameterAssignment, StreamletInstance},
+                Structure,
+            },
             Implementation, ImplementationKind,
         },
         physical_properties::InterfaceDirection,
@@ -34,13 +37,14 @@ use tydi_vhdl::{
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
-    port::Port,
+    port::{GenericParameter, Port},
     statement::mapping::Mapping,
 };
 
 use crate::IntoVhdl;
 
 use super::{
+    generics::{param_to_param, param_value::param_value_to_vhdl},
     interface_port::VhdlInterface,
     physical_properties::{VhdlDomain, VhdlDomainListOrDefault},
 };
@@ -252,6 +256,7 @@ pub struct VhdlStreamlet {
     prefix: Option<VhdlName>,
     name: PathName,
     implementation: Option<Id<Implementation>>,
+    parameters: InsertionOrderedMap<Name, GenericParameter>,
     domains: VhdlDomainListOrDefault<Port>,
     interface: InsertionOrderedMap<Name, VhdlInterface>,
     doc: Option<String>,
@@ -279,6 +284,7 @@ pub fn create_instance(
     instance: &StreamletInstance,
     architecture: &mut Architecture,
     parent_domains: &VhdlDomainListOrDefault<Id<ObjectDeclaration>>,
+    parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
     prefix: impl TryOptional<VhdlName>,
 ) -> Result<InsertionOrderedMap<InterfaceReference, PortObject>> {
     let prefix = prefix.try_optional()?;
@@ -300,6 +306,17 @@ pub fn create_instance(
     };
 
     let mut port_mapping = Mapping::from_component(arch_db, &component, instance_name.clone())?;
+
+    for (param_name, param_assignment) in instance.parameter_assignments() {
+        match param_assignment {
+            GenericParameterAssignment::Default(_) => (),
+            GenericParameterAssignment::Assigned(_, val) => port_mapping.map_param(
+                arch_db,
+                param_name.clone(),
+                param_value_to_vhdl(arch_db, val, parent_params)?,
+            )?,
+        };
+    }
 
     let mut signals = InsertionOrderedMap::new();
 
@@ -417,6 +434,10 @@ impl VhdlStreamlet {
         &self.domains
     }
 
+    pub fn parameters(&self) -> &InsertionOrderedMap<Name, GenericParameter> {
+        &self.parameters
+    }
+
     pub fn to_component(&mut self) -> Arc<Component> {
         if let Some(component) = &self.component {
             component.clone()
@@ -432,6 +453,12 @@ impl VhdlStreamlet {
                 ports.push(domain.clock().clone());
                 ports.push(domain.reset().clone());
             }
+
+            let parameters = self
+                .parameters()
+                .iter()
+                .map(|(_, p)| p.clone())
+                .collect::<Vec<_>>();
 
             for (_, vhdl_interface) in self.interface() {
                 let logical_stream = vhdl_interface.typed_stream().logical_stream();
@@ -453,7 +480,7 @@ impl VhdlStreamlet {
                 ports.extend(result_ports);
             }
 
-            let mut component = Component::try_new(n, vec![], ports, None).unwrap();
+            let mut component = Component::try_new(n, parameters, ports, None).unwrap();
             if let Some(doc) = self.doc() {
                 component.set_doc(doc);
             }
@@ -465,10 +492,6 @@ impl VhdlStreamlet {
         }
     }
 
-    // TODO: For now, assume architecture output will be a string.
-    // The architecture for Structural and None is stored in the arch_db.
-    // Might make more sense/be safer if we could either parse Linked architectures to an object,
-    // or have some enclosing type which returns either an architecture or a string.
     pub fn to_architecture(
         &self,
         ir_db: &dyn Ir,
@@ -581,6 +604,11 @@ impl VhdlStreamlet {
             )?;
         }
 
+        let parent_parameters = self
+            .parameters()
+            .clone()
+            .try_map_convert(|x| ObjectDeclaration::from_parameter(arch_db, &x))?;
+
         for (_, streamlet) in structure.streamlet_instances() {
             ports.try_append(create_instance(
                 ir_db,
@@ -588,6 +616,7 @@ impl VhdlStreamlet {
                 streamlet,
                 &mut architecture,
                 &entity_domains,
+                &parent_parameters,
                 self.prefix().clone(),
             )?)?;
         }
@@ -756,10 +785,16 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
 
         let domains = self.domains(ir_db).into();
 
+        let no_parent_params = InsertionOrderedMap::new();
+        let parameters = self
+            .parameters(ir_db)
+            .try_map_convert(|p| param_to_param(arch_db, &p, &no_parent_params))?;
+
         Ok(VhdlStreamlet {
             prefix,
             name: self.path_name().clone(),
             implementation: self.implementation_id(),
+            parameters,
             domains,
             interface,
             doc: self.doc().cloned(),

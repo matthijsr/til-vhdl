@@ -1,5 +1,6 @@
 use textwrap::indent;
-use tydi_common::error::{Result, TryResult};
+use tydi_common::error::{Error, Result, TryResult};
+use tydi_common::map::InsertionOrderedMap;
 use tydi_common::traits::{Document, Documents, Identify};
 
 use crate::architecture::arch_storage::Arch;
@@ -27,7 +28,7 @@ impl DeclareWithIndent for Entity {
             let parameters = self
                 .parameters()
                 .iter()
-                .map(|x| x.declare(db))
+                .map(|(_, x)| x.declare(db))
                 .collect::<Result<Vec<String>>>()?
                 .join(";\n");
             parameter_body.push_str(&indent(&parameters, indent_style));
@@ -39,7 +40,7 @@ impl DeclareWithIndent for Entity {
         let ports = self
             .ports()
             .iter()
-            .map(|x| x.declare(db))
+            .map(|(_, x)| x.declare(db))
             .collect::<Result<Vec<String>>>()?
             .join(";\n");
         port_body.push_str(&indent(&ports, indent_style));
@@ -77,21 +78,35 @@ impl Entity {
         ports: Vec<Port>,
         doc: Option<String>,
     ) -> Result<Entity> {
+        let mut ports_map = InsertionOrderedMap::new();
+        for port in ports {
+            ports_map.try_insert(port.vhdl_name().clone(), port)?;
+        }
+        let mut parameters_map = InsertionOrderedMap::new();
+        for param in parameters {
+            if ports_map.contains(param.vhdl_name()) {
+                return Err(Error::InvalidArgument(format!(
+                    "Cannot add parameter \"{}\", there is already a port with the same name.",
+                    param.vhdl_name()
+                )));
+            }
+            parameters_map.try_insert(param.vhdl_name().clone(), param)?;
+        }
         Ok(Entity {
             identifier: identifier.try_result()?,
-            parameters,
-            ports,
+            parameters: parameters_map,
+            ports: ports_map,
             doc,
         })
     }
 
     /// Return a reference to the ports of this entity.
-    pub fn ports(&self) -> &Vec<Port> {
+    pub fn ports(&self) -> &InsertionOrderedMap<VhdlName, Port> {
         &self.ports
     }
 
     /// Return a reference to the parameters of this entity.
-    pub fn parameters(&self) -> &Vec<GenericParameter> {
+    pub fn parameters(&self) -> &InsertionOrderedMap<VhdlName, GenericParameter> {
         &self.parameters
     }
 }
@@ -100,8 +115,8 @@ impl From<&Component> for Entity {
     fn from(comp: &Component) -> Self {
         Entity {
             identifier: comp.vhdl_name().clone(),
-            parameters: comp.parameters().to_vec(),
-            ports: comp.ports().to_vec(),
+            parameters: comp.parameters().clone(),
+            ports: comp.ports().clone(),
             doc: comp.doc().cloned(),
         }
     }

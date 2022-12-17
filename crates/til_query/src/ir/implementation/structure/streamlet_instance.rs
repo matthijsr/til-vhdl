@@ -9,6 +9,7 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::ir::{
+    generics::{condition::TestValue, param_value::GenericParamValue, GenericParameter},
     interface_port::InterfacePort,
     physical_properties::{Domain, InterfaceDirection},
     streamlet::Streamlet,
@@ -24,6 +25,39 @@ pub enum DomainAssignments {
     /// Definition has a Default Domain, and is assigned either a Default
     /// Domain (None), or a named Domain (Some).
     Default(Option<Domain>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum GenericParameterAssignment {
+    Default(GenericParameter),
+    Assigned(GenericParameter, GenericParamValue),
+}
+
+impl GenericParameterAssignment {
+    pub fn try_assign(&self, param_value: impl TryResult<GenericParamValue>) -> Result<Self> {
+        match self {
+            GenericParameterAssignment::Default(param) => {
+                let param_value = param_value.try_result()?;
+                if param.valid_value(param_value.clone())? {
+                    Ok(GenericParameterAssignment::Assigned(
+                        param.clone(),
+                        param_value,
+                    ))
+                } else {
+                    Err(Error::InvalidTarget(format!(
+                        "Value {} is not a valid value for parameter {} with condition: {}",
+                        param_value,
+                        param.name(),
+                        param.describe_condition()
+                    )))
+                }
+            }
+            GenericParameterAssignment::Assigned(param, _) => Err(Error::InvalidTarget(format!(
+                "Parameter {} was already assigned.",
+                param.name()
+            ))),
+        }
+    }
 }
 
 impl DomainAssignments {
@@ -97,6 +131,7 @@ pub struct StreamletInstance {
     name: Name,
     definition: Arc<Streamlet>,
     domain_assignments: DomainAssignments,
+    parameter_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
     ports: InsertionOrderedMap<Name, InterfacePort>,
     doc: Option<String>,
 }
@@ -128,10 +163,16 @@ impl StreamletInstance {
         for port in ports.values_mut() {
             port.set_domain(domain_assignments.get_assignment(port.domain())?.cloned());
         }
+        let mut parameter_assignments = InsertionOrderedMap::new();
+        let parameters = definition.parameters(db);
+        for (name, param) in parameters {
+            parameter_assignments.try_insert(name, GenericParameterAssignment::Default(param))?;
+        }
 
         Ok(Self {
             name,
             definition,
+            parameter_assignments,
             domain_assignments,
             ports,
             doc: None,
@@ -220,16 +261,40 @@ impl StreamletInstance {
             for port in ports.values_mut() {
                 port.set_domain(domain_assignments.get_assignment(port.domain())?.cloned());
             }
+            let mut parameter_assignments = InsertionOrderedMap::new();
+            let parameters = definition.parameters(db);
+            for (name, param) in parameters {
+                parameter_assignments
+                    .try_insert(name, GenericParameterAssignment::Default(param))?;
+            }
 
             Ok(Self {
                 name,
                 definition,
+                parameter_assignments,
                 domain_assignments,
                 ports,
                 doc: None,
             })
         } else {
             Self::new_assign_default(db, name, definition)
+        }
+    }
+
+    pub fn assign_parameter(
+        &mut self,
+        param_name: impl TryResult<Name>,
+        param_value: impl TryResult<GenericParamValue>,
+    ) -> Result<()> {
+        let param_name = param_name.try_result()?;
+        if let Some(parameter) = self.parameter_assignments.get(&param_name) {
+            self.parameter_assignments
+                .try_replace(&param_name, parameter.try_assign(param_value)?)
+        } else {
+            Err(Error::InvalidTarget(format!(
+                "No parameter with identifier: {}",
+                param_name
+            )))
         }
     }
 
@@ -271,6 +336,10 @@ impl StreamletInstance {
 
     pub fn domain_assignments(&self) -> &DomainAssignments {
         &self.domain_assignments
+    }
+
+    pub fn parameter_assignments(&self) -> &InsertionOrderedMap<Name, GenericParameterAssignment> {
+        &self.parameter_assignments
     }
 }
 
