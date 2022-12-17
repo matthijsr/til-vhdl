@@ -2,12 +2,13 @@ use std::convert::TryInto;
 
 use textwrap::indent;
 use tydi_common::{
-    error::{Error, Result, TryResult},
+    error::{Error, Result, TryResult, WrapError},
     traits::Identify,
 };
 
 use crate::{
     architecture::arch_storage::Arch,
+    assignment::ValueAssignment,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
     declaration::Declare,
     statement::relation::Relation,
@@ -120,9 +121,22 @@ impl ArrayObject {
         &self.low
     }
 
-    pub fn width(&self) -> u32 {
-        todo!()
-        // (1 + self.high - self.low).try_into().unwrap()
+    pub fn width(&self) -> Result<Option<u32>> {
+        let high = self.high().try_eval()?;
+        let low = self.low().try_eval()?;
+        match (high, low) {
+            (Some(ValueAssignment::Integer(high)), Some(ValueAssignment::Integer(low))) => {
+                match (1 + high - low).try_into() {
+                    Ok(val) => Ok(Some(val)),
+                    Err(err) => Err(Error::BackEndError(format!(
+                        "Something went wrong trying to calculate the width of array {}: {}",
+                        self.identifier(),
+                        err
+                    ))),
+                }
+            }
+            _ => Ok(None),
+        }
     }
 
     pub fn is_bitvector(&self) -> bool {

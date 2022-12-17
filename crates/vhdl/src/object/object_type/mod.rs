@@ -251,14 +251,18 @@ impl ObjectType {
             ObjectType::Array(to_array) => {
                 if let ObjectType::Array(from_array) = typ {
                     if from_array.identifier() == to_array.identifier() {
-                        if from_array.width() == to_array.width() {
-                            to_array.typ().can_assign_type(from_array.typ())
-                        } else {
-                            Err(Error::InvalidTarget(format!(
-                                "Cannot assign array with width {} to array with width {}",
-                                from_array.width(),
-                                to_array.width(),
-                            )))
+                        match (from_array.width()?, to_array.width()?) {
+                            (Some(from_w), Some(to_w)) => {
+                                if from_w == to_w {
+                                    to_array.typ().can_assign_type(from_array.typ())
+                                } else {
+                                    Err(Error::InvalidTarget(format!(
+                                        "Cannot assign array with width {} to array with width {}",
+                                        from_w, to_w,
+                                    )))
+                                }
+                            }
+                            _ => Ok(()),
                         }
                     } else {
                         Err(Error::InvalidTarget(format!(

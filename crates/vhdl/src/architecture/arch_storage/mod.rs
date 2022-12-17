@@ -154,18 +154,20 @@ fn can_assign(
                         );
                         match array {
                             ArrayAssignment::Direct(direct) => {
-                                if to_array.width() == direct.len().try_into().unwrap() {
-                                    for value in direct {
-                                        db.can_assign(
-                                            to_array_elem_key.clone(),
-                                            Assignment::from(value.clone()),
-                                            state,
-                                        )?;
+                                match to_array.width()? {
+                                    Some(w) if w != direct.len().try_into().unwrap() => Err(Error::InvalidArgument(format!("Attempted full array assignment. Number of fields do not match. Array has {} fields, assignment has {} fields", w, direct.len()))),
+                                    _ => {
+                                        for value in direct {
+                                            db.can_assign(
+                                                to_array_elem_key.clone(),
+                                                Assignment::from(value.clone()),
+                                                state,
+                                            )?;
+                                        }
+                                        Ok(())
                                     }
-                                    Ok(())
-                                } else {
-                                    Err(Error::InvalidArgument(format!("Attempted full array assignment. Number of fields do not match. Array has {} fields, assignment has {} fields", to_array.width(), direct.len())))
                                 }
+    
                             }
                             ArrayAssignment::Sliced { direct, others } => {
                                 let mut ranges_assigned: Vec<&RangeConstraint> = vec![];
@@ -189,9 +191,12 @@ fn can_assign(
                                     )?;
                                     ranges_assigned.push(range);
                                 }
-                                let total_assigned: u32 =
-                                    ranges_assigned.iter().map(|x| x.width_u32()).sum();
-                                if total_assigned == to_array.width() {
+                                let total_assigned: u32 = ranges_assigned
+                                    .iter()
+                                    .map(|x| x.width_u32().unwrap_or(0)) // TODO: This unwrap probably isn't entirely correct
+                                    .sum();
+                                    if let Some(w) = to_array.width()? {
+                                        if total_assigned == w {
                                     if let Some(_) = others {
                                         return Err(Error::InvalidArgument("Sliced array assignment contains an 'others' field, but already assigns all fields directly.".to_string()));
                                     } else {
@@ -208,6 +213,11 @@ fn can_assign(
                                         Err(Error::InvalidArgument("Sliced array assignment does not assign all values directly, but does not contain an 'others' field.".to_string()))
                                     }
                                 }
+                                    } else {
+                                        // TODO: There's probably a check I can do here
+                                        Ok(())
+                                    }
+                                
                             }
                             ArrayAssignment::Others(others) => db.can_assign(
                                 to_array_elem_key,

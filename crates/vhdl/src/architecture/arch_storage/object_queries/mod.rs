@@ -5,7 +5,7 @@ use tydi_intern::Id;
 
 use crate::{
     declaration::{ObjectDeclaration, ObjectKind},
-    object::{object_type::ObjectType, Object},
+    object::object_type::ObjectType,
 };
 
 use self::object_key::ObjectKey;

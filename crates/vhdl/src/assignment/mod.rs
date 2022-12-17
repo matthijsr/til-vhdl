@@ -669,7 +669,11 @@ impl ValueAssignment {
             },
             ValueAssignment::BitVec(bitvec) => match to_typ {
                 ObjectType::Array(array) if array.is_bitvector() => {
-                    bitvec.validate_width(array.width())
+                    if let Some(w) = array.width()? {
+                        bitvec.validate_width(w)
+                    } else {
+                        Ok(())
+                    }
                 }
                 ObjectType::Array(_)
                 | ObjectType::Bit
@@ -778,6 +782,32 @@ impl From<VhdlName> for FieldSelection {
     }
 }
 
+pub enum FixedRangeConstraint {
+    To { start: i32, end: i32 },
+    Downto { start: i32, end: i32 },
+    Index(i32),
+}
+
+impl FixedRangeConstraint {
+    /// Returns the greatest index within the range constraint
+    pub fn high(&self) -> i32 {
+        match self {
+            FixedRangeConstraint::To { start: _, end } => *end,
+            FixedRangeConstraint::Downto { start, end: _ } => *start,
+            FixedRangeConstraint::Index(index) => *index,
+        }
+    }
+
+    /// Returns the smallest index within the range constraint
+    pub fn low(&self) -> i32 {
+        match self {
+            FixedRangeConstraint::To { start, end: _ } => *start,
+            FixedRangeConstraint::Downto { start: _, end } => *end,
+            FixedRangeConstraint::Index(index) => *index,
+        }
+    }
+}
+
 /// A VHDL range constraint
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RangeConstraint {
@@ -800,6 +830,37 @@ impl fmt::Display for RangeConstraint {
 }
 
 impl RangeConstraint {
+    // TODO: This should be a result, to propagate the try_eval errors
+    pub fn fixed(&self) -> Option<FixedRangeConstraint> {
+        match self {
+            RangeConstraint::To { start, end } => {
+                match (start.try_eval().unwrap(), end.try_eval().unwrap()) {
+                    (
+                        Some(ValueAssignment::Integer(start)),
+                        Some(ValueAssignment::Integer(end)),
+                    ) => Some(FixedRangeConstraint::To { start, end }),
+                    _ => None,
+                }
+            }
+            RangeConstraint::Downto { start, end } => {
+                match (start.try_eval().unwrap(), end.try_eval().unwrap()) {
+                    (
+                        Some(ValueAssignment::Integer(start)),
+                        Some(ValueAssignment::Integer(end)),
+                    ) => Some(FixedRangeConstraint::Downto { start, end }),
+                    _ => None,
+                }
+            }
+            RangeConstraint::Index(r) => {
+                if let Some(ValueAssignment::Integer(i)) = r.try_eval().unwrap() {
+                    Some(FixedRangeConstraint::Index(i))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Create a `RangeConstraint::To` and ensure correctness (end > start)
     pub fn to(start: i32, end: i32) -> Result<RangeConstraint> {
         if start > end {
@@ -831,25 +892,24 @@ impl RangeConstraint {
     }
 
     /// Returns the width of the range
-    pub fn width(&self) -> Width {
-        todo!()
-        // match self {
-        //     RangeConstraint::To { start, end } => {
-        //         Width::Vector((1 + end - start).try_into().unwrap())
-        //     }
-        //     RangeConstraint::Downto { start, end } => {
-        //         Width::Vector((1 + start - end).try_into().unwrap())
-        //     }
-        //     RangeConstraint::Index(_) => Width::Scalar,
-        // }
+    pub fn width(&self) -> Option<Width> {
+        self.fixed().map(|f| match f {
+            FixedRangeConstraint::To { start, end } => {
+                Width::Vector((1 + end - start).try_into().unwrap())
+            }
+            FixedRangeConstraint::Downto { start, end } => {
+                Width::Vector((1 + start - end).try_into().unwrap())
+            }
+            FixedRangeConstraint::Index(_) => Width::Scalar,
+        })
     }
 
     /// Returns the width of the range
-    pub fn width_u32(&self) -> u32 {
-        match self.width() {
+    pub fn width_u32(&self) -> Option<u32> {
+        self.width().map(|w| match w {
             Width::Scalar => 1,
             Width::Vector(width) => width,
-        }
+        })
     }
 
     /// Returns the greatest index within the range constraint
@@ -872,27 +932,39 @@ impl RangeConstraint {
 
     /// Verifies whether a range constraint overlaps with this range constraint
     pub fn overlaps(&self, other: &RangeConstraint) -> bool {
-        todo!()
-        // self.low() <= other.high() && other.low() <= self.high()
+        match (self.fixed(), other.fixed()) {
+            (Some(lhs), Some(rhs)) => lhs.low() <= rhs.high() && rhs.low() <= lhs.high(),
+            _ => true,
+        }
     }
 
     /// Verifies whether a range constraint is inside of this range constraint
     pub fn contains(&self, other: &RangeConstraint) -> bool {
-        todo!()
-        // self.high() >= other.high() && self.low() <= other.low()
+        match (self.fixed(), other.fixed()) {
+            (Some(lhs), Some(rhs)) => lhs.high() >= rhs.high() && lhs.low() <= rhs.low(),
+            _ => true,
+        }
     }
 
     /// Verifies whether this range constraint is between `high` and `low`
     pub fn is_between(&self, high: &Relation, low: &Relation) -> Result<bool> {
-        todo!()
-        // if low > high {
-        //     Err(Error::InvalidArgument(format!(
-        //         "{} > {}! Low cannot be greater than high",
-        //         low, high
-        //     )))
-        // } else {
-        //     Ok(high >= self.high() && low <= self.low())
-        // }
+        match (self.fixed(), high.try_eval()?, low.try_eval()?) {
+            (
+                Some(fixed),
+                Some(ValueAssignment::Integer(high)),
+                Some(ValueAssignment::Integer(low)),
+            ) => {
+                if low > high {
+                    Err(Error::InvalidArgument(format!(
+                        "{} > {}! Low cannot be greater than high",
+                        low, high
+                    )))
+                } else {
+                    Ok(high >= fixed.high() && low <= fixed.low())
+                }
+            }
+            _ => Ok(true),
+        }
     }
 
     pub fn as_slice_index(&self) -> String {
