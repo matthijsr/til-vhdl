@@ -337,6 +337,10 @@ impl StreamletInstance {
     pub fn domain_assignments(&self) -> &DomainAssignments {
         &self.domain_assignments
     }
+
+    pub fn parameter_assignments(&self) -> &InsertionOrderedMap<Name, GenericParameterAssignment> {
+        &self.parameter_assignments
+    }
 }
 
 impl Document for StreamletInstance {

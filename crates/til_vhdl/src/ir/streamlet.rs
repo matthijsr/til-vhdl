@@ -11,7 +11,10 @@ use til_query::{
         connection::InterfaceReference,
         implementation::{
             link::Link,
-            structure::{streamlet_instance::StreamletInstance, Structure},
+            structure::{
+                streamlet_instance::{GenericParameterAssignment, StreamletInstance},
+                Structure,
+            },
             Implementation, ImplementationKind,
         },
         physical_properties::InterfaceDirection,
@@ -41,7 +44,7 @@ use tydi_vhdl::{
 use crate::IntoVhdl;
 
 use super::{
-    generics::param_to_param,
+    generics::{param_to_param, param_value::param_value_to_vhdl},
     interface_port::VhdlInterface,
     physical_properties::{VhdlDomain, VhdlDomainListOrDefault},
 };
@@ -281,6 +284,7 @@ pub fn create_instance(
     instance: &StreamletInstance,
     architecture: &mut Architecture,
     parent_domains: &VhdlDomainListOrDefault<Id<ObjectDeclaration>>,
+    parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
     prefix: impl TryOptional<VhdlName>,
 ) -> Result<InsertionOrderedMap<InterfaceReference, PortObject>> {
     let prefix = prefix.try_optional()?;
@@ -302,6 +306,17 @@ pub fn create_instance(
     };
 
     let mut port_mapping = Mapping::from_component(arch_db, &component, instance_name.clone())?;
+
+    for (param_name, param_assignment) in instance.parameter_assignments() {
+        match param_assignment {
+            GenericParameterAssignment::Default(_) => (),
+            GenericParameterAssignment::Assigned(_, val) => port_mapping.map_param(
+                arch_db,
+                param_name.clone(),
+                param_value_to_vhdl(arch_db, val, parent_params)?,
+            )?,
+        };
+    }
 
     let mut signals = InsertionOrderedMap::new();
 
@@ -589,6 +604,11 @@ impl VhdlStreamlet {
             )?;
         }
 
+        let parent_parameters = self
+            .parameters()
+            .clone()
+            .try_map_convert(|x| ObjectDeclaration::from_parameter(arch_db, &x))?;
+
         for (_, streamlet) in structure.streamlet_instances() {
             ports.try_append(create_instance(
                 ir_db,
@@ -596,6 +616,7 @@ impl VhdlStreamlet {
                 streamlet,
                 &mut architecture,
                 &entity_domains,
+                &parent_parameters,
                 self.prefix().clone(),
             )?)?;
         }
