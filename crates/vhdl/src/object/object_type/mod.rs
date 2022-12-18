@@ -159,9 +159,9 @@ impl ObjectType {
                         } else {
                             Err(Error::InvalidArgument(format!(
                                 "Cannot select {} on array with high: {}, low: {}",
-                                range,
-                                array.high(),
-                                array.low()
+                                range.declare(db)?,
+                                array.high().declare(db)?,
+                                array.low().declare(db)?
                             )))
                         }
                     }
@@ -437,7 +437,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{architecture::arch_storage::db::Database, object::*};
+    use crate::object::*;
 
     #[test]
     fn bit_vector_from_range() {

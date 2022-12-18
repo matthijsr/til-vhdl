@@ -4,7 +4,7 @@ use tydi_common::error::{Error, Result};
 use tydi_intern::Id;
 
 use crate::{
-    common::vhdl_name::VhdlName, component::Component, declaration::ObjectDeclaration,
+    common::vhdl_name::VhdlName, component::Component, declaration::{ObjectDeclaration, Declare},
     object::Object, package::Package,
 };
 
@@ -176,13 +176,13 @@ fn can_assign(
                                     if !range.is_between(to_array.high(), to_array.low())? {
                                         return Err(Error::InvalidArgument(format!(
                                             "{} is not between {} and {}",
-                                            range,
-                                            to_array.high(),
-                                            to_array.low()
+                                            range.declare(db)?,
+                                            to_array.high().declare(db)?,
+                                            to_array.low().declare(db)?
                                         )));
                                     }
-                                    if ranges_assigned.iter().any(|x| x.overlaps(range)) {
-                                        return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range)));
+                                    if ranges_assigned.iter().map(|x| x.overlaps(range)).collect::<Result<Vec<_>>>()?.iter().any(|x| *x) {
+                                        return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range.declare(db)?)));
                                     }
                                     db.can_assign(
                                         to_array_elem_key.clone(),
@@ -193,7 +193,10 @@ fn can_assign(
                                 }
                                 let total_assigned: u32 = ranges_assigned
                                     .iter()
-                                    .map(|x| x.width_u32().unwrap_or(0)) // TODO: This unwrap probably isn't entirely correct
+                                    .map(|x| x.width_u32())
+                                    .collect::<Result<Vec<_>>>()?
+                                    .iter()
+                                    .map(|x| x.unwrap_or(0)) // TODO: This unwrap probably isn't entirely correct
                                     .sum();
                                     if let Some(w) = to_array.width()? {
                                         if total_assigned == w {

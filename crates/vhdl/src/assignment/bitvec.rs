@@ -162,7 +162,7 @@ impl BitVecValue {
     pub fn declare_for_range(&self, range: &RangeConstraint) -> Result<String> {
         match self {
             BitVecValue::Others(_) | BitVecValue::Full(_) => self.declare(),
-            BitVecValue::Unsigned(value, _) => match range.width() {
+            BitVecValue::Unsigned(value, _) => match range.width()? {
                 Some(Width::Scalar) => Err(Error::InvalidTarget(
                     "Cannot assign an std_logic_vector(unsigned) to indexed std_logic".to_string(),
                 )),
@@ -175,7 +175,7 @@ impl BitVecValue {
                 }
                 _ => todo!(),
             },
-            BitVecValue::Signed(value, _) => match range.width() {
+            BitVecValue::Signed(value, _) => match range.width()? {
                 Some(Width::Scalar) => Err(Error::InvalidTarget(
                     "Cannot assign an std_logic_vector(signed) to indexed std_logic".to_string(),
                 )),

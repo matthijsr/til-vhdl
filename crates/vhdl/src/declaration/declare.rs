@@ -61,8 +61,8 @@ impl DeclareWithIndent for ObjectDeclaration {
                     .object_key()
                     .selection()
                     .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
+                    .map(|x| x.declare_with_indent(db, indent_style))
+                    .collect::<Result<Vec<String>>>()?
                     .join("");
                 format!(
                     "alias {} : {} is {}{}",

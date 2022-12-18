@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use textwrap::indent;
 use tydi_common::{
-    error::{Error, Result, TryResult, WrapError},
+    error::{Error, Result, TryResult},
     traits::Identify,
 };
 
