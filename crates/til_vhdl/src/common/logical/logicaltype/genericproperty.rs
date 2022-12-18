@@ -2,7 +2,7 @@ use til_query::common::logical::logicaltype::genericproperty::{
     GenericProperty, GenericPropertyOperator,
 };
 use tydi_common::{
-    error::{Error, Result},
+    error::Result,
     map::InsertionOrderedMap,
     name::Name,
     numbers::{u32_to_i32, NonNegative},

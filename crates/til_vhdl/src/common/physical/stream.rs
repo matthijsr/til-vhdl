@@ -1,13 +1,12 @@
+use til_query::common::logical::logicaltype::genericproperty::GenericPropertyOperator;
 use til_query::common::physical::stream::{PhysicalBitCount, PhysicalStream};
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
-use til_query::ir::generics::interface::dimensionality;
 use til_query::ir::physical_properties::InterfaceDirection;
-use til_query::ir::Ir;
 use tydi_common::error::TryOptional;
 use tydi_common::map::InsertionOrderedMap;
 use tydi_common::name::Name;
-use tydi_common::numbers::Positive;
+use tydi_common::numbers::{u32_to_i32, Positive};
 use tydi_common::{
     cat,
     error::Result,
@@ -17,6 +16,7 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::architecture::arch_storage::Arch;
 use tydi_vhdl::declaration::ObjectDeclaration;
+use tydi_vhdl::statement::relation::math::CreateMath;
 use tydi_vhdl::statement::relation::Relation;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
@@ -24,17 +24,27 @@ use tydi_vhdl::{
 };
 
 use crate::common::logical::logicaltype::genericproperty::generic_property_to_relation;
-use crate::IntoVhdl;
 
 pub fn physical_bitcount_to_relation(
-    arch_db: &dyn Arch,
+    db: &dyn Arch,
     bitcount: &PhysicalBitCount,
     parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
 ) -> Result<Relation> {
-    todo!()
+    Ok(match bitcount {
+        PhysicalBitCount::Combination(l, op, r) => {
+            let l = Relation::parentheses(physical_bitcount_to_relation(db, l, parent_params)?)?;
+            let r = physical_bitcount_to_relation(db, r, parent_params)?;
+            match op {
+                GenericPropertyOperator::Add => Relation::from(l.r_add(db, r)?),
+                GenericPropertyOperator::Subtract => Relation::from(l.r_subtract(db, r)?),
+                GenericPropertyOperator::Multiply => Relation::from(l.r_multiply(db, r)?),
+                GenericPropertyOperator::Divide => Relation::from(l.r_divide_by(db, r)?),
+            }
+        }
+        PhysicalBitCount::Fixed(f) => Relation::from(u32_to_i32(f.get())?),
+        PhysicalBitCount::Parameterized(n) => Relation::from(*(parent_params.try_get(n)?)),
+    })
 }
-
-//pub(crate) type PhysicalStream = til_query::common::physical::stream::PhysicalStream;
 
 pub fn physical_stream_to_vhdl(
     arch_db: &dyn Arch,
@@ -105,82 +115,6 @@ pub fn physical_stream_to_vhdl(
         physical_stream.stream_direction(),
     ))
 }
-
-// impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
-//     fn canonical(
-//         &self,
-//         _ir_db: &dyn Ir,
-//         _arch_db: &mut dyn Arch,
-//         prefix: impl TryOptional<VhdlName>,
-//     ) -> Result<VhdlPhysicalStream> {
-//         // The VhdlPhysicalStream initially assumes it is part of an
-//         // "In" interface.
-
-//         let prefix = match prefix.try_optional()? {
-//             Some(n) => n.to_string(),
-//             None => "".to_string(),
-//         };
-//         let mode = match self.stream_direction() {
-//             StreamDirection::Forward => Mode::In,
-//             StreamDirection::Reverse => Mode::Out,
-//         };
-
-//         // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-
-//         let signal_list: SignalList<PhysicalBitCount> = self.into();
-//         let mut signal_list = signal_list.map_named(|n, x| {
-//             if let Some(f) = x.try_eval() {
-//                 // As the prefix is either a VhdlName or empty, and all signal names are valid
-//                 Port::try_new(cat!(prefix, n), mode, f).unwrap()
-//             } else {
-//                 // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-//                 todo!()
-//             }
-//         });
-
-//         signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
-
-//         let user_bit_count = if let Some(u) = self.user_bit_count() {
-//             if let Some(f) = u.try_eval() {
-//                 f.get()
-//             } else {
-//                 // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-//                 todo!()
-//             }
-//         } else {
-//             0
-//         };
-
-//         let data_element_bit_count = if let Some(d) = self.data_element_bit_count() {
-//             if let Some(f) = d.try_eval() {
-//                 f.get()
-//             } else {
-//                 // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-//                 todo!()
-//             }
-//         } else {
-//             0
-//         };
-
-//         // TODO: ALLOW FOR PARAMETERIZED DIMENSIONALITY
-//         let dimensionality = if let Some(f) = self.dimensionality().try_eval() {
-//             f
-//         } else {
-//             todo!()
-//         };
-
-//         Ok(VhdlPhysicalStream::new(
-//             signal_list,
-//             self.element_lanes().clone(),
-//             dimensionality,
-//             self.complexity().clone(),
-//             data_element_bit_count,
-//             user_bit_count,
-//             InterfaceDirection::In,
-//             self.stream_direction(),
-//         ))
-//     }
-// }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct VhdlPhysicalStream {
@@ -295,7 +229,6 @@ impl Reverse for VhdlPhysicalStream {
 mod tests {
     use std::convert::TryInto;
 
-    use til_query::ir::db::Database;
     use tydi_common::{
         map::InsertionOrderedMap,
         name::{Name, PathName},
@@ -308,7 +241,6 @@ mod tests {
 
     #[test]
     fn test_into_vhdl() -> Result<()> {
-        let ir_db = &Database::default();
         let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
         let arch_db = &mut _arch_db;
         let physical_stream = PhysicalStream::new(

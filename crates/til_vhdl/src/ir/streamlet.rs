@@ -168,7 +168,7 @@ impl PhysicalStreamObject {
                 let upper: Relation = self
                     .dimensionality()
                     .clone()
-                    .r_multiply(db, u32_to_i32(lane)?.r_add(db, 1)?)?
+                    .r_multiply(db, Relation::parentheses(u32_to_i32(lane)?.r_add(db, 1)?)?)?
                     .r_subtract(db, 1)?
                     .into();
                 let selection = if lower.try_eval()? == upper.try_eval()? {
