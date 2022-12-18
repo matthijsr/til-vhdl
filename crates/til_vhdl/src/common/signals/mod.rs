@@ -15,13 +15,13 @@ use til_query::{
 use tydi_common::{
     error::{Error, Result, TryResult},
     name::{PathName, PathNameSelf},
-    numbers::{usize_to_u32, NonNegative},
+    numbers::{i32_to_u32, usize_to_u32, NonNegative},
     traits::{Identify, Reversed},
     util::log2_ceil,
 };
 use tydi_intern::Id;
 use tydi_vhdl::{
-    architecture::arch_storage::db::Database,
+    architecture::arch_storage::{db::Database, Arch},
     assignment::{
         bitvec::{BitVecValue, WidthSource},
         Assign, ObjectSelection, StdLogicValue, ValueAssignment,
@@ -153,42 +153,55 @@ impl<'a> PhysicalStreamProcessWithDb<'a> {
 
     fn last_for_lane(
         &self,
+        db: &dyn Arch,
         lane: u32,
         last: &Option<std::ops::Range<u32>>,
     ) -> Result<(ObjectSelection, ValueAssignment)> {
-        let left = self.stream_object().get_last(lane)?;
-        let right = if let Some(transfer_last) = last {
-            let mut assign_vec = vec![];
-            for dim in (0..self.stream_object().dimensionality()).rev() {
-                if dim <= transfer_last.end && dim >= transfer_last.start {
-                    assign_vec.push(StdLogicValue::Logic(true));
-                } else {
-                    assign_vec.push(StdLogicValue::Logic(false));
+        let left = self.stream_object().get_last(db, lane)?;
+        if let Some(ValueAssignment::Integer(i)) =
+            self.stream_object().dimensionality().try_eval()?
+        {
+            let right = if let Some(transfer_last) = last {
+                let mut assign_vec = vec![];
+                for dim in (0..i32_to_u32(i)?).rev() {
+                    if dim <= transfer_last.end && dim >= transfer_last.start {
+                        assign_vec.push(StdLogicValue::Logic(true));
+                    } else {
+                        assign_vec.push(StdLogicValue::Logic(false));
+                    }
                 }
-            }
-            if assign_vec.len() == 1 {
-                assign_vec[0].into()
+                if assign_vec.len() == 1 {
+                    assign_vec[0].into()
+                } else {
+                    BitVecValue::Full(assign_vec).into()
+                }
             } else {
-                BitVecValue::Full(assign_vec).into()
-            }
+                if i == 1 {
+                    StdLogicValue::Logic(false).into()
+                } else {
+                    BitVecValue::Others(StdLogicValue::Logic(false)).into()
+                }
+            };
+            Ok((left, right))
         } else {
-            if self.stream_object().dimensionality() == 1 {
-                StdLogicValue::Logic(false).into()
-            } else {
-                BitVecValue::Others(StdLogicValue::Logic(false)).into()
-            }
-        };
-        Ok((left, right))
+            todo!()
+        }
     }
 
-    fn last_and_val(&self, last: &LastMode) -> Result<Vec<(ObjectSelection, ValueAssignment)>> {
+    fn last_and_val(
+        &self,
+        db: &dyn Arch,
+        last: &LastMode,
+    ) -> Result<Vec<(ObjectSelection, ValueAssignment)>> {
         match last {
             LastMode::None => Ok(vec![]),
-            LastMode::Transfer(transfer_last) => Ok(vec![self.last_for_lane(0, transfer_last)?]),
+            LastMode::Transfer(transfer_last) => {
+                Ok(vec![self.last_for_lane(db, 0, transfer_last)?])
+            }
             LastMode::Lane(last_lanes) => last_lanes
                 .iter()
                 .enumerate()
-                .map(|(lane, last)| Ok(self.last_for_lane(usize_to_u32(lane)?, last)?))
+                .map(|(lane, last)| Ok(self.last_for_lane(db, usize_to_u32(lane)?, last)?))
                 .collect(),
         }
     }
@@ -438,14 +451,14 @@ impl<'a> PhysicalSignals for PhysicalStreamProcessWithDb<'a> {
     }
 
     fn act_last(&mut self, last: &LastMode) -> Result<()> {
-        for (sig, val) in self.last_and_val(last)? {
+        for (sig, val) in self.last_and_val(self.db, last)? {
             self.add_statement(sig.assign(self.db, val)?)?;
         }
         Ok(())
     }
 
     fn assert_last(&mut self, last: &LastMode, message: &str) -> Result<()> {
-        for (sig, val) in self.last_and_val(last)? {
+        for (sig, val) in self.last_and_val(self.db, last)? {
             self.assert_eq_report(sig, val, message)?
         }
         Ok(())

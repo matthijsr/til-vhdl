@@ -755,6 +755,30 @@ impl FieldSelection {
         )?))
     }
 
+    pub fn relation_to(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<FieldSelection> {
+        Ok(FieldSelection::Range(RangeConstraint::relation_downto(
+            db,
+            start.into(),
+            end.into(),
+        )?))
+    }
+
+    pub fn relation_downto(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<FieldSelection> {
+        Ok(FieldSelection::Range(RangeConstraint::relation_downto(
+            db,
+            start.into(),
+            end.into(),
+        )?))
+    }
+
     pub fn index(index: impl Into<Relation>) -> FieldSelection {
         FieldSelection::Range(RangeConstraint::Index(index.into()))
     }
@@ -879,6 +903,18 @@ impl RangeConstraint {
         }
     }
 
+    pub fn relation_to(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<RangeConstraint> {
+        let start = start.into();
+        let end = end.into();
+        start.is_integer(db)?;
+        end.is_integer(db)?;
+        Ok(RangeConstraint::To { start, end })
+    }
+
     /// Create a `RangeConstraint::DownTo` and ensure correctness (start > end)
     pub fn downto(start: i32, end: i32) -> Result<RangeConstraint> {
         if end > start {
@@ -892,6 +928,18 @@ impl RangeConstraint {
                 end: end.into(),
             })
         }
+    }
+
+    pub fn relation_downto(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<RangeConstraint> {
+        let start = start.into();
+        let end = end.into();
+        start.is_integer(db)?;
+        end.is_integer(db)?;
+        Ok(RangeConstraint::Downto { start, end })
     }
 
     /// Returns the width of the range

@@ -38,14 +38,17 @@ use tydi_vhdl::{
     component::Component,
     declaration::{Declare, DeclareWithIndent, ObjectDeclaration},
     port::{GenericParameter, Port},
-    statement::mapping::Mapping,
+    statement::{
+        mapping::Mapping,
+        relation::{math::CreateMath, Relation},
+    },
 };
 
 use crate::IntoVhdl;
 
 use super::{
     generics::{param_to_param, param_value::param_value_to_vhdl},
-    interface_port::VhdlInterface,
+    interface_port::{interface_port_to_vhdl, VhdlInterface},
     physical_properties::{VhdlDomain, VhdlDomainListOrDefault},
 };
 
@@ -92,7 +95,7 @@ pub struct PhysicalStreamObject {
     /// Number of element lanes.
     element_lanes: Positive,
     /// Dimensionality.
-    dimensionality: NonNegative,
+    dimensionality: Relation,
     /// Complexity.
     complexity: Complexity,
     /// The absolute size of a data element
@@ -115,8 +118,8 @@ impl PhysicalStreamObject {
         &self.element_lanes
     }
     /// Dimensionality.
-    pub fn dimensionality(&self) -> NonNegative {
-        self.dimensionality
+    pub fn dimensionality(&self) -> &Relation {
+        &self.dimensionality
     }
     /// Complexity.
     pub fn complexity(&self) -> &Complexity {
@@ -154,15 +157,24 @@ impl PhysicalStreamObject {
     ///
     /// Will throw an error if `lane` > 0 and this stream's Complexity < 8, or
     /// this stream does not have more than one element lane.
-    pub fn get_last(&self, lane: NonNegative) -> Result<ObjectSelection> {
+    pub fn get_last(&self, db: &dyn Arch, lane: NonNegative) -> Result<ObjectSelection> {
         if let Some(last) = *self.signal_list().last() {
             if self.complexity().major() >= 8 && self.element_lanes().get() > 1 {
-                let lower = self.dimensionality() * lane;
-                let upper = self.dimensionality() * (lane + 1) - 1;
-                let selection = if lower == upper {
-                    FieldSelection::index(u32_to_i32(lower)?)
+                let lower: Relation = self
+                    .dimensionality()
+                    .clone()
+                    .r_multiply(db, u32_to_i32(lane)?)?
+                    .into();
+                let upper: Relation = self
+                    .dimensionality()
+                    .clone()
+                    .r_multiply(db, u32_to_i32(lane)?.r_add(db, 1)?)?
+                    .r_subtract(db, 1)?
+                    .into();
+                let selection = if lower.try_eval()? == upper.try_eval()? {
+                    FieldSelection::index(lower)
                 } else {
-                    FieldSelection::downto(u32_to_i32(upper)?, u32_to_i32(lower)?)?
+                    FieldSelection::relation_downto(db, upper, lower)?
                 };
                 last.select(selection)
             } else if lane > 0 {
@@ -324,7 +336,7 @@ pub fn create_instance(
     for (name, port) in instance.ports() {
         interface.try_insert(
             name.clone(),
-            port.canonical(ir_db, arch_db, prefix.clone())?,
+            interface_port_to_vhdl(ir_db, arch_db, port, prefix.clone(), parent_params)?,
         )?;
     }
 
@@ -362,7 +374,7 @@ pub fn create_instance(
                                     .clone()
                                     .try_map(&mut try_signal_decl)?,
                                 element_lanes: stream.element_lanes().clone(),
-                                dimensionality: stream.dimensionality(),
+                                dimensionality: stream.dimensionality().clone(),
                                 complexity: stream.complexity().clone(),
                                 data_element_size: stream.data_element_size(),
                                 user_size: stream.user_size(),
@@ -590,7 +602,7 @@ impl VhdlStreamlet {
                                 clock: clk,
                                 signal_list: stream.signal_list().clone().map(entity_port_obj),
                                 element_lanes: stream.element_lanes().clone(),
-                                dimensionality: stream.dimensionality(),
+                                dimensionality: stream.dimensionality().clone(),
                                 complexity: stream.complexity().clone(),
                                 data_element_size: stream.data_element_size(),
                                 user_size: stream.user_size(),
@@ -775,20 +787,24 @@ impl IntoVhdl<VhdlStreamlet> for Streamlet {
     ) -> Result<VhdlStreamlet> {
         let prefix = prefix.try_optional()?;
 
-        let mut interface = InsertionOrderedMap::new();
-        for (name, port) in self.interface(ir_db).ports() {
-            interface.try_insert(
-                name.clone(),
-                port.canonical(ir_db, arch_db, prefix.clone())?,
-            )?;
-        }
-
-        let domains = self.domains(ir_db).into();
-
         let no_parent_params = InsertionOrderedMap::new();
         let parameters = self
             .parameters(ir_db)
             .try_map_convert(|p| param_to_param(arch_db, &p, &no_parent_params))?;
+
+        let parent_params = parameters
+            .clone()
+            .try_map_convert(|x| ObjectDeclaration::from_parameter(arch_db, &x))?;
+
+        let mut interface = InsertionOrderedMap::new();
+        for (name, port) in self.interface(ir_db).ports() {
+            interface.try_insert(
+                name.clone(),
+                interface_port_to_vhdl(ir_db, arch_db, port, prefix.clone(), &parent_params)?,
+            )?;
+        }
+
+        let domains = self.domains(ir_db).into();
 
         Ok(VhdlStreamlet {
             prefix,
