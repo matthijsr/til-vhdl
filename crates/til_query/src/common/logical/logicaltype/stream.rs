@@ -193,11 +193,11 @@ impl Stream {
             Ok(db.intern_stream(Stream {
                 data: data,
                 throughput: throughput.try_result()?,
-                dimensionality: dimensionality.try_result()?,
+                dimensionality: dimensionality.try_result()?.try_reduce(),
                 synchronicity,
                 complexity: complexity.try_result()?,
                 direction,
-                user: user,
+                user,
                 keep,
             }))
         } else {
@@ -217,13 +217,13 @@ impl Stream {
         keep: bool,
     ) -> Self {
         Stream {
-            data: data,
+            data,
             throughput: throughput,
-            dimensionality: dimensionality.into(),
+            dimensionality: dimensionality.into().try_reduce(),
             synchronicity,
             complexity: complexity.into(),
             direction,
-            user: user,
+            user,
             keep,
         }
     }
@@ -304,7 +304,7 @@ impl Stream {
 
     /// Set the dimensionality of this stream.
     pub(crate) fn set_dimensionality(&mut self, dimensionality: GenericProperty<NonNegative>) {
-        self.dimensionality = dimensionality;
+        self.dimensionality = dimensionality.try_reduce();
     }
 }
 

@@ -39,11 +39,8 @@ pub enum GenericProperty<T: fmt::Display> {
     Parameterized(Name),
 }
 
-impl<
-        T: fmt::Display + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Copy,
-    > GenericProperty<T>
-{
-    pub fn try_eval(&self) -> Option<T> {
+impl GenericProperty<NonNegative> {
+    pub fn try_eval(&self) -> Option<NonNegative> {
         match self {
             GenericProperty::Combination(l, op, r) => {
                 if let Some(lv) = l.try_eval() {
@@ -60,6 +57,91 @@ impl<
             }
             GenericProperty::Fixed(f) => Some(*f),
             GenericProperty::Parameterized(_) => None,
+        }
+    }
+
+    pub fn is_one(&self) -> bool {
+        if let GenericProperty::Fixed(1) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        if let GenericProperty::Fixed(0) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Tries to remove unnecessary operations
+    ///
+    /// E.g.:
+    /// * N - N = 0
+    /// * N * 1 = N
+    /// * N / 1 = N
+    /// * N * 0 = 0
+    /// * etc.
+    pub fn try_reduce(&self) -> Self {
+        match self {
+            GenericProperty::Combination(l, op, r) => {
+                let l = l.try_reduce();
+                let r = r.try_reduce();
+                if l.is_zero() && r.is_zero() {
+                    return GenericProperty::Fixed(0);
+                }
+                match op {
+                    GenericPropertyOperator::Add => {
+                        if l.is_zero() {
+                            r
+                        } else if r.is_zero() {
+                            l
+                        } else {
+                            l + r
+                        }
+                    }
+                    GenericPropertyOperator::Subtract => {
+                        if l.is_zero() {
+                            r
+                        } else if r.is_zero() {
+                            l
+                        } else if l == r {
+                            GenericProperty::Fixed(0)
+                        } else {
+                            l - r
+                        }
+                    }
+                    GenericPropertyOperator::Multiply => {
+                        if l.is_zero() {
+                            GenericProperty::Fixed(0)
+                        } else if r.is_zero() {
+                            GenericProperty::Fixed(0)
+                        } else if l.is_one() {
+                            r
+                        } else if r.is_one() {
+                            l
+                        } else {
+                            l * r
+                        }
+                    }
+                    GenericPropertyOperator::Divide => {
+                        if l.is_zero() {
+                            GenericProperty::Fixed(0)
+                        } else if r.is_one() {
+                            l
+                        } else if r.is_zero() {
+                            // Might want to throw an error?
+                            l / r
+                        } else {
+                            l / r
+                        }
+                    }
+                }
+            }
+            GenericProperty::Fixed(_) => self.clone(),
+            GenericProperty::Parameterized(_) => self.clone(),
         }
     }
 }
