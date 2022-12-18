@@ -10,7 +10,7 @@ use tydi_common::numbers::BitCount;
 use tydi_common::traits::Identify;
 
 use crate::architecture::arch_storage::Arch;
-use crate::assignment::{FieldSelection, RangeConstraint};
+use crate::assignment::{FieldSelection, RangeConstraint, ValueAssignment};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::array::ArrayObject;
@@ -128,17 +128,25 @@ impl ObjectType {
             ObjectType::Array(array) => match field {
                 FieldSelection::Range(range) => {
                     if let RangeConstraint::Index(index) = range {
-                        todo!()
-                        // if *index <= array.high() && *index >= array.low() {
-                        //     Ok(array.typ().clone())
-                        // } else {
-                        //     Err(Error::InvalidArgument(format!(
-                        //         "Cannot select index {} on array with high: {}, low: {}",
-                        //         index,
-                        //         array.high(),
-                        //         array.low()
-                        //     )))
-                        // }
+                        if let Some(ValueAssignment::Integer(i)) = index.try_eval()? {
+                            match (array.high().try_eval()?, array.low().try_eval()?) {
+                                (
+                                    Some(ValueAssignment::Integer(high)),
+                                    Some(ValueAssignment::Integer(low)),
+                                ) => {
+                                    if !(i <= high && i >= low) {
+                                        return Err(Error::InvalidArgument(format!(
+                                    "Cannot select index {} on array with high: {}, low: {}",
+                                    index,
+                                    array.high(),
+                                    array.low()
+                                )));
+                                    }
+                                }
+                                _ => (),
+                            };
+                        }
+                        Ok(array.typ().clone())
                     } else {
                         if range.is_between(array.high(), array.low())? {
                             if array.is_std_logic_vector() {
