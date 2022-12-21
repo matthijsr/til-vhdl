@@ -164,7 +164,7 @@ fn logical_type_parameter_kinds(
         LogicalType::Union(u) => {
             try_add_params_for_fields(db, u.field_ids(), &mut result)?;
         }
-        LogicalType::Stream(_) => todo!(),
+        LogicalType::Stream(s) => result = db.stream_parameter_kinds(s)?,
     }
     Ok(result)
 }

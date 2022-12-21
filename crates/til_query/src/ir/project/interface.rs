@@ -91,7 +91,22 @@ impl Interface {
     }
 
     fn verify_port(&self, db: &dyn Ir, port: &InterfacePort) -> Result<()> {
-        self.verify_domains(port)
+        self.verify_domains(port)?;
+        self.verify_parameters(db, port)
+    }
+
+    fn verify_parameters(&self, db: &dyn Ir, port: &InterfacePort) -> Result<()> {
+        let expected_params = db.stream_parameter_kinds(port.stream_id())?;
+        for (expected_param_name, expected_param_kind) in expected_params.iter() {
+            if let Some(param) = self.parameters().get(expected_param_name) {
+                if let Err(err) = param.kind().satisfies(expected_param_kind) {
+                    return Err(Error::InvalidArgument(format!("Parameter {} does not satisfy the parameter expected by a type on port {}: {}", expected_param_name, port.name(), err)))
+                }
+            } else {
+                return Err(Error::InterfaceError(format!("A type on port {} expects a parameter with name {}, but none exists on this interface.", port.name(), expected_param_name)));
+            }
+        }
+        Ok(())
     }
 
     fn verify_domains(&self, port: &InterfacePort) -> Result<()> {

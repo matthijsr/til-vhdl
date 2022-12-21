@@ -16,6 +16,15 @@ pub enum GenericCondition<T: TestValue> {
 }
 
 impl<T: TestValue> GenericCondition<T> {
+    /// Verify whether this condition only permits values permitted by the other
+    /// condition. (I.e., it is as or more restrictive.)
+    pub fn satisfies(&self, _other: &Self) -> bool {
+        // TODO
+        true
+    }
+}
+
+impl<T: TestValue> GenericCondition<T> {
     // This doesn't implement the trait, to avoid strange nesting behavior.
     pub fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         let value = value.try_result()?;
