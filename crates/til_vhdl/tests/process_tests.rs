@@ -287,13 +287,13 @@ end process \a__x\;"#,
             r#"process is
 begin
   wait until rising_edge(clk) and \a__y_valid\ = '1';
-  assert \a__y_data(1 downto 0) = "11" report "test message compare 1";
-  assert \a__y_data(5 downto 4) = "11" report "test message compare 1";
-  assert \a__y_last(2 downto 0) = (others => '0') report "test message compare 1";
-  assert \a__y_last(5 downto 3) = (others => '0') report "test message compare 1";
-  assert \a__y_last(8 downto 6) = (others => '0') report "test message compare 1";
-  assert \a__y_strb = "101" report "test message compare 1";
-  assert \a__y_user(2 downto 0) = "101" report "test message compare 1";
+  assert \a__y_data\(1 downto 0) = "11" report "test message compare 1";
+  assert \a__y_data\(5 downto 4) = "11" report "test message compare 1";
+  assert \a__y_last\(2 downto 0) = (others => '0') report "test message compare 1";
+  assert \a__y_last\(5 downto 3) = (others => '0') report "test message compare 1";
+  assert \a__y_last\(8 downto 6) = (others => '0') report "test message compare 1";
+  assert \a__y_strb\ = "101" report "test message compare 1";
+  assert \a__y_user\(2 downto 0) = "101" report "test message compare 1";
   \a__y_ready\ <= '1';
   wait until rising_edge(clk) and \a__y_valid\ = '1';
   assert \a__y_data\(1 downto 0) = "10" report "test message compare 2";

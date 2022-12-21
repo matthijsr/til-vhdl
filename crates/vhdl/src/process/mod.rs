@@ -180,7 +180,7 @@ impl DeclareWithIndent for Process {
         }
         result.push_str(&indent(&statements, indent_style));
 
-        result.push_str(&format!("end process {};", &self.label));
+        result.push_str(&format!("end process {};", &self.label.declare()));
 
         Ok(result)
     }
