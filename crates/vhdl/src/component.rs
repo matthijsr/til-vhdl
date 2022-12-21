@@ -119,7 +119,7 @@ impl DeclareWithIndent for Component {
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());
         }
-        result.push_str(format!("component {}\n", self.identifier()).as_str());
+        result.push_str(format!("component {} is\n", self.identifier()).as_str());
         if self.parameters().len() > 0 {
             let mut parameter_body = "generic (\n".to_string();
             let parameters = self
@@ -143,7 +143,7 @@ impl DeclareWithIndent for Component {
         port_body.push_str(&indent(&ports, indent_style));
         port_body.push_str("\n);\n");
         result.push_str(&indent(&port_body, indent_style));
-        result.push_str("end component;");
+        result.push_str(format!("end component {};", self.identifier()).as_str());
         Ok(result)
     }
 }
@@ -161,11 +161,11 @@ mod tests {
         assert_eq!(
             r#"-- test
 -- test
-component empty_component
+component empty_component is
   port (
 
   );
-end component;"#,
+end component empty_component;"#,
             empty_comp.declare(&db)?
         );
 
@@ -177,7 +177,7 @@ end component;"#,
         let db = Database::default();
         let comp = test_tools::simple_component()?;
         assert_eq!(
-            r#"component test
+            r#"component test is
   port (
     -- This is port documentation
     -- Next line.
@@ -185,7 +185,7 @@ end component;"#,
     some_other_port : out std_logic_vector(43 downto 0);
     clk : in std_logic
   );
-end component;"#,
+end component test;"#,
             comp.declare(&db)?
         );
 
@@ -197,7 +197,7 @@ end component;"#,
         let db = Database::default();
         let comp = test_tools::simple_component_with_generics()?;
         assert_eq!(
-            r#"component test
+            r#"component test is
   generic (
     -- This is parameter documentation
     -- Next line.
@@ -212,7 +212,7 @@ end component;"#,
     some_other_port : out std_logic_vector(43 downto 0);
     clk : in std_logic
   );
-end component;"#,
+end component test;"#,
             comp.declare(&db)?
         );
 
