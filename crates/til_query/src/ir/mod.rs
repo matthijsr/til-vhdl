@@ -3,7 +3,8 @@ use std::sync::Arc;
 use tydi_common::{
     error::{Error, Result, WrapError},
     map::InsertionOrderedMap,
-    name::PathName,
+    name::{Name, PathName},
+    numbers::NonNegative,
     traits::Reverse,
 };
 
@@ -13,6 +14,7 @@ use crate::{
     common::{
         logical::{
             logicaltype::{
+                genericproperty::GenericProperty,
                 group::Group,
                 stream::{Stream, Synchronicity},
                 union::Union,
@@ -26,8 +28,13 @@ use crate::{
 };
 
 use self::{
-    implementation::Implementation, interface_port::InterfacePort, interner::Interner,
-    project::Project, streamlet::Streamlet, traits::GetSelf,
+    generics::{interface::InterfaceGenericKind, GenericKind},
+    implementation::Implementation,
+    interface_port::InterfacePort,
+    interner::Interner,
+    project::Project,
+    streamlet::Streamlet,
+    traits::GetSelf,
 };
 
 pub mod annotation_keys;
@@ -59,10 +66,107 @@ pub trait Ir: Interner {
     fn logical_type_split_streams(&self, key: Id<LogicalType>) -> Result<SplitStreams>;
 
     fn stream_split_streams(&self, key: Id<Stream>) -> Result<SplitStreams>;
+
+    fn logical_type_parameter_kinds(
+        &self,
+        key: Id<LogicalType>,
+    ) -> Result<InsertionOrderedMap<Name, GenericKind>>;
+
+    fn stream_parameter_kinds(
+        &self,
+        key: Id<Stream>,
+    ) -> Result<InsertionOrderedMap<Name, GenericKind>>;
 }
 
 fn project_ref(db: &dyn Ir) -> Arc<Project> {
     Arc::new(db.project())
+}
+
+fn try_add_param_kind(
+    result: &mut InsertionOrderedMap<Name, GenericKind>,
+    kind_name: Name,
+    kind: GenericKind,
+) -> Result<()> {
+    if let Some(existing_kind) = result.get(&kind_name) {
+        if &kind == existing_kind {
+            Ok(())
+        } else {
+            Err(Error::ProjectError(format!(
+                "Duplicate parameter name: \"{}\" is both a {} and a {}",
+                &kind_name, existing_kind, &kind
+            )))
+        }
+    } else {
+        result.try_insert(kind_name, kind)
+    }
+}
+
+fn stream_parameter_kinds(
+    db: &dyn Ir,
+    key: Id<Stream>,
+) -> Result<InsertionOrderedMap<Name, GenericKind>> {
+    let stream = db.lookup_intern_stream(key);
+    let mut result = db.logical_type_parameter_kinds(stream.data_id())?;
+
+    // For now, dimensionality is the only parameterized property, may need to
+    // refactor this in the future.
+    fn add_dim(
+        result: &mut InsertionOrderedMap<Name, GenericKind>,
+        prop: &GenericProperty<NonNegative>,
+    ) -> Result<()> {
+        match prop {
+            GenericProperty::Combination(l, _, r) => {
+                add_dim(result, l.as_ref())?;
+                add_dim(result, r.as_ref())
+            }
+            GenericProperty::Fixed(_) => Ok(()),
+            GenericProperty::Parameterized(n) => try_add_param_kind(
+                result,
+                n.clone(),
+                InterfaceGenericKind::dimensionality().into(),
+            ),
+        }
+    }
+
+    add_dim(&mut result, stream.dimensionality())?;
+
+    Ok(result)
+}
+
+fn logical_type_parameter_kinds(
+    db: &dyn Ir,
+    key: Id<LogicalType>,
+) -> Result<InsertionOrderedMap<Name, GenericKind>> {
+    fn try_add_params_for_fields(
+        db: &dyn Ir,
+        field_ids: &InsertionOrderedMap<PathName, Id<LogicalType>>,
+        result: &mut InsertionOrderedMap<Name, GenericKind>,
+    ) -> Result<()> {
+        Ok(for (field_name, field_typ) in field_ids {
+            let field_kinds = db.logical_type_parameter_kinds(*field_typ)?;
+            for (field_kind_name, field_kind) in field_kinds.into_iter() {
+                try_add_param_kind(result, field_kind_name, field_kind).map_err(|err| {
+                    Error::ProjectError(format!("Issue with field {}: {}", field_name, err))
+                })?;
+            }
+        })
+    }
+
+    let mut result = InsertionOrderedMap::new();
+    let typ = db.lookup_intern_type(key);
+    match typ {
+        LogicalType::Null => (),
+        // No generic parameter support for Bits yet.
+        LogicalType::Bits(_) => (),
+        LogicalType::Group(g) => {
+            try_add_params_for_fields(db, g.field_ids(), &mut result)?;
+        }
+        LogicalType::Union(u) => {
+            try_add_params_for_fields(db, u.field_ids(), &mut result)?;
+        }
+        LogicalType::Stream(_) => todo!(),
+    }
+    Ok(result)
 }
 
 fn all_streamlets(db: &dyn Ir) -> Arc<Vec<Arc<Streamlet>>> {

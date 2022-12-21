@@ -42,7 +42,7 @@ impl Streamlet {
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
-        let interface = Interface::new_ports_domains(domains, ports)?.intern_arc(db);
+        let interface = Interface::new_ports_domains(db, domains, ports)?;
         self.interface = Some(interface);
 
         Ok(self)
@@ -54,10 +54,10 @@ impl Streamlet {
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
     ) -> Result<Streamlet> {
         if let Some(interface) = self.interface {
-            let new_interface = interface.get(db).as_ref().clone().with_ports(ports)?;
-            self.interface = Some(new_interface.intern_arc(db));
+            let new_interface = interface.get(db).as_ref().clone().with_ports(db, ports)?;
+            self.interface = Some(new_interface);
         } else {
-            let interface = Interface::new_ports(ports)?.intern_arc(db);
+            let interface = Interface::new_ports(db, ports)?;
             self.interface = Some(interface);
         }
 

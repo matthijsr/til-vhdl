@@ -18,7 +18,7 @@ use crate::ir::{
     interface_port::InterfacePort,
     physical_properties::{Domain, InterfaceDirection},
     streamlet::Streamlet,
-    traits::{InternSelf, MoveDb},
+    traits::{InternArc, InternSelf, MoveDb},
     Ir,
 };
 
@@ -39,20 +39,22 @@ impl Interface {
     }
 
     pub fn new(
+        db: &dyn Ir,
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
-    ) -> Result<Self> {
+    ) -> Result<Id<Arc<Self>>> {
         Self::new_domains(domains)?
             .with_parameters(parameters)?
-            .with_ports(ports)
+            .with_ports(db, ports)
     }
 
     pub fn new_ports_domains(
+        db: &dyn Ir,
         domains: impl IntoIterator<Item = impl TryResult<Name>>,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
-    ) -> Result<Self> {
-        Self::new_domains(domains)?.with_ports(ports)
+    ) -> Result<Id<Arc<Self>>> {
+        Self::new_domains(domains)?.with_ports(db, ports)
     }
 
     pub fn new_parameters(
@@ -82,12 +84,17 @@ impl Interface {
     }
 
     pub fn new_ports(
+        db: &dyn Ir,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
-    ) -> Result<Self> {
-        Self::new_empty().with_ports(ports)
+    ) -> Result<Id<Arc<Self>>> {
+        Self::new_empty().with_ports(db, ports)
     }
 
-    fn verify_port(&self, port: &InterfacePort) -> Result<()> {
+    fn verify_port(&self, db: &dyn Ir, port: &InterfacePort) -> Result<()> {
+        self.verify_domains(port)
+    }
+
+    fn verify_domains(&self, port: &InterfacePort) -> Result<()> {
         if let Some(domains) = self.domains() {
             let domains_string = domains
                 .iter()
@@ -128,17 +135,18 @@ impl Interface {
 
     pub fn with_ports(
         mut self,
+        db: &dyn Ir,
         ports: impl IntoIterator<Item = impl TryResult<InterfacePort>>,
-    ) -> Result<Self> {
+    ) -> Result<Id<Arc<Self>>> {
         let mut port_map = InsertionOrderedMap::new();
         for port in ports {
             let port = port.try_result()?;
-            self.verify_port(&port)?;
+            self.verify_port(db, &port)?;
             port_map.try_insert(port.name().clone(), port)?
         }
 
         self.ports = port_map;
-        Ok(self)
+        Ok(self.intern_arc(db))
     }
 
     pub fn with_parameters(
@@ -155,9 +163,9 @@ impl Interface {
         Ok(self)
     }
 
-    pub fn push_port(&mut self, port: impl TryResult<InterfacePort>) -> Result<()> {
+    pub fn push_port(&mut self, db: &dyn Ir, port: impl TryResult<InterfacePort>) -> Result<()> {
         let port = port.try_result()?;
-        self.verify_port(&port)?;
+        self.verify_port(db, &port)?;
         self.ports.try_insert(port.name().clone(), port)
     }
 
