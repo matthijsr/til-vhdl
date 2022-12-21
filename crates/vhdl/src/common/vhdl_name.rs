@@ -30,7 +30,15 @@ impl VhdlName {
     /// Constructs a new name wrapper. Returns an error when the provided name
     /// is invalid.
     pub fn try_new(name: impl Into<String>) -> Result<Self> {
-        let name = name.into();
+        let mut name: String = name.into();
+        // Remove enclosing backslashes for extended
+        // TODO: Map this to an enum later
+        if name.len() > 1 && name.starts_with("\\") && name.ends_with("\\") {
+            name.pop();
+            name.remove(0);
+            return Self::try_new(name);
+        }
+
         if name.is_empty() {
             Err(Error::InvalidArgument("name cannot be empty".to_string()))
         } else if name.chars().next().unwrap().is_ascii_digit() {
@@ -56,6 +64,16 @@ impl VhdlName {
             ))
         } else {
             Ok(VhdlName(name))
+        }
+    }
+
+    // Includes surrounding `\`s when this is an extended identifier
+    // TODO: Should probably refactor this into an enum
+    pub fn declare(&self) -> String {
+        if self.0.contains("__") {
+            format!("\\{}\\", self)
+        } else {
+            self.to_string()
         }
     }
 }

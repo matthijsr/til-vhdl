@@ -116,7 +116,7 @@ impl DeclareWithIndent for ArrayObject {
 
 impl Identify for ArrayObject {
     fn identifier(&self) -> String {
-        self.vhdl_name().to_string()
+        self.vhdl_name().declare()
     }
 }
 

@@ -70,8 +70,7 @@ impl AssignDeclaration {
     pub fn object_string(&self, db: &dyn Arch) -> String {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
-            .identifier()
-            .to_string();
+            .identifier();
         for field in self.assignment().to_field() {
             result.push_str(&field.to_string());
         }
@@ -600,7 +599,7 @@ impl FieldAssignment {
 
 impl Identify for FieldAssignment {
     fn identifier(&self) -> String {
-        self.field().to_string()
+        self.field().declare()
     }
 }
 

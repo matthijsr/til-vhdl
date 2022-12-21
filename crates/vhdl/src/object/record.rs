@@ -90,7 +90,7 @@ impl VhdlNameSelf for RecordObject {
 
 impl Identify for RecordObject {
     fn identifier(&self) -> String {
-        self.vhdl_name().to_string()
+        self.vhdl_name().declare()
     }
 }
 
