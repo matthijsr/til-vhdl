@@ -158,19 +158,21 @@ pub fn simple_streamlet_with_interface_params(
         null_type,
         false,
     )?;
-    let streamlet = Streamlet::new().try_with_name(name)?.with_ports(
-        db,
-        vec![
-            ("a", stream, InterfaceDirection::In),
-            ("b", stream, InterfaceDirection::Out),
-        ],
-    )?;
-    streamlet.with_parameters(
-        db,
-        vec![GenericParameter::try_new(
-            "pa",
-            DimensionalityGeneric::new(),
-            5,
-        )?],
-    )
+    Streamlet::new()
+        .try_with_name(name)?
+        .with_parameters(
+            db,
+            vec![GenericParameter::try_new(
+                "pa",
+                DimensionalityGeneric::new(),
+                5,
+            )?],
+        )?
+        .with_ports(
+            db,
+            vec![
+                ("a", stream, InterfaceDirection::In),
+                ("b", stream, InterfaceDirection::Out),
+            ],
+        )
 }

@@ -25,9 +25,9 @@ use til_query::{
         Ir,
     },
     test_utils::{
-        simple_structural_streamlet, simple_structural_streamlet_with_behav_params,
-        streamlet_without_impl, streamlet_without_impl_with_behav_params, test_stream_id,
-        test_stream_id_custom,
+        simple_streamlet_with_interface_params, simple_structural_streamlet,
+        simple_structural_streamlet_with_behav_params, streamlet_without_impl,
+        streamlet_without_impl_with_behav_params, test_stream_id, test_stream_id_custom,
     },
 };
 use til_vhdl::IntoVhdl;
@@ -716,6 +716,31 @@ begin
 end structural;"#,
         streamlet_arch.declare(arch_db)?
     );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_interface_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let streamlet = simple_streamlet_with_interface_params(db, "test")?;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let mut streamlet = ir_streamlet_to_vhdl(streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    println!("{}", streamlet.to_component().declare(arch_db)?);
+
+    println!("{}", arch_db.default_package().declare(arch_db)?);
+
+    println!("{}", streamlet_arch.declare(arch_db)?);
 
     Ok(())
 }
