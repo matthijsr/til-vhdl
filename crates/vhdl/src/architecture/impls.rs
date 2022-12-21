@@ -95,7 +95,7 @@ impl DeclareWithIndent for Architecture {
 
 impl Identify for Architecture {
     fn identifier(&self) -> String {
-        self.identifier.to_string()
+        self.identifier.declare()
     }
 }
 

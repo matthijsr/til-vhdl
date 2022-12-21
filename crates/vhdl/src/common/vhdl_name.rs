@@ -58,6 +58,16 @@ impl VhdlName {
             Ok(VhdlName(name))
         }
     }
+
+    // Includes surrounding `\`s when this is an extended identifier
+    // TODO: Should probably refactor this into an enum
+    pub fn declare(&self) -> String {
+        if self.0.contains("__") {
+            format!("\\{}\\", self)
+        } else {
+            self.to_string()
+        }
+    }
 }
 
 impl From<VhdlName> for String {

@@ -332,7 +332,7 @@ pub fn create_instance(
         let mut try_signal_decl = |p: Port| {
             let signal = ObjectDeclaration::signal(
                 arch_db,
-                format!("{}__{}", instance_name, p.identifier()),
+                format!("{}__{}", instance_name, p.vhdl_name()),
                 p.typ().clone(),
                 None,
             )?;

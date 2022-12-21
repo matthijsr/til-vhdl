@@ -65,7 +65,7 @@ pub fn canonical(db: &dyn Ir) -> Result<()> {
 
     let package = Arc::new(package);
     let mut pkg = dir.clone();
-    pkg.push(format!("{}_pkg", package.identifier()));
+    pkg.push(format!("{}_pkg", package.vhdl_name()));
     pkg.set_extension("vhd");
 
     let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
