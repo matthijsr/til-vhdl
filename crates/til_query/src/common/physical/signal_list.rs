@@ -197,6 +197,47 @@ impl<T> SignalList<T> {
         })
     }
 
+    /// Use a function to try to convert the SignalList's fields from `T` to `R`
+    pub fn try_map_named<F, R>(self, mut f: F) -> Result<SignalList<R>>
+    where
+        F: FnMut(Name, T) -> Result<R>,
+    {
+        Ok(SignalList {
+            valid: self
+                .valid
+                .map(|x| f(Name::try_new("valid").unwrap(), x))
+                .transpose()?,
+            ready: self
+                .ready
+                .map(|x| f(Name::try_new("ready").unwrap(), x))
+                .transpose()?,
+            data: self
+                .data
+                .map(|x| f(Name::try_new("data").unwrap(), x))
+                .transpose()?,
+            last: self
+                .last
+                .map(|x| f(Name::try_new("last").unwrap(), x))
+                .transpose()?,
+            stai: self
+                .stai
+                .map(|x| f(Name::try_new("stai").unwrap(), x))
+                .transpose()?,
+            endi: self
+                .endi
+                .map(|x| f(Name::try_new("endi").unwrap(), x))
+                .transpose()?,
+            strb: self
+                .strb
+                .map(|x| f(Name::try_new("strb").unwrap(), x))
+                .transpose()?,
+            user: self
+                .user
+                .map(|x| f(Name::try_new("user").unwrap(), x))
+                .transpose()?,
+        })
+    }
+
     /// Use a function to convert the SignalList's fields from `T` to `R`, inserts the canonical name of each signal into the function
     pub fn map_named<F, R>(self, mut f: F) -> SignalList<R>
     where

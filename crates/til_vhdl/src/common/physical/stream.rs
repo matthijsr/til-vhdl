@@ -16,6 +16,7 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::architecture::arch_storage::Arch;
 use tydi_vhdl::declaration::ObjectDeclaration;
+use tydi_vhdl::object::object_type::ObjectType;
 use tydi_vhdl::statement::relation::math::CreateMath;
 use tydi_vhdl::statement::relation::Relation;
 use tydi_vhdl::{
@@ -67,15 +68,22 @@ pub fn physical_stream_to_vhdl(
     // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
 
     let signal_list: SignalList<PhysicalBitCount> = physical_stream.into();
-    let mut signal_list = signal_list.map_named(|n, x| {
+    let mut signal_list = signal_list.try_map_named(|n, x| {
         if let Some(f) = x.try_eval() {
             // As the prefix is either a VhdlName or empty, and all signal names are valid
-            Port::try_new(cat!(prefix, n), mode, f).unwrap()
+            Port::try_new(cat!(prefix, n), mode, f)
         } else {
-            // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-            todo!()
+            Port::try_new(
+                cat!(prefix, n),
+                mode,
+                ObjectType::relation_bit_vector(
+                    arch_db,
+                    physical_bitcount_to_relation(arch_db, &x, parent_params)?,
+                    0,
+                )?,
+            )
         }
-    });
+    })?;
 
     signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
