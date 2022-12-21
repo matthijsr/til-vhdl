@@ -65,7 +65,7 @@ use ieee.std_logic_1164.all;
 
 package default is
 
-  component test_com
+  component test_com is
     port (
       clk : in std_logic;
       rst : in std_logic;
@@ -75,7 +75,7 @@ package default is
       a_last : in std_logic;
       a_strb : in std_logic
     );
-  end component;
+  end component test_com;
 
 end default;"#,
         package.declare(arch_db)?
@@ -129,7 +129,7 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
 
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -137,12 +137,12 @@ fn streamlet_to_vhdl_complexities() -> Result<()> {
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0)
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[0],
         "Complexity 1"
     );
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -150,12 +150,12 @@ end component;"#,
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0)
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[1],
         "Complexity 2"
     );
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -163,12 +163,12 @@ end component;"#,
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0)
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[2],
         "Complexity 3"
     );
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -176,12 +176,12 @@ end component;"#,
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0)
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[3],
         "Complexity 4"
     );
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -190,12 +190,12 @@ end component;"#,
     a_data : in std_logic_vector(7 downto 0);
     a_endi : in std_logic
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[4],
         "Complexity 5"
     );
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -205,12 +205,12 @@ end component;"#,
     a_stai : in std_logic;
     a_endi : in std_logic
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[5],
         "Complexity 6"
     );
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -221,7 +221,7 @@ end component;"#,
     a_endi : in std_logic;
     a_strb : in std_logic_vector(1 downto 0)
   );
-end component;"#,
+end component test_com;"#,
         complexity_decls[6],
         "Complexity 7"
     );
@@ -275,7 +275,7 @@ namespace my::test::space {
 
     let comp = streamlet.canonical(&db, &mut arch_db, None)?.to_component();
     assert_eq!(
-        r#"component my__test__space__multi_streamlet_com
+        r#"component my__test__space__multi_streamlet_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -298,7 +298,7 @@ namespace my::test::space {
     y__c_ready : out std_logic;
     y__c_data : in std_logic_vector(23 downto 0)
   );
-end component;"#,
+end component my__test__space__multi_streamlet_com;"#,
         comp.declare(&arch_db)?
     );
 
@@ -485,7 +485,7 @@ multiline#
     let comp = streamlet.canonical(&db, &mut arch_db, None)?.to_component();
     assert_eq!(
         r#"-- streamlet documentation is multi-line but can act as a split string
-component my__test__space__doc_streamlet_com
+component my__test__space__doc_streamlet_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -496,7 +496,7 @@ component my__test__space__doc_streamlet_com
     x_ready : out std_logic;
     x_data : in std_logic_vector(7 downto 0)
   );
-end component;"#,
+end component my__test__space__doc_streamlet_com;"#,
         comp.declare(&arch_db)?
     );
 
@@ -520,7 +520,7 @@ fn basic_comp_arch() -> Result<()> {
     let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
 
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -535,7 +535,7 @@ fn basic_comp_arch() -> Result<()> {
     b_last : out std_logic;
     b_strb : out std_logic
   );
-end component;"#,
+end component test_com;"#,
         streamlet.to_component().declare(arch_db)?
     );
 
@@ -545,7 +545,7 @@ use ieee.std_logic_1164.all;
 
 package default is
 
-  component test_com
+  component test_com is
     port (
       clk : in std_logic;
       rst : in std_logic;
@@ -560,7 +560,7 @@ package default is
       b_last : out std_logic;
       b_strb : out std_logic
     );
-  end component;
+  end component test_com;
 
 end default;"#,
         arch_db.default_package().declare(arch_db)?
@@ -621,7 +621,7 @@ fn basic_comp_arch_with_behav_params() -> Result<()> {
     let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
 
     assert_eq!(
-        r#"component test_com
+        r#"component test_com is
   generic (
     pa : natural := 0;
     pb : positive := 2;
@@ -641,7 +641,7 @@ fn basic_comp_arch_with_behav_params() -> Result<()> {
     b_last : out std_logic;
     b_strb : out std_logic
   );
-end component;"#,
+end component test_com;"#,
         streamlet.to_component().declare(arch_db)?
     );
 
@@ -651,7 +651,7 @@ use ieee.std_logic_1164.all;
 
 package default is
 
-  component test_com
+  component test_com is
     generic (
       pa : natural := 0;
       pb : positive := 2;
@@ -671,7 +671,7 @@ package default is
       b_last : out std_logic;
       b_strb : out std_logic
     );
-  end component;
+  end component test_com;
 
 end default;"#,
         arch_db.default_package().declare(arch_db)?
