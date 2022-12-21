@@ -14,7 +14,7 @@ impl DeclareWithIndent for AssignDeclaration {
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(&doc);
         }
-        result.push_str(&self.object_string(db));
+        result.push_str(&self.object_string(db, indent_style)?);
         fn assign_symbol(kind: &ObjectKind) -> String {
             match kind {
                 ObjectKind::Signal => " <= ".to_string(),
@@ -30,7 +30,7 @@ impl DeclareWithIndent for AssignDeclaration {
         ));
         result.push_str(&self.assignment().declare_for(
             db,
-            self.object_string(db),
+            self.object_string(db, indent_style)?,
             indent_style,
         )?);
         Ok(result)

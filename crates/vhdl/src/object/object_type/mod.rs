@@ -10,16 +10,17 @@ use tydi_common::numbers::BitCount;
 use tydi_common::traits::Identify;
 
 use crate::architecture::arch_storage::Arch;
-use crate::assignment::{FieldSelection, RangeConstraint};
+use crate::assignment::{FieldSelection, RangeConstraint, ValueAssignment};
 use crate::common::vhdl_name::{VhdlName, VhdlNameSelf};
 use crate::declaration::{Declare, DeclareWithIndent};
 use crate::object::array::ArrayObject;
 use crate::object::record::RecordObject;
 use crate::properties::Analyze;
+use crate::statement::relation::Relation;
 
 pub trait DeclarationTypeName {
     /// Returns the type name for use in object declaration
-    fn declaration_type_name(&self) -> String;
+    fn declaration_type_name(&self, db: &dyn Arch) -> Result<String>;
 }
 
 /// Basic signed number type defined in the std package, typically 32 bits,
@@ -45,12 +46,12 @@ impl fmt::Display for IntegerType {
 }
 
 impl DeclarationTypeName for IntegerType {
-    fn declaration_type_name(&self) -> String {
-        match self {
+    fn declaration_type_name(&self, _db: &dyn Arch) -> Result<String> {
+        Ok(match self {
             IntegerType::Integer => "integer".to_string(),
             IntegerType::Natural => "natural".to_string(),
             IntegerType::Positive => "positive".to_string(),
-        }
+        })
     }
 }
 
@@ -107,7 +108,7 @@ impl fmt::Display for ObjectType {
                 write!(
                     f,
                     "Record (type name: {}) with fields: ( {})",
-                    record.declaration_type_name(),
+                    record.identifier(),
                     fields
                 )
             }
@@ -119,7 +120,7 @@ impl fmt::Display for ObjectType {
 }
 
 impl ObjectType {
-    pub fn get_field(&self, field: &FieldSelection) -> Result<ObjectType> {
+    pub fn get_field(&self, db: &dyn Arch, field: &FieldSelection) -> Result<ObjectType> {
         match self {
             ObjectType::Bit => Err(Error::InvalidTarget(
                 "Cannot select a field on a Bit".to_string(),
@@ -127,24 +128,38 @@ impl ObjectType {
             ObjectType::Array(array) => match field {
                 FieldSelection::Range(range) => {
                     if let RangeConstraint::Index(index) = range {
-                        if *index <= array.high() && *index >= array.low() {
-                            Ok(array.typ().clone())
-                        } else {
-                            Err(Error::InvalidArgument(format!(
-                                "Cannot select index {} on array with high: {}, low: {}",
-                                index,
-                                array.high(),
-                                array.low()
-                            )))
+                        if let Some(ValueAssignment::Integer(i)) = index.try_eval()? {
+                            match (array.high().try_eval()?, array.low().try_eval()?) {
+                                (
+                                    Some(ValueAssignment::Integer(high)),
+                                    Some(ValueAssignment::Integer(low)),
+                                ) => {
+                                    if !(i <= high && i >= low) {
+                                        return Err(Error::InvalidArgument(format!(
+                                    "Cannot select index {} on array with high: {}, low: {}",
+                                    index,
+                                    array.high(),
+                                    array.low()
+                                )));
+                                    }
+                                }
+                                _ => (),
+                            };
                         }
+                        Ok(array.typ().clone())
                     } else {
                         if range.is_between(array.high(), array.low())? {
                             if array.is_std_logic_vector() {
-                                ObjectType::bit_vector(range.high(), range.low())
+                                ObjectType::relation_bit_vector(
+                                    db,
+                                    range.high().clone(),
+                                    range.low().clone(),
+                                )
                             } else {
-                                ObjectType::array(
-                                    range.high(),
-                                    range.low(),
+                                ObjectType::relation_array(
+                                    db,
+                                    range.high().clone(),
+                                    range.low().clone(),
                                     array.typ().clone(),
                                     array.vhdl_name().clone(),
                                 )
@@ -152,9 +167,9 @@ impl ObjectType {
                         } else {
                             Err(Error::InvalidArgument(format!(
                                 "Cannot select {} on array with high: {}, low: {}",
-                                range,
-                                array.high(),
-                                array.low()
+                                range.declare(db)?,
+                                array.high().declare(db)?,
+                                array.low().declare(db)?
                             )))
                         }
                     }
@@ -181,10 +196,10 @@ impl ObjectType {
         }
     }
 
-    pub fn get_nested(&self, nested: &Vec<FieldSelection>) -> Result<ObjectType> {
+    pub fn get_nested(&self, db: &dyn Arch, nested: &Vec<FieldSelection>) -> Result<ObjectType> {
         let mut result = self.clone();
         for field in nested {
-            result = result.get_field(field)?;
+            result = result.get_field(db, field)?;
         }
         Ok(result)
     }
@@ -201,9 +216,31 @@ impl ObjectType {
         )?))
     }
 
+    /// Create an array of a specific field type
+    pub fn relation_array(
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
+        object: ObjectType,
+        type_name: impl TryResult<VhdlName>,
+    ) -> Result<ObjectType> {
+        Ok(ObjectType::Array(ArrayObject::relation_array(
+            db, high, low, object, type_name,
+        )?))
+    }
+
     /// Create a bit vector object
     pub fn bit_vector(high: i32, low: i32) -> Result<ObjectType> {
         Ok(ArrayObject::bit_vector(high, low)?.into())
+    }
+
+    /// Create a bit vector object
+    pub fn relation_bit_vector(
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
+    ) -> Result<ObjectType> {
+        Ok(ArrayObject::relation_bit_vector(db, high, low)?.into())
     }
 
     /// Test whether two `ObjectType`s can be assigned to one another
@@ -222,14 +259,18 @@ impl ObjectType {
             ObjectType::Array(to_array) => {
                 if let ObjectType::Array(from_array) = typ {
                     if from_array.identifier() == to_array.identifier() {
-                        if from_array.width() == to_array.width() {
-                            to_array.typ().can_assign_type(from_array.typ())
-                        } else {
-                            Err(Error::InvalidTarget(format!(
-                                "Cannot assign array with width {} to array with width {}",
-                                from_array.width(),
-                                to_array.width(),
-                            )))
+                        match (from_array.width()?, to_array.width()?) {
+                            (Some(from_w), Some(to_w)) => {
+                                if from_w == to_w {
+                                    to_array.typ().can_assign_type(from_array.typ())
+                                } else {
+                                    Err(Error::InvalidTarget(format!(
+                                        "Cannot assign array with width {} to array with width {}",
+                                        from_w, to_w,
+                                    )))
+                                }
+                            }
+                            _ => Ok(()),
                         }
                     } else {
                         Err(Error::InvalidTarget(format!(
@@ -311,27 +352,27 @@ impl ObjectType {
 }
 
 impl DeclarationTypeName for ObjectType {
-    fn declaration_type_name(&self) -> String {
+    fn declaration_type_name(&self, db: &dyn Arch) -> Result<String> {
         match self {
-            ObjectType::Bit => "std_logic".to_string(),
-            ObjectType::Array(array) => array.declaration_type_name(),
-            ObjectType::Record(record) => record.declaration_type_name(),
-            ObjectType::Time => "time".to_string(),
-            ObjectType::Boolean => "boolean".to_string(),
-            ObjectType::Integer(int_typ) => int_typ.declaration_type_name(),
+            ObjectType::Bit => Ok("std_logic".to_string()),
+            ObjectType::Array(array) => array.declaration_type_name(db),
+            ObjectType::Record(record) => record.declaration_type_name(db),
+            ObjectType::Time => Ok("time".to_string()),
+            ObjectType::Boolean => Ok("boolean".to_string()),
+            ObjectType::Integer(int_typ) => int_typ.declaration_type_name(db),
         }
     }
 }
 
 impl Analyze for ObjectType {
-    fn list_nested_types(&self) -> Vec<ObjectType> {
+    fn list_nested_types(&self, db: &dyn Arch) -> Vec<ObjectType> {
         match self {
             ObjectType::Bit => vec![],
             ObjectType::Array(array_object) => {
                 if array_object.is_std_logic_vector() {
                     vec![]
                 } else {
-                    let mut result = array_object.typ().list_nested_types();
+                    let mut result = array_object.typ().list_nested_types(db);
                     result.push(self.clone());
                     result
                 }
@@ -339,7 +380,7 @@ impl Analyze for ObjectType {
             ObjectType::Record(record_object) => {
                 let mut result = vec![];
                 for (_, typ) in record_object.fields() {
-                    result.append(&mut typ.list_nested_types())
+                    result.append(&mut typ.list_nested_types(db))
                 }
                 result.push(self.clone());
                 result
@@ -363,7 +404,7 @@ impl DeclareWithIndent for ObjectType {
                 Err(Error::BackEndError(format!(
                     "Invalid type, {} ({}) cannot be declared.",
                     self,
-                    self.declaration_type_name(),
+                    self.declaration_type_name(db)?,
                 )))
             }
         }

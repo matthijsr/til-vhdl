@@ -273,7 +273,7 @@ impl ListUsingsDb for Mapping {
 mod tests {
     use crate::{
         architecture::arch_storage::db::Database,
-        assignment::{StdLogicValue, ValueAssignment},
+        assignment::StdLogicValue,
         declaration::Declare,
         object::object_type::IntegerType,
         statement::{relation::math::CreateMath, Statement},
@@ -369,19 +369,10 @@ mod tests {
             mapping.declare(db)?
         );
 
-        let outer_const = ObjectDeclaration::constant(
-            db,
-            "OUTER_CONST",
-            IntegerType::Integer,
-            ValueAssignment::from(1),
-        )?;
+        let outer_const = ObjectDeclaration::constant(db, "OUTER_CONST", IntegerType::Integer, 1)?;
 
-        mapping.map_param(db, "some_param", ValueAssignment::from(20))?;
-        mapping.map_param(
-            db,
-            "some_other_param2",
-            outer_const.r_add(db, ValueAssignment::from(4))?,
-        )?;
+        mapping.map_param(db, "some_param", 20)?;
+        mapping.map_param(db, "some_other_param2", outer_const.r_add(db, 4)?)?;
 
         assert_eq!(
             r#"test generic map(

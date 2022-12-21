@@ -35,11 +35,8 @@ impl From<ArrayAssignment> for AssignmentKind {
     }
 }
 
-impl<T> From<T> for ObjectSelection
-where
-    T: Into<Id<ObjectDeclaration>>,
-{
-    fn from(object: T) -> Self {
+impl From<Id<ObjectDeclaration>> for ObjectSelection {
+    fn from(object: Id<ObjectDeclaration>) -> Self {
         ObjectSelection {
             object: object.into(),
             from_field: vec![],

@@ -134,7 +134,7 @@ impl Documents for Port {
 }
 
 impl Declare for Port {
-    fn declare(&self, _db: &dyn Arch) -> Result<String> {
+    fn declare(&self, db: &dyn Arch) -> Result<String> {
         let mut result = String::new();
         if let Some(doc) = self.vhdl_doc() {
             result.push_str(doc.as_str());
@@ -144,7 +144,7 @@ impl Declare for Port {
                 "{} : {} {}",
                 self.identifier(),
                 self.mode(),
-                self.typ().declaration_type_name()
+                self.typ().declaration_type_name(db)?
             )
             .as_str(),
         );
@@ -272,7 +272,7 @@ impl DeclareWithIndent for GenericParameter {
             format!(
                 "{} : {}",
                 self.identifier(),
-                self.typ().declaration_type_name()
+                self.typ().declaration_type_name(db)?
             )
             .as_str(),
         );

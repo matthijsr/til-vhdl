@@ -25,9 +25,9 @@ use til_query::{
         Ir,
     },
     test_utils::{
-        simple_structural_streamlet, simple_structural_streamlet_with_behav_params,
-        streamlet_without_impl, streamlet_without_impl_with_behav_params, test_stream_id,
-        test_stream_id_custom,
+        simple_streamlet_with_interface_params, simple_structural_streamlet,
+        simple_structural_streamlet_with_behav_params, streamlet_without_impl,
+        streamlet_without_impl_with_behav_params, test_stream_id, test_stream_id_custom,
     },
 };
 use til_vhdl::IntoVhdl;
@@ -365,7 +365,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: (Fixed(0)) + Fixed(0),
+      dimensionality: Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -375,7 +375,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: (Fixed(0)) + Fixed(0),
+      dimensionality: Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -385,7 +385,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Reverse,
       complexity: 4,
-      dimensionality: (Fixed(0)) + Fixed(0),
+      dimensionality: Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -405,7 +405,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: (Fixed(0)) + Fixed(0),
+      dimensionality: Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -415,7 +415,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Forward,
       complexity: 4,
-      dimensionality: (Fixed(0)) + Fixed(0),
+      dimensionality: Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -425,7 +425,7 @@ namespace my::test::space {
       data: Bits(8),
       direction: Reverse,
       complexity: 4,
-      dimensionality: (Fixed(0)) + Fixed(0),
+      dimensionality: Fixed(0),
       transfer_scope: Sync(),
       element_lanes: 3,
       user: Null
@@ -714,6 +714,111 @@ begin
   b_last <= a_last;
   b_strb <= a_strb;
 end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_interface_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let streamlet = simple_streamlet_with_interface_params(db, "test")?;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let mut streamlet = ir_streamlet_to_vhdl(streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"component test_com is
+  generic (
+    pa : positive := 5
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic_vector((pa) + 1 downto 0);
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic_vector((pa) + 1 downto 0);
+    b_strb : out std_logic
+  );
+end component test_com;"#,
+        streamlet.to_component().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+package default is
+
+  component test_com is
+    generic (
+      pa : positive := 5
+    );
+    port (
+      clk : in std_logic;
+      rst : in std_logic;
+      a_valid : in std_logic;
+      a_ready : out std_logic;
+      a_data : in std_logic_vector(4 downto 0);
+      a_last : in std_logic_vector((pa) + 1 downto 0);
+      a_strb : in std_logic;
+      b_valid : out std_logic;
+      b_ready : in std_logic;
+      b_data : out std_logic_vector(4 downto 0);
+      b_last : out std_logic_vector((pa) + 1 downto 0);
+      b_strb : out std_logic
+    );
+  end component test_com;
+
+end default;"#,
+        arch_db.default_package().declare(arch_db)?
+    );
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity test_com is
+  generic (
+    pa : positive := 5
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic_vector((pa) + 1 downto 0);
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic_vector((pa) + 1 downto 0);
+    b_strb : out std_logic
+  );
+end test_com;
+
+architecture Behavioral of test_com is
+begin
+end Behavioral;"#,
         streamlet_arch.declare(arch_db)?
     );
 

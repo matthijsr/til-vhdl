@@ -29,7 +29,7 @@ pub mod assign;
 pub mod assignment_from;
 pub mod bitvec;
 pub mod declare;
-pub mod flatten;
+// pub mod flatten;
 pub mod impls;
 
 pub trait Assign {
@@ -67,14 +67,14 @@ impl AssignDeclaration {
     }
 
     /// The object declaration with any field selections on it
-    pub fn object_string(&self, db: &dyn Arch) -> String {
+    pub fn object_string(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
             .identifier();
         for field in self.assignment().to_field() {
-            result.push_str(&field.to_string());
+            result.push_str(&field.declare_with_indent(db, indent_style)?);
         }
-        result
+        Ok(result)
     }
 
     /// If this is an object to object assignment, return the object being assigned from
@@ -204,7 +204,7 @@ impl Assignment {
 
     /// Append a to range field selection
     pub fn to_index(self, index: i32) -> Self {
-        self.to_range(RangeConstraint::Index(index))
+        self.to_range(RangeConstraint::Index(index.into()))
     }
 
     /// Returns the fields selected
@@ -493,13 +493,13 @@ impl<T: TryResult<ObjectSelection>> SelectObject for T {
 }
 
 impl DeclareWithIndent for ObjectSelection {
-    fn declare_with_indent(&self, db: &dyn Arch, _indent_style: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut result = db
             .lookup_intern_object_declaration(self.object())
             .identifier()
             .to_string();
         for field in self.from_field() {
-            result.push_str(&field.to_string());
+            result.push_str(&field.declare_with_indent(db, indent_style)?);
         }
         Ok(result)
     }
@@ -669,7 +669,11 @@ impl ValueAssignment {
             },
             ValueAssignment::BitVec(bitvec) => match to_typ {
                 ObjectType::Array(array) if array.is_bitvector() => {
-                    bitvec.validate_width(array.width())
+                    if let Some(w) = array.width()? {
+                        bitvec.validate_width(w)
+                    } else {
+                        Ok(())
+                    }
                 }
                 ObjectType::Array(_)
                 | ObjectType::Bit
@@ -727,14 +731,14 @@ pub enum FieldSelection {
     Name(VhdlName),
 }
 
-impl fmt::Display for FieldSelection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            FieldSelection::Range(range) => range.fmt(f),
-            FieldSelection::Name(name) => write!(f, ".{}", name),
-        }
-    }
-}
+// impl fmt::Display for FieldSelection {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             FieldSelection::Range(range) => range.fmt(f),
+//             FieldSelection::Name(name) => write!(f, ".{}", name),
+//         }
+//     }
+// }
 
 impl FieldSelection {
     pub fn to(start: impl Into<i32>, end: impl Into<i32>) -> Result<FieldSelection> {
@@ -751,7 +755,31 @@ impl FieldSelection {
         )?))
     }
 
-    pub fn index(index: impl Into<i32>) -> FieldSelection {
+    pub fn relation_to(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<FieldSelection> {
+        Ok(FieldSelection::Range(RangeConstraint::relation_downto(
+            db,
+            start.into(),
+            end.into(),
+        )?))
+    }
+
+    pub fn relation_downto(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<FieldSelection> {
+        Ok(FieldSelection::Range(RangeConstraint::relation_downto(
+            db,
+            start.into(),
+            end.into(),
+        )?))
+    }
+
+    pub fn index(index: impl Into<Relation>) -> FieldSelection {
         FieldSelection::Range(RangeConstraint::Index(index.into()))
     }
 
@@ -778,9 +806,38 @@ impl From<VhdlName> for FieldSelection {
     }
 }
 
-impl From<i32> for FieldSelection {
-    fn from(i: i32) -> Self {
-        FieldSelection::index(i)
+impl DeclareWithIndent for FieldSelection {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        Ok(match self {
+            FieldSelection::Range(range) => range.declare_with_indent(db, indent_style)?,
+            FieldSelection::Name(name) => format!(".{}", name),
+        })
+    }
+}
+
+pub enum FixedRangeConstraint {
+    To { start: i32, end: i32 },
+    Downto { start: i32, end: i32 },
+    Index(i32),
+}
+
+impl FixedRangeConstraint {
+    /// Returns the greatest index within the range constraint
+    pub fn high(&self) -> i32 {
+        match self {
+            FixedRangeConstraint::To { start: _, end } => *end,
+            FixedRangeConstraint::Downto { start, end: _ } => *start,
+            FixedRangeConstraint::Index(index) => *index,
+        }
+    }
+
+    /// Returns the smallest index within the range constraint
+    pub fn low(&self) -> i32 {
+        match self {
+            FixedRangeConstraint::To { start, end: _ } => *start,
+            FixedRangeConstraint::Downto { start: _, end } => *end,
+            FixedRangeConstraint::Index(index) => *index,
+        }
     }
 }
 
@@ -788,24 +845,49 @@ impl From<i32> for FieldSelection {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RangeConstraint {
     /// A range [start] to [end]
-    To { start: i32, end: i32 },
+    To { start: Relation, end: Relation },
     /// A range [start] downto [end]
-    Downto { start: i32, end: i32 },
+    Downto { start: Relation, end: Relation },
     /// An index within a range
-    Index(i32),
+    Index(Relation),
 }
 
-impl fmt::Display for RangeConstraint {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RangeConstraint::To { start, end } => write!(f, "({} to {})", start, end),
-            RangeConstraint::Downto { start, end } => write!(f, "({} downto {})", start, end),
-            RangeConstraint::Index(index) => write!(f, "({})", index),
-        }
-    }
-}
+// impl fmt::Display for RangeConstraint {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             RangeConstraint::To { start, end } => write!(f, "({} to {})", start, end),
+//             RangeConstraint::Downto { start, end } => write!(f, "({} downto {})", start, end),
+//             RangeConstraint::Index(index) => write!(f, "({})", index),
+//         }
+//     }
+// }
 
 impl RangeConstraint {
+    // TODO: This should be a result, to propagate the try_eval errors
+    pub fn fixed(&self) -> Result<Option<FixedRangeConstraint>> {
+        Ok(match self {
+            RangeConstraint::To { start, end } => match (start.try_eval()?, end.try_eval()?) {
+                (Some(ValueAssignment::Integer(start)), Some(ValueAssignment::Integer(end))) => {
+                    Some(FixedRangeConstraint::To { start, end })
+                }
+                _ => None,
+            },
+            RangeConstraint::Downto { start, end } => match (start.try_eval()?, end.try_eval()?) {
+                (Some(ValueAssignment::Integer(start)), Some(ValueAssignment::Integer(end))) => {
+                    Some(FixedRangeConstraint::Downto { start, end })
+                }
+                _ => None,
+            },
+            RangeConstraint::Index(r) => {
+                if let Some(ValueAssignment::Integer(i)) = r.try_eval()? {
+                    Some(FixedRangeConstraint::Index(i))
+                } else {
+                    None
+                }
+            }
+        })
+    }
+
     /// Create a `RangeConstraint::To` and ensure correctness (end > start)
     pub fn to(start: i32, end: i32) -> Result<RangeConstraint> {
         if start > end {
@@ -814,8 +896,23 @@ impl RangeConstraint {
                 start, end
             )))
         } else {
-            Ok(RangeConstraint::To { start, end })
+            Ok(RangeConstraint::To {
+                start: start.into(),
+                end: end.into(),
+            })
         }
+    }
+
+    pub fn relation_to(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<RangeConstraint> {
+        let start = start.into();
+        let end = end.into();
+        start.is_integer(db)?;
+        end.is_integer(db)?;
+        Ok(RangeConstraint::To { start, end })
     }
 
     /// Create a `RangeConstraint::DownTo` and ensure correctness (start > end)
@@ -826,68 +923,114 @@ impl RangeConstraint {
                 end, start
             )))
         } else {
-            Ok(RangeConstraint::Downto { start, end })
+            Ok(RangeConstraint::Downto {
+                start: start.into(),
+                end: end.into(),
+            })
         }
     }
 
-    /// Returns the width of the range
-    pub fn width(&self) -> Width {
-        match self {
-            RangeConstraint::To { start, end } => {
-                Width::Vector((1 + end - start).try_into().unwrap())
-            }
-            RangeConstraint::Downto { start, end } => {
-                Width::Vector((1 + start - end).try_into().unwrap())
-            }
-            RangeConstraint::Index(_) => Width::Scalar,
-        }
+    pub fn relation_downto(
+        db: &dyn Arch,
+        start: impl Into<Relation>,
+        end: impl Into<Relation>,
+    ) -> Result<RangeConstraint> {
+        let start = start.into();
+        let end = end.into();
+        start.is_integer(db)?;
+        end.is_integer(db)?;
+        Ok(RangeConstraint::Downto { start, end })
     }
 
     /// Returns the width of the range
-    pub fn width_u32(&self) -> u32 {
-        match self.width() {
+    pub fn width(&self) -> Result<Option<Width>> {
+        let fixed = self.fixed()?;
+        Ok(if let Some(fixed) = fixed {
+            Some(match fixed {
+                FixedRangeConstraint::To { start, end } => {
+                    Width::Vector((1 + end - start).try_into().map_err(|err| {
+                        Error::BackEndError(format!(
+                            "Something went wrong calculating the width of a range constraint: {}",
+                            err
+                        ))
+                    })?)
+                }
+                FixedRangeConstraint::Downto { start, end } => {
+                    Width::Vector((1 + start - end).try_into().map_err(|err| {
+                        Error::BackEndError(format!(
+                            "Something went wrong calculating the width of a range constraint: {}",
+                            err
+                        ))
+                    })?)
+                }
+                FixedRangeConstraint::Index(_) => Width::Scalar,
+            })
+        } else {
+            None
+        })
+    }
+
+    /// Returns the width of the range
+    pub fn width_u32(&self) -> Result<Option<u32>> {
+        let width = self.width()?;
+        Ok(width.map(|w| match w {
             Width::Scalar => 1,
             Width::Vector(width) => width,
-        }
+        }))
     }
 
     /// Returns the greatest index within the range constraint
-    pub fn high(&self) -> i32 {
+    pub fn high(&self) -> &Relation {
         match self {
-            RangeConstraint::To { start: _, end } => *end,
-            RangeConstraint::Downto { start, end: _ } => *start,
-            RangeConstraint::Index(index) => *index,
+            RangeConstraint::To { start: _, end } => end,
+            RangeConstraint::Downto { start, end: _ } => start,
+            RangeConstraint::Index(index) => index,
         }
     }
 
     /// Returns the smallest index within the range constraint
-    pub fn low(&self) -> i32 {
+    pub fn low(&self) -> &Relation {
         match self {
-            RangeConstraint::To { start, end: _ } => *start,
-            RangeConstraint::Downto { start: _, end } => *end,
-            RangeConstraint::Index(index) => *index,
+            RangeConstraint::To { start, end: _ } => start,
+            RangeConstraint::Downto { start: _, end } => end,
+            RangeConstraint::Index(index) => index,
         }
     }
 
     /// Verifies whether a range constraint overlaps with this range constraint
-    pub fn overlaps(&self, other: &RangeConstraint) -> bool {
-        self.low() <= other.high() && other.low() <= self.high()
+    pub fn overlaps(&self, other: &RangeConstraint) -> Result<bool> {
+        Ok(match (self.fixed()?, other.fixed()?) {
+            (Some(lhs), Some(rhs)) => lhs.low() <= rhs.high() && rhs.low() <= lhs.high(),
+            _ => true,
+        })
     }
 
     /// Verifies whether a range constraint is inside of this range constraint
-    pub fn contains(&self, other: &RangeConstraint) -> bool {
-        self.high() >= other.high() && self.low() <= other.low()
+    pub fn contains(&self, other: &RangeConstraint) -> Result<bool> {
+        Ok(match (self.fixed()?, other.fixed()?) {
+            (Some(lhs), Some(rhs)) => lhs.high() >= rhs.high() && lhs.low() <= rhs.low(),
+            _ => true,
+        })
     }
 
     /// Verifies whether this range constraint is between `high` and `low`
-    pub fn is_between(&self, high: i32, low: i32) -> Result<bool> {
-        if low > high {
-            Err(Error::InvalidArgument(format!(
-                "{} > {}! Low cannot be greater than high",
-                low, high
-            )))
-        } else {
-            Ok(high >= self.high() && low <= self.low())
+    pub fn is_between(&self, high: &Relation, low: &Relation) -> Result<bool> {
+        match (self.fixed()?, high.try_eval()?, low.try_eval()?) {
+            (
+                Some(fixed),
+                Some(ValueAssignment::Integer(high)),
+                Some(ValueAssignment::Integer(low)),
+            ) => {
+                if low > high {
+                    Err(Error::InvalidArgument(format!(
+                        "{} > {}! Low cannot be greater than high",
+                        low, high
+                    )))
+                } else {
+                    Ok(high >= fixed.high() && low <= fixed.low())
+                }
+            }
+            _ => Ok(true),
         }
     }
 
@@ -897,5 +1040,25 @@ impl RangeConstraint {
             RangeConstraint::Downto { start, end } => format!("{} downto {}", start, end),
             RangeConstraint::Index(index) => format!("{}", index),
         }
+    }
+}
+
+impl DeclareWithIndent for RangeConstraint {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
+        Ok(match self {
+            RangeConstraint::To { start, end } => format!(
+                "({} to {})",
+                start.declare_with_indent(db, indent_style)?,
+                end.declare_with_indent(db, indent_style)?
+            ),
+            RangeConstraint::Downto { start, end } => format!(
+                "({} downto {})",
+                start.declare_with_indent(db, indent_style)?,
+                end.declare_with_indent(db, indent_style)?
+            ),
+            RangeConstraint::Index(index) => {
+                format!("({})", index.declare_with_indent(db, indent_style)?)
+            }
+        })
     }
 }

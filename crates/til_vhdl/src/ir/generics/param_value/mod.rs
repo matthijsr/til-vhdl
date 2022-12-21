@@ -10,7 +10,6 @@ use tydi_common::{
 use tydi_intern::Id;
 use tydi_vhdl::{
     architecture::arch_storage::Arch,
-    assignment::ValueAssignment,
     declaration::ObjectDeclaration,
     statement::relation::{
         math::{CreateMath, MathExpression},
@@ -56,7 +55,7 @@ pub fn param_value_to_vhdl(
     parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
 ) -> Result<Relation> {
     match val {
-        GenericParamValue::Integer(i) => Ok(ValueAssignment::from(*i).into()),
+        GenericParamValue::Integer(i) => Ok((*i).into()),
         GenericParamValue::Ref(r) => {
             let param = *parent_params.try_get(r.name())?;
             Ok(param.into())

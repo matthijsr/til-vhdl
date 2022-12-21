@@ -1,12 +1,13 @@
 use core::fmt;
 
 use tydi_common::error::{Error, Result, TryResult};
+use tydi_intern::Id;
 
 use crate::{
     architecture::arch_storage::Arch,
-    assignment::{bitvec::BitVecValue, ObjectSelection, StdLogicValue, ValueAssignment},
+    assignment::{bitvec::BitVecValue, ObjectSelection, ValueAssignment},
     common::vhdl_name::VhdlName,
-    declaration::DeclareWithIndent,
+    declaration::{DeclareWithIndent, ObjectDeclaration},
     object::object_type::{IntegerType, ObjectType},
     usings::{ListUsings, Usings},
 };
@@ -337,14 +338,14 @@ impl<T: Into<Relation>> From<Parentheses<T>> for Relation {
     }
 }
 
-impl From<ValueAssignment> for Relation {
-    fn from(val: ValueAssignment) -> Self {
-        Self::Value(Box::new(val))
+impl From<ObjectSelection> for Relation {
+    fn from(val: ObjectSelection) -> Self {
+        Self::Object(val)
     }
 }
 
-impl<T: Into<ObjectSelection>> From<T> for Relation {
-    fn from(val: T) -> Self {
+impl From<Id<ObjectDeclaration>> for Relation {
+    fn from(val: Id<ObjectDeclaration>) -> Self {
         Self::Object(val.into())
     }
 }
@@ -367,21 +368,15 @@ impl From<Edge> for Relation {
     }
 }
 
-impl From<StdLogicValue> for Relation {
-    fn from(assignment: StdLogicValue) -> Self {
-        Relation::from(ValueAssignment::from(assignment))
-    }
-}
-
-impl From<BitVecValue> for Relation {
-    fn from(assignment: BitVecValue) -> Self {
-        Relation::from(ValueAssignment::from(assignment))
-    }
-}
-
 impl From<MathExpression> for Relation {
     fn from(mathexpr: MathExpression) -> Self {
         Self::MathExpression(mathexpr)
+    }
+}
+
+impl<T: Into<ValueAssignment>> From<T> for Relation {
+    fn from(val: T) -> Self {
+        Relation::Value(Box::new(val.into()))
     }
 }
 
@@ -400,6 +395,87 @@ impl fmt::Display for Relation {
 }
 
 impl Relation {
+    pub fn try_eval(&self) -> Result<Option<ValueAssignment>> {
+        fn eval_lr(
+            l: &Relation,
+            r: &Relation,
+        ) -> Result<Option<(ValueAssignment, ValueAssignment)>> {
+            let l = l.try_eval()?;
+            let r = r.try_eval()?;
+            match (l, r) {
+                (Some(l), Some(r)) => Ok(Some((l, r))),
+                _ => Ok(None),
+            }
+        }
+        fn eval_lr_math(l: &Relation, r: &Relation) -> Result<Option<(i32, i32)>> {
+            match eval_lr(l, r)? {
+                Some((ValueAssignment::Integer(li), ValueAssignment::Integer(ri))) => {
+                    Ok(Some((li, ri)))
+                }
+                None => Ok(None),
+                _ => Err(Error::InvalidArgument(format!(
+                    "Can't apply a math expression to values ({}) and ({})",
+                    l, r
+                ))),
+            }
+        }
+        match self {
+            Relation::Parentheses(p) => p.try_eval(),
+            Relation::Value(v) => Ok(Some(v.as_ref().clone())),
+            Relation::Object(_) => Ok(None),
+            Relation::Combination(_) => todo!(),
+            Relation::Edge(_) => Ok(None),
+            Relation::LogicalExpression(_) => todo!(),
+            Relation::MathExpression(math) => match math {
+                MathExpression::Negative(n) => {
+                    if let Some(v) = n.try_eval()? {
+                        match v {
+                            ValueAssignment::Boolean(_)
+                            | ValueAssignment::Bit(_)
+                            | ValueAssignment::BitVec(_) => Err(Error::ProjectError(format!(
+                                "Cannot apply Negative to a value {}",
+                                v.declare()?
+                            ))),
+                            ValueAssignment::Time(t) => {
+                                Ok(Some(ValueAssignment::Time(t.negative())))
+                            }
+                            ValueAssignment::Integer(i) => Ok(Some((-i).into())),
+                        }
+                    } else {
+                        Ok(None)
+                    }
+                }
+                MathExpression::Sum(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l + r).into())
+                } else {
+                    None
+                }),
+                MathExpression::Subtraction(l, r) => {
+                    Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                        Some((l - r).into())
+                    } else {
+                        None
+                    })
+                }
+                MathExpression::Product(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l * r).into())
+                } else {
+                    None
+                }),
+                MathExpression::Division(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l / r).into())
+                } else {
+                    None
+                }),
+                MathExpression::Modulo(l, r) => Ok(if let Some((l, r)) = eval_lr_math(l, r)? {
+                    Some((l % r).into())
+                } else {
+                    None
+                }),
+            },
+        }
+    }
+
     pub fn parentheses(relation: impl TryResult<Relation>) -> Result<Relation> {
         let relation = relation.try_result()?;
         Ok(Relation::Parentheses(Box::new(relation)))
@@ -592,7 +668,7 @@ pub struct Parentheses<T>(T);
 mod tests {
     use crate::{
         architecture::arch_storage::db::Database,
-        assignment::SelectObject,
+        assignment::{FieldSelection, SelectObject},
         declaration::{Declare, ObjectDeclaration},
         statement::relation::math::CreateMath,
     };
@@ -640,7 +716,7 @@ mod tests {
 
         let obj1 = ObjectDeclaration::signal(db, "test_sig1", ObjectType::Bit, None)?;
         let obj2 = ObjectDeclaration::signal(db, "test_sig2", ObjectType::bit_vector(1, 0)?, None)?
-            .select_nested([0])?;
+            .select_nested([FieldSelection::index(0)])?;
         let rising_edge = Edge::rising_edge(db, obj1)?;
         let falling_edge = Edge::falling_edge(db, obj2)?;
         assert_eq!(
@@ -658,15 +734,12 @@ mod tests {
             db,
             "test_const",
             ObjectType::Integer(IntegerType::Natural),
-            ValueAssignment::from(42),
+            42,
         )?;
         let math = Parentheses(
-            obj1.r_add(
-                db,
-                Parentheses(ValueAssignment::from(30).r_subtract(db, obj2)?),
-            )?
-            .r_multiply(db, obj2)?
-            .r_divide_by(db, obj1.r_negative(db)?)?,
+            obj1.r_add(db, Parentheses(30.r_subtract(db, obj2)?))?
+                .r_multiply(db, obj2)?
+                .r_divide_by(db, obj1.r_negative(db)?)?,
         )
         .r_mod(db, ValueAssignment::Integer(4))?;
         assert_eq!(

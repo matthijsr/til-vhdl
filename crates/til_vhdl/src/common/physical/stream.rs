@@ -1,100 +1,127 @@
-use til_query::common::physical::stream::PhysicalBitCount;
+use til_query::common::logical::logicaltype::genericproperty::GenericPropertyOperator;
+use til_query::common::physical::stream::{PhysicalBitCount, PhysicalStream};
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
 use til_query::ir::physical_properties::InterfaceDirection;
-use til_query::ir::Ir;
 use tydi_common::error::TryOptional;
-use tydi_common::numbers::Positive;
+use tydi_common::map::InsertionOrderedMap;
+use tydi_common::name::Name;
+use tydi_common::numbers::{u32_to_i32, Positive};
 use tydi_common::{
     cat,
     error::Result,
     numbers::NonNegative,
     traits::{Reverse, Reversed},
 };
+use tydi_intern::Id;
 use tydi_vhdl::architecture::arch_storage::Arch;
+use tydi_vhdl::declaration::ObjectDeclaration;
+use tydi_vhdl::object::object_type::ObjectType;
+use tydi_vhdl::statement::relation::math::CreateMath;
+use tydi_vhdl::statement::relation::Relation;
 use tydi_vhdl::{
     common::vhdl_name::VhdlName,
     port::{Mode, Port},
 };
 
-use crate::IntoVhdl;
+use crate::common::logical::logicaltype::genericproperty::generic_property_to_relation;
 
-pub(crate) type PhysicalStream = til_query::common::physical::stream::PhysicalStream;
-
-impl IntoVhdl<VhdlPhysicalStream> for PhysicalStream {
-    fn canonical(
-        &self,
-        _ir_db: &dyn Ir,
-        _arch_db: &mut dyn Arch,
-        prefix: impl TryOptional<VhdlName>,
-    ) -> Result<VhdlPhysicalStream> {
-        // The VhdlPhysicalStream initially assumes it is part of an
-        // "In" interface.
-
-        let prefix = match prefix.try_optional()? {
-            Some(n) => n.to_string(),
-            None => "".to_string(),
-        };
-        let mode = match self.stream_direction() {
-            StreamDirection::Forward => Mode::In,
-            StreamDirection::Reverse => Mode::Out,
-        };
-
-        // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-
-        let signal_list: SignalList<PhysicalBitCount> = self.into();
-        let mut signal_list = signal_list.map_named(|n, x| {
-            if let Some(f) = x.try_eval() {
-                // As the prefix is either a VhdlName or empty, and all signal names are valid
-                Port::try_new(cat!(prefix, n), mode, f).unwrap()
-            } else {
-                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-                todo!()
+pub fn physical_bitcount_to_relation(
+    db: &dyn Arch,
+    bitcount: &PhysicalBitCount,
+    parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
+) -> Result<Relation> {
+    Ok(match bitcount {
+        PhysicalBitCount::Combination(l, op, r) => {
+            let l = Relation::parentheses(physical_bitcount_to_relation(db, l, parent_params)?)?;
+            let r = physical_bitcount_to_relation(db, r, parent_params)?;
+            match op {
+                GenericPropertyOperator::Add => Relation::from(l.r_add(db, r)?),
+                GenericPropertyOperator::Subtract => Relation::from(l.r_subtract(db, r)?),
+                GenericPropertyOperator::Multiply => Relation::from(l.r_multiply(db, r)?),
+                GenericPropertyOperator::Divide => Relation::from(l.r_divide_by(db, r)?),
             }
-        });
+        }
+        PhysicalBitCount::Fixed(f) => Relation::from(u32_to_i32(f.get())?),
+        PhysicalBitCount::Parameterized(n) => Relation::from(*(parent_params.try_get(n)?)),
+    })
+}
 
-        signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
+pub fn physical_stream_to_vhdl(
+    arch_db: &dyn Arch,
+    physical_stream: &PhysicalStream,
+    prefix: impl TryOptional<VhdlName>,
+    parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
+) -> Result<VhdlPhysicalStream> {
+    // The VhdlPhysicalStream initially assumes it is part of an
+    // "In" interface.
 
-        let user_bit_count = if let Some(u) = self.user_bit_count() {
-            if let Some(f) = u.try_eval() {
-                f.get()
-            } else {
-                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-                todo!()
-            }
+    let prefix = match prefix.try_optional()? {
+        Some(n) => n.to_string(),
+        None => "".to_string(),
+    };
+    let mode = match physical_stream.stream_direction() {
+        StreamDirection::Forward => Mode::In,
+        StreamDirection::Reverse => Mode::Out,
+    };
+
+    // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+
+    let signal_list: SignalList<PhysicalBitCount> = physical_stream.into();
+    let mut signal_list = signal_list.try_map_named(|n, x| {
+        if let Some(f) = x.try_eval() {
+            // As the prefix is either a VhdlName or empty, and all signal names are valid
+            Port::try_new(cat!(prefix, n), mode, f)
         } else {
-            0
-        };
+            Port::try_new(
+                cat!(prefix, n),
+                mode,
+                ObjectType::relation_bit_vector(
+                    arch_db,
+                    physical_bitcount_to_relation(arch_db, &x, parent_params)?,
+                    0,
+                )?,
+            )
+        }
+    })?;
 
-        let data_element_bit_count = if let Some(d) = self.data_element_bit_count() {
-            if let Some(f) = d.try_eval() {
-                f.get()
-            } else {
-                // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-                todo!()
-            }
-        } else {
-            0
-        };
+    signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
 
-        // TODO: ALLOW FOR PARAMETERIZED DIMENSIONALITY
-        let dimensionality = if let Some(f) = self.dimensionality().try_eval() {
-            f
+    let user_bit_count = if let Some(u) = physical_stream.user_bit_count() {
+        if let Some(f) = u.try_eval() {
+            f.get()
         } else {
+            // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
             todo!()
-        };
+        }
+    } else {
+        0
+    };
 
-        Ok(VhdlPhysicalStream::new(
-            signal_list,
-            self.element_lanes().clone(),
-            dimensionality,
-            self.complexity().clone(),
-            data_element_bit_count,
-            user_bit_count,
-            InterfaceDirection::In,
-            self.stream_direction(),
-        ))
-    }
+    let data_element_bit_count = if let Some(d) = physical_stream.data_element_bit_count() {
+        if let Some(f) = d.try_eval() {
+            f.get()
+        } else {
+            // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
+            todo!()
+        }
+    } else {
+        0
+    };
+
+    let dimensionality =
+        generic_property_to_relation(arch_db, physical_stream.dimensionality(), parent_params)?;
+
+    Ok(VhdlPhysicalStream::new(
+        signal_list,
+        physical_stream.element_lanes().clone(),
+        dimensionality,
+        physical_stream.complexity().clone(),
+        data_element_bit_count,
+        user_bit_count,
+        InterfaceDirection::In,
+        physical_stream.stream_direction(),
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -103,7 +130,7 @@ pub struct VhdlPhysicalStream {
     /// Number of element lanes.
     element_lanes: Positive,
     /// Dimensionality.
-    dimensionality: NonNegative,
+    dimensionality: Relation,
     /// Complexity.
     complexity: Complexity,
     /// The absolute size of a data element
@@ -123,7 +150,7 @@ impl VhdlPhysicalStream {
     pub fn new(
         signal_list: SignalList<Port>,
         element_lanes: Positive,
-        dimensionality: NonNegative,
+        dimensionality: impl Into<Relation>,
         complexity: Complexity,
         data_element_size: NonNegative,
         user_size: NonNegative,
@@ -133,7 +160,7 @@ impl VhdlPhysicalStream {
         VhdlPhysicalStream {
             signal_list,
             element_lanes,
-            dimensionality,
+            dimensionality: dimensionality.into(),
             complexity,
             data_element_size,
             user_size,
@@ -150,8 +177,8 @@ impl VhdlPhysicalStream {
         &self.element_lanes
     }
 
-    pub fn dimensionality(&self) -> NonNegative {
-        self.dimensionality
+    pub fn dimensionality(&self) -> &Relation {
+        &self.dimensionality
     }
 
     pub fn complexity(&self) -> &Complexity {
@@ -210,7 +237,6 @@ impl Reverse for VhdlPhysicalStream {
 mod tests {
     use std::convert::TryInto;
 
-    use til_query::ir::db::Database;
     use tydi_common::{
         map::InsertionOrderedMap,
         name::{Name, PathName},
@@ -223,7 +249,6 @@ mod tests {
 
     #[test]
     fn test_into_vhdl() -> Result<()> {
-        let ir_db = &Database::default();
         let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
         let arch_db = &mut _arch_db;
         let physical_stream = PhysicalStream::new(
@@ -237,15 +262,16 @@ mod tests {
             InsertionOrderedMap::new(),
             StreamDirection::Forward,
         );
-        let mut signal_list = physical_stream.canonical(
-            ir_db,
+        let mut signal_list = physical_stream_to_vhdl(
             arch_db,
+            &physical_stream,
             cat!(
                 "a",
                 PathName::new(vec![Name::try_new("test")?, Name::try_new("sub")?].into_iter())
                     .to_string()
             )
             .as_str(),
+            &InsertionOrderedMap::new(),
         )?;
         let ports = signal_list
             .mut_with_interface_direction(InterfaceDirection::Out)
@@ -266,7 +292,8 @@ mod tests {
             result,
             "output with pathname"
         );
-        let mut signal_list = physical_stream.canonical(ir_db, arch_db, "a")?;
+        let mut signal_list =
+            physical_stream_to_vhdl(arch_db, &physical_stream, "a", &InsertionOrderedMap::new())?;
         let ports = signal_list
             .mut_with_interface_direction(InterfaceDirection::Out)
             .signal_list();

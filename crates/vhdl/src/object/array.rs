@@ -8,7 +8,10 @@ use tydi_common::{
 
 use crate::{
     architecture::arch_storage::Arch,
+    assignment::ValueAssignment,
     common::vhdl_name::{VhdlName, VhdlNameSelf},
+    declaration::Declare,
+    statement::relation::Relation,
 };
 use crate::{declaration::DeclareWithIndent, object::object_type::ObjectType};
 
@@ -17,8 +20,8 @@ use super::object_type::DeclarationTypeName;
 /// An array object, arrays contain a single type of object, but can contain nested objects
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrayObject {
-    high: i32,
-    low: i32,
+    high: Relation,
+    low: Relation,
     typ: Box<ObjectType>,
     type_name: VhdlName,
     is_std_logic_vector: bool,
@@ -34,8 +37,8 @@ impl ArrayObject {
             )))
         } else {
             Ok(ArrayObject {
-                high,
-                low,
+                high: high.into(),
+                low: low.into(),
                 typ: Box::new(ObjectType::Bit),
                 type_name: VhdlName::try_new("std_logic_vector")?,
                 is_std_logic_vector: true,
@@ -57,8 +60,8 @@ impl ArrayObject {
             )))
         } else {
             Ok(ArrayObject {
-                high,
-                low,
+                high: high.into(),
+                low: low.into(),
                 typ: Box::new(object),
                 type_name: type_name.try_result()?,
                 is_std_logic_vector: false,
@@ -66,20 +69,74 @@ impl ArrayObject {
         }
     }
 
+    /// Create a bit vector object
+    pub fn relation_bit_vector(
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
+    ) -> Result<ArrayObject> {
+        let high = high.into();
+        let low = low.into();
+        high.is_integer(db)?;
+        low.is_integer(db)?;
+        Ok(ArrayObject {
+            high,
+            low,
+            typ: Box::new(ObjectType::Bit),
+            type_name: VhdlName::try_new("std_logic_vector")?,
+            is_std_logic_vector: true,
+        })
+    }
+
+    /// Create an array of a specific field type
+    pub fn relation_array(
+        db: &dyn Arch,
+        high: impl Into<Relation>,
+        low: impl Into<Relation>,
+        object: ObjectType,
+        type_name: impl TryResult<VhdlName>,
+    ) -> Result<ArrayObject> {
+        let high = high.into();
+        let low = low.into();
+        high.is_integer(db)?;
+        low.is_integer(db)?;
+        Ok(ArrayObject {
+            high,
+            low,
+            typ: Box::new(object),
+            type_name: type_name.try_result()?,
+            is_std_logic_vector: false,
+        })
+    }
+
     pub fn typ(&self) -> &ObjectType {
         &self.typ
     }
 
-    pub fn high(&self) -> i32 {
-        self.high
+    pub fn high(&self) -> &Relation {
+        &self.high
     }
 
-    pub fn low(&self) -> i32 {
-        self.low
+    pub fn low(&self) -> &Relation {
+        &self.low
     }
 
-    pub fn width(&self) -> u32 {
-        (1 + self.high - self.low).try_into().unwrap()
+    pub fn width(&self) -> Result<Option<u32>> {
+        let high = self.high().try_eval()?;
+        let low = self.low().try_eval()?;
+        match (high, low) {
+            (Some(ValueAssignment::Integer(high)), Some(ValueAssignment::Integer(low))) => {
+                match (1 + high - low).try_into() {
+                    Ok(val) => Ok(Some(val)),
+                    Err(err) => Err(Error::BackEndError(format!(
+                        "Something went wrong trying to calculate the width of array {}: {}",
+                        self.identifier(),
+                        err
+                    ))),
+                }
+            }
+            _ => Ok(None),
+        }
     }
 
     pub fn is_bitvector(&self) -> bool {
@@ -127,11 +184,15 @@ impl VhdlNameSelf for ArrayObject {
 }
 
 impl DeclarationTypeName for ArrayObject {
-    fn declaration_type_name(&self) -> String {
-        if self.is_std_logic_vector() {
-            format!("std_logic_vector({} downto {})", self.high(), self.low())
+    fn declaration_type_name(&self, db: &dyn Arch) -> Result<String> {
+        Ok(if self.is_std_logic_vector() {
+            format!(
+                "std_logic_vector({} downto {})",
+                self.high().declare(db)?,
+                self.low().declare(db)?
+            )
         } else {
             self.identifier()
-        }
+        })
     }
 }

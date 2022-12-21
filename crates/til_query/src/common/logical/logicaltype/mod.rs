@@ -1,29 +1,29 @@
 use core::fmt;
 use std::convert::TryFrom;
 
-use crate::{
-    ir::{
-        traits::{GetSelf, InternSelf, MoveDb},
-        Ir,
-    },
+use crate::ir::{
+    traits::{GetSelf, InternSelf, MoveDb},
+    Ir,
 };
 
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::InsertionOrderedMap,
     name::{Name, PathName},
-    numbers::{BitCount, NonNegative, Positive}, map::InsertionOrderedMap,
+    numbers::{BitCount, NonNegative, Positive},
 };
 
 pub mod bits;
+pub mod genericproperty;
 pub mod group;
 pub mod stream;
+pub mod union;
 
 use tydi_intern::Id;
 
 use self::{group::Group, stream::Stream, union::Union};
 
 use super::split_streams::{SplitStreams, SplitsStreams};
-pub mod union;
 
 pub trait IsNull {
     fn is_null(&self, db: &dyn Ir) -> bool;

@@ -70,11 +70,11 @@ impl RecordObject {
 }
 
 impl DeclareWithIndent for RecordObject {
-    fn declare_with_indent(&self, _db: &dyn Arch, indent_style: &str) -> Result<String> {
+    fn declare_with_indent(&self, db: &dyn Arch, indent_style: &str) -> Result<String> {
         let mut this = format!("type {} is record\n", self.vhdl_name());
         let mut fields = String::new();
         for (name, typ) in self.fields() {
-            fields.push_str(format!("{} : {};\n", name, typ.declaration_type_name()).as_str());
+            fields.push_str(format!("{} : {};\n", name, typ.declaration_type_name(db)?).as_str());
         }
         this.push_str(&indent(&fields, indent_style));
         this.push_str("end record;");
@@ -95,7 +95,7 @@ impl Identify for RecordObject {
 }
 
 impl DeclarationTypeName for RecordObject {
-    fn declaration_type_name(&self) -> String {
-        self.identifier()
+    fn declaration_type_name(&self, _db: &dyn Arch) -> Result<String> {
+        Ok(self.identifier())
     }
 }

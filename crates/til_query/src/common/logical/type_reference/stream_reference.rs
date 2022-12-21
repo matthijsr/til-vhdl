@@ -1,13 +1,20 @@
 use core::fmt;
 
 use textwrap::indent;
-use tydi_common::{error::Result, name::PathName, numbers::Positive};
+use tydi_common::{
+    error::Result,
+    name::PathName,
+    numbers::{NonNegative, Positive},
+};
 use tydi_intern::Id;
 
 use crate::{
     common::{
         logical::{
-            logicaltype::stream::{Dimensionality, Stream, Synchronicity},
+            logicaltype::{
+                genericproperty::GenericProperty,
+                stream::{Stream, Synchronicity},
+            },
             split_streams::SplitStreams,
             type_hierarchy::TypeHierarchy,
         },
@@ -25,7 +32,7 @@ pub struct StreamReference {
     data: Box<TypeReference>,
     direction: StreamDirection,
     complexity: Complexity,
-    dimensionality: Dimensionality,
+    dimensionality: GenericProperty<NonNegative>,
     transfer_scope: TransferScope,
     element_lanes: Positive,
     user: ElementManipulatingReference,
@@ -86,7 +93,7 @@ impl StreamReference {
     pub fn complexity(&self) -> &Complexity {
         &self.complexity
     }
-    pub fn dimensionality(&self) -> &Dimensionality {
+    pub fn dimensionality(&self) -> &GenericProperty<NonNegative> {
         &self.dimensionality
     }
     pub fn transfer_scope(&self) -> &TransferScope {

@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
 use tydi_common::error::{Error, Result};
+use tydi_intern::Id;
 
-use crate::{common::vhdl_name::VhdlName, component::Component, package::Package};
+use crate::{
+    common::vhdl_name::VhdlName, component::Component, declaration::{ObjectDeclaration, Declare},
+    object::Object, package::Package,
+};
 
 use self::{interner::Interner, object_queries::ObjectQueries};
 
@@ -41,6 +45,41 @@ pub trait Arch: Interner + ObjectQueries {
         assignment: Assignment,
         state: AssignmentState,
     ) -> Result<()>;
+
+    /// Get an object based on its key
+    fn get_object(&self, key: ObjectKey) -> Result<Object>;
+
+    fn get_object_type(&self, key: ObjectKey) -> Result<Arc<ObjectType>>;
+
+    fn get_object_declaration_type(&self, key: Id<ObjectDeclaration>) -> Result<Arc<ObjectType>>;
+}
+
+fn get_object(db: &dyn Arch, key: ObjectKey) -> Result<Object> {
+    let obj = db.lookup_intern_object(key.obj());
+    let typ = db
+        .lookup_intern_object_type(obj.typ)
+        .get_nested(db, key.selection())?;
+    Ok(Object {
+        typ: db.intern_object_type(typ),
+        assignable: obj.assignable,
+    })
+}
+
+fn get_object_type(db: &dyn Arch, key: ObjectKey) -> Result<Arc<ObjectType>> {
+    Ok(Arc::new(
+        db.lookup_intern_object_type(db.get_object(key)?.typ_id()),
+    ))
+}
+
+fn get_object_declaration_type(
+    db: &dyn Arch,
+    key: Id<ObjectDeclaration>,
+) -> Result<Arc<ObjectType>> {
+    db.get_object_type(
+        db.lookup_intern_object_declaration(key)
+            .object_key()
+            .clone(),
+    )
 }
 
 fn subject_component(db: &dyn Arch) -> Result<Arc<Component>> {
@@ -111,22 +150,24 @@ fn can_assign(
                         // As each element is the same and we only really care about the type, using a single ObjectKey to represent all queries
                         // will be more efficient. (As this means Salsa is more likely to reuse previous results.)
                         let to_array_elem_key = to_key.clone().with_selection(
-                            FieldSelection::Range(RangeConstraint::Index(to_array.high())),
+                            FieldSelection::Range(RangeConstraint::Index(to_array.high().clone())),
                         );
                         match array {
                             ArrayAssignment::Direct(direct) => {
-                                if to_array.width() == direct.len().try_into().unwrap() {
-                                    for value in direct {
-                                        db.can_assign(
-                                            to_array_elem_key.clone(),
-                                            Assignment::from(value.clone()),
-                                            state,
-                                        )?;
+                                match to_array.width()? {
+                                    Some(w) if w != direct.len().try_into().unwrap() => Err(Error::InvalidArgument(format!("Attempted full array assignment. Number of fields do not match. Array has {} fields, assignment has {} fields", w, direct.len()))),
+                                    _ => {
+                                        for value in direct {
+                                            db.can_assign(
+                                                to_array_elem_key.clone(),
+                                                Assignment::from(value.clone()),
+                                                state,
+                                            )?;
+                                        }
+                                        Ok(())
                                     }
-                                    Ok(())
-                                } else {
-                                    Err(Error::InvalidArgument(format!("Attempted full array assignment. Number of fields do not match. Array has {} fields, assignment has {} fields", to_array.width(), direct.len())))
                                 }
+    
                             }
                             ArrayAssignment::Sliced { direct, others } => {
                                 let mut ranges_assigned: Vec<&RangeConstraint> = vec![];
@@ -135,13 +176,13 @@ fn can_assign(
                                     if !range.is_between(to_array.high(), to_array.low())? {
                                         return Err(Error::InvalidArgument(format!(
                                             "{} is not between {} and {}",
-                                            range,
-                                            to_array.high(),
-                                            to_array.low()
+                                            range.declare(db)?,
+                                            to_array.high().declare(db)?,
+                                            to_array.low().declare(db)?
                                         )));
                                     }
-                                    if ranges_assigned.iter().any(|x| x.overlaps(range)) {
-                                        return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range)));
+                                    if ranges_assigned.iter().map(|x| x.overlaps(range)).collect::<Result<Vec<_>>>()?.iter().any(|x| *x) {
+                                        return Err(Error::InvalidArgument(format!("Sliced array assignment: {} overlaps with a range which was already assigned.", range.declare(db)?)));
                                     }
                                     db.can_assign(
                                         to_array_elem_key.clone(),
@@ -150,9 +191,15 @@ fn can_assign(
                                     )?;
                                     ranges_assigned.push(range);
                                 }
-                                let total_assigned: u32 =
-                                    ranges_assigned.iter().map(|x| x.width_u32()).sum();
-                                if total_assigned == to_array.width() {
+                                let total_assigned: u32 = ranges_assigned
+                                    .iter()
+                                    .map(|x| x.width_u32())
+                                    .collect::<Result<Vec<_>>>()?
+                                    .iter()
+                                    .map(|x| x.unwrap_or(0)) // TODO: This unwrap probably isn't entirely correct
+                                    .sum();
+                                    if let Some(w) = to_array.width()? {
+                                        if total_assigned == w {
                                     if let Some(_) = others {
                                         return Err(Error::InvalidArgument("Sliced array assignment contains an 'others' field, but already assigns all fields directly.".to_string()));
                                     } else {
@@ -169,6 +216,11 @@ fn can_assign(
                                         Err(Error::InvalidArgument("Sliced array assignment does not assign all values directly, but does not contain an 'others' field.".to_string()))
                                     }
                                 }
+                                    } else {
+                                        // TODO: There's probably a check I can do here
+                                        Ok(())
+                                    }
+                                
                             }
                             ArrayAssignment::Others(others) => db.can_assign(
                                 to_array_elem_key,

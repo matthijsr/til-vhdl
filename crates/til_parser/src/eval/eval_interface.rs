@@ -117,7 +117,7 @@ pub fn eval_interface_expr(
                             if let Some(doc) = &port_def.doc {
                                 port.set_doc(&doc.0);
                             }
-                            eval_common_error(result.push_port(port), port_span)?;
+                            eval_common_error(result.push_port(db, port), port_span)?;
                         }
                     }
                     Ok(result.intern_arc(db))

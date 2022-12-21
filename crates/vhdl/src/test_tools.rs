@@ -2,7 +2,6 @@ use indexmap::IndexMap;
 
 use tydi_common::error::Result;
 
-use crate::assignment::ValueAssignment;
 use crate::object::object_type::{IntegerType, ObjectType};
 use crate::port::GenericParameter;
 use crate::{
@@ -79,14 +78,14 @@ pub(crate) fn simple_component_with_generics() -> Result<Component> {
 
     let param1 = GenericParameter::try_new_documented(
         "some_param",
-        Some(ValueAssignment::from(42).into()),
+        Some((42).into()),
         ObjectType::Integer(IntegerType::Positive),
         "This is parameter documentation\nNext line.",
     )?;
     let param2 = GenericParameter::try_new("some_other_param", None, ObjectType::Bit)?;
     let param3 = GenericParameter::try_new(
         "some_other_param2",
-        Some(ValueAssignment::from(-42).into()),
+        Some((-42).into()),
         ObjectType::Integer(IntegerType::Integer),
     )?;
     Component::try_new(

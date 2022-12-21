@@ -8,7 +8,7 @@ use tydi_common::{
 
 use self::{
     behavioral::BehavioralGenericKind,
-    condition::TestValue,
+    condition::{AppliesCondition, TestValue},
     interface::{dimensionality::DimensionalityGeneric, InterfaceGenericKind},
     param_value::GenericParamValue,
 };
@@ -22,6 +22,66 @@ pub mod param_value;
 pub enum GenericKind {
     Behavioral(BehavioralGenericKind),
     Interface(InterfaceGenericKind),
+}
+
+impl GenericKind {
+    /// Verify whether this GenericKind satisfies the requirements of another
+    /// GenericKind (i.e., they should be the same type, and the should have
+    /// a condition that does not allow for values exceeding the other)
+    pub fn satisfies(&self, other: &Self) -> Result<()> {
+        match self {
+            GenericKind::Behavioral(b) => {
+                match b {
+                    BehavioralGenericKind::Integer(i) => {
+                        if let GenericKind::Behavioral(BehavioralGenericKind::Integer(other_i)) =
+                            other
+                        {
+                            if i.kind() == other_i.kind() {
+                                if i.condition().satisfies(other_i.condition()) {
+                                    Ok(())
+                                } else {
+                                    Err(Error::InvalidArgument(format!(
+                                        "Condition \"{}\" is more permissive than condition \"{}\"",
+                                        i.describe_condition(),
+                                        other_i.describe_condition()
+                                    )))
+                                }
+                            } else {
+                                Err(Error::InvalidArgument(format!("Expected a parameter of type {}, this is a parameter with type {}", other_i.kind(), i.kind())))
+                            }
+                        } else {
+                            Err(Error::InvalidArgument(format!(
+                                "Expected a parameter of type {}, this is a parameter with type {}",
+                                other, self
+                            )))
+                        }
+                    }
+                }
+            }
+            GenericKind::Interface(i) => match i {
+                InterfaceGenericKind::Dimensionality(d) => {
+                    if let GenericKind::Interface(InterfaceGenericKind::Dimensionality(other_d)) =
+                        other
+                    {
+                        if d.condition().satisfies(other_d.condition()) {
+                            Ok(())
+                        } else {
+                            Err(Error::InvalidArgument(format!(
+                                "Condition \"{}\" is more permissive than condition \"{}\"",
+                                d.describe_condition(),
+                                other_d.describe_condition()
+                            )))
+                        }
+                    } else {
+                        Err(Error::InvalidArgument(format!(
+                            "Expected a parameter of type {}, this is a parameter with type {}",
+                            other, self
+                        )))
+                    }
+                }
+            },
+        }
+    }
 }
 
 impl fmt::Display for GenericKind {

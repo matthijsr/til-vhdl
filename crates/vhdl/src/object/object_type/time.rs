@@ -74,6 +74,11 @@ impl TimeValue {
     pub fn represent_as(&self) -> Option<TimeUnit> {
         self.represent_as
     }
+
+    pub fn negative(mut self) -> Self {
+        self.value = -self.value;
+        self
+    }
 }
 
 pub trait TimeValueFrom {

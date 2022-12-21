@@ -1,6 +1,6 @@
 use tydi_common::numbers::NonNegative;
 
-use crate::object::object_type::ObjectType;
+use crate::{architecture::arch_storage::Arch, object::object_type::ObjectType};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Width {
@@ -13,5 +13,5 @@ pub enum Width {
 /// Analyze trait for VHDL objects.
 pub trait Analyze {
     /// List all nested types used.
-    fn list_nested_types(&self) -> Vec<ObjectType>;
+    fn list_nested_types(&self, db: &dyn Arch) -> Vec<ObjectType>;
 }
