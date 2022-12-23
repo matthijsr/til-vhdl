@@ -122,11 +122,16 @@ impl Structure {
         // Interfaces are on the same layer if they both either belong to the structure or to a streamlet instance
         let same_layer = left_i.on_streamlet == right_i.on_streamlet;
 
-        if left_i.interface.stream_id() == right_i.interface.stream_id()
+        if !(left_i.interface.stream_id() == right_i.interface.stream_id()
             // If the interfaces are on the same layer, their directions should be opposite.
             // If they are not on the same layer, their directions should be the same.
-            && same_layer == (left_i.interface.direction() != right_i.interface.direction())
+            && same_layer == (left_i.interface.direction() != right_i.interface.direction()))
         {
+            Err(Error::InvalidTarget(format!(
+                "The ports {} and {} are incompatible",
+                left, right
+            )))
+        } else {
             if left_i.interface.domain() != right_i.interface.domain() {
                 let dom_str = |dom: Option<&Domain>| {
                     if let Some(dom) = dom {
@@ -157,11 +162,6 @@ impl Structure {
 
             self.connections.push(Connection::new(source, sink));
             Ok(())
-        } else {
-            Err(Error::InvalidTarget(format!(
-                "The ports {} and {} are incompatible",
-                left, right
-            )))
         }
     }
 
