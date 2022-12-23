@@ -1031,6 +1031,150 @@ end structural;"#,
 }
 
 #[test]
+fn basic_comp_arch_with_instance_and_interface_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
+    let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
+    let mut structure = Structure::try_from(&parent_streamlet)?;
+    let instance =
+        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
+    instance.assign_parameter(
+        "pa",
+        parent_streamlet
+            .try_get_parameter(db, &Name::try_new("pa")?)?
+            .g_add(1)?,
+    )?;
+
+    structure.try_add_connection(db, "a", "b")?;
+    structure.try_add_connection(db, ("a", "a"), ("a", "b"))?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity parent_com is
+  generic (
+    pa : positive := 5
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic_vector((pa) + 1 downto 0);
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic_vector((pa) + 1 downto 0);
+    b_strb : out std_logic
+  );
+end parent_com;
+
+architecture structural of parent_com is
+  signal \a__a_valid\ : std_logic;
+  signal \a__a_ready\ : std_logic;
+  signal \a__a_data\ : std_logic_vector(4 downto 0);
+  signal \a__a_last\ : std_logic_vector((pa) + 1 downto 0);
+  signal \a__a_strb\ : std_logic;
+  signal \a__b_valid\ : std_logic;
+  signal \a__b_ready\ : std_logic;
+  signal \a__b_data\ : std_logic_vector(4 downto 0);
+  signal \a__b_last\ : std_logic_vector((pa) + 1 downto 0);
+  signal \a__b_strb\ : std_logic;
+begin
+  a: inner_com generic map(
+    pa => pa + 1
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => \a__a_valid\,
+    a_ready => \a__a_ready\,
+    a_data => \a__a_data\,
+    a_last => \a__a_last\,
+    a_strb => \a__a_strb\,
+    b_valid => \a__b_valid\,
+    b_ready => \a__b_ready\,
+    b_data => \a__b_data\,
+    b_last => \a__b_last\,
+    b_strb => \a__b_strb\
+  );
+  b_valid <= a_valid;
+  a_ready <= b_ready;
+  b_data <= a_data;
+  b_last <= a_last;
+  b_strb <= a_strb;
+  \a__a_valid\ <= \a__b_valid\;
+  \a__b_ready\ <= \a__a_ready\;
+  \a__a_data\ <= \a__b_data\;
+  \a__a_last\ <= \a__b_last\;
+  \a__a_strb\ <= \a__b_strb\;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_instance_and_interface_params_playground() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
+    let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
+    let mut structure = Structure::try_from(&parent_streamlet)?;
+    let instance =
+        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
+    instance.assign_parameter(
+        "pa",
+        parent_streamlet
+            .try_get_parameter(db, &Name::try_new("pa")?)?
+            .g_add(1)?,
+    )?;
+
+    // This should fail
+    structure.try_add_connection(db, "a", ("a", "a"))?;
+    structure.try_add_connection(db, ("a", "b"), "b")?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    println!("{}", streamlet_arch.declare(arch_db)?);
+
+    Ok(())
+}
+
+#[test]
 fn playground() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
