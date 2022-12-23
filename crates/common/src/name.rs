@@ -6,6 +6,8 @@ use std::{
     str::FromStr,
 };
 
+use uncased::Uncased;
+
 use crate::{
     error::{Error, Result, TryOptionalFrom, TryResult},
     traits::Identify,
@@ -25,7 +27,7 @@ use crate::{
 /// ```rust
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Name(String);
+pub struct Name(Uncased<'static>);
 
 impl Name {
     /// Constructs a new name wrapper. Returns an error when the provided name
@@ -49,6 +51,11 @@ impl Name {
                 "{}: name cannot contain two or more consecutive underscores",
                 name
             )))
+        } else if name.contains("_0_") {
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot contain the sequence \"_0_\" for compatibility with certain targets, consider using \"_00_\" if necessary",
+                name
+            )))
         } else if !name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c.eq(&'_'))
@@ -61,20 +68,20 @@ impl Name {
                 .to_string(),
             ))
         } else {
-            Ok(Name(name))
+            Ok(Name(name.into()))
         }
     }
 }
 
 impl From<Name> for String {
     fn from(name: Name) -> Self {
-        name.0
+        name.0.into_string()
     }
 }
 
 impl From<&Name> for String {
     fn from(name: &Name) -> Self {
-        name.0.clone()
+        name.0.clone().into_string()
     }
 }
 
@@ -265,6 +272,14 @@ impl PathName {
             }
             return true;
         }
+    }
+
+    /// Join the Names in this PathName into a string, using a specific separator
+    pub fn join(&self, separator: &str) -> String {
+        self.into_iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(separator)
     }
 }
 

@@ -78,7 +78,7 @@ pub fn interface_port_to_vhdl(
 
     let mut fields = InsertionOrderedMap::new();
     for (path, width) in synth.logical_stream().fields_iter() {
-        let prefixed_path = format!("{}__{}", &n, path);
+        let prefixed_path = format!("{}_0_{}", &n, path);
         fields.try_insert(
             path.clone(),
             Port::try_new(
@@ -95,7 +95,7 @@ pub fn interface_port_to_vhdl(
     let mut streams = InsertionOrderedMap::new();
     for (path, phys) in synth.logical_stream().streams_iter() {
         let phys_name = if path.len() > 0 {
-            format!("{}__{}", &n, path)
+            format!("{}_0_{}", &n, path)
         } else {
             n.to_string()
         };

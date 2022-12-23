@@ -268,7 +268,7 @@ mod tests {
             cat!(
                 "a",
                 PathName::new(vec![Name::try_new("test")?, Name::try_new("sub")?].into_iter())
-                    .to_string()
+                    .join("_0_")
             )
             .as_str(),
             &InsertionOrderedMap::new(),
@@ -282,13 +282,13 @@ mod tests {
             .collect::<Result<Vec<String>>>()?
             .join("\n");
         assert_eq!(
-            r#"\a_test__sub_valid\ : out std_logic
-\a_test__sub_ready\ : in std_logic
-\a_test__sub_data\ : out std_logic_vector(9 downto 0)
-\a_test__sub_last\ : out std_logic_vector(5 downto 0)
-\a_test__sub_stai\ : out std_logic
-\a_test__sub_endi\ : out std_logic
-\a_test__sub_strb\ : out std_logic_vector(1 downto 0)"#,
+            r#"a_test_0_sub_valid : out std_logic
+a_test_0_sub_ready : in std_logic
+a_test_0_sub_data : out std_logic_vector(9 downto 0)
+a_test_0_sub_last : out std_logic_vector(5 downto 0)
+a_test_0_sub_stai : out std_logic
+a_test_0_sub_endi : out std_logic
+a_test_0_sub_strb : out std_logic_vector(1 downto 0)"#,
             result,
             "output with pathname"
         );

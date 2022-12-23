@@ -66,7 +66,7 @@ impl DeclareWithIndent for Statement {
             Statement::Process(process) => process.declare_with_indent(db, indent_style),
         };
         if let Some(label) = self.label() {
-            Ok(format!("{}: {}", label.declare(), result?))
+            Ok(format!("{}: {}", label, result?))
         } else {
             result
         }

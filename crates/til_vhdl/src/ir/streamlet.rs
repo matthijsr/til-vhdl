@@ -344,7 +344,7 @@ pub fn create_instance(
         let mut try_signal_decl = |p: Port| {
             let signal = ObjectDeclaration::signal(
                 arch_db,
-                format!("{}__{}", instance_name, p.vhdl_name()),
+                format!("{}_0_{}", instance_name, p.vhdl_name()),
                 p.typ().clone(),
                 None,
             )?;
@@ -762,7 +762,7 @@ impl VhdlStreamlet {
 
 impl Identify for VhdlStreamlet {
     fn identifier(&self) -> String {
-        self.name.to_string()
+        self.name.join("_0_")
     }
 }
 

@@ -86,7 +86,7 @@ impl DeclareWithIndent for SequentialStatement {
             SequentialStatement::Test(t) => t.declare_with_indent(db, indent_style),
         };
         if let Some(label) = self.label() {
-            Ok(format!("{}: {}", label.declare(), result?))
+            Ok(format!("{}: {}", label, result?))
         } else {
             result
         }

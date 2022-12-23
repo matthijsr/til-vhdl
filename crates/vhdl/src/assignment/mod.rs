@@ -599,7 +599,7 @@ impl FieldAssignment {
 
 impl Identify for FieldAssignment {
     fn identifier(&self) -> String {
-        self.field().declare()
+        self.field().to_string()
     }
 }
 
