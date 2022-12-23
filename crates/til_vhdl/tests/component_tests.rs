@@ -275,30 +275,30 @@ namespace my::test::space {
 
     let comp = streamlet.canonical(&db, &mut arch_db, None)?.to_component();
     assert_eq!(
-        r#"component \my__test__space__multi_streamlet_com\ is
+        r#"component my_0_test_0_space_0_multi_streamlet_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
-    \x__a_valid\ : in std_logic;
-    \x__a_ready\ : out std_logic;
-    \x__a_data\ : in std_logic_vector(23 downto 0);
-    \x__b_valid\ : in std_logic;
-    \x__b_ready\ : out std_logic;
-    \x__b_data\ : in std_logic_vector(23 downto 0);
-    \x__c_valid\ : out std_logic;
-    \x__c_ready\ : in std_logic;
-    \x__c_data\ : out std_logic_vector(23 downto 0);
-    \y__a_valid\ : out std_logic;
-    \y__a_ready\ : in std_logic;
-    \y__a_data\ : out std_logic_vector(23 downto 0);
-    \y__b_valid\ : out std_logic;
-    \y__b_ready\ : in std_logic;
-    \y__b_data\ : out std_logic_vector(23 downto 0);
-    \y__c_valid\ : in std_logic;
-    \y__c_ready\ : out std_logic;
-    \y__c_data\ : in std_logic_vector(23 downto 0)
+    x_0_a_valid : in std_logic;
+    x_0_a_ready : out std_logic;
+    x_0_a_data : in std_logic_vector(23 downto 0);
+    x_0_b_valid : in std_logic;
+    x_0_b_ready : out std_logic;
+    x_0_b_data : in std_logic_vector(23 downto 0);
+    x_0_c_valid : out std_logic;
+    x_0_c_ready : in std_logic;
+    x_0_c_data : out std_logic_vector(23 downto 0);
+    y_0_a_valid : out std_logic;
+    y_0_a_ready : in std_logic;
+    y_0_a_data : out std_logic_vector(23 downto 0);
+    y_0_b_valid : out std_logic;
+    y_0_b_ready : in std_logic;
+    y_0_b_data : out std_logic_vector(23 downto 0);
+    y_0_c_valid : in std_logic;
+    y_0_c_ready : out std_logic;
+    y_0_c_data : in std_logic_vector(23 downto 0)
   );
-end component \my__test__space__multi_streamlet_com\;"#,
+end component my_0_test_0_space_0_multi_streamlet_com;"#,
         comp.declare(&arch_db)?
     );
 
@@ -485,7 +485,7 @@ multiline#
     let comp = streamlet.canonical(&db, &mut arch_db, None)?.to_component();
     assert_eq!(
         r#"-- streamlet documentation is multi-line but can act as a split string
-component \my__test__space__doc_streamlet_com\ is
+component my_0_test_0_space_0_doc_streamlet_com is
   port (
     clk : in std_logic;
     rst : in std_logic;
@@ -496,7 +496,7 @@ component \my__test__space__doc_streamlet_com\ is
     x_ready : out std_logic;
     x_data : in std_logic_vector(7 downto 0)
   );
-end component \my__test__space__doc_streamlet_com\;"#,
+end component my_0_test_0_space_0_doc_streamlet_com;"#,
         comp.declare(&arch_db)?
     );
 
@@ -875,41 +875,41 @@ entity parent_com is
 end parent_com;
 
 architecture structural of parent_com is
-  signal \a__a_valid\ : std_logic;
-  signal \a__a_ready\ : std_logic;
-  signal \a__a_data\ : std_logic_vector(4 downto 0);
-  signal \a__a_last\ : std_logic;
-  signal \a__a_strb\ : std_logic;
-  signal \a__b_valid\ : std_logic;
-  signal \a__b_ready\ : std_logic;
-  signal \a__b_data\ : std_logic_vector(4 downto 0);
-  signal \a__b_last\ : std_logic;
-  signal \a__b_strb\ : std_logic;
+  signal a_0_a_valid : std_logic;
+  signal a_0_a_ready : std_logic;
+  signal a_0_a_data : std_logic_vector(4 downto 0);
+  signal a_0_a_last : std_logic;
+  signal a_0_a_strb : std_logic;
+  signal a_0_b_valid : std_logic;
+  signal a_0_b_ready : std_logic;
+  signal a_0_b_data : std_logic_vector(4 downto 0);
+  signal a_0_b_last : std_logic;
+  signal a_0_b_strb : std_logic;
 begin
   a: inner_com port map(
     clk => clk,
     rst => rst,
-    a_valid => \a__a_valid\,
-    a_ready => \a__a_ready\,
-    a_data => \a__a_data\,
-    a_last => \a__a_last\,
-    a_strb => \a__a_strb\,
-    b_valid => \a__b_valid\,
-    b_ready => \a__b_ready\,
-    b_data => \a__b_data\,
-    b_last => \a__b_last\,
-    b_strb => \a__b_strb\
+    a_valid => a_0_a_valid,
+    a_ready => a_0_a_ready,
+    a_data => a_0_a_data,
+    a_last => a_0_a_last,
+    a_strb => a_0_a_strb,
+    b_valid => a_0_b_valid,
+    b_ready => a_0_b_ready,
+    b_data => a_0_b_data,
+    b_last => a_0_b_last,
+    b_strb => a_0_b_strb
   );
-  \a__a_valid\ <= a_valid;
-  a_ready <= \a__a_ready\;
-  \a__a_data\ <= a_data;
-  \a__a_last\ <= a_last;
-  \a__a_strb\ <= a_strb;
-  b_valid <= \a__b_valid\;
-  \a__b_ready\ <= b_ready;
-  b_data <= \a__b_data\;
-  b_last <= \a__b_last\;
-  b_strb <= \a__b_strb\;
+  a_0_a_valid <= a_valid;
+  a_ready <= a_0_a_ready;
+  a_0_a_data <= a_data;
+  a_0_a_last <= a_last;
+  a_0_a_strb <= a_strb;
+  b_valid <= a_0_b_valid;
+  a_0_b_ready <= b_ready;
+  b_data <= a_0_b_data;
+  b_last <= a_0_b_last;
+  b_strb <= a_0_b_strb;
 end structural;"#,
         streamlet_arch.declare(arch_db)?
     );
@@ -984,16 +984,16 @@ entity parent_com is
 end parent_com;
 
 architecture structural of parent_com is
-  signal \a__a_valid\ : std_logic;
-  signal \a__a_ready\ : std_logic;
-  signal \a__a_data\ : std_logic_vector(4 downto 0);
-  signal \a__a_last\ : std_logic;
-  signal \a__a_strb\ : std_logic;
-  signal \a__b_valid\ : std_logic;
-  signal \a__b_ready\ : std_logic;
-  signal \a__b_data\ : std_logic_vector(4 downto 0);
-  signal \a__b_last\ : std_logic;
-  signal \a__b_strb\ : std_logic;
+  signal a_0_a_valid : std_logic;
+  signal a_0_a_ready : std_logic;
+  signal a_0_a_data : std_logic_vector(4 downto 0);
+  signal a_0_a_last : std_logic;
+  signal a_0_a_strb : std_logic;
+  signal a_0_b_valid : std_logic;
+  signal a_0_b_ready : std_logic;
+  signal a_0_b_data : std_logic_vector(4 downto 0);
+  signal a_0_b_last : std_logic;
+  signal a_0_b_strb : std_logic;
 begin
   a: inner_com generic map(
     pa => 20,
@@ -1002,27 +1002,27 @@ begin
   ) port map(
     clk => clk,
     rst => rst,
-    a_valid => \a__a_valid\,
-    a_ready => \a__a_ready\,
-    a_data => \a__a_data\,
-    a_last => \a__a_last\,
-    a_strb => \a__a_strb\,
-    b_valid => \a__b_valid\,
-    b_ready => \a__b_ready\,
-    b_data => \a__b_data\,
-    b_last => \a__b_last\,
-    b_strb => \a__b_strb\
+    a_valid => a_0_a_valid,
+    a_ready => a_0_a_ready,
+    a_data => a_0_a_data,
+    a_last => a_0_a_last,
+    a_strb => a_0_a_strb,
+    b_valid => a_0_b_valid,
+    b_ready => a_0_b_ready,
+    b_data => a_0_b_data,
+    b_last => a_0_b_last,
+    b_strb => a_0_b_strb
   );
-  \a__a_valid\ <= a_valid;
-  a_ready <= \a__a_ready\;
-  \a__a_data\ <= a_data;
-  \a__a_last\ <= a_last;
-  \a__a_strb\ <= a_strb;
-  b_valid <= \a__b_valid\;
-  \a__b_ready\ <= b_ready;
-  b_data <= \a__b_data\;
-  b_last <= \a__b_last\;
-  b_strb <= \a__b_strb\;
+  a_0_a_valid <= a_valid;
+  a_ready <= a_0_a_ready;
+  a_0_a_data <= a_data;
+  a_0_a_last <= a_last;
+  a_0_a_strb <= a_strb;
+  b_valid <= a_0_b_valid;
+  a_0_b_ready <= b_ready;
+  b_data <= a_0_b_data;
+  b_last <= a_0_b_last;
+  b_strb <= a_0_b_strb;
 end structural;"#,
         streamlet_arch.declare(arch_db)?
     );

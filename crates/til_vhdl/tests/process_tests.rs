@@ -245,34 +245,34 @@ multiline#
         assert_eq!(
             r#"process is
 begin
-  \a__x_valid\ <= '1';
-  \a__x_data\(1 downto 0) <= "11";
-  \a__x_data\(5 downto 4) <= "11";
-  \a__x_last\(3 * (0 + 1) - 1 downto 3 * 0) <= (others => '0');
-  \a__x_last\(3 * (1 + 1) - 1 downto 3 * 1) <= (others => '0');
-  \a__x_last\(3 * (2 + 1) - 1 downto 3 * 2) <= (others => '0');
-  \a__x_strb\ <= "101";
-  \a__x_user\(2 downto 0) <= "101";
-  wait until rising_edge(clk) and \a__x_ready\ = '1';
-  \a__x_data\(1 downto 0) <= "10";
-  \a__x_data\(3 downto 2) <= "01";
-  \a__x_data\(5 downto 4) <= "00";
-  \a__x_last\(3 * (0 + 1) - 1 downto 3 * 0) <= "001";
-  \a__x_last\(3 * (1 + 1) - 1 downto 3 * 1) <= (others => '0');
-  \a__x_last\(3 * (2 + 1) - 1 downto 3 * 2) <= (others => '0');
-  \a__x_strb\ <= "111";
-  \a__x_stai\ <= std_logic_vector(to_unsigned(0, 2));
-  \a__x_endi\ <= std_logic_vector(to_unsigned(2, 2));
-  wait until rising_edge(clk) and \a__x_ready\ = '1';
-  \a__x_data\(1 downto 0) <= "10";
-  \a__x_last\(3 * (0 + 1) - 1 downto 3 * 0) <= "011";
-  \a__x_last\(3 * (1 + 1) - 1 downto 3 * 1) <= "100";
-  \a__x_last\(3 * (2 + 1) - 1 downto 3 * 2) <= (others => '0');
-  \a__x_strb\ <= "100";
-  wait until rising_edge(clk) and \a__x_ready\ = '1';
-  \a__x_valid\ <= '0';
+  a_0_x_valid <= '1';
+  a_0_x_data(1 downto 0) <= "11";
+  a_0_x_data(5 downto 4) <= "11";
+  a_0_x_last(3 * (0 + 1) - 1 downto 3 * 0) <= (others => '0');
+  a_0_x_last(3 * (1 + 1) - 1 downto 3 * 1) <= (others => '0');
+  a_0_x_last(3 * (2 + 1) - 1 downto 3 * 2) <= (others => '0');
+  a_0_x_strb <= "101";
+  a_0_x_user(2 downto 0) <= "101";
+  wait until rising_edge(clk) and a_0_x_ready = '1';
+  a_0_x_data(1 downto 0) <= "10";
+  a_0_x_data(3 downto 2) <= "01";
+  a_0_x_data(5 downto 4) <= "00";
+  a_0_x_last(3 * (0 + 1) - 1 downto 3 * 0) <= "001";
+  a_0_x_last(3 * (1 + 1) - 1 downto 3 * 1) <= (others => '0');
+  a_0_x_last(3 * (2 + 1) - 1 downto 3 * 2) <= (others => '0');
+  a_0_x_strb <= "111";
+  a_0_x_stai <= std_logic_vector(to_unsigned(0, 2));
+  a_0_x_endi <= std_logic_vector(to_unsigned(2, 2));
+  wait until rising_edge(clk) and a_0_x_ready = '1';
+  a_0_x_data(1 downto 0) <= "10";
+  a_0_x_last(3 * (0 + 1) - 1 downto 3 * 0) <= "011";
+  a_0_x_last(3 * (1 + 1) - 1 downto 3 * 1) <= "100";
+  a_0_x_last(3 * (2 + 1) - 1 downto 3 * 2) <= (others => '0');
+  a_0_x_strb <= "100";
+  wait until rising_edge(clk) and a_0_x_ready = '1';
+  a_0_x_valid <= '0';
   wait until rising_edge(clk);
-end process \a__x\;"#,
+end process a_0_x;"#,
             proc.process().declare(&arch_db)?
         );
 
@@ -286,37 +286,37 @@ end process \a__x\;"#,
         assert_eq!(
             r#"process is
 begin
-  wait until rising_edge(clk) and \a__y_valid\ = '1';
-  assert \a__y_data\(1 downto 0) = "11" report "test message compare 1";
-  assert \a__y_data\(5 downto 4) = "11" report "test message compare 1";
-  assert \a__y_last\(3 * (0 + 1) - 1 downto 3 * 0) = (others => '0') report "test message compare 1";
-  assert \a__y_last\(3 * (1 + 1) - 1 downto 3 * 1) = (others => '0') report "test message compare 1";
-  assert \a__y_last\(3 * (2 + 1) - 1 downto 3 * 2) = (others => '0') report "test message compare 1";
-  assert \a__y_strb\ = "101" report "test message compare 1";
-  assert \a__y_user\(2 downto 0) = "101" report "test message compare 1";
-  \a__y_ready\ <= '1';
-  wait until rising_edge(clk) and \a__y_valid\ = '1';
-  assert \a__y_data\(1 downto 0) = "10" report "test message compare 2";
-  assert \a__y_data\(3 downto 2) = "01" report "test message compare 2";
-  assert \a__y_data\(5 downto 4) = "00" report "test message compare 2";
-  assert \a__y_last\(3 * (0 + 1) - 1 downto 3 * 0) = "001" report "test message compare 2";
-  assert \a__y_last\(3 * (1 + 1) - 1 downto 3 * 1) = (others => '0') report "test message compare 2";
-  assert \a__y_last\(3 * (2 + 1) - 1 downto 3 * 2) = (others => '0') report "test message compare 2";
-  assert \a__y_strb\ = "111" report "test message compare 2";
-  assert \a__y_stai\ = std_logic_vector(to_unsigned(0, 2)) report "test message compare 2";
-  assert \a__y_endi\ = std_logic_vector(to_unsigned(2, 2)) report "test message compare 2";
-  \a__y_ready\ <= '1';
-  wait until rising_edge(clk) and \a__y_valid\ = '1';
-  assert \a__y_data\(1 downto 0) = "10" report "test message compare 3";
-  assert \a__y_last\(3 * (0 + 1) - 1 downto 3 * 0) = "011" report "test message compare 3";
-  assert \a__y_last\(3 * (1 + 1) - 1 downto 3 * 1) = "100" report "test message compare 3";
-  assert \a__y_last\(3 * (2 + 1) - 1 downto 3 * 2) = (others => '0') report "test message compare 3";
-  assert \a__y_strb\ = "100" report "test message compare 3";
-  \a__y_ready\ <= '1';
-  wait until rising_edge(clk) and \a__y_valid\ = '1';
-  \a__y_ready\ <= '0';
+  wait until rising_edge(clk) and a_0_y_valid = '1';
+  assert a_0_y_data(1 downto 0) = "11" report "test message compare 1";
+  assert a_0_y_data(5 downto 4) = "11" report "test message compare 1";
+  assert a_0_y_last(3 * (0 + 1) - 1 downto 3 * 0) = (others => '0') report "test message compare 1";
+  assert a_0_y_last(3 * (1 + 1) - 1 downto 3 * 1) = (others => '0') report "test message compare 1";
+  assert a_0_y_last(3 * (2 + 1) - 1 downto 3 * 2) = (others => '0') report "test message compare 1";
+  assert a_0_y_strb = "101" report "test message compare 1";
+  assert a_0_y_user(2 downto 0) = "101" report "test message compare 1";
+  a_0_y_ready <= '1';
+  wait until rising_edge(clk) and a_0_y_valid = '1';
+  assert a_0_y_data(1 downto 0) = "10" report "test message compare 2";
+  assert a_0_y_data(3 downto 2) = "01" report "test message compare 2";
+  assert a_0_y_data(5 downto 4) = "00" report "test message compare 2";
+  assert a_0_y_last(3 * (0 + 1) - 1 downto 3 * 0) = "001" report "test message compare 2";
+  assert a_0_y_last(3 * (1 + 1) - 1 downto 3 * 1) = (others => '0') report "test message compare 2";
+  assert a_0_y_last(3 * (2 + 1) - 1 downto 3 * 2) = (others => '0') report "test message compare 2";
+  assert a_0_y_strb = "111" report "test message compare 2";
+  assert a_0_y_stai = std_logic_vector(to_unsigned(0, 2)) report "test message compare 2";
+  assert a_0_y_endi = std_logic_vector(to_unsigned(2, 2)) report "test message compare 2";
+  a_0_y_ready <= '1';
+  wait until rising_edge(clk) and a_0_y_valid = '1';
+  assert a_0_y_data(1 downto 0) = "10" report "test message compare 3";
+  assert a_0_y_last(3 * (0 + 1) - 1 downto 3 * 0) = "011" report "test message compare 3";
+  assert a_0_y_last(3 * (1 + 1) - 1 downto 3 * 1) = "100" report "test message compare 3";
+  assert a_0_y_last(3 * (2 + 1) - 1 downto 3 * 2) = (others => '0') report "test message compare 3";
+  assert a_0_y_strb = "100" report "test message compare 3";
+  a_0_y_ready <= '1';
+  wait until rising_edge(clk) and a_0_y_valid = '1';
+  a_0_y_ready <= '0';
   wait until rising_edge(clk);
-end process \a__y\;"#,
+end process a_0_y;"#,
             proc.process().declare(&arch_db)?
         );
     } else {

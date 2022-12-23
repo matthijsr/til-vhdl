@@ -322,8 +322,8 @@ impl TryFrom<String> for VhdlPathName {
             Ok(VhdlPathName::new_empty())
         } else if string.contains(".") {
             VhdlPathName::try_new(string.split("."))
-        } else if string.contains("__") {
-            VhdlPathName::try_new(string.split("__"))
+        } else if string.contains("_0_") {
+            VhdlPathName::try_new(string.split("_0_"))
         } else {
             let name: VhdlName = string.try_into()?;
             Ok(VhdlPathName::from(name))
@@ -338,8 +338,8 @@ impl TryFrom<&str> for VhdlPathName {
             Ok(VhdlPathName::new_empty())
         } else if str.contains(".") {
             VhdlPathName::try_new(str.split("."))
-        } else if str.contains("__") {
-            VhdlPathName::try_new(str.split("__"))
+        } else if str.contains("_0_") {
+            VhdlPathName::try_new(str.split("_0_"))
         } else {
             let name: VhdlName = str.try_into()?;
             Ok(VhdlPathName::from(name))
