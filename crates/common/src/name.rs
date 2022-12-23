@@ -51,6 +51,11 @@ impl Name {
                 "{}: name cannot contain two or more consecutive underscores",
                 name
             )))
+        } else if name.contains("_0_") {
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot contain the sequence \"_0_\" for compatibility with certain targets, consider using \"_00_\" if necessary",
+                name
+            )))
         } else if !name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c.eq(&'_'))
@@ -267,6 +272,14 @@ impl PathName {
             }
             return true;
         }
+    }
+
+    /// Join the Names in this PathName into a string, using a specific separator
+    pub fn join(&self, separator: &str) -> String {
+        self.into_iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(separator)
     }
 }
 

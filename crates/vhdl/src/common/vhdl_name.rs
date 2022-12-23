@@ -10,6 +10,7 @@ use tydi_common::{
     error::{Error, Result, TryOptionalFrom, TryResult},
     name::{Name, PathName},
 };
+use uncased::Uncased;
 /// Type-safe wrapper for valid names.
 ///
 /// The following rules apply for valid names
@@ -24,20 +25,13 @@ use tydi_common::{
 /// ```rust
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct VhdlName(String);
+pub struct VhdlName(Uncased<'static>);
 
 impl VhdlName {
     /// Constructs a new name wrapper. Returns an error when the provided name
     /// is invalid.
     pub fn try_new(name: impl Into<String>) -> Result<Self> {
-        let mut name: String = name.into();
-        // Remove enclosing backslashes for extended
-        // TODO: Map this to an enum later
-        if name.len() > 1 && name.starts_with("\\") && name.ends_with("\\") {
-            name.pop();
-            name.remove(0);
-            return Self::try_new(name);
-        }
+        let name: String = name.into();
 
         if name.is_empty() {
             Err(Error::InvalidArgument("name cannot be empty".to_string()))
@@ -49,6 +43,11 @@ impl VhdlName {
         } else if name.starts_with('_') || name.ends_with('_') {
             Err(Error::InvalidArgument(format!(
                 "{}: name cannot start or end with an underscore",
+                name
+            )))
+        } else if name.contains("__") {
+            Err(Error::InvalidArgument(format!(
+                "{}: name cannot contain two or more consecutive underscores",
                 name
             )))
         } else if !name
@@ -63,30 +62,20 @@ impl VhdlName {
                 .to_string(),
             ))
         } else {
-            Ok(VhdlName(name))
-        }
-    }
-
-    // Includes surrounding `\`s when this is an extended identifier
-    // TODO: Should probably refactor this into an enum
-    pub fn declare(&self) -> String {
-        if self.0.contains("__") {
-            format!("\\{}\\", self)
-        } else {
-            self.to_string()
+            Ok(VhdlName(name.into()))
         }
     }
 }
 
 impl From<VhdlName> for String {
     fn from(name: VhdlName) -> Self {
-        name.0
+        name.0.into_string()
     }
 }
 
 impl From<&VhdlName> for String {
     fn from(name: &VhdlName) -> Self {
-        name.0.clone()
+        name.0.clone().into_string()
     }
 }
 
@@ -98,19 +87,13 @@ impl From<Name> for VhdlName {
 
 impl From<PathName> for VhdlName {
     fn from(path: PathName) -> Self {
-        VhdlName::try_new(path).unwrap()
+        VhdlName::try_new(path.join("_0_")).unwrap()
     }
 }
 
 impl From<&PathName> for VhdlName {
     fn from(path: &PathName) -> Self {
-        VhdlName::try_new(path).unwrap()
-    }
-}
-
-impl From<VhdlPathName> for VhdlName {
-    fn from(path: VhdlPathName) -> Self {
-        VhdlName::try_new(path).unwrap()
+        VhdlName::try_new(path.join("_0_")).unwrap()
     }
 }
 
@@ -169,6 +152,8 @@ impl fmt::Display for VhdlName {
         write!(f, "{}", self.0)
     }
 }
+
+// TODO: VhdlPathName is kind of useless, since libraries/packages can't be nested.
 
 /// Type-safe path for names.
 ///

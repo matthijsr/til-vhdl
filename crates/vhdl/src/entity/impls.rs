@@ -54,7 +54,7 @@ impl DeclareWithIndent for Entity {
 
 impl Identify for Entity {
     fn identifier(&self) -> String {
-        self.identifier.declare()
+        self.identifier.to_string()
     }
 }
 

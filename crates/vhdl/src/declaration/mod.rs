@@ -371,7 +371,7 @@ impl ObjectDeclaration {
 
 impl Identify for ObjectDeclaration {
     fn identifier(&self) -> String {
-        self.identifier.declare()
+        self.identifier.to_string()
     }
 }
 

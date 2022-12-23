@@ -14,3 +14,4 @@ tydi-intern = { path = "../intern" }
 itertools = "0.10.3"
 textwrap = "0.15.0"
 salsa = "0.16.1"
+uncased = "0.9.7"

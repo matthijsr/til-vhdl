@@ -111,7 +111,7 @@ impl Port {
 
 impl Identify for Port {
     fn identifier(&self) -> String {
-        self.identifier.declare()
+        self.identifier.to_string()
     }
 }
 
@@ -240,7 +240,7 @@ impl GenericParameter {
 
 impl Identify for GenericParameter {
     fn identifier(&self) -> String {
-        self.identifier.declare()
+        self.identifier.to_string()
     }
 }
 

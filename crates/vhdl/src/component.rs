@@ -78,7 +78,7 @@ impl Component {
 
 impl Identify for Component {
     fn identifier(&self) -> String {
-        self.identifier.declare()
+        self.identifier.to_string()
     }
 }
 

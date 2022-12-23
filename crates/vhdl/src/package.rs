@@ -167,7 +167,7 @@ impl ListUsings for Package {
 
 impl Identify for Package {
     fn identifier(&self) -> String {
-        self.identifier.declare()
+        self.identifier.to_string()
     }
 }
 
