@@ -8,3 +8,4 @@ description = "Common traits and functions for use in Tydi crates"
 
 [dependencies]
 log = "0.4.14"
+uncased = "0.9.7"
