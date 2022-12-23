@@ -1091,43 +1091,43 @@ entity parent_com is
 end parent_com;
 
 architecture structural of parent_com is
-  signal \a__a_valid\ : std_logic;
-  signal \a__a_ready\ : std_logic;
-  signal \a__a_data\ : std_logic_vector(4 downto 0);
-  signal \a__a_last\ : std_logic_vector((pa) + 1 downto 0);
-  signal \a__a_strb\ : std_logic;
-  signal \a__b_valid\ : std_logic;
-  signal \a__b_ready\ : std_logic;
-  signal \a__b_data\ : std_logic_vector(4 downto 0);
-  signal \a__b_last\ : std_logic_vector((pa) + 1 downto 0);
-  signal \a__b_strb\ : std_logic;
+  signal a_0_a_valid : std_logic;
+  signal a_0_a_ready : std_logic;
+  signal a_0_a_data : std_logic_vector(4 downto 0);
+  signal a_0_a_last : std_logic_vector((pa) + 1 downto 0);
+  signal a_0_a_strb : std_logic;
+  signal a_0_b_valid : std_logic;
+  signal a_0_b_ready : std_logic;
+  signal a_0_b_data : std_logic_vector(4 downto 0);
+  signal a_0_b_last : std_logic_vector((pa) + 1 downto 0);
+  signal a_0_b_strb : std_logic;
 begin
   a: inner_com generic map(
     pa => pa + 1
   ) port map(
     clk => clk,
     rst => rst,
-    a_valid => \a__a_valid\,
-    a_ready => \a__a_ready\,
-    a_data => \a__a_data\,
-    a_last => \a__a_last\,
-    a_strb => \a__a_strb\,
-    b_valid => \a__b_valid\,
-    b_ready => \a__b_ready\,
-    b_data => \a__b_data\,
-    b_last => \a__b_last\,
-    b_strb => \a__b_strb\
+    a_valid => a_0_a_valid,
+    a_ready => a_0_a_ready,
+    a_data => a_0_a_data,
+    a_last => a_0_a_last,
+    a_strb => a_0_a_strb,
+    b_valid => a_0_b_valid,
+    b_ready => a_0_b_ready,
+    b_data => a_0_b_data,
+    b_last => a_0_b_last,
+    b_strb => a_0_b_strb
   );
   b_valid <= a_valid;
   a_ready <= b_ready;
   b_data <= a_data;
   b_last <= a_last;
   b_strb <= a_strb;
-  \a__a_valid\ <= \a__b_valid\;
-  \a__b_ready\ <= \a__a_ready\;
-  \a__a_data\ <= \a__b_data\;
-  \a__a_last\ <= \a__b_last\;
-  \a__a_strb\ <= \a__b_strb\;
+  a_0_a_valid <= a_0_b_valid;
+  a_0_b_ready <= a_0_a_ready;
+  a_0_a_data <= a_0_b_data;
+  a_0_a_last <= a_0_b_last;
+  a_0_a_strb <= a_0_b_strb;
 end structural;"#,
         streamlet_arch.declare(arch_db)?
     );
