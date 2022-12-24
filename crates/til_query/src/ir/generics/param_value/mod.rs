@@ -18,6 +18,16 @@ pub enum GenericParamValue {
 }
 
 impl GenericParamValue {
+    pub fn reduce(&self) -> Self {
+        match self {
+            GenericParamValue::Integer(_) => self.clone(),
+            GenericParamValue::Ref(_) => self.clone(),
+            GenericParamValue::Combination(m) => match m {
+                Combination::Math(m) => m.reduce(),
+            },
+        }
+    }
+
     pub fn is_integer(&self) -> bool {
         match &self {
             GenericParamValue::Integer(_) => true,

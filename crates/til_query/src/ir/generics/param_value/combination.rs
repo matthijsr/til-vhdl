@@ -30,15 +30,32 @@ impl From<MathCombination> for Combination {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MathOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+}
+
+impl fmt::Display for MathOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MathOperator::Add => write!(f, "+"),
+            MathOperator::Subtract => write!(f, "-"),
+            MathOperator::Multiply => write!(f, "*"),
+            MathOperator::Divide => write!(f, "/"),
+            MathOperator::Modulo => write!(f, "%"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MathCombination {
     Parentheses(Box<MathCombination>),
     Negative(Box<GenericParamValue>),
-    Sum(Box<GenericParamValue>, Box<GenericParamValue>),
-    Subtraction(Box<GenericParamValue>, Box<GenericParamValue>),
-    Product(Box<GenericParamValue>, Box<GenericParamValue>),
-    Division(Box<GenericParamValue>, Box<GenericParamValue>),
-    Modulo(Box<GenericParamValue>, Box<GenericParamValue>),
+    Combination(Box<GenericParamValue>, MathOperator, Box<GenericParamValue>),
 }
 
 impl fmt::Display for MathCombination {
@@ -46,25 +63,39 @@ impl fmt::Display for MathCombination {
         match self {
             MathCombination::Parentheses(p) => write!(f, "Parentheses({})", p),
             MathCombination::Negative(n) => write!(f, "Negative({})", n),
-            MathCombination::Sum(l, r) => write!(f, "Sum({}, {})", l, r),
-            MathCombination::Subtraction(l, r) => write!(f, "Subtraction({}, {})", l, r),
-            MathCombination::Product(l, r) => write!(f, "Product({}, {})", l, r),
-            MathCombination::Division(l, r) => write!(f, "Division({}, {})", l, r),
-            MathCombination::Modulo(l, r) => write!(f, "Modulo({}, {})", l, r),
+            MathCombination::Combination(l, op, r) => write!(f, "{} {} {}", l, op, r),
         }
     }
 }
 
 impl MathCombination {
+    pub fn reduce(&self) -> GenericParamValue {
+        match self {
+            MathCombination::Parentheses(p) => p.reduce(),
+            MathCombination::Negative(n) => match n.as_ref() {
+                GenericParamValue::Integer(i) => GenericParamValue::Integer(-i),
+                GenericParamValue::Ref(_) => self.clone().into(),
+                GenericParamValue::Combination(c) => match c {
+                    Combination::Math(m) => match m {
+                        MathCombination::Parentheses(p) => {
+                            // Negative implicitly includes parentheses
+                            MathCombination::Negative(Box::new(p.reduce())).into()
+                        }
+                        // Two negatives cancel out
+                        MathCombination::Negative(n) => n.reduce(),
+                        _ => MathCombination::Negative(Box::new(m.reduce())).into(),
+                    },
+                },
+            },
+            MathCombination::Combination(_, _, _) => todo!(),
+        }
+    }
+
     pub fn left_val(&self) -> &GenericParamValue {
         match self {
             MathCombination::Parentheses(p) => p.left_val(),
             MathCombination::Negative(n) => n.as_ref(),
-            MathCombination::Sum(l, _)
-            | MathCombination::Subtraction(l, _)
-            | MathCombination::Product(l, _)
-            | MathCombination::Division(l, _)
-            | MathCombination::Modulo(l, _) => l.as_ref(),
+            MathCombination::Combination(l, _, _) => l.as_ref(),
         }
     }
 
@@ -94,8 +125,9 @@ impl MathCombination {
         left: impl Into<GenericParamValue>,
         right: impl Into<GenericParamValue>,
     ) -> Result<MathCombination> {
-        Ok(MathCombination::Sum(
+        Ok(MathCombination::Combination(
             Self::integer_or_err(left)?,
+            MathOperator::Add,
             Self::integer_or_err(right)?,
         ))
     }
@@ -104,8 +136,9 @@ impl MathCombination {
         left: impl Into<GenericParamValue>,
         right: impl Into<GenericParamValue>,
     ) -> Result<MathCombination> {
-        Ok(MathCombination::Subtraction(
+        Ok(MathCombination::Combination(
             Self::integer_or_err(left)?,
+            MathOperator::Subtract,
             Self::integer_or_err(right)?,
         ))
     }
@@ -114,8 +147,9 @@ impl MathCombination {
         left: impl Into<GenericParamValue>,
         right: impl Into<GenericParamValue>,
     ) -> Result<MathCombination> {
-        Ok(MathCombination::Product(
+        Ok(MathCombination::Combination(
             Self::integer_or_err(left)?,
+            MathOperator::Multiply,
             Self::integer_or_err(right)?,
         ))
     }
@@ -124,8 +158,9 @@ impl MathCombination {
         left: impl Into<GenericParamValue>,
         right: impl Into<GenericParamValue>,
     ) -> Result<MathCombination> {
-        Ok(MathCombination::Division(
+        Ok(MathCombination::Combination(
             Self::integer_or_err(left)?,
+            MathOperator::Divide,
             Self::integer_or_err(right)?,
         ))
     }
@@ -134,8 +169,9 @@ impl MathCombination {
         left: impl Into<GenericParamValue>,
         right: impl Into<GenericParamValue>,
     ) -> Result<MathCombination> {
-        Ok(MathCombination::Modulo(
+        Ok(MathCombination::Combination(
             Self::integer_or_err(left)?,
+            MathOperator::Modulo,
             Self::integer_or_err(right)?,
         ))
     }
