@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use bitvec::order;
 use tydi_common::{
     error::{Error, Result, TryOptional, TryResult, WrapError},
     map::{InsertionOrderedMap, InsertionOrderedSet},
