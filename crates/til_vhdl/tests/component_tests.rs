@@ -17,7 +17,7 @@ use til_query::{
     },
     ir::{
         db::Database,
-        generics::param_value::combination::GenericParamValueOps,
+        generics::param_value::{combination::GenericParamValueOps, GenericParamValue},
         implementation::{structure::Structure, Implementation},
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
@@ -925,18 +925,26 @@ fn basic_comp_arch_with_instance_and_behav_params() -> Result<()> {
     let instance_streamlet = streamlet_without_impl_with_behav_params(db, "inner")?;
     let parent_streamlet = streamlet_without_impl_with_behav_params(db, "parent")?;
     let mut structure = Structure::try_from(&parent_streamlet)?;
-    let instance =
-        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
-    instance.assign_parameter("pa", 20)?;
-    instance.assign_parameter(
-        "pb",
-        parent_streamlet.try_get_parameter(db, &Name::try_new("pb")?)?,
-    )?;
-    instance.assign_parameter(
-        "pc",
-        parent_streamlet
-            .try_get_parameter(db, &Name::try_new("pa")?)?
-            .g_add(1)?,
+    let instance = structure.try_add_streamlet_instance_domains_default(
+        db,
+        "a",
+        instance_streamlet.intern_arc(db),
+        vec![
+            ("pa", GenericParamValue::from(20)),
+            (
+                "pb",
+                parent_streamlet
+                    .try_get_parameter(db, &Name::try_new("pb")?)?
+                    .into(),
+            ),
+            (
+                "pc",
+                parent_streamlet
+                    .try_get_parameter(db, &Name::try_new("pa")?)?
+                    .g_add(1)?
+                    .into(),
+            ),
+        ],
     )?;
     structure.try_add_connection(db, "a", ("a", "a"))?;
     structure.try_add_connection(db, "b", ("a", "b"))?;
@@ -1038,13 +1046,16 @@ fn basic_comp_arch_with_instance_and_interface_params() -> Result<()> {
     let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
     let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
     let mut structure = Structure::try_from(&parent_streamlet)?;
-    let instance =
-        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
-    instance.assign_parameter(
-        "pa",
-        parent_streamlet
-            .try_get_parameter(db, &Name::try_new("pa")?)?
-            .g_add(1)?,
+    let instance = structure.try_add_streamlet_instance_domains_default(
+        db,
+        "a",
+        instance_streamlet.intern_arc(db),
+        vec![(
+            "pa",
+            parent_streamlet
+                .try_get_parameter(db, &Name::try_new("pa")?)?
+                .g_add(1)?,
+        )],
     )?;
 
     structure.try_add_connection(db, "a", "b")?;
@@ -1143,13 +1154,16 @@ fn basic_comp_arch_with_instance_and_interface_params_playground() -> Result<()>
     let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
     let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
     let mut structure = Structure::try_from(&parent_streamlet)?;
-    let instance =
-        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
-    instance.assign_parameter(
-        "pa",
-        parent_streamlet
-            .try_get_parameter(db, &Name::try_new("pa")?)?
-            .g_add(1)?,
+    structure.try_add_streamlet_instance_domains_default(
+        db,
+        "a",
+        instance_streamlet.intern_arc(db),
+        vec![(
+            "pa",
+            parent_streamlet
+                .try_get_parameter(db, &Name::try_new("pa")?)?
+                .g_add(1)?,
+        )],
     )?;
 
     // This should fail

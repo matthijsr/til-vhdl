@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
+use tydi_common::{map::InsertionOrderedMap, name::Name};
 use tydi_intern::Id;
 
 use crate::common::logical::logicaltype::{stream::Stream, LogicalType};
 
 use super::{
-    implementation::Implementation,
+    implementation::{structure::streamlet_instance::GenericParameterAssignment, Implementation},
     project::{interface::Interface, namespace::Namespace},
     streamlet::Streamlet,
 };
@@ -24,4 +25,9 @@ pub trait Interner {
     fn intern_streamlet(&self, streamlet: Arc<Streamlet>) -> Id<Arc<Streamlet>>;
     #[salsa::interned]
     fn intern_interface(&self, interface: Arc<Interface>) -> Id<Arc<Interface>>;
+    #[salsa::interned]
+    fn intern_param_assignments(
+        &self,
+        param_assignments: Arc<InsertionOrderedMap<Name, GenericParameterAssignment>>,
+    ) -> Id<Arc<InsertionOrderedMap<Name, GenericParameterAssignment>>>;
 }

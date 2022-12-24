@@ -11,6 +11,7 @@ use til_query::{
     },
     ir::{
         db::Database,
+        generics::param_value::GenericParamValue,
         implementation::structure::Structure,
         physical_properties::InterfaceDirection,
         project::{namespace::Namespace, Project},
@@ -20,7 +21,7 @@ use til_query::{
     },
 };
 use til_vhdl::canonical;
-use tydi_common::error::Result;
+use tydi_common::{error::Result, name::Name};
 
 extern crate til_vhdl;
 
@@ -111,7 +112,7 @@ fn playground() -> Result<()> {
 
     let streamlet_id = namespace.get_streamlet_id("streamlet")?;
     let mut structure: Structure = streamlet_id.get(db).as_ref().try_into()?;
-    structure.try_add_streamlet_instance(
+    structure.try_add_streamlet_instance_parameters_default(
         db,
         "a",
         streamlet_id,

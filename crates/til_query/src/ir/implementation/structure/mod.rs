@@ -13,6 +13,7 @@ use tydi_intern::Id;
 
 use crate::ir::{
     connection::{Connection, InterfaceReference},
+    generics::param_value::GenericParamValue,
     physical_properties::{Domain, InterfaceDirection},
     project::interface::Interface,
     traits::{GetSelf, MoveDb},
@@ -170,7 +171,10 @@ impl Structure {
         db: &dyn Ir,
         name: impl TryResult<Name>,
         streamlet: Id<Arc<Streamlet>>,
-        assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
+        domain_assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
+        parameter_assignments: impl IntoIterator<
+            Item = (impl TryOptional<Name>, impl TryResult<GenericParamValue>),
+        >,
     ) -> Result<&mut StreamletInstance> {
         let name = name.try_result()?;
         if self.streamlet_instances().contains_key(&name) {
@@ -181,7 +185,13 @@ impl Structure {
         } else {
             self.streamlet_instances.insert(
                 name.clone(),
-                StreamletInstance::new(db, name.clone(), streamlet, assignments)?,
+                StreamletInstance::new(
+                    db,
+                    name.clone(),
+                    streamlet,
+                    domain_assignments,
+                    parameter_assignments,
+                )?,
             );
             Ok(self.streamlet_instances.get_mut(&name).unwrap())
         }
@@ -203,6 +213,62 @@ impl Structure {
             self.streamlet_instances.insert(
                 name.clone(),
                 StreamletInstance::new_assign_default(db, name.clone(), streamlet)?,
+            );
+            Ok(self.streamlet_instances.get_mut(&name).unwrap())
+        }
+    }
+
+    pub fn try_add_streamlet_instance_domains_default(
+        &mut self,
+        db: &dyn Ir,
+        name: impl TryResult<Name>,
+        streamlet: Id<Arc<Streamlet>>,
+        parameter_assignments: impl IntoIterator<
+            Item = (impl TryOptional<Name>, impl TryResult<GenericParamValue>),
+        >,
+    ) -> Result<&mut StreamletInstance> {
+        let name = name.try_result()?;
+        if self.streamlet_instances().contains_key(&name) {
+            Err(Error::InvalidArgument(format!(
+                "A streamlet instance with name {} already exists in this structure",
+                name
+            )))
+        } else {
+            self.streamlet_instances.insert(
+                name.clone(),
+                StreamletInstance::new_assign_domains_default(
+                    db,
+                    name.clone(),
+                    streamlet,
+                    parameter_assignments,
+                )?,
+            );
+            Ok(self.streamlet_instances.get_mut(&name).unwrap())
+        }
+    }
+
+    pub fn try_add_streamlet_instance_parameters_default(
+        &mut self,
+        db: &dyn Ir,
+        name: impl TryResult<Name>,
+        streamlet: Id<Arc<Streamlet>>,
+        domain_assignments: impl IntoIterator<Item = (impl TryOptional<Domain>, impl TryResult<Domain>)>,
+    ) -> Result<&mut StreamletInstance> {
+        let name = name.try_result()?;
+        if self.streamlet_instances().contains_key(&name) {
+            Err(Error::InvalidArgument(format!(
+                "A streamlet instance with name {} already exists in this structure",
+                name
+            )))
+        } else {
+            self.streamlet_instances.insert(
+                name.clone(),
+                StreamletInstance::new_assign_parameters_default(
+                    db,
+                    name.clone(),
+                    streamlet,
+                    domain_assignments,
+                )?,
             );
             Ok(self.streamlet_instances.get_mut(&name).unwrap())
         }

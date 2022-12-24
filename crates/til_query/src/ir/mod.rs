@@ -29,7 +29,7 @@ use crate::{
 
 use self::{
     generics::{interface::InterfaceGenericKind, GenericKind},
-    implementation::Implementation,
+    implementation::{structure::streamlet_instance::GenericParameterAssignment, Implementation},
     interface_port::InterfacePort,
     interner::Interner,
     project::Project,
@@ -76,6 +76,18 @@ pub trait Ir: Interner {
         &self,
         key: Id<Stream>,
     ) -> Result<InsertionOrderedMap<Name, GenericKind>>;
+
+    fn stream_for_param_assignments(
+        &self,
+        key: Id<Stream>,
+        param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+    ) -> Result<Id<Stream>>;
+
+    fn type_for_param_assignments(
+        &self,
+        key: Id<LogicalType>,
+        param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+    ) -> Result<Id<Stream>>;
 }
 
 fn project_ref(db: &dyn Ir) -> Arc<Project> {
@@ -276,6 +288,22 @@ You must ensure that only one Stream has a Keep and/or User property."#.to_strin
         db.intern_type(LogicalType::Null),
         streams,
     ))
+}
+
+fn type_for_param_assignments(
+    db: &dyn Ir,
+    key: Id<LogicalType>,
+    param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+) -> Result<Id<Stream>> {
+    todo!()
+}
+
+fn stream_for_param_assignments(
+    db: &dyn Ir,
+    key: Id<Stream>,
+    param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+) -> Result<Id<Stream>> {
+    todo!()
 }
 
 #[cfg(test)]
