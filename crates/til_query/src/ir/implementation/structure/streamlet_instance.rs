@@ -37,7 +37,8 @@ impl GenericParameterAssignment {
     pub fn try_assign(&self, param_value: impl TryResult<GenericParamValue>) -> Result<Self> {
         match self {
             GenericParameterAssignment::Default(param) => {
-                let param_value = param_value.try_result()?;
+                let param_value: GenericParamValue = param_value.try_result()?;
+                let param_value = param_value.reduce();
                 if param.valid_value(param_value.clone())? {
                     Ok(GenericParameterAssignment::Assigned(
                         param.clone(),

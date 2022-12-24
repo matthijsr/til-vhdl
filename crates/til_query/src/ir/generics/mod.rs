@@ -141,10 +141,11 @@ impl GenericParameter {
         kind: impl TryResult<GenericKind>,
         default_value: impl TryResult<GenericParamValue>,
     ) -> Result<Self> {
+        let default_value: GenericParamValue = default_value.try_result()?;
         let r = Self {
             name: name.try_result()?,
             kind: kind.try_result()?,
-            default_value: default_value.try_result()?,
+            default_value: default_value.reduce(),
             doc: None,
         };
         if !r.default_value().is_fixed() {

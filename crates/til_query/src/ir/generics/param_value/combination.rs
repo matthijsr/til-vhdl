@@ -87,7 +87,84 @@ impl MathCombination {
                     },
                 },
             },
-            MathCombination::Combination(_, _, _) => todo!(),
+            MathCombination::Combination(l, op, r) => {
+                let l = l.reduce();
+                let r = r.reduce();
+                if l == 0 && r == 0 {
+                    // TODO: Technically incorrect for division and mod, I think?
+                    return GenericParamValue::Integer(0);
+                }
+                if let (GenericParamValue::Integer(l), GenericParamValue::Integer(r)) = (&l, &r) {
+                    return match op {
+                        MathOperator::Add => GenericParamValue::Integer(l + r),
+                        MathOperator::Subtract => GenericParamValue::Integer(l - r),
+                        MathOperator::Multiply => GenericParamValue::Integer(l * r),
+                        MathOperator::Divide => GenericParamValue::Integer(l / r),
+                        MathOperator::Modulo => GenericParamValue::Integer(l % r),
+                    };
+                }
+                match op {
+                    MathOperator::Add if l == r => MathCombination::Combination(
+                        Box::new(GenericParamValue::Integer(2)),
+                        *op,
+                        Box::new(r),
+                    )
+                    .into(),
+                    MathOperator::Add if l == 0 => r,
+                    MathOperator::Subtract if l == r => GenericParamValue::Integer(0),
+                    MathOperator::Subtract if l == 0 => {
+                        MathCombination::Negative(Box::new(r)).into()
+                    }
+                    MathOperator::Add | MathOperator::Subtract => {
+                        if r == 0 {
+                            l
+                        } else {
+                            MathCombination::Combination(Box::new(l), *op, Box::new(r)).into()
+                        }
+                    }
+                    MathOperator::Multiply => {
+                        if l == 0 {
+                            GenericParamValue::Integer(0)
+                        } else if r == 0 {
+                            GenericParamValue::Integer(0)
+                        } else if l == 1 {
+                            r
+                        } else if r == 1 {
+                            l
+                        } else {
+                            MathCombination::Combination(Box::new(l), *op, Box::new(r)).into()
+                        }
+                    }
+                    MathOperator::Divide => {
+                        if l == 0 {
+                            GenericParamValue::Integer(0)
+                        } else if r == 0 {
+                            // TODO: Should throw an error here
+                            todo!()
+                        } else if r == 1 {
+                            l
+                        } else if l == r {
+                            GenericParamValue::Integer(1)
+                        } else {
+                            MathCombination::Combination(Box::new(l), *op, Box::new(r)).into()
+                        }
+                    }
+                    MathOperator::Modulo => {
+                        if l == 0 {
+                            GenericParamValue::Integer(0)
+                        } else if r == 0 {
+                            // TODO: Should throw an error here
+                            todo!()
+                        } else if r == 1 {
+                            GenericParamValue::Integer(0)
+                        } else if l == r {
+                            GenericParamValue::Integer(0)
+                        } else {
+                            MathCombination::Combination(Box::new(l), *op, Box::new(r)).into()
+                        }
+                    }
+                }
+            }
         }
     }
 

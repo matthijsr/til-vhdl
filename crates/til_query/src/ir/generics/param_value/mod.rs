@@ -50,6 +50,24 @@ impl GenericParamValue {
             GenericParamValue::Combination(_) => false,
         }
     }
+
+    pub fn is_zero(&self) -> bool {
+        matches!(self, GenericParamValue::Integer(0))
+    }
+
+    pub fn is_one(&self) -> bool {
+        matches!(self, GenericParamValue::Integer(0))
+    }
+}
+
+impl PartialEq<i32> for GenericParamValue {
+    fn eq(&self, other: &i32) -> bool {
+        if let GenericParamValue::Integer(i) = self {
+            i == other
+        } else {
+            false
+        }
+    }
 }
 
 impl fmt::Display for GenericParamValue {
