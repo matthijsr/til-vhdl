@@ -11,7 +11,6 @@ use til_query::{
     },
     ir::{
         db::Database,
-        generics::param_value::GenericParamValue,
         implementation::structure::Structure,
         physical_properties::InterfaceDirection,
         project::{namespace::Namespace, Project},
@@ -21,7 +20,7 @@ use til_query::{
     },
 };
 use til_vhdl::canonical;
-use tydi_common::{error::Result, name::Name};
+use tydi_common::{error::Result};
 
 extern crate til_vhdl;
 

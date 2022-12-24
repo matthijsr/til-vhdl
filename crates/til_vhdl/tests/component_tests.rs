@@ -925,7 +925,7 @@ fn basic_comp_arch_with_instance_and_behav_params() -> Result<()> {
     let instance_streamlet = streamlet_without_impl_with_behav_params(db, "inner")?;
     let parent_streamlet = streamlet_without_impl_with_behav_params(db, "parent")?;
     let mut structure = Structure::try_from(&parent_streamlet)?;
-    let instance = structure.try_add_streamlet_instance_domains_default(
+    structure.try_add_streamlet_instance_domains_default(
         db,
         "a",
         instance_streamlet.intern_arc(db),
@@ -1046,7 +1046,7 @@ fn basic_comp_arch_with_instance_and_interface_params() -> Result<()> {
     let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
     let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
     let mut structure = Structure::try_from(&parent_streamlet)?;
-    let instance = structure.try_add_streamlet_instance_domains_default(
+    structure.try_add_streamlet_instance_domains_default(
         db,
         "a",
         instance_streamlet.intern_arc(db),
