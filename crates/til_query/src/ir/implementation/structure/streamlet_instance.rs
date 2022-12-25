@@ -343,6 +343,8 @@ impl StreamletInstance {
 
         let parameter_assignments = Self::set_parameters_default(definition.parameters(db))?;
 
+        ports.try_apply(|port| port.try_assign_stream(db, &parameter_assignments))?;
+
         Ok(Self {
             name,
             definition,
@@ -378,6 +380,8 @@ impl StreamletInstance {
         } else {
             Self::set_parameters_default(definition.parameters(db))?
         };
+
+        ports.try_apply(|port| port.try_assign_stream(db, &parameter_assignments))?;
 
         Ok(Self {
             name,
@@ -417,6 +421,8 @@ impl StreamletInstance {
         };
 
         let parameter_assignments = Self::set_parameters_default(definition.parameters(db))?;
+
+        ports.try_apply(|port| port.try_assign_stream(db, &parameter_assignments))?;
 
         Ok(Self {
             name,
@@ -468,6 +474,8 @@ impl StreamletInstance {
         } else {
             Self::set_parameters_default(definition.parameters(db))?
         };
+
+        ports.try_apply(|port| port.try_assign_stream(db, &parameter_assignments))?;
 
         Ok(Self {
             name,

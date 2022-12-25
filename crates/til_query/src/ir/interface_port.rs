@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 
 use tydi_common::{
     error::{Error, Result, TryResult},
+    map::InsertionOrderedMap,
     name::{Name, NameSelf},
     traits::{Document, Documents, Identify},
 };
@@ -11,7 +12,8 @@ use tydi_intern::Id;
 use crate::common::logical::logicaltype::stream::Stream;
 
 use super::{
-    physical_properties::{InterfaceDirection, PhysicalProperties, Domain},
+    implementation::structure::streamlet_instance::GenericParameterAssignment,
+    physical_properties::{Domain, InterfaceDirection, PhysicalProperties},
     Ir,
 };
 
@@ -36,6 +38,26 @@ impl InterfacePort {
             physical_properties,
             doc: None,
         })
+    }
+
+    pub fn try_assign_stream(
+        &mut self,
+        db: &dyn Ir,
+        param_assignments: &InsertionOrderedMap<Name, GenericParameterAssignment>,
+    ) -> Result<()> {
+        let stream_params = db.stream_parameter_kinds(self.stream_id())?;
+        let mut to_assign = InsertionOrderedMap::new();
+        for (param_name, param_assignment) in param_assignments {
+            if stream_params.contains(param_name) {
+                to_assign.try_insert(param_name.clone(), param_assignment.clone())?;
+            }
+        }
+        if to_assign.len() > 0 {
+            self.stream = db.stream_for_param_assignments(self.stream_id(), to_assign)?;
+            Ok(())
+        } else {
+            Ok(())
+        }
     }
 
     pub fn stream(&self, db: &dyn Ir) -> Stream {
