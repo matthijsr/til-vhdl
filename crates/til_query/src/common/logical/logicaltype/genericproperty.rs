@@ -42,7 +42,8 @@ impl GenericProperty<NonNegative> {
                 Box::new(l.try_assign(param, val.clone())?),
                 *op,
                 Box::new(r.try_assign(param, val.clone())?),
-            ).try_reduce(),
+            )
+            .try_reduce(),
             GenericProperty::Fixed(_) => self.clone(),
             GenericProperty::Parameterized(n) => {
                 if n == param {
@@ -91,6 +92,40 @@ impl GenericProperty<NonNegative> {
         }
     }
 
+    // Very basic direct transitives (addition, multiplication)
+    // TODO: Should probably just be more careful with parentheses
+    pub fn transitive_for(
+        self,
+        check_op: MathOperator,
+    ) -> (
+        GenericProperty<NonNegative>,
+        Option<GenericProperty<NonNegative>>,
+    ) {
+        match &self {
+            GenericProperty::Combination(l, op, r) => match op {
+                MathOperator::Add => {
+                    if check_op == MathOperator::Add {
+                        (l.as_ref().clone(), Some(r.as_ref().clone()))
+                    } else {
+                        (self, None)
+                    }
+                }
+                MathOperator::Subtract => (self, None),
+                MathOperator::Multiply => {
+                    if check_op == MathOperator::Multiply {
+                        (l.as_ref().clone(), Some(r.as_ref().clone()))
+                    } else {
+                        (self, None)
+                    }
+                }
+                MathOperator::Divide => (self, None),
+                MathOperator::Modulo => (self, None),
+            },
+            GenericProperty::Fixed(_) => (self, None),
+            GenericProperty::Parameterized(_) => (self, None),
+        }
+    }
+
     /// Tries to remove unnecessary operations
     ///
     /// E.g.:
@@ -102,10 +137,30 @@ impl GenericProperty<NonNegative> {
     pub fn try_reduce(&self) -> Self {
         match self {
             GenericProperty::Combination(l, op, r) => {
-                let l = l.try_reduce();
+                let (l, t) = l.try_reduce().transitive_for(*op);
                 let r = r.try_reduce();
+                let r = if let Some(t) = t {
+                    match op {
+                        MathOperator::Add => (t + r).try_reduce(),
+                        MathOperator::Subtract => todo!(),
+                        MathOperator::Multiply => (t * r).try_reduce(),
+                        MathOperator::Divide => todo!(),
+                        MathOperator::Modulo => todo!(),
+                    }
+                } else {
+                    r
+                };
                 if l.is_zero() && r.is_zero() {
                     return GenericProperty::Fixed(0);
+                }
+                if let (GenericProperty::Fixed(l), GenericProperty::Fixed(r)) = (&l, &r) {
+                    return match op {
+                        MathOperator::Add => GenericProperty::Fixed(l + r),
+                        MathOperator::Subtract => GenericProperty::Fixed(l - r),
+                        MathOperator::Multiply => GenericProperty::Fixed(l * r),
+                        MathOperator::Divide => GenericProperty::Fixed(l / r),
+                        MathOperator::Modulo => GenericProperty::Fixed(l % r),
+                    };
                 }
                 match op {
                     MathOperator::Add => {
