@@ -40,6 +40,7 @@ pub fn physical_bitcount_to_relation(
                 GenericPropertyOperator::Subtract => Relation::from(l.r_subtract(db, r)?),
                 GenericPropertyOperator::Multiply => Relation::from(l.r_multiply(db, r)?),
                 GenericPropertyOperator::Divide => Relation::from(l.r_divide_by(db, r)?),
+                GenericPropertyOperator::Modulo => Relation::from(l.r_mod(db, r)?),
             }
         }
         PhysicalBitCount::Fixed(f) => Relation::from(u32_to_i32(f.get())?),

@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 use std::ops::Add;
 use std::ops::Div;
 use std::ops::Mul;
+use std::ops::Rem;
 use std::ops::Sub;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
@@ -15,6 +16,7 @@ pub enum GenericPropertyOperator {
     Subtract,
     Multiply,
     Divide,
+    Modulo,
 }
 
 impl fmt::Display for GenericPropertyOperator {
@@ -24,6 +26,7 @@ impl fmt::Display for GenericPropertyOperator {
             GenericPropertyOperator::Subtract => write!(f, "-"),
             GenericPropertyOperator::Multiply => write!(f, "*"),
             GenericPropertyOperator::Divide => write!(f, "/"),
+            GenericPropertyOperator::Modulo => write!(f, "%"),
         }
     }
 }
@@ -50,6 +53,7 @@ impl GenericProperty<NonNegative> {
                             GenericPropertyOperator::Subtract => Some(lv - rv),
                             GenericPropertyOperator::Multiply => Some(lv * rv),
                             GenericPropertyOperator::Divide => Some(lv / rv),
+                            GenericPropertyOperator::Modulo => Some(lv % rv),
                         };
                     }
                 }
@@ -138,6 +142,18 @@ impl GenericProperty<NonNegative> {
                             l / r
                         }
                     }
+                    GenericPropertyOperator::Modulo => {
+                        if l.is_zero() {
+                            GenericProperty::Fixed(0)
+                        } else if r.is_zero() {
+                            // TODO: This should be an error
+                            todo!()
+                        } else if r.is_one() {
+                            GenericProperty::Fixed(0)
+                        } else {
+                            l % r
+                        }
+                    }
                 }
             }
             GenericProperty::Fixed(_) => self.clone(),
@@ -195,6 +211,18 @@ impl<T: fmt::Display> Div for GenericProperty<T> {
         GenericProperty::Combination(
             Box::new(self),
             GenericPropertyOperator::Divide,
+            Box::new(rhs),
+        )
+    }
+}
+
+impl<T: fmt::Display> Rem for GenericProperty<T> {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        GenericProperty::Combination(
+            Box::new(self),
+            GenericPropertyOperator::Modulo,
             Box::new(rhs),
         )
     }

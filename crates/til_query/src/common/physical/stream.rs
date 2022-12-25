@@ -62,6 +62,7 @@ impl PhysicalBitCount {
                             GenericPropertyOperator::Subtract => Positive::new(lv.get() - rv.get()),
                             GenericPropertyOperator::Multiply => lv.checked_mul(rv),
                             GenericPropertyOperator::Divide => Positive::new(lv.get() / rv.get()),
+                            GenericPropertyOperator::Modulo => Positive::new(lv.get() % rv.get()),
                         };
                     }
                 }
