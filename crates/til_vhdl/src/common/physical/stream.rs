@@ -33,7 +33,11 @@ pub fn physical_bitcount_to_relation(
 ) -> Result<Relation> {
     Ok(match bitcount {
         PhysicalBitCount::Combination(l, op, r) => {
-            let l = Relation::parentheses(physical_bitcount_to_relation(db, l, parent_params)?)?;
+            let l = match l.as_ref() {
+                PhysicalBitCount::Combination(_, _, _) => Relation::parentheses(physical_bitcount_to_relation(db, l, parent_params)?)?,
+                PhysicalBitCount::Fixed(_) => physical_bitcount_to_relation(db, l, parent_params)?,
+                PhysicalBitCount::Parameterized(_) => physical_bitcount_to_relation(db, l, parent_params)?,
+            };
             let r = physical_bitcount_to_relation(db, r, parent_params)?;
             match op {
                 GenericPropertyOperator::Add => Relation::from(l.r_add(db, r)?),
