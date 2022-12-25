@@ -42,7 +42,7 @@ impl GenericProperty<NonNegative> {
                 Box::new(l.try_assign(param, val.clone())?),
                 *op,
                 Box::new(r.try_assign(param, val.clone())?),
-            ),
+            ).try_reduce(),
             GenericProperty::Fixed(_) => self.clone(),
             GenericProperty::Parameterized(n) => {
                 if n == param {
