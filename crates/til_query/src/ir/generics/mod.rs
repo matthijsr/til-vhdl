@@ -145,7 +145,7 @@ impl GenericParameter {
         let r = Self {
             name: name.try_result()?,
             kind: kind.try_result()?,
-            default_value: default_value.reduce(),
+            default_value: default_value.reduce().remove_outer_parens(),
             doc: None,
         };
         if !r.default_value().is_fixed() {

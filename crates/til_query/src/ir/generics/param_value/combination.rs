@@ -69,9 +69,36 @@ impl fmt::Display for MathCombination {
 }
 
 impl MathCombination {
+    // Performed at the end, if there are any (pointless) parentheses remaining, this will remove them
+    pub fn remove_outer_parens(self) -> GenericParamValue {
+        match self {
+            MathCombination::Parentheses(p) => p.clone().remove_outer_parens(),
+            MathCombination::Negative(_) => self.into(),
+            MathCombination::Combination(_, _, _) => self.into(),
+        }
+    }
+
     pub fn reduce(&self) -> GenericParamValue {
         match self {
-            MathCombination::Parentheses(p) => p.reduce(),
+            MathCombination::Parentheses(p) => match p.reduce() {
+                GenericParamValue::Integer(i) => GenericParamValue::Integer(i),
+                GenericParamValue::Ref(r) => GenericParamValue::Ref(r),
+                GenericParamValue::Combination(c) => match c {
+                    Combination::Math(m) => match m {
+                        // If the inside is also Parentheses, remove the outer Parentheses
+                        // Since the reduce will have recursively stripped them, this should be the last
+                        MathCombination::Parentheses(inner_p) => {
+                            MathCombination::Parentheses(inner_p).into()
+                        }
+                        // Negative effectively replaces Parentheses
+                        MathCombination::Negative(n) => MathCombination::Negative(n).into(),
+                        // Once we hit a combination that couldn't be reduced to a single value
+                        MathCombination::Combination(l, op, r) => {
+                            Self::parentheses(MathCombination::Combination(l, op, r)).into()
+                        }
+                    },
+                },
+            },
             MathCombination::Negative(n) => match n.as_ref() {
                 GenericParamValue::Integer(i) => GenericParamValue::Integer(-i),
                 GenericParamValue::Ref(_) => self.clone().into(),

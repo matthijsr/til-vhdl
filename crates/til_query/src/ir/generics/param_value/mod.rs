@@ -18,6 +18,17 @@ pub enum GenericParamValue {
 }
 
 impl GenericParamValue {
+    // Performed at the end, if there are any (pointless) parentheses remaining, this will remove them
+    pub fn remove_outer_parens(self) -> Self {
+        match self {
+            GenericParamValue::Integer(_) => self,
+            GenericParamValue::Ref(_) => self,
+            GenericParamValue::Combination(c) => match c {
+                Combination::Math(m) => m.remove_outer_parens(),
+            },
+        }
+    }
+
     pub fn reduce(&self) -> Self {
         match self {
             GenericParamValue::Integer(_) => self.clone(),
