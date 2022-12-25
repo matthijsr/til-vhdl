@@ -180,6 +180,7 @@ pub fn simple_streamlet_with_interface_params(
 pub fn structural_streamlet_with_interface_params_and_instances(
     db: &mut Database,
     name: impl TryResult<PathName>,
+    instance_name: impl TryResult<PathName>,
 ) -> Result<Streamlet> {
     let bits = LogicalType::try_new_bits(4)?.intern(db);
     let data_type = LogicalType::try_new_union(None, vec![("a", bits), ("b", bits)])?.intern(db);
@@ -218,16 +219,16 @@ pub fn structural_streamlet_with_interface_params_and_instances(
         null_type,
         false,
     )?;
-    let base = Streamlet::new().try_with_name(name)?.with_parameters(
-        db,
-        vec![GenericParameter::try_new(
-            "pa",
-            DimensionalityGeneric::new(),
-            5,
-        )?],
-    )?;
-    let instance_streamlet = base
-        .clone()
+    let instance_streamlet = Streamlet::new()
+        .try_with_name(instance_name)?
+        .with_parameters(
+            db,
+            vec![GenericParameter::try_new(
+                "pa",
+                DimensionalityGeneric::new(),
+                5,
+            )?],
+        )?
         .with_ports(
             db,
             vec![
@@ -236,13 +237,23 @@ pub fn structural_streamlet_with_interface_params_and_instances(
             ],
         )?
         .intern_arc(db);
-    let parent_streamlet = base.with_ports(
-        db,
-        vec![
-            ("a", stream_in, InterfaceDirection::In),
-            ("b", stream_big_out, InterfaceDirection::Out),
-        ],
-    )?;
+    let parent_streamlet = Streamlet::new()
+        .try_with_name(name)?
+        .with_parameters(
+            db,
+            vec![GenericParameter::try_new(
+                "pa",
+                DimensionalityGeneric::new(),
+                5,
+            )?],
+        )?
+        .with_ports(
+            db,
+            vec![
+                ("a", stream_in, InterfaceDirection::In),
+                ("b", stream_big_out, InterfaceDirection::Out),
+            ],
+        )?;
 
     let mut structure = Structure::try_from(&parent_streamlet)?;
     structure.try_add_streamlet_instance_domains_default(

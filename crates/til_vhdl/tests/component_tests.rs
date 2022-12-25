@@ -1107,12 +1107,12 @@ architecture structural of parent_com is
   signal a_0_a_valid : std_logic;
   signal a_0_a_ready : std_logic;
   signal a_0_a_data : std_logic_vector(4 downto 0);
-  signal a_0_a_last : std_logic_vector((pa + 1) + 1 downto 0);
+  signal a_0_a_last : std_logic_vector(pa + 2 downto 0);
   signal a_0_a_strb : std_logic;
   signal a_0_b_valid : std_logic;
   signal a_0_b_ready : std_logic;
   signal a_0_b_data : std_logic_vector(4 downto 0);
-  signal a_0_b_last : std_logic_vector((pa + 1) + 1 downto 0);
+  signal a_0_b_last : std_logic_vector(pa + 2 downto 0);
   signal a_0_b_strb : std_logic;
 begin
   a: inner_com generic map(
@@ -1149,11 +1149,12 @@ end structural;"#,
 }
 
 #[test]
-fn basic_comp_arch_with_instances_and_interface_params_playground() -> Result<()> {
+fn structural_comp_arch_with_instances_and_interface_params() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
 
-    let streamlet = structural_streamlet_with_interface_params_and_instances(db, "test")?;
+    let streamlet =
+        structural_streamlet_with_interface_params_and_instances(db, "test", "instance")?;
 
     let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     let arch_db = &mut _arch_db;
@@ -1164,7 +1165,105 @@ fn basic_comp_arch_with_instances_and_interface_params_playground() -> Result<()
 
     let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
 
-    println!("{}", streamlet_arch.declare(arch_db)?);
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity test_com is
+  generic (
+    pa : positive := 5
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic_vector(pa downto 0);
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic_vector(pa + 2 downto 0);
+    b_strb : out std_logic
+  );
+end test_com;
+
+architecture Behaviour of test_com is
+  signal first_0_a_valid : std_logic;
+  signal first_0_a_ready : std_logic;
+  signal first_0_a_data : std_logic_vector(4 downto 0);
+  signal first_0_a_last : std_logic_vector(pa downto 0);
+  signal first_0_a_strb : std_logic;
+  signal first_0_b_valid : std_logic;
+  signal first_0_b_ready : std_logic;
+  signal first_0_b_data : std_logic_vector(4 downto 0);
+  signal first_0_b_last : std_logic_vector(pa + 1 downto 0);
+  signal first_0_b_strb : std_logic;
+  signal second_0_a_valid : std_logic;
+  signal second_0_a_ready : std_logic;
+  signal second_0_a_data : std_logic_vector(4 downto 0);
+  signal second_0_a_last : std_logic_vector(pa + 1 downto 0);
+  signal second_0_a_strb : std_logic;
+  signal second_0_b_valid : std_logic;
+  signal second_0_b_ready : std_logic;
+  signal second_0_b_data : std_logic_vector(4 downto 0);
+  signal second_0_b_last : std_logic_vector(pa + 2 downto 0);
+  signal second_0_b_strb : std_logic;
+begin
+  first: instance_com generic map(
+    pa => pa
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => first_0_a_valid,
+    a_ready => first_0_a_ready,
+    a_data => first_0_a_data,
+    a_last => first_0_a_last,
+    a_strb => first_0_a_strb,
+    b_valid => first_0_b_valid,
+    b_ready => first_0_b_ready,
+    b_data => first_0_b_data,
+    b_last => first_0_b_last,
+    b_strb => first_0_b_strb
+  );
+  second: instance_com generic map(
+    pa => pa + 1
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => second_0_a_valid,
+    a_ready => second_0_a_ready,
+    a_data => second_0_a_data,
+    a_last => second_0_a_last,
+    a_strb => second_0_a_strb,
+    b_valid => second_0_b_valid,
+    b_ready => second_0_b_ready,
+    b_data => second_0_b_data,
+    b_last => second_0_b_last,
+    b_strb => second_0_b_strb
+  );
+  first_0_a_valid <= a_valid;
+  a_ready <= first_0_a_ready;
+  first_0_a_data <= a_data;
+  first_0_a_last <= a_last;
+  first_0_a_strb <= a_strb;
+  second_0_a_valid <= first_0_b_valid;
+  first_0_b_ready <= second_0_a_ready;
+  second_0_a_data <= first_0_b_data;
+  second_0_a_last <= first_0_b_last;
+  second_0_a_strb <= first_0_b_strb;
+  b_valid <= second_0_b_valid;
+  second_0_b_ready <= b_ready;
+  b_data <= second_0_b_data;
+  b_last <= second_0_b_last;
+  b_strb <= second_0_b_strb;
+end Behaviour;"#,
+        streamlet_arch.declare(arch_db)?
+    );
 
     Ok(())
 }
