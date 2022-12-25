@@ -1,7 +1,7 @@
-use til_query::common::logical::logicaltype::genericproperty::GenericPropertyOperator;
 use til_query::common::physical::stream::{PhysicalBitCount, PhysicalStream};
 use til_query::common::physical::{complexity::Complexity, signal_list::SignalList};
 use til_query::common::stream_direction::StreamDirection;
+use til_query::ir::generics::param_value::combination::MathOperator;
 use til_query::ir::physical_properties::InterfaceDirection;
 use tydi_common::error::TryOptional;
 use tydi_common::map::InsertionOrderedMap;
@@ -34,17 +34,21 @@ pub fn physical_bitcount_to_relation(
     Ok(match bitcount {
         PhysicalBitCount::Combination(l, op, r) => {
             let l = match l.as_ref() {
-                PhysicalBitCount::Combination(_, _, _) => Relation::parentheses(physical_bitcount_to_relation(db, l, parent_params)?)?,
+                PhysicalBitCount::Combination(_, _, _) => {
+                    Relation::parentheses(physical_bitcount_to_relation(db, l, parent_params)?)?
+                }
                 PhysicalBitCount::Fixed(_) => physical_bitcount_to_relation(db, l, parent_params)?,
-                PhysicalBitCount::Parameterized(_) => physical_bitcount_to_relation(db, l, parent_params)?,
+                PhysicalBitCount::Parameterized(_) => {
+                    physical_bitcount_to_relation(db, l, parent_params)?
+                }
             };
             let r = physical_bitcount_to_relation(db, r, parent_params)?;
             match op {
-                GenericPropertyOperator::Add => Relation::from(l.r_add(db, r)?),
-                GenericPropertyOperator::Subtract => Relation::from(l.r_subtract(db, r)?),
-                GenericPropertyOperator::Multiply => Relation::from(l.r_multiply(db, r)?),
-                GenericPropertyOperator::Divide => Relation::from(l.r_divide_by(db, r)?),
-                GenericPropertyOperator::Modulo => Relation::from(l.r_mod(db, r)?),
+                MathOperator::Add => Relation::from(l.r_add(db, r)?),
+                MathOperator::Subtract => Relation::from(l.r_subtract(db, r)?),
+                MathOperator::Multiply => Relation::from(l.r_multiply(db, r)?),
+                MathOperator::Divide => Relation::from(l.r_divide_by(db, r)?),
+                MathOperator::Modulo => Relation::from(l.r_mod(db, r)?),
             }
         }
         PhysicalBitCount::Fixed(f) => Relation::from(u32_to_i32(f.get())?),
