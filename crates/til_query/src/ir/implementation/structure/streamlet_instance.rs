@@ -9,7 +9,9 @@ use tydi_common::{
 use tydi_intern::Id;
 
 use crate::ir::{
-    generics::{condition::TestValue, param_value::GenericParamValue, GenericParameter},
+    generics::{
+        condition::TestValue, param_value::GenericParamValue, GenericKind, GenericParameter,
+    },
     interface_port::InterfacePort,
     physical_properties::{Domain, InterfaceDirection},
     streamlet::Streamlet,
@@ -57,6 +59,27 @@ impl GenericParameterAssignment {
                 "Parameter {} was already assigned.",
                 param.name()
             ))),
+        }
+    }
+
+    pub fn kind(&self) -> &GenericKind {
+        match self {
+            GenericParameterAssignment::Default(p) => p.kind(),
+            GenericParameterAssignment::Assigned(p, _) => p.kind(),
+        }
+    }
+
+    pub fn value(&self) -> &GenericParamValue {
+        match self {
+            GenericParameterAssignment::Default(p) => p.default_value(),
+            GenericParameterAssignment::Assigned(_, v) => v,
+        }
+    }
+
+    pub fn value_take(self) -> GenericParamValue {
+        match self {
+            GenericParameterAssignment::Default(p) => p.default_value_take(),
+            GenericParameterAssignment::Assigned(_, v) => v,
         }
     }
 }

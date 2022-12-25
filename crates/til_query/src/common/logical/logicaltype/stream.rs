@@ -22,6 +22,8 @@ use crate::{
         stream_direction::StreamDirection,
     },
     ir::{
+        generics::{interface::InterfaceGenericKind, GenericKind},
+        implementation::structure::streamlet_instance::GenericParameterAssignment,
         traits::{GetSelf, InternSelf, MoveDb},
         Ir,
     },
@@ -176,6 +178,21 @@ pub struct Stream {
 }
 
 impl Stream {
+    pub fn try_assign(
+        &mut self,
+        param_name: &Name,
+        param_assignment: GenericParameterAssignment,
+    ) -> Result<()> {
+        match param_assignment.kind() {
+            GenericKind::Behavioral(_) => Ok(()),
+            GenericKind::Interface(i) => match i {
+                InterfaceGenericKind::Dimensionality(_) => Ok(self.dimensionality = self
+                    .dimensionality
+                    .try_assign(param_name, param_assignment.value_take())?),
+            },
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn try_new(
         db: &dyn Ir,

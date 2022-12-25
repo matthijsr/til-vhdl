@@ -171,6 +171,10 @@ impl GenericParameter {
     pub fn default_value(&self) -> &GenericParamValue {
         &self.default_value
     }
+
+    pub fn default_value_take(self) -> GenericParamValue {
+        self.default_value
+    }
 }
 
 impl Identify for GenericParameter {
