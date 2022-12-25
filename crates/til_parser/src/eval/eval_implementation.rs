@@ -4,6 +4,7 @@ use til_query::{
     common::logical::logicaltype::LogicalType,
     ir::{
         connection::InterfaceReference,
+        generics::param_value::GenericParamValue,
         implementation::{link::Link, structure::Structure, Implementation},
         project::interface::Interface,
         streamlet::Streamlet,
@@ -99,7 +100,13 @@ pub fn eval_struct_stat(
                     }
                     eval_common_error(
                         structure
-                            .try_add_streamlet_instance(db, name, streamlet, name_list)
+                            .try_add_streamlet_instance(
+                                db,
+                                name,
+                                streamlet,
+                                name_list,
+                                Vec::<(Option<Name>, GenericParamValue)>::new(),
+                            )
                             .map(|_| ()),
                         name_span,
                     )

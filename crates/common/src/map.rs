@@ -276,6 +276,17 @@ impl<K: Ord + Clone + ToString, V: Clone> InsertionOrderedMap<K, V> {
         Ok(InsertionOrderedMap::<K, R> { len, keys, items })
     }
 
+    /// Apply a mutating function to the map's values
+    pub fn try_apply<F>(&mut self, mut f: F) -> Result<()>
+    where
+        F: FnMut(&mut V) -> Result<()>,
+    {
+        for (_, x) in self.items.iter_mut() {
+            f(x)?;
+        }
+        Ok(())
+    }
+
     /// Use a function to try to convert the map's values from `V` to `R`, using
     /// `&K` in its function
     pub fn try_map_convert_with_key<F, R: Clone + PartialEq>(

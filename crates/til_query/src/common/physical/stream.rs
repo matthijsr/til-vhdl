@@ -11,16 +11,16 @@ use tydi_common::{
     util::log2_ceil,
 };
 
-use crate::common::{
-    logical::logicaltype::genericproperty::{GenericProperty, GenericPropertyOperator},
+use crate::{common::{
+    logical::logicaltype::genericproperty::{GenericProperty},
     stream_direction::StreamDirection,
-};
+}, ir::generics::param_value::combination::MathOperator};
 
 use super::{complexity::Complexity, signal_list::SignalList};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhysicalBitCount {
-    Combination(Box<Self>, GenericPropertyOperator, Box<Self>),
+    Combination(Box<Self>, MathOperator, Box<Self>),
     Fixed(Positive),
     Parameterized(Name),
 }
@@ -43,7 +43,7 @@ impl PhysicalBitCount {
             if mul > Positive::new(1).unwrap() {
                 return PhysicalBitCount::Combination(
                     Box::new(self),
-                    GenericPropertyOperator::Multiply,
+                    MathOperator::Multiply,
                     Box::new(PhysicalBitCount::Fixed(mul)),
                 );
             }
@@ -58,10 +58,11 @@ impl PhysicalBitCount {
                 if let Some(lv) = l.try_eval() {
                     if let Some(rv) = r.try_eval() {
                         return match op {
-                            GenericPropertyOperator::Add => lv.checked_add(rv.get()),
-                            GenericPropertyOperator::Subtract => Positive::new(lv.get() - rv.get()),
-                            GenericPropertyOperator::Multiply => lv.checked_mul(rv),
-                            GenericPropertyOperator::Divide => Positive::new(lv.get() / rv.get()),
+                            MathOperator::Add => lv.checked_add(rv.get()),
+                            MathOperator::Subtract => Positive::new(lv.get() - rv.get()),
+                            MathOperator::Multiply => lv.checked_mul(rv),
+                            MathOperator::Divide => Positive::new(lv.get() / rv.get()),
+                            MathOperator::Modulo => Positive::new(lv.get() % rv.get()),
                         };
                     }
                 }
@@ -100,7 +101,7 @@ impl Add for PhysicalBitCount {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        PhysicalBitCount::Combination(Box::new(self), GenericPropertyOperator::Add, Box::new(rhs))
+        PhysicalBitCount::Combination(Box::new(self), MathOperator::Add, Box::new(rhs))
     }
 }
 
@@ -110,7 +111,7 @@ impl Sub for PhysicalBitCount {
     fn sub(self, rhs: Self) -> Self::Output {
         PhysicalBitCount::Combination(
             Box::new(self),
-            GenericPropertyOperator::Subtract,
+            MathOperator::Subtract,
             Box::new(rhs),
         )
     }
@@ -122,7 +123,7 @@ impl Mul for PhysicalBitCount {
     fn mul(self, rhs: Self) -> Self::Output {
         PhysicalBitCount::Combination(
             Box::new(self),
-            GenericPropertyOperator::Multiply,
+            MathOperator::Multiply,
             Box::new(rhs),
         )
     }
@@ -134,7 +135,7 @@ impl Div for PhysicalBitCount {
     fn div(self, rhs: Self) -> Self::Output {
         PhysicalBitCount::Combination(
             Box::new(self),
-            GenericPropertyOperator::Divide,
+            MathOperator::Divide,
             Box::new(rhs),
         )
     }

@@ -18,6 +18,27 @@ pub enum GenericParamValue {
 }
 
 impl GenericParamValue {
+    // Performed at the end, if there are any (pointless) parentheses remaining, this will remove them
+    pub fn remove_outer_parens(self) -> Self {
+        match self {
+            GenericParamValue::Integer(_) => self,
+            GenericParamValue::Ref(_) => self,
+            GenericParamValue::Combination(c) => match c {
+                Combination::Math(m) => m.remove_outer_parens(),
+            },
+        }
+    }
+
+    pub fn reduce(&self) -> Self {
+        match self {
+            GenericParamValue::Integer(_) => self.clone(),
+            GenericParamValue::Ref(_) => self.clone(),
+            GenericParamValue::Combination(m) => match m {
+                Combination::Math(m) => m.reduce(),
+            },
+        }
+    }
+
     pub fn is_integer(&self) -> bool {
         match &self {
             GenericParamValue::Integer(_) => true,
@@ -38,6 +59,24 @@ impl GenericParamValue {
             GenericParamValue::Integer(_) => true,
             GenericParamValue::Ref(_) => false,
             GenericParamValue::Combination(_) => false,
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        matches!(self, GenericParamValue::Integer(0))
+    }
+
+    pub fn is_one(&self) -> bool {
+        matches!(self, GenericParamValue::Integer(0))
+    }
+}
+
+impl PartialEq<i32> for GenericParamValue {
+    fn eq(&self, other: &i32) -> bool {
+        if let GenericParamValue::Integer(i) = self {
+            i == other
+        } else {
+            false
         }
     }
 }

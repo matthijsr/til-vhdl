@@ -1,5 +1,5 @@
 use til_query::ir::generics::param_value::{
-    combination::{Combination, MathCombination},
+    combination::{Combination, MathCombination, MathOperator},
     GenericParamValue,
 };
 use tydi_common::{
@@ -31,21 +31,17 @@ pub fn math_combination_to_relation(
             param_value_to_vhdl(arch_db, n, parent_params)?,
         )?
         .into()),
-        MathCombination::Sum(l, r) => Ok(param_value_to_vhdl(arch_db, l, parent_params)?
-            .r_add(arch_db, param_value_to_vhdl(arch_db, r, parent_params)?)?
-            .into()),
-        MathCombination::Subtraction(l, r) => Ok(param_value_to_vhdl(arch_db, l, parent_params)?
-            .r_subtract(arch_db, param_value_to_vhdl(arch_db, r, parent_params)?)?
-            .into()),
-        MathCombination::Product(l, r) => Ok(param_value_to_vhdl(arch_db, l, parent_params)?
-            .r_multiply(arch_db, param_value_to_vhdl(arch_db, r, parent_params)?)?
-            .into()),
-        MathCombination::Division(l, r) => Ok(param_value_to_vhdl(arch_db, l, parent_params)?
-            .r_divide_by(arch_db, param_value_to_vhdl(arch_db, r, parent_params)?)?
-            .into()),
-        MathCombination::Modulo(l, r) => Ok(param_value_to_vhdl(arch_db, l, parent_params)?
-            .r_mod(arch_db, param_value_to_vhdl(arch_db, r, parent_params)?)?
-            .into()),
+        MathCombination::Combination(l, op, r) => {
+            let left = param_value_to_vhdl(arch_db, l, parent_params)?;
+            let right = param_value_to_vhdl(arch_db, r, parent_params)?;
+            Ok(match op {
+                MathOperator::Add => left.r_add(arch_db, right)?.into(),
+                MathOperator::Subtract => left.r_subtract(arch_db, right)?.into(),
+                MathOperator::Multiply => left.r_multiply(arch_db, right)?.into(),
+                MathOperator::Divide => left.r_divide_by(arch_db, right)?.into(),
+                MathOperator::Modulo => left.r_mod(arch_db, right)?.into(),
+            })
+        }
     }
 }
 

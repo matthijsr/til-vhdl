@@ -2,37 +2,27 @@ use std::convert::TryFrom;
 use std::ops::Add;
 use std::ops::Div;
 use std::ops::Mul;
+use std::ops::Rem;
 use std::ops::Sub;
+use tydi_common::error::TryResult;
 use tydi_common::error::{Error, Result};
 use tydi_common::name::Name;
+use tydi_common::name::NameSelf;
+use tydi_common::numbers::i32_to_u32;
 use tydi_common::numbers::NonNegative;
 
 use core::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GenericPropertyOperator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-}
-
-impl fmt::Display for GenericPropertyOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GenericPropertyOperator::Add => write!(f, "+"),
-            GenericPropertyOperator::Subtract => write!(f, "-"),
-            GenericPropertyOperator::Multiply => write!(f, "*"),
-            GenericPropertyOperator::Divide => write!(f, "/"),
-        }
-    }
-}
+use crate::ir::generics::param_value::combination::Combination;
+use crate::ir::generics::param_value::combination::MathCombination;
+use crate::ir::generics::param_value::combination::MathOperator;
+use crate::ir::generics::param_value::GenericParamValue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GenericProperty<T: fmt::Display> {
     Combination(
         Box<GenericProperty<T>>,
-        GenericPropertyOperator,
+        MathOperator,
         Box<GenericProperty<T>>,
     ),
     Fixed(T),
@@ -40,16 +30,42 @@ pub enum GenericProperty<T: fmt::Display> {
 }
 
 impl GenericProperty<NonNegative> {
+    pub fn try_assign(
+        &self,
+        param: &Name,
+        val: impl TryResult<GenericProperty<NonNegative>>,
+    ) -> Result<Self> {
+        let param = param.try_result()?;
+        let val = val.try_result()?;
+        Ok(match &self {
+            GenericProperty::Combination(l, op, r) => GenericProperty::Combination(
+                Box::new(l.try_assign(param, val.clone())?),
+                *op,
+                Box::new(r.try_assign(param, val.clone())?),
+            )
+            .try_reduce(),
+            GenericProperty::Fixed(_) => self.clone(),
+            GenericProperty::Parameterized(n) => {
+                if n == param {
+                    val
+                } else {
+                    self.clone()
+                }
+            }
+        })
+    }
+
     pub fn try_eval(&self) -> Option<NonNegative> {
         match self {
             GenericProperty::Combination(l, op, r) => {
                 if let Some(lv) = l.try_eval() {
                     if let Some(rv) = r.try_eval() {
                         return match op {
-                            GenericPropertyOperator::Add => Some(lv + rv),
-                            GenericPropertyOperator::Subtract => Some(lv - rv),
-                            GenericPropertyOperator::Multiply => Some(lv * rv),
-                            GenericPropertyOperator::Divide => Some(lv / rv),
+                            MathOperator::Add => Some(lv + rv),
+                            MathOperator::Subtract => Some(lv - rv),
+                            MathOperator::Multiply => Some(lv * rv),
+                            MathOperator::Divide => Some(lv / rv),
+                            MathOperator::Modulo => Some(lv % rv),
                         };
                     }
                 }
@@ -76,6 +92,40 @@ impl GenericProperty<NonNegative> {
         }
     }
 
+    // Very basic direct transitives (addition, multiplication)
+    // TODO: Should probably just be more careful with parentheses
+    pub fn transitive_for(
+        self,
+        check_op: MathOperator,
+    ) -> (
+        GenericProperty<NonNegative>,
+        Option<GenericProperty<NonNegative>>,
+    ) {
+        match &self {
+            GenericProperty::Combination(l, op, r) => match op {
+                MathOperator::Add => {
+                    if check_op == MathOperator::Add {
+                        (l.as_ref().clone(), Some(r.as_ref().clone()))
+                    } else {
+                        (self, None)
+                    }
+                }
+                MathOperator::Subtract => (self, None),
+                MathOperator::Multiply => {
+                    if check_op == MathOperator::Multiply {
+                        (l.as_ref().clone(), Some(r.as_ref().clone()))
+                    } else {
+                        (self, None)
+                    }
+                }
+                MathOperator::Divide => (self, None),
+                MathOperator::Modulo => (self, None),
+            },
+            GenericProperty::Fixed(_) => (self, None),
+            GenericProperty::Parameterized(_) => (self, None),
+        }
+    }
+
     /// Tries to remove unnecessary operations
     ///
     /// E.g.:
@@ -87,13 +137,33 @@ impl GenericProperty<NonNegative> {
     pub fn try_reduce(&self) -> Self {
         match self {
             GenericProperty::Combination(l, op, r) => {
-                let l = l.try_reduce();
+                let (l, t) = l.try_reduce().transitive_for(*op);
                 let r = r.try_reduce();
+                let r = if let Some(t) = t {
+                    match op {
+                        MathOperator::Add => (t + r).try_reduce(),
+                        MathOperator::Subtract => todo!(),
+                        MathOperator::Multiply => (t * r).try_reduce(),
+                        MathOperator::Divide => todo!(),
+                        MathOperator::Modulo => todo!(),
+                    }
+                } else {
+                    r
+                };
                 if l.is_zero() && r.is_zero() {
                     return GenericProperty::Fixed(0);
                 }
+                if let (GenericProperty::Fixed(l), GenericProperty::Fixed(r)) = (&l, &r) {
+                    return match op {
+                        MathOperator::Add => GenericProperty::Fixed(l + r),
+                        MathOperator::Subtract => GenericProperty::Fixed(l - r),
+                        MathOperator::Multiply => GenericProperty::Fixed(l * r),
+                        MathOperator::Divide => GenericProperty::Fixed(l / r),
+                        MathOperator::Modulo => GenericProperty::Fixed(l % r),
+                    };
+                }
                 match op {
-                    GenericPropertyOperator::Add => {
+                    MathOperator::Add => {
                         if l.is_zero() {
                             r
                         } else if r.is_zero() {
@@ -102,7 +172,7 @@ impl GenericProperty<NonNegative> {
                             l + r
                         }
                     }
-                    GenericPropertyOperator::Subtract => {
+                    MathOperator::Subtract => {
                         if l.is_zero() {
                             r
                         } else if r.is_zero() {
@@ -113,7 +183,7 @@ impl GenericProperty<NonNegative> {
                             l - r
                         }
                     }
-                    GenericPropertyOperator::Multiply => {
+                    MathOperator::Multiply => {
                         if l.is_zero() {
                             GenericProperty::Fixed(0)
                         } else if r.is_zero() {
@@ -126,7 +196,7 @@ impl GenericProperty<NonNegative> {
                             l * r
                         }
                     }
-                    GenericPropertyOperator::Divide => {
+                    MathOperator::Divide => {
                         if l.is_zero() {
                             GenericProperty::Fixed(0)
                         } else if r.is_one() {
@@ -136,6 +206,18 @@ impl GenericProperty<NonNegative> {
                             l / r
                         } else {
                             l / r
+                        }
+                    }
+                    MathOperator::Modulo => {
+                        if l.is_zero() {
+                            GenericProperty::Fixed(0)
+                        } else if r.is_zero() {
+                            // TODO: This should be an error
+                            todo!()
+                        } else if r.is_one() {
+                            GenericProperty::Fixed(0)
+                        } else {
+                            l % r
                         }
                     }
                 }
@@ -160,7 +242,7 @@ impl<T: fmt::Display> Add for GenericProperty<T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        GenericProperty::Combination(Box::new(self), GenericPropertyOperator::Add, Box::new(rhs))
+        GenericProperty::Combination(Box::new(self), MathOperator::Add, Box::new(rhs))
     }
 }
 
@@ -168,11 +250,7 @@ impl<T: fmt::Display> Sub for GenericProperty<T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        GenericProperty::Combination(
-            Box::new(self),
-            GenericPropertyOperator::Subtract,
-            Box::new(rhs),
-        )
+        GenericProperty::Combination(Box::new(self), MathOperator::Subtract, Box::new(rhs))
     }
 }
 
@@ -180,11 +258,7 @@ impl<T: fmt::Display> Mul for GenericProperty<T> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        GenericProperty::Combination(
-            Box::new(self),
-            GenericPropertyOperator::Multiply,
-            Box::new(rhs),
-        )
+        GenericProperty::Combination(Box::new(self), MathOperator::Multiply, Box::new(rhs))
     }
 }
 
@@ -192,11 +266,15 @@ impl<T: fmt::Display> Div for GenericProperty<T> {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        GenericProperty::Combination(
-            Box::new(self),
-            GenericPropertyOperator::Divide,
-            Box::new(rhs),
-        )
+        GenericProperty::Combination(Box::new(self), MathOperator::Divide, Box::new(rhs))
+    }
+}
+
+impl<T: fmt::Display> Rem for GenericProperty<T> {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        GenericProperty::Combination(Box::new(self), MathOperator::Modulo, Box::new(rhs))
     }
 }
 
@@ -223,5 +301,43 @@ impl<T: fmt::Display> TryFrom<&str> for GenericProperty<T> {
 
     fn try_from(value: &str) -> Result<Self> {
         Ok(Self::Parameterized(Name::try_new(value)?))
+    }
+}
+
+impl TryFrom<MathCombination> for GenericProperty<NonNegative> {
+    type Error = Error;
+
+    fn try_from(value: MathCombination) -> Result<Self> {
+        match value {
+            MathCombination::Parentheses(p) => p.as_ref().clone().try_into(),
+            MathCombination::Negative(_) => Err(Error::InvalidArgument(
+                "NonNegative GenericProperty should not feature a negative operator".to_string(),
+            )),
+            MathCombination::Combination(l, op, r) => Ok(GenericProperty::Combination(
+                Box::new(l.as_ref().clone().try_into()?),
+                op,
+                Box::new(r.as_ref().clone().try_into()?),
+            )),
+        }
+    }
+}
+
+impl TryFrom<GenericParamValue> for GenericProperty<NonNegative> {
+    type Error = Error;
+
+    fn try_from(value: GenericParamValue) -> Result<Self> {
+        if !value.is_integer() {
+            return Err(Error::InvalidArgument(format!(
+                "Cannot convert a {} into a NonNegative GenericProperty",
+                value
+            )));
+        }
+        Ok(match value {
+            GenericParamValue::Integer(i) => GenericProperty::Fixed(i32_to_u32(i)?),
+            GenericParamValue::Ref(r) => GenericProperty::Parameterized(r.name().clone()),
+            GenericParamValue::Combination(c) => match c {
+                Combination::Math(m) => m.try_into()?,
+            },
+        })
     }
 }

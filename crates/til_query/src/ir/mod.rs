@@ -29,7 +29,7 @@ use crate::{
 
 use self::{
     generics::{interface::InterfaceGenericKind, GenericKind},
-    implementation::Implementation,
+    implementation::{structure::streamlet_instance::GenericParameterAssignment, Implementation},
     interface_port::InterfacePort,
     interner::Interner,
     project::Project,
@@ -76,6 +76,18 @@ pub trait Ir: Interner {
         &self,
         key: Id<Stream>,
     ) -> Result<InsertionOrderedMap<Name, GenericKind>>;
+
+    fn stream_for_param_assignments(
+        &self,
+        key: Id<Stream>,
+        param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+    ) -> Result<Id<Stream>>;
+
+    fn type_for_param_assignments(
+        &self,
+        key: Id<LogicalType>,
+        param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+    ) -> Result<Id<LogicalType>>;
 }
 
 fn project_ref(db: &dyn Ir) -> Arc<Project> {
@@ -276,6 +288,71 @@ You must ensure that only one Stream has a Keep and/or User property."#.to_strin
         db.intern_type(LogicalType::Null),
         streams,
     ))
+}
+
+fn type_for_param_assignments(
+    db: &dyn Ir,
+    key: Id<LogicalType>,
+    param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+) -> Result<Id<LogicalType>> {
+    let typ_params = db.logical_type_parameter_kinds(key)?;
+    let mut to_assign = InsertionOrderedMap::new();
+    for (param_name, param_assignment) in param_assignments {
+        if typ_params.contains(&param_name) {
+            to_assign.try_insert(param_name, param_assignment)?;
+        }
+    }
+    if to_assign.len() > 0 {
+        let typ = db.lookup_intern_type(key);
+        match typ {
+            LogicalType::Null => Err(Error::BackEndError(
+                "Found a parameter to assign for Null, when none should exist".to_string(),
+            )),
+            LogicalType::Bits(_) => Err(Error::BackEndError(
+                "Found a parameter to assign for Bits, when none should exist".to_string(),
+            )),
+            LogicalType::Group(g) => {
+                let modified_fields = g.field_ids().clone().try_map_convert(|field_id| {
+                    db.type_for_param_assignments(field_id, to_assign.clone())
+                })?;
+                Ok(db.intern_type(LogicalType::Group(Group::new(modified_fields))))
+            }
+            LogicalType::Union(u) => {
+                let modified_fields = u.field_ids().clone().try_map_convert(|field_id| {
+                    db.type_for_param_assignments(field_id, to_assign.clone())
+                })?;
+                Ok(db.intern_type(LogicalType::Union(Union::new(modified_fields))))
+            }
+            LogicalType::Stream(s) => Ok(db.intern_type(LogicalType::Stream(
+                db.stream_for_param_assignments(s, to_assign)?,
+            ))),
+        }
+    } else {
+        Ok(key)
+    }
+}
+
+fn stream_for_param_assignments(
+    db: &dyn Ir,
+    key: Id<Stream>,
+    param_assignments: InsertionOrderedMap<Name, GenericParameterAssignment>,
+) -> Result<Id<Stream>> {
+    let stream_params = db.stream_parameter_kinds(key)?;
+    let mut to_assign = vec![];
+    for (param_name, param_assignment) in param_assignments {
+        if stream_params.contains(&param_name) {
+            to_assign.push((param_name, param_assignment));
+        }
+    }
+    if to_assign.len() > 0 {
+        let mut stream = db.lookup_intern_stream(key);
+        for (param_name, param_assignment) in to_assign {
+            stream.try_assign(&param_name, param_assignment)?;
+        }
+        Ok(db.intern_stream(stream))
+    } else {
+        Ok(key)
+    }
 }
 
 #[cfg(test)]

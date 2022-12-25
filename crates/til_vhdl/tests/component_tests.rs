@@ -17,7 +17,7 @@ use til_query::{
     },
     ir::{
         db::Database,
-        generics::param_value::combination::GenericParamValueOps,
+        generics::param_value::{combination::GenericParamValueOps, GenericParamValue},
         implementation::{structure::Structure, Implementation},
         physical_properties::InterfaceDirection,
         streamlet::Streamlet,
@@ -27,7 +27,9 @@ use til_query::{
     test_utils::{
         simple_streamlet_with_interface_params, simple_structural_streamlet,
         simple_structural_streamlet_with_behav_params, streamlet_without_impl,
-        streamlet_without_impl_with_behav_params, test_stream_id, test_stream_id_custom,
+        streamlet_without_impl_with_behav_params,
+        structural_streamlet_with_interface_params_and_instances, test_stream_id,
+        test_stream_id_custom,
     },
 };
 use til_vhdl::IntoVhdl;
@@ -747,12 +749,12 @@ fn basic_comp_arch_with_interface_params() -> Result<()> {
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic_vector((pa) + 1 downto 0);
+    a_last : in std_logic_vector(pa + 1 downto 0);
     a_strb : in std_logic;
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic_vector((pa) + 1 downto 0);
+    b_last : out std_logic_vector(pa + 1 downto 0);
     b_strb : out std_logic
   );
 end component test_com;"#,
@@ -775,12 +777,12 @@ package default is
       a_valid : in std_logic;
       a_ready : out std_logic;
       a_data : in std_logic_vector(4 downto 0);
-      a_last : in std_logic_vector((pa) + 1 downto 0);
+      a_last : in std_logic_vector(pa + 1 downto 0);
       a_strb : in std_logic;
       b_valid : out std_logic;
       b_ready : in std_logic;
       b_data : out std_logic_vector(4 downto 0);
-      b_last : out std_logic_vector((pa) + 1 downto 0);
+      b_last : out std_logic_vector(pa + 1 downto 0);
       b_strb : out std_logic
     );
   end component test_com;
@@ -806,12 +808,12 @@ entity test_com is
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic_vector((pa) + 1 downto 0);
+    a_last : in std_logic_vector(pa + 1 downto 0);
     a_strb : in std_logic;
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic_vector((pa) + 1 downto 0);
+    b_last : out std_logic_vector(pa + 1 downto 0);
     b_strb : out std_logic
   );
 end test_com;
@@ -925,18 +927,26 @@ fn basic_comp_arch_with_instance_and_behav_params() -> Result<()> {
     let instance_streamlet = streamlet_without_impl_with_behav_params(db, "inner")?;
     let parent_streamlet = streamlet_without_impl_with_behav_params(db, "parent")?;
     let mut structure = Structure::try_from(&parent_streamlet)?;
-    let instance =
-        structure.try_add_streamlet_instance_default(db, "a", instance_streamlet.intern_arc(db))?;
-    instance.assign_parameter("pa", 20)?;
-    instance.assign_parameter(
-        "pb",
-        parent_streamlet.try_get_parameter(db, &Name::try_new("pb")?)?,
-    )?;
-    instance.assign_parameter(
-        "pc",
-        parent_streamlet
-            .try_get_parameter(db, &Name::try_new("pa")?)?
-            .g_add(1)?,
+    structure.try_add_streamlet_instance_domains_default(
+        db,
+        "a",
+        instance_streamlet.intern_arc(db),
+        vec![
+            ("pa", GenericParamValue::from(20)),
+            (
+                "pb",
+                parent_streamlet
+                    .try_get_parameter(db, &Name::try_new("pb")?)?
+                    .into(),
+            ),
+            (
+                "pc",
+                parent_streamlet
+                    .try_get_parameter(db, &Name::try_new("pa")?)?
+                    .g_add(1)?
+                    .into(),
+            ),
+        ],
     )?;
     structure.try_add_connection(db, "a", ("a", "a"))?;
     structure.try_add_connection(db, "b", ("a", "b"))?;
@@ -1024,6 +1034,234 @@ begin
   b_last <= a_0_b_last;
   b_strb <= a_0_b_strb;
 end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn basic_comp_arch_with_instance_and_interface_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
+    let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
+    let mut structure = Structure::try_from(&parent_streamlet)?;
+    structure.try_add_streamlet_instance_domains_default(
+        db,
+        "a",
+        instance_streamlet.intern_arc(db),
+        vec![(
+            "pa",
+            parent_streamlet
+                .try_get_parameter(db, &Name::try_new("pa")?)?
+                .g_add(1)?,
+        )],
+    )?;
+
+    structure.try_add_connection(db, "a", "b")?;
+    structure.try_add_connection(db, ("a", "a"), ("a", "b"))?;
+    let implementation = Implementation::structural(structure)?
+        .try_with_name("structural")?
+        .intern(db);
+    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity parent_com is
+  generic (
+    pa : positive := 5
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic_vector(pa + 1 downto 0);
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic_vector(pa + 1 downto 0);
+    b_strb : out std_logic
+  );
+end parent_com;
+
+architecture structural of parent_com is
+  signal a_0_a_valid : std_logic;
+  signal a_0_a_ready : std_logic;
+  signal a_0_a_data : std_logic_vector(4 downto 0);
+  signal a_0_a_last : std_logic_vector(pa + 2 downto 0);
+  signal a_0_a_strb : std_logic;
+  signal a_0_b_valid : std_logic;
+  signal a_0_b_ready : std_logic;
+  signal a_0_b_data : std_logic_vector(4 downto 0);
+  signal a_0_b_last : std_logic_vector(pa + 2 downto 0);
+  signal a_0_b_strb : std_logic;
+begin
+  a: inner_com generic map(
+    pa => pa + 1
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => a_0_a_valid,
+    a_ready => a_0_a_ready,
+    a_data => a_0_a_data,
+    a_last => a_0_a_last,
+    a_strb => a_0_a_strb,
+    b_valid => a_0_b_valid,
+    b_ready => a_0_b_ready,
+    b_data => a_0_b_data,
+    b_last => a_0_b_last,
+    b_strb => a_0_b_strb
+  );
+  b_valid <= a_valid;
+  a_ready <= b_ready;
+  b_data <= a_data;
+  b_last <= a_last;
+  b_strb <= a_strb;
+  a_0_a_valid <= a_0_b_valid;
+  a_0_b_ready <= a_0_a_ready;
+  a_0_a_data <= a_0_b_data;
+  a_0_a_last <= a_0_b_last;
+  a_0_a_strb <= a_0_b_strb;
+end structural;"#,
+        streamlet_arch.declare(arch_db)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn structural_comp_arch_with_instances_and_interface_params() -> Result<()> {
+    let mut _db = Database::default();
+    let db = &mut _db;
+
+    let streamlet =
+        structural_streamlet_with_interface_params_and_instances(db, "test", "instance")?;
+
+    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+    let arch_db = &mut _arch_db;
+
+    let package = Package::new_default_empty();
+
+    let streamlet = ir_streamlet_to_vhdl(streamlet, db, arch_db, package)?;
+
+    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+
+    assert_eq!(
+        r#"library ieee;
+use ieee.std_logic_1164.all;
+
+library work;
+use work.default.all;
+
+entity test_com is
+  generic (
+    pa : positive := 5
+  );
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    a_valid : in std_logic;
+    a_ready : out std_logic;
+    a_data : in std_logic_vector(4 downto 0);
+    a_last : in std_logic_vector(pa downto 0);
+    a_strb : in std_logic;
+    b_valid : out std_logic;
+    b_ready : in std_logic;
+    b_data : out std_logic_vector(4 downto 0);
+    b_last : out std_logic_vector(pa + 2 downto 0);
+    b_strb : out std_logic
+  );
+end test_com;
+
+architecture Behaviour of test_com is
+  signal first_0_a_valid : std_logic;
+  signal first_0_a_ready : std_logic;
+  signal first_0_a_data : std_logic_vector(4 downto 0);
+  signal first_0_a_last : std_logic_vector(pa downto 0);
+  signal first_0_a_strb : std_logic;
+  signal first_0_b_valid : std_logic;
+  signal first_0_b_ready : std_logic;
+  signal first_0_b_data : std_logic_vector(4 downto 0);
+  signal first_0_b_last : std_logic_vector(pa + 1 downto 0);
+  signal first_0_b_strb : std_logic;
+  signal second_0_a_valid : std_logic;
+  signal second_0_a_ready : std_logic;
+  signal second_0_a_data : std_logic_vector(4 downto 0);
+  signal second_0_a_last : std_logic_vector(pa + 1 downto 0);
+  signal second_0_a_strb : std_logic;
+  signal second_0_b_valid : std_logic;
+  signal second_0_b_ready : std_logic;
+  signal second_0_b_data : std_logic_vector(4 downto 0);
+  signal second_0_b_last : std_logic_vector(pa + 2 downto 0);
+  signal second_0_b_strb : std_logic;
+begin
+  first: instance_com generic map(
+    pa => pa
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => first_0_a_valid,
+    a_ready => first_0_a_ready,
+    a_data => first_0_a_data,
+    a_last => first_0_a_last,
+    a_strb => first_0_a_strb,
+    b_valid => first_0_b_valid,
+    b_ready => first_0_b_ready,
+    b_data => first_0_b_data,
+    b_last => first_0_b_last,
+    b_strb => first_0_b_strb
+  );
+  second: instance_com generic map(
+    pa => pa + 1
+  ) port map(
+    clk => clk,
+    rst => rst,
+    a_valid => second_0_a_valid,
+    a_ready => second_0_a_ready,
+    a_data => second_0_a_data,
+    a_last => second_0_a_last,
+    a_strb => second_0_a_strb,
+    b_valid => second_0_b_valid,
+    b_ready => second_0_b_ready,
+    b_data => second_0_b_data,
+    b_last => second_0_b_last,
+    b_strb => second_0_b_strb
+  );
+  first_0_a_valid <= a_valid;
+  a_ready <= first_0_a_ready;
+  first_0_a_data <= a_data;
+  first_0_a_last <= a_last;
+  first_0_a_strb <= a_strb;
+  second_0_a_valid <= first_0_b_valid;
+  first_0_b_ready <= second_0_a_ready;
+  second_0_a_data <= first_0_b_data;
+  second_0_a_last <= first_0_b_last;
+  second_0_a_strb <= first_0_b_strb;
+  b_valid <= second_0_b_valid;
+  second_0_b_ready <= b_ready;
+  b_data <= second_0_b_data;
+  b_last <= second_0_b_last;
+  b_strb <= second_0_b_strb;
+end Behaviour;"#,
         streamlet_arch.declare(arch_db)?
     );
 
