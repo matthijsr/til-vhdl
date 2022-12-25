@@ -115,8 +115,8 @@ impl MathCombination {
                 },
             },
             MathCombination::Combination(l, op, r) => {
-                let l = l.reduce();
-                let r = r.reduce();
+                let mut l = l.reduce();
+                let mut r = r.reduce();
                 if l == 0 && r == 0 {
                     // TODO: Technically incorrect for division and mod, I think?
                     return GenericParamValue::Integer(0);
@@ -129,6 +129,15 @@ impl MathCombination {
                         MathOperator::Divide => GenericParamValue::Integer(l / r),
                         MathOperator::Modulo => GenericParamValue::Integer(l % r),
                     };
+                }
+                if let GenericParamValue::Integer(_) = &l {
+                    match op {
+                        // Try to push any integers to the right, to simplify further reduction
+                        MathOperator::Add | MathOperator::Multiply => (l, r) = (r, l),
+                        MathOperator::Subtract => (),
+                        MathOperator::Divide => (),
+                        MathOperator::Modulo => (),
+                    }
                 }
                 match op {
                     MathOperator::Add if l == r => MathCombination::Combination(
