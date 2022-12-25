@@ -1105,12 +1105,12 @@ architecture structural of parent_com is
   signal a_0_a_valid : std_logic;
   signal a_0_a_ready : std_logic;
   signal a_0_a_data : std_logic_vector(4 downto 0);
-  signal a_0_a_last : std_logic_vector(pa + 1 downto 0);
+  signal a_0_a_last : std_logic_vector((pa + 1) + 1 downto 0);
   signal a_0_a_strb : std_logic;
   signal a_0_b_valid : std_logic;
   signal a_0_b_ready : std_logic;
   signal a_0_b_data : std_logic_vector(4 downto 0);
-  signal a_0_b_last : std_logic_vector(pa + 1 downto 0);
+  signal a_0_b_last : std_logic_vector((pa + 1) + 1 downto 0);
   signal a_0_b_strb : std_logic;
 begin
   a: inner_com generic map(
@@ -1146,47 +1146,47 @@ end structural;"#,
     Ok(())
 }
 
-#[test]
-fn basic_comp_arch_with_instance_and_interface_params_playground() -> Result<()> {
-    let mut _db = Database::default();
-    let db = &mut _db;
+// #[test]
+// fn basic_comp_arch_with_instance_and_interface_params_playground() -> Result<()> {
+//     let mut _db = Database::default();
+//     let db = &mut _db;
 
-    let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
-    let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
-    let mut structure = Structure::try_from(&parent_streamlet)?;
-    structure.try_add_streamlet_instance_domains_default(
-        db,
-        "a",
-        instance_streamlet.intern_arc(db),
-        vec![(
-            "pa",
-            parent_streamlet
-                .try_get_parameter(db, &Name::try_new("pa")?)?
-                .g_add(1)?,
-        )],
-    )?;
+//     let instance_streamlet = simple_streamlet_with_interface_params(db, "inner")?;
+//     let parent_streamlet = simple_streamlet_with_interface_params(db, "parent")?;
+//     let mut structure = Structure::try_from(&parent_streamlet)?;
+//     structure.try_add_streamlet_instance_domains_default(
+//         db,
+//         "a",
+//         instance_streamlet.intern_arc(db),
+//         vec![(
+//             "pa",
+//             parent_streamlet
+//                 .try_get_parameter(db, &Name::try_new("pa")?)?
+//                 .g_add(1)?,
+//         )],
+//     )?;
 
-    // This should fail
-    structure.try_add_connection(db, "a", ("a", "a"))?;
-    structure.try_add_connection(db, ("a", "b"), "b")?;
-    let implementation = Implementation::structural(structure)?
-        .try_with_name("structural")?
-        .intern(db);
-    let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
+//     // This should fail
+//     structure.try_add_connection(db, "a", ("a", "a"))?;
+//     structure.try_add_connection(db, ("a", "b"), "b")?;
+//     let implementation = Implementation::structural(structure)?
+//         .try_with_name("structural")?
+//         .intern(db);
+//     let parent_streamlet = parent_streamlet.with_implementation(Some(implementation));
 
-    let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
-    let arch_db = &mut _arch_db;
+//     let mut _arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
+//     let arch_db = &mut _arch_db;
 
-    let package = Package::new_default_empty();
+//     let package = Package::new_default_empty();
 
-    let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
+//     let streamlet = ir_streamlet_to_vhdl(parent_streamlet, db, arch_db, package)?;
 
-    let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
+//     let streamlet_arch = streamlet.to_architecture(db, arch_db)?;
 
-    println!("{}", streamlet_arch.declare(arch_db)?);
+//     println!("{}", streamlet_arch.declare(arch_db)?);
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[test]
 fn playground() -> Result<()> {
