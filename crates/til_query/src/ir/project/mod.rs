@@ -20,6 +20,7 @@ use super::{
 
 pub mod interface;
 pub mod namespace;
+pub mod type_declaration;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Project {
