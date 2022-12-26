@@ -11,7 +11,7 @@ use crate::{
     ir::{
         generics::{param_value::GenericParamValue, GenericParameter},
         implementation::structure::streamlet_instance::GenericParameterAssignment,
-        traits::TryIntern,
+        traits::MoveDb,
         Ir,
     },
 };
@@ -27,11 +27,11 @@ impl TypeDeclaration {
     pub fn try_new_no_params(
         db: &dyn Ir,
         name: impl TryResult<PathName>,
-        typ: impl TryIntern<LogicalType>,
+        typ: Id<LogicalType>,
     ) -> Result<Self> {
         let result = Self {
             name: name.try_result()?,
-            typ: typ.try_intern(db)?,
+            typ,
             parameter_assignments: None,
         };
         result.verify_parameters(db)?;
@@ -41,7 +41,7 @@ impl TypeDeclaration {
     pub fn try_new(
         db: &dyn Ir,
         name: impl TryResult<PathName>,
-        typ: impl TryIntern<LogicalType>,
+        typ: Id<LogicalType>,
         parameters: impl IntoIterator<Item = impl TryResult<GenericParameter>>,
     ) -> Result<Self> {
         let mut parameter_assignments = InsertionOrderedMap::new();
@@ -54,7 +54,7 @@ impl TypeDeclaration {
         }
         let result = Self {
             name: name.try_result()?,
-            typ: typ.try_intern(db)?,
+            typ,
             parameter_assignments: Some(parameter_assignments),
         };
         result.verify_parameters(db)?;
@@ -196,5 +196,20 @@ impl Identify for TypeDeclaration {
 impl PathNameSelf for TypeDeclaration {
     fn path_name(&self) -> &PathName {
         &self.name
+    }
+}
+
+impl MoveDb<TypeDeclaration> for TypeDeclaration {
+    fn move_db(
+        &self,
+        original_db: &dyn Ir,
+        target_db: &dyn Ir,
+        prefix: &Option<Name>,
+    ) -> Result<TypeDeclaration> {
+        Ok(Self {
+            name: self.path_name().with_parents(prefix),
+            typ: self.typ.move_db(original_db, target_db, prefix)?,
+            parameter_assignments: self.parameter_assignments().clone(),
+        })
     }
 }

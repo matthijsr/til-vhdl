@@ -12,12 +12,12 @@ use crate::{
     ir::{
         implementation::Implementation,
         streamlet::Streamlet,
-        traits::{GetSelf, InternSelf, InternArc, MoveDb, TryIntern},
+        traits::{GetSelf, InternArc, InternSelf, MoveDb, TryIntern},
         Ir,
     },
 };
 
-use super::interface::Interface;
+use super::{interface::Interface, type_declaration::TypeDeclaration};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
@@ -25,7 +25,7 @@ pub struct Namespace {
     name: PathName,
     /// The types declared within the namespace.
     /// Names are purely for tracking, and do not affect type equivalence.
-    types: BTreeMap<Name, Id<LogicalType>>,
+    types: BTreeMap<Name, TypeDeclaration>,
     /// The streamlets declared within the namespace.
     streamlets: BTreeMap<Name, Id<Arc<Streamlet>>>,
     /// The implementations declared within the namespace.
@@ -48,16 +48,16 @@ impl Namespace {
         })
     }
 
-    pub fn type_ids(&self) -> &BTreeMap<Name, Id<LogicalType>> {
+    pub fn type_decls(&self) -> &BTreeMap<Name, TypeDeclaration> {
         &self.types
     }
 
-    pub fn types(&self, db: &dyn Ir) -> BTreeMap<Name, LogicalType> {
-        self.type_ids()
-            .iter()
-            .map(|(name, id)| (name.clone(), id.get(db)))
-            .collect()
-    }
+    // pub fn types(&self, db: &dyn Ir) -> BTreeMap<Name, LogicalType> {
+    //     self.type_decls()
+    //         .iter()
+    //         .map(|(name, id)| (name.clone(), id.get(db)))
+    //         .collect()
+    // }
 
     pub fn streamlet_ids(&self) -> &BTreeMap<Name, Id<Arc<Streamlet>>> {
         &self.streamlets
@@ -95,10 +95,10 @@ impl Namespace {
     pub fn import_type(
         &mut self,
         name: impl TryResult<Name>,
-        type_id: Id<LogicalType>,
+        type_decl: TypeDeclaration,
     ) -> Result<()> {
         let name = name.try_result()?;
-        match self.types.insert(name.clone(), type_id) {
+        match self.types.insert(name.clone(), type_decl) {
             None => Ok(()),
             Some(_) => Err(Error::InvalidArgument(format!(
                 "A type with name {} already exists in namespace {}.",
@@ -156,16 +156,18 @@ impl Namespace {
         }
     }
 
-    pub fn define_type(
+    pub fn define_type_no_params(
         &mut self,
         db: &dyn Ir,
         name: impl TryResult<Name>,
         typ: impl TryResult<LogicalType>,
-    ) -> Result<Id<LogicalType>> {
+    ) -> Result<()> {
         let name = name.try_result()?;
         let type_id = typ.try_result()?.intern(db);
-        self.import_type(name, type_id)?;
-        Ok(type_id)
+        let type_decl =
+            TypeDeclaration::try_new_no_params(db, self.path_name().with_child(&name), type_id)?;
+        self.import_type(name, type_decl)?;
+        Ok(())
     }
 
     pub fn define_streamlet(
@@ -210,20 +212,21 @@ impl Namespace {
         Ok(interface_id)
     }
 
-    pub fn get_type_id(&self, name: impl TryResult<Name>) -> Result<Id<LogicalType>> {
+    pub fn get_type_id(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<Id<LogicalType>> {
         let name = name.try_result()?;
-        self.type_ids()
+        self.type_decls()
             .get(&name)
             .cloned()
             .ok_or(Error::InvalidArgument(format!(
                 "A type with name {} does not exist in namespace {}",
                 name,
                 self.path_name()
-            )))
+            )))?
+            .type_id(db)
     }
 
     pub fn get_type(&self, db: &dyn Ir, name: impl TryResult<Name>) -> Result<LogicalType> {
-        Ok(self.get_type_id(name)?.get(db))
+        Ok(self.get_type_id(db, name)?.get(db))
     }
 
     pub fn get_streamlet_id(&self, name: impl TryResult<Name>) -> Result<Id<Arc<Streamlet>>> {
@@ -317,7 +320,7 @@ impl MoveDb<Id<Namespace>> for Namespace {
         prefix: &Option<Name>,
     ) -> Result<Id<Namespace>> {
         let types = self
-            .type_ids()
+            .type_decls()
             .iter()
             .map(|(k, v)| Ok((k.clone(), v.move_db(original_db, target_db, prefix)?)))
             .collect::<Result<_>>()?;
@@ -360,7 +363,7 @@ mod tests {
 
         let mut namespace = Namespace::new("namespace")?;
         let stream_id = test_stream_id(db, 4)?;
-        namespace.define_type(db, "typ", stream_id)?;
+        namespace.define_type_no_params(db, "typ", stream_id)?;
         assert_eq!(stream_id, namespace.get_stream_id(db, "typ")?);
         Ok(())
     }

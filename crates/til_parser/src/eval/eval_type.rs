@@ -13,7 +13,7 @@ use til_query::{
         physical::complexity::Complexity,
         stream_direction::StreamDirection,
     },
-    ir::{traits::InternSelf, Ir},
+    ir::{project::type_declaration::TypeDeclaration, traits::InternSelf, Ir},
 };
 use tydi_common::{
     name::{Name, PathName},
@@ -44,8 +44,8 @@ pub struct StreamTypeDef {
 pub fn eval_type_expr(
     db: &dyn Ir,
     expr: (&TypeExpr, &Span),
-    types: &HashMap<Name, Id<LogicalType>>,
-    type_imports: &HashMap<PathName, Id<LogicalType>>,
+    types: &HashMap<Name, TypeDeclaration>,
+    type_imports: &HashMap<PathName, TypeDeclaration>,
 ) -> Result<Id<LogicalType>, EvalError> {
     let eval_fields =
         |fields: &Spanned<FieldsDef>| -> Result<Vec<(Name, Id<LogicalType>)>, EvalError> {
@@ -325,7 +325,12 @@ pub fn eval_type_expr(
             span: expr.1.clone(),
             msg: format!("Invalid expression {:#?} for type definition", &expr.0),
         }),
-        TypeExpr::Identifier(ident) => eval_ident(ident, &expr.1, types, type_imports, "type"),
+        TypeExpr::Identifier(ident) => eval_ident(ident, &expr.1, types, type_imports, "type")?
+            .type_id(db)
+            .map_err(|err| EvalError {
+                span: expr.1.clone(),
+                msg: format!("Something went wrong retrieving a type ID: {}", err),
+            }),
         TypeExpr::Definition(typ_def) => match &typ_def.as_ref().0 {
             LogicalTypeDef::Null => Ok(LogicalType::null_id(db)),
             LogicalTypeDef::Bits((num, num_span)) => {
@@ -369,10 +374,11 @@ pub(crate) mod tests {
         src: impl Into<String>,
         name: impl TryResult<Name>,
         db: &dyn Ir,
-        types: &mut HashMap<Name, Id<LogicalType>>,
+        types: &mut HashMap<Name, TypeDeclaration>,
     ) {
         let src = src.into();
         let (tokens, mut errs) = lexer().parse_recovery(src.as_str());
+        let name: Name = name.try_result().unwrap();
 
         // println!("{:#?}", tokens);
 
@@ -385,7 +391,7 @@ pub(crate) mod tests {
             if let Some(expr) = ast {
                 match eval_type_expr(db, (&expr.0, &expr.1), types, &HashMap::new()) {
                     Ok(def) => {
-                        types.insert(name.try_result().unwrap(), def.clone());
+                        types.insert(name.clone(), TypeDeclaration::try_new_no_params(db, name, def).unwrap());
                         println!("{}", def.get(db));
                     }
                     Err(e) => errs.push(Simple::custom(e.span, e.msg)),

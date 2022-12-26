@@ -1,14 +1,11 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use til_query::{
-    common::logical::logicaltype::LogicalType,
-    ir::{
-        implementation::Implementation,
-        project::interface::Interface,
-        streamlet::Streamlet,
-        traits::{GetSelf, InternSelf},
-        Ir,
-    },
+use til_query::ir::{
+    implementation::Implementation,
+    project::{interface::Interface, type_declaration::TypeDeclaration},
+    streamlet::Streamlet,
+    traits::{GetSelf, InternSelf},
+    Ir,
 };
 use tydi_common::{
     name::{Name, PathName},
@@ -39,8 +36,8 @@ pub fn eval_declaration(
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
     interfaces: &mut HashMap<Name, Id<Arc<Interface>>>,
     interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
-    types: &mut HashMap<Name, Id<LogicalType>>,
-    type_imports: &HashMap<PathName, Id<LogicalType>>,
+    types: &mut HashMap<Name, TypeDeclaration>,
+    type_imports: &HashMap<PathName, TypeDeclaration>,
 ) -> Result<(), EvalError> {
     // As everything is exported (public) by default, shadowing declarations would be confusing
     let dup_id = |n: &String, s: &Span, kind: &str| -> EvalError {
@@ -54,7 +51,13 @@ pub fn eval_declaration(
         Decl::TypeDecl((n, s), expr) => {
             let name = eval_name(n, s)?;
             let type_id = eval_type_expr(db, (&expr.0, &expr.1), types, type_imports)?;
-            if let Some(_) = types.insert(name, type_id) {
+            let type_decl =
+                TypeDeclaration::try_new_no_params(db, namespace.with_child(&name), type_id)
+                    .map_err(|err| EvalError {
+                        span: s.clone(),
+                        msg: format!("Something went wrong declaring type {}: {}", n, err),
+                    })?;
+            if let Some(_) = types.insert(name, type_decl) {
                 Err(dup_id(n, s, "type"))
             } else {
                 Ok(())
