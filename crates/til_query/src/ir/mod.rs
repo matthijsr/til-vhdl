@@ -382,20 +382,20 @@ mod tests {
         let db = &mut _db;
         let mut project = Project::new("proj", ".", None::<&str>)?;
         let mut namespace = Namespace::new("root.sub")?;
-        namespace.define_type(db, "bits", 4)?;
-        namespace.define_type(db, "null", LogicalType::Null)?;
-        namespace.define_type(
+        namespace.define_type_no_params(db, "bits", 4)?;
+        namespace.define_type_no_params(db, "null", LogicalType::Null)?;
+        namespace.define_type_no_params(
             db,
             "stream",
             Stream::try_new(
                 db,
-                namespace.get_type_id("bits")?,
+                namespace.get_type_id_no_assignments(db, "bits")?,
                 1.0,
                 1,
                 Synchronicity::Sync,
                 4,
                 StreamDirection::Forward,
-                namespace.get_type_id("null")?,
+                namespace.get_type_id_no_assignments(db, "null")?,
                 false,
             )?,
         )?;
@@ -406,7 +406,7 @@ mod tests {
                 db,
                 vec![(
                     "a",
-                    namespace.get_stream_id(db, "stream")?,
+                    namespace.get_stream_id_no_assignments(db, "stream")?,
                     InterfaceDirection::In,
                 )],
             )?,

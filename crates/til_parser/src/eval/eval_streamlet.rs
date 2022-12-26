@@ -1,14 +1,11 @@
-use std::{collections::HashMap, sync::Arc, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use til_query::{
-    common::logical::logicaltype::LogicalType,
-    ir::{
-        implementation::Implementation,
-        project::interface::Interface,
-        streamlet::Streamlet,
-        traits::{GetSelf, InternArc},
-        Ir,
-    },
+use til_query::ir::{
+    implementation::Implementation,
+    project::{interface::Interface, type_declaration::TypeDeclaration},
+    streamlet::Streamlet,
+    traits::{GetSelf, InternArc},
+    Ir,
 };
 use tydi_common::{
     name::{Name, PathName},
@@ -37,8 +34,8 @@ pub fn eval_streamlet_expr(
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
     interfaces: &HashMap<Name, Id<Arc<Interface>>>,
     interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
-    types: &HashMap<Name, Id<LogicalType>>,
-    type_imports: &HashMap<PathName, Id<LogicalType>>,
+    types: &HashMap<Name, TypeDeclaration>,
+    type_imports: &HashMap<PathName, TypeDeclaration>,
 ) -> Result<(Id<Arc<Streamlet>>, Id<Arc<Interface>>), EvalError> {
     match &expr.0 {
         Expr::Ident(ident) => {

@@ -20,7 +20,7 @@ use til_query::{
     },
 };
 use til_vhdl::canonical;
-use tydi_common::{error::Result};
+use tydi_common::error::Result;
 
 extern crate til_vhdl;
 
@@ -71,20 +71,20 @@ fn playground() -> Result<()> {
 
     let mut project = Project::new("playground", ".", Some("../../test_output/"))?;
     let mut namespace = Namespace::new("root.sub")?;
-    namespace.define_type(db, "bits", 4)?;
-    namespace.define_type(db, "null", LogicalType::Null)?;
-    namespace.define_type(
+    namespace.define_type_no_params(db, "bits", 4)?;
+    namespace.define_type_no_params(db, "null", LogicalType::Null)?;
+    namespace.define_type_no_params(
         db,
         "stream",
         Stream::try_new(
             db,
-            namespace.get_type_id("bits")?,
+            namespace.get_type_id_no_assignments(db, "bits")?,
             1.0,
             1,
             Synchronicity::Sync,
             4,
             StreamDirection::Forward,
-            namespace.get_type_id("null")?,
+            namespace.get_type_id_no_assignments(db, "null")?,
             false,
         )?,
     )?;
@@ -97,12 +97,12 @@ fn playground() -> Result<()> {
             vec![
                 (
                     "a",
-                    namespace.get_stream_id(db, "stream")?,
+                    namespace.get_stream_id_no_assignments(db, "stream")?,
                     ("domain1", InterfaceDirection::In),
                 ),
                 (
                     "b",
-                    namespace.get_stream_id(db, "stream")?,
+                    namespace.get_stream_id_no_assignments(db, "stream")?,
                     ("domain2", InterfaceDirection::Out),
                 ),
             ],

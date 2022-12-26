@@ -5,10 +5,10 @@ use std::{
 };
 
 use til_query::{
-    common::logical::logicaltype::{stream::Stream, LogicalType},
+    common::logical::logicaltype::stream::Stream,
     ir::{
         interface_port::InterfacePort,
-        project::interface::Interface,
+        project::{interface::Interface, type_declaration::TypeDeclaration},
         traits::{GetSelf, InternArc},
         Ir,
     },
@@ -34,8 +34,8 @@ pub fn eval_interface_expr(
     expr: &Spanned<InterfaceExpr>,
     interfaces: &HashMap<Name, Id<Arc<Interface>>>,
     interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
-    types: &HashMap<Name, Id<LogicalType>>,
-    type_imports: &HashMap<PathName, Id<LogicalType>>,
+    types: &HashMap<Name, TypeDeclaration>,
+    type_imports: &HashMap<PathName, TypeDeclaration>,
 ) -> Result<Id<Arc<Interface>>, EvalError> {
     match &expr.0 {
         InterfaceExpr::Identifier(ident) => {
@@ -130,7 +130,7 @@ pub fn eval_interface_expr(
 #[cfg(test)]
 pub(crate) mod tests {
     use chumsky::{prelude::Simple, Parser, Stream};
-    use til_query::ir::db::Database;
+    use til_query::ir::{db::Database, project::type_declaration::TypeDeclaration};
     use tydi_common::error::TryResult;
 
     use crate::{
@@ -144,7 +144,7 @@ pub(crate) mod tests {
         src: impl Into<String>,
         name: impl TryResult<Name>,
         db: &dyn Ir,
-        types: &HashMap<Name, Id<LogicalType>>,
+        types: &HashMap<Name, TypeDeclaration>,
         interfaces: &mut HashMap<Name, Id<Arc<Interface>>>,
     ) {
         let src = src.into();

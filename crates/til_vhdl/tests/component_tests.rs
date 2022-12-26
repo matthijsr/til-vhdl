@@ -354,8 +354,8 @@ namespace my::test::space {
         .get(&("my::test::space".try_into()?))
         .unwrap()
         .get(&db);
-    let stream1 = namespace.get_stream_id(&db, "multi_stream")?;
-    let stream2 = namespace.get_stream_id(&db, "multi_stream2")?;
+    let stream1 = namespace.get_stream_id_no_assignments(&db, "multi_stream")?;
+    let stream2 = namespace.get_stream_id_no_assignments(&db, "multi_stream2")?;
 
     let result1 = stream1.synthesize(&db)?;
     assert_eq!(

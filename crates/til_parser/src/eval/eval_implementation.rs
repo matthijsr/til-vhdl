@@ -1,16 +1,13 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use til_query::{
-    common::logical::logicaltype::LogicalType,
-    ir::{
-        connection::InterfaceReference,
-        generics::param_value::GenericParamValue,
-        implementation::{link::Link, structure::Structure, Implementation},
-        project::interface::Interface,
-        streamlet::Streamlet,
-        traits::InternSelf,
-        Ir,
-    },
+use til_query::ir::{
+    connection::InterfaceReference,
+    generics::param_value::GenericParamValue,
+    implementation::{link::Link, structure::Structure, Implementation},
+    project::{interface::Interface, type_declaration::TypeDeclaration},
+    streamlet::Streamlet,
+    traits::InternSelf,
+    Ir,
 };
 use tydi_common::{
     name::{Name, PathName},
@@ -38,8 +35,8 @@ pub fn eval_struct_stat(
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
     interfaces: &HashMap<Name, Id<Arc<Interface>>>,
     interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
-    types: &HashMap<Name, Id<LogicalType>>,
-    type_imports: &HashMap<PathName, Id<LogicalType>>,
+    types: &HashMap<Name, TypeDeclaration>,
+    type_imports: &HashMap<PathName, TypeDeclaration>,
 ) -> Result<(), EvalError> {
     match &stat.0 {
         StructStat::Error => Err(EvalError {
@@ -152,8 +149,8 @@ pub fn eval_implementation_expr(
     implementation_imports: &HashMap<PathName, Id<Implementation>>,
     interfaces: &HashMap<Name, Id<Arc<Interface>>>,
     interface_imports: &HashMap<PathName, Id<Arc<Interface>>>,
-    types: &HashMap<Name, Id<LogicalType>>,
-    type_imports: &HashMap<PathName, Id<LogicalType>>,
+    types: &HashMap<Name, TypeDeclaration>,
+    type_imports: &HashMap<PathName, TypeDeclaration>,
 ) -> Result<(Id<Implementation>, Id<Arc<Interface>>), EvalError> {
     match &expr.0 {
         ImplBodyExpr::Error => Err(EvalError {

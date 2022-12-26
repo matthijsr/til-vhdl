@@ -107,8 +107,8 @@ pub fn file_to_project(
             let mut streamlet_imports = HashMap::new();
             for (imported_space, _) in namespace_node.imports() {
                 let imported_space = db.project().namespaces().try_get(imported_space)?.get(db);
-                for (name, id) in imported_space.type_ids() {
-                    type_imports.insert(imported_space.path_name().with_child(name), *id);
+                for (name, decl) in imported_space.type_decls() {
+                    type_imports.insert(imported_space.path_name().with_child(name), decl.clone());
                 }
                 for (name, id) in imported_space.interface_ids() {
                     interface_imports.insert(imported_space.path_name().with_child(name), *id);
