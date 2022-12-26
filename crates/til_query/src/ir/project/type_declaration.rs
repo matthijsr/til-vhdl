@@ -75,7 +75,7 @@ impl TypeDeclaration {
         }
     }
 
-    pub fn with_parameters(
+    pub fn with_assignments(
         self,
         parameter_assignments: impl IntoIterator<
             Item = (impl TryOptional<Name>, impl TryResult<GenericParamValue>),

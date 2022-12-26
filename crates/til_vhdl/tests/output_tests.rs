@@ -78,13 +78,13 @@ fn playground() -> Result<()> {
         "stream",
         Stream::try_new(
             db,
-            namespace.get_type_id(db, "bits")?,
+            namespace.get_type_id_no_assignments(db, "bits")?,
             1.0,
             1,
             Synchronicity::Sync,
             4,
             StreamDirection::Forward,
-            namespace.get_type_id(db, "null")?,
+            namespace.get_type_id_no_assignments(db, "null")?,
             false,
         )?,
     )?;
@@ -97,12 +97,12 @@ fn playground() -> Result<()> {
             vec![
                 (
                     "a",
-                    namespace.get_stream_id(db, "stream")?,
+                    namespace.get_stream_id_no_assignments(db, "stream")?,
                     ("domain1", InterfaceDirection::In),
                 ),
                 (
                     "b",
-                    namespace.get_stream_id(db, "stream")?,
+                    namespace.get_stream_id_no_assignments(db, "stream")?,
                     ("domain2", InterfaceDirection::Out),
                 ),
             ],
