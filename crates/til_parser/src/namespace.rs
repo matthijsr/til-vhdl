@@ -153,4 +153,9 @@ mod tests {
     fn test_test_nspace_til() {
         test_namespace_parse(source("test_nspace.til"))
     }
+
+    #[test]
+    fn test_generics_til() {
+        test_namespace_parse(source("generics.til"))
+    }
 }
