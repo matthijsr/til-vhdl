@@ -29,13 +29,7 @@ impl TypeDeclaration {
         name: impl TryResult<PathName>,
         typ: Id<LogicalType>,
     ) -> Result<Self> {
-        let result = Self {
-            name: name.try_result()?,
-            typ,
-            parameter_assignments: None,
-        };
-        result.verify_parameters(db)?;
-        Ok(result)
+        Self::try_new(db, name, typ, Vec::<GenericParameter>::new())
     }
 
     pub fn try_new(
@@ -52,10 +46,18 @@ impl TypeDeclaration {
                 GenericParameterAssignment::Default(param),
             )?;
         }
-        let result = Self {
-            name: name.try_result()?,
-            typ,
-            parameter_assignments: Some(parameter_assignments),
+        let result = if parameter_assignments.len() > 0 {
+            Self {
+                name: name.try_result()?,
+                typ,
+                parameter_assignments: Some(parameter_assignments),
+            }
+        } else {
+            Self {
+                name: name.try_result()?,
+                typ,
+                parameter_assignments: None,
+            }
         };
         result.verify_parameters(db)?;
         Ok(result)

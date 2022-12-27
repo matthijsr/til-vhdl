@@ -4,6 +4,7 @@ use std::hash::Hash;
 use crate::{
     doc_expr::{doc_expr, DocExpr},
     expr::{doc_parser, expr_parser, Expr},
+    generic_param::{generic_parameters, GenericParameterList},
     ident_expr::{ident_expr, name, path_name, IdentExpr},
     impl_expr::{impl_def_expr, ImplDefExpr},
     interface_expr::{interface_expr, InterfaceExpr},
@@ -14,7 +15,7 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
-    TypeDecl(Spanned<String>, Spanned<TypeExpr>),
+    TypeDecl(Spanned<String>, Spanned<TypeExpr>, GenericParameterList),
     ImplDecl(DocExpr, Spanned<String>, Spanned<ImplDefExpr>),
     InterfaceDecl(Spanned<String>, Spanned<InterfaceExpr>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
@@ -67,9 +68,25 @@ pub fn namespaces_parser() -> impl Parser<Token, Vec<Namespace>, Error = Simple<
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
         .ignore_then(name())
+        .then(
+            generic_parameters()
+                .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
+                .map(|x| GenericParameterList::List(x))
+                .recover_with(nested_delimiters(
+                    Token::Ctrl('<'),
+                    Token::Ctrl('>'),
+                    [],
+                    |span| GenericParameterList::Error(span),
+                ))
+                .or_not()
+                .map(|x| match x {
+                    Some(x) => x,
+                    None => GenericParameterList::None,
+                }),
+        )
         .then_ignore(just(Token::Op(Operator::Eq)))
         .then(type_expr())
-        .map(|(n, e)| Decl::TypeDecl(n, e));
+        .map(|((n, g), e)| Decl::TypeDecl(n, e, g));
 
     let impl_decl = doc_expr()
         .then(just(Token::Decl(DeclKeyword::Implementation)).ignore_then(name()))
@@ -157,5 +174,10 @@ mod tests {
     #[test]
     fn test_generics_til() {
         test_namespace_parse(source("generics.til"))
+    }
+
+    #[test]
+    fn test_simple_generics_til() {
+        test_namespace_parse(source("simple_generics.til"))
     }
 }

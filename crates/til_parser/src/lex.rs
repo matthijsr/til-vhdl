@@ -98,26 +98,6 @@ impl fmt::Display for ConditionKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GenericParamKeyword {
-    /// integer
-    Integer,
-    /// natural
-    Natural,
-    /// positive
-    Positive,
-}
-
-impl fmt::Display for GenericParamKeyword {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GenericParamKeyword::Integer => write!(f, "integer"),
-            GenericParamKeyword::Natural => write!(f, "natural"),
-            GenericParamKeyword::Positive => write!(f, "positive"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operator {
     /// `=`
     Eq,
@@ -193,8 +173,6 @@ pub enum Token {
     PortMode(InterfaceDirection),
     /// Words pertaining to conditions
     Condition(ConditionKeyword),
-    /// Words pertaining to generic parameters
-    GenericParam(GenericParamKeyword),
 }
 
 impl fmt::Display for Token {
@@ -215,7 +193,6 @@ impl fmt::Display for Token {
             Token::Boolean(b) => write!(f, "{}", b),
             Token::PortMode(p) => write!(f, "{}", p),
             Token::Condition(c) => write!(f, "{}", c),
-            Token::GenericParam(g) => write!(f, "{}", g),
         }
     }
 }
@@ -294,9 +271,6 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "or" => Token::Condition(ConditionKeyword::Or),
         "not" => Token::Condition(ConditionKeyword::Not),
         "one_of" => Token::Condition(ConditionKeyword::OneOf),
-        "integer" => Token::GenericParam(GenericParamKeyword::Integer),
-        "natural" => Token::GenericParam(GenericParamKeyword::Natural),
-        "positive" => Token::GenericParam(GenericParamKeyword::Positive),
         _ => Token::Identifier(ident),
     });
 
@@ -359,5 +333,10 @@ mod tests {
     #[test]
     fn test_generics_til() {
         test_lex("generics.til")
+    }
+
+    #[test]
+    fn test_simple_generics_til() {
+        test_lex("simple_generics.til")
     }
 }
