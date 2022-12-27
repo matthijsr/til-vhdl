@@ -39,7 +39,7 @@ pub fn domain_assignments(
     let domain_assignment = domain_name()
         .clone()
         .then(
-            just(Token::Op(Operator::Declare))
+            just(Token::Op(Operator::Eq))
                 .ignore_then(domain_name())
                 .or_not(),
         )
@@ -81,7 +81,7 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     let ident = ident_expr();
 
     let instance = name()
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
         .then(domain_assignments())
         .map(|((i_name, streamlet_name), domain_assignments)| {

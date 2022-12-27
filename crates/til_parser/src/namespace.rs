@@ -67,25 +67,25 @@ pub fn namespaces_parser() -> impl Parser<Token, Vec<Namespace>, Error = Simple<
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
         .ignore_then(name())
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(type_expr())
         .map(|(n, e)| Decl::TypeDecl(n, e));
 
     let impl_decl = doc_expr()
         .then(just(Token::Decl(DeclKeyword::Implementation)).ignore_then(name()))
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(impl_def_expr())
         .map(|((doc, name), body)| Decl::ImplDecl(doc, name, body));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
         .ignore_then(name())
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(interface_expr())
         .map(|(n, e)| Decl::InterfaceDecl(n, e));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
         .ignore_then(name())
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(expr_parser());
     let doc_streamlet_decl = doc_parser()
         .then(streamlet_decl.clone())

@@ -152,7 +152,7 @@ pub fn eval_type_expr(
                         "throughput" => {
                             if stream.throughput == None {
                                 match &prop.0 {
-                                    StreamProp::Value(Value::Int(i)) => {
+                                    StreamProp::Value(Value::NonNegative(i)) => {
                                         match Throughput::try_new(*i) {
                                             Ok(t) => {
                                                 stream.throughput = Some(t);
@@ -166,7 +166,7 @@ pub fn eval_type_expr(
                                             }
                                         }
                                     }
-                                    StreamProp::Value(Value::Float(f)) => {
+                                    StreamProp::Value(Value::PositiveReal(f)) => {
                                         stream.throughput = Some(f.positive_real().into());
                                     }
                                     _ => return invalid_prop("throughput", prop),
@@ -178,7 +178,7 @@ pub fn eval_type_expr(
                         "dimensionality" => {
                             if stream.dimensionality == None {
                                 match &prop.0 {
-                                    StreamProp::Value(Value::Int(i)) => {
+                                    StreamProp::Value(Value::NonNegative(i)) => {
                                         stream.dimensionality = Some(*i);
                                     }
                                     _ => return invalid_prop("dimensionality", prop),
@@ -202,10 +202,10 @@ pub fn eval_type_expr(
                         "complexity" => {
                             if stream.complexity == None {
                                 match &prop.0 {
-                                    StreamProp::Value(Value::Int(i)) => {
+                                    StreamProp::Value(Value::NonNegative(i)) => {
                                         stream.complexity = Some(Complexity::from(*i));
                                     }
-                                    StreamProp::Value(Value::Float(f)) => {
+                                    StreamProp::Value(Value::PositiveReal(f)) => {
                                         match Complexity::try_from(f.positive_real()) {
                                             Ok(c) => {
                                                 stream.complexity = Some(c);
@@ -391,7 +391,10 @@ pub(crate) mod tests {
             if let Some(expr) = ast {
                 match eval_type_expr(db, (&expr.0, &expr.1), types, &HashMap::new()) {
                     Ok(def) => {
-                        types.insert(name.clone(), TypeDeclaration::try_new_no_params(db, name, def).unwrap());
+                        types.insert(
+                            name.clone(),
+                            TypeDeclaration::try_new_no_params(db, name, def).unwrap(),
+                        );
                         println!("{}", def.get(db));
                     }
                     Err(e) => errs.push(Simple::custom(e.span, e.msg)),

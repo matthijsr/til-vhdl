@@ -15,6 +15,29 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct HashableReal(f64);
+
+impl Eq for HashableReal {}
+
+impl Hash for HashableReal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_ne_bytes().hash(state);
+    }
+}
+
+impl HashableReal {
+    pub fn get(&self) -> f64 {
+        self.0
+    }
+}
+
+impl fmt::Display for HashableReal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.get())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct HashablePositiveReal(PositiveReal);
 
 impl Eq for HashablePositiveReal {}
@@ -59,8 +82,10 @@ impl fmt::Display for HashablePositiveReal {
 pub enum Value {
     Synchronicity(Synchronicity),
     Direction(StreamDirection),
-    Int(NonNegative),
-    Float(HashablePositiveReal),
+    Negative(i32),
+    NegativeReal(HashableReal),
+    NonNegative(NonNegative),
+    PositiveReal(HashablePositiveReal),
     Version(String),
     Boolean(bool),
 }
@@ -70,10 +95,12 @@ impl fmt::Display for Value {
         match self {
             Value::Synchronicity(s) => write!(f, "{}", s),
             Value::Direction(d) => write!(f, "{}", d),
-            Value::Int(i) => write!(f, "{}", i),
-            Value::Float(ff) => write!(f, "{}", ff),
+            Value::NonNegative(i) => write!(f, "{}", i),
+            Value::PositiveReal(ff) => write!(f, "{}", ff),
             Value::Version(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::Negative(n) => write!(f, "{}", n),
+            Value::NegativeReal(ff) => write!(f, "{}", ff),
         }
     }
 }
@@ -105,9 +132,9 @@ pub fn val() -> impl Parser<Token, Spanned<Value>, Error = Simple<Token>> + Clon
     filter_map(|span: Span, tok| match tok {
         Token::Num(num) => {
             if let Ok(i) = num.parse() {
-                Ok(Value::Int(i))
+                Ok(Value::NonNegative(i))
             } else if let Ok(f) = num.parse() {
-                Ok(Value::Float(HashablePositiveReal(
+                Ok(Value::PositiveReal(HashablePositiveReal(
                     PositiveReal::new(f).unwrap(),
                 )))
             } else {

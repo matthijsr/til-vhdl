@@ -1,7 +1,7 @@
 namespace generics::space {
     type genericstream<
         d: dimensionality = 3;
-        (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or in(7, 9, 111) or < 99
+        (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or one_of(7, 9, 111) or < 99
     > = Stream (
         data: Bits(8),
         throughput: 2.0,
@@ -24,7 +24,7 @@ namespace generics::space {
         pa: natural = 2,
         pb: positive = 1,
         pc: integer = -1; < 10 and > -2,
-        pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or in(7, 9, 111) or < 99,
+        pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or one_of(7, 9, 111) or < 99,
     >(
         a: genericstream in 'a,
         b: genericstream out 'a,
@@ -43,7 +43,7 @@ namespace generics::space {
         pa: natural = 2,
         pb: positive = 1,
         pc: integer = 0; < 9 and > 2,
-        pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or in(7, 9, 111) or < 99,
+        pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or one_of(7, 9, 111) or < 99,
     >() {
         impl: {
             a = gs<'a, 'b, pa, pb, pc + 1, pd>;
