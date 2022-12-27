@@ -128,8 +128,6 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
             .map_with_span(|x, span| (x, span))
             .map(|x| TypeExpr::Definition(Box::new(x)));
 
-        let ident_typ = ident_expr().map(TypeExpr::Identifier);
-
         let ident_typ = ident_expr()
             .then(
                 generic_parameter_assignments()

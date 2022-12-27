@@ -110,6 +110,8 @@ pub fn generic_parameter_assignment(
                 },
             );
 
+        let single_value = integer_value.clone().or(negative.clone());
+
         // TODO: Ref parameter values
 
         let math_op = just(Token::Op(Operator::Add))
@@ -119,11 +121,11 @@ pub fn generic_parameter_assignment(
             .or(just(Token::Op(Operator::Div)).to(MathOperator::Divide))
             .or(just(Token::Op(Operator::Mod)).to(MathOperator::Modulo));
 
-        let math_combination = param_assignment
+        let math_combination = single_value
             .clone()
-            .then(math_op)
-            .then(param_assignment.clone())
-            .map(|(((l, _), o), (r, _))| {
+            .then(math_op.clone())
+            .then(single_value.clone())
+            .map(|((l, o), r)| {
                 match o {
                     MathOperator::Add => l?.g_add(r?),
                     MathOperator::Subtract => l?.g_sub(r?),
@@ -149,10 +151,30 @@ pub fn generic_parameter_assignment(
                 },
             ));
 
-        math_combination
-            .or(integer_value)
+        let single_value = parens.clone().or(single_value);
+
+        // TODO: This isn't actually correct, it should be (left-associative) recursive
+        // But doing it that way resulted in a stack overflow.
+        // I suspect there's probably a way to tell chumsky how to do it correctly.
+        let math_combination = single_value
+            .clone()
+            .then(math_op)
+            .then(single_value.clone())
+            .map(|((l, o), r)| {
+                match o {
+                    MathOperator::Add => l?.g_add(r?),
+                    MathOperator::Subtract => l?.g_sub(r?),
+                    MathOperator::Multiply => l?.g_mul(r?),
+                    MathOperator::Divide => l?.g_div(r?),
+                    MathOperator::Modulo => l?.g_mod(r?),
+                }
+                .map(|x| GenericParamValue::from(x))
+            });
+
+        parens
+            .or(math_combination)
             .or(negative)
-            .or(parens)
+            .or(integer_value)
             .map_with_span(|x, span| (x, span))
     })
 }
