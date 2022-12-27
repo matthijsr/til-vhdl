@@ -23,7 +23,9 @@ use tydi_intern::Id;
 
 use crate::{
     expr::Value,
-    type_expr::{FieldsDef, LogicalTypeDef, StreamProp, StreamProps, TypeExpr},
+    type_expr::{
+        FieldsDef, GenericParameterAssignments, LogicalTypeDef, StreamProp, StreamProps, TypeExpr,
+    },
     Span, Spanned,
 };
 
@@ -357,6 +359,37 @@ pub fn eval_type_expr(
                 Ok(LogicalType::Stream(eval_stream(&props.1, &props.0)?).intern(db))
             }
         },
+        TypeExpr::Assigned(ident, assignments) => {
+            let parameter_assignments = match assignments {
+                GenericParameterAssignments::Error(a_span) => Err(EvalError {
+                    span: a_span.clone(),
+                    msg: "There's an issue with the parameter assignments".to_string(),
+                }),
+                GenericParameterAssignments::List(assignments) => assignments
+                    .iter()
+                    .map(|(opt_name, res_val)| {
+                        Ok((
+                            opt_name.clone(),
+                            res_val.0.clone().map_err(|err| EvalError {
+                                span: res_val.1.clone(),
+                                msg: format!("Something is wrong with this value: {}", err),
+                            })?,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, EvalError>>(),
+            }?;
+            eval_ident(ident, &expr.1, types, type_imports, "type")?
+                .with_assignments(parameter_assignments)
+                .map_err(|err| EvalError {
+                    span: expr.1.clone(),
+                    msg: format!("Something went wrong assigning this type: {}", err),
+                })?
+                .type_id(db)
+                .map_err(|err| EvalError {
+                    span: expr.1.clone(),
+                    msg: format!("Something went wrong retrieving a type ID: {}", err),
+                })
+        }
     }
 }
 

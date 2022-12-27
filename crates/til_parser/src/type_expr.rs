@@ -1,17 +1,27 @@
 use chumsky::prelude::*;
+use til_query::ir::generics::param_value::GenericParamValue;
+use tydi_common::{error::Error, name::Name};
 
 use crate::{
     expr::{val, Value},
+    generic_param::generic_parameter_assignments,
     ident_expr::{ident_expr, label, IdentExpr},
     lex::{Token, TypeKeyword},
-    Spanned,
+    Span, Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeExpr {
     Error,
     Identifier(IdentExpr),
+    Assigned(IdentExpr, GenericParameterAssignments),
     Definition(Box<Spanned<LogicalTypeDef>>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum GenericParameterAssignments {
+    Error(Span),
+    List(Vec<(Option<Name>, Spanned<Result<GenericParamValue, Error>>)>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -118,8 +128,28 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
             .map_with_span(|x, span| (x, span))
             .map(|x| TypeExpr::Definition(Box::new(x)));
 
+        let ident_typ = ident_expr().map(TypeExpr::Identifier);
+
+        let ident_typ = ident_expr()
+            .then(
+                generic_parameter_assignments()
+                    .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
+                    .map(|x| GenericParameterAssignments::List(x))
+                    .recover_with(nested_delimiters(
+                        Token::Ctrl('<'),
+                        Token::Ctrl('>'),
+                        [],
+                        |span| GenericParameterAssignments::Error(span),
+                    ))
+                    .or_not(),
+            )
+            .map(|(i, a)| match a {
+                Some(a) => TypeExpr::Assigned(i, a),
+                None => TypeExpr::Identifier(i),
+            });
+
         logical_type_def
-            .or(ident_expr().map(TypeExpr::Identifier))
+            .or(ident_typ)
             .map_with_span(|t, span| (t, span))
             .recover_with(nested_delimiters(
                 Token::Ctrl('('),

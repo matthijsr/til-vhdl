@@ -1,13 +1,18 @@
 use chumsky::prelude::*;
 use til_query::ir::generics::{
-    behavioral::integer::IntegerGeneric, interface::InterfaceGenericKind,
-    param_value::GenericParamValue, GenericKind, GenericParameter,
+    behavioral::integer::IntegerGeneric,
+    interface::InterfaceGenericKind,
+    param_value::{
+        combination::{GenericParamValueOps, MathOperator},
+        GenericParamValue,
+    },
+    GenericKind, GenericParameter,
 };
 use tydi_common::{error::Error, name::Name};
 
 use crate::{
     lex::{Operator, Token},
-    Spanned, Span,
+    Span, Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -89,4 +94,86 @@ pub fn generic_parameters(
         )
         .then_ignore(just(Token::Ctrl(',')).or_not())
         .labelled("generic parameters")
+}
+
+pub fn generic_parameter_assignment(
+) -> impl Parser<Token, Spanned<Result<GenericParamValue, Error>>, Error = Simple<Token>> + Clone {
+    recursive(|param_assignment| {
+        let integer_value = param_integer().map(|x| Ok(GenericParamValue::from(x)));
+
+        let negative = just(Token::Op(Operator::Sub))
+            .ignore_then(param_assignment.clone())
+            .map(
+                |(x, _): Spanned<Result<GenericParamValue, Error>>| match x {
+                    Ok(x) => x.g_negative().map(|x| GenericParamValue::from(x)),
+                    Err(e) => Err(e),
+                },
+            );
+
+        // TODO: Ref parameter values
+
+        let math_op = just(Token::Op(Operator::Add))
+            .to(MathOperator::Add)
+            .or(just(Token::Op(Operator::Sub)).to(MathOperator::Subtract))
+            .or(just(Token::Op(Operator::Mul)).to(MathOperator::Multiply))
+            .or(just(Token::Op(Operator::Div)).to(MathOperator::Divide))
+            .or(just(Token::Op(Operator::Mod)).to(MathOperator::Modulo));
+
+        let math_combination = param_assignment
+            .clone()
+            .then(math_op)
+            .then(param_assignment.clone())
+            .map(|(((l, _), o), (r, _))| {
+                match o {
+                    MathOperator::Add => l?.g_add(r?),
+                    MathOperator::Subtract => l?.g_sub(r?),
+                    MathOperator::Multiply => l?.g_mul(r?),
+                    MathOperator::Divide => l?.g_div(r?),
+                    MathOperator::Modulo => l?.g_mod(r?),
+                }
+                .map(|x| GenericParamValue::from(x))
+            });
+
+        let parens = math_combination
+            .clone()
+            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
+            .recover_with(nested_delimiters(
+                Token::Ctrl('('),
+                Token::Ctrl(')'),
+                [],
+                // TODO: Would be nice to include the span in the error somehow
+                |_| {
+                    Err(Error::ParsingError(
+                        "Nesting delimiter fallback".to_string(),
+                    ))
+                },
+            ));
+
+        math_combination
+            .or(integer_value)
+            .or(negative)
+            .or(parens)
+            .map_with_span(|x, span| (x, span))
+    })
+}
+
+pub fn generic_parameter_assignments() -> impl Parser<
+    Token,
+    Vec<(Option<Name>, Spanned<Result<GenericParamValue, Error>>)>,
+    Error = Simple<Token>,
+> + Clone {
+    let assignment = param_name()
+        .then_ignore(just(Token::Op(Operator::Eq)))
+        .or_not()
+        .then(generic_parameter_assignment());
+
+    assignment
+        .clone()
+        .chain(
+            just(Token::Ctrl(','))
+                .ignore_then(assignment.clone())
+                .repeated(),
+        )
+        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .labelled("generic parameter assignments")
 }
