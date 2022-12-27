@@ -156,6 +156,9 @@ pub fn generic_parameter_assignment(
         // TODO: This isn't actually correct, it should be (left-associative) recursive
         // But doing it that way resulted in a stack overflow.
         // I suspect there's probably a way to tell chumsky how to do it correctly.
+        // Specifically, I think the issue is that when you get something like "1 + 1 + 1", Chumsky doesn't know whether to interpret it as:
+        // "(1 + 1) + 1" or "1 + (1 + 1)"
+        // The correct usage may involve using foldl, like shown here: https://github.com/zesterer/chumsky/blob/6107b2f98a22e8d22a6ee64b0ab4f727166d6769/examples/nano_rust.rs
         let math_combination = single_value
             .clone()
             .then(math_op)
