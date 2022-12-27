@@ -1,0 +1,57 @@
+namespace generics::space {
+    type genericstream<
+        d: dimensionality = 3;
+        (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or in(7, 9, 111) or < 99
+    > = Stream (
+        data: Bits(8),
+        throughput: 2.0,
+        dimensionality: d,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+
+    type stream_assigned1 = genericstream<8 / 2>;
+    type stream_assigned2 = genericstream<4 % 10>;
+    type stream_assigned2 = genericstream<4 * 2>;
+    type stream_assigned2 = genericstream<6 - 2>;
+
+    streamlet gs = <
+        'a,
+        'b,
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = -1; < 10 and > -2,
+        pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or in(7, 9, 111) or < 99,
+    >(
+        a: genericstream in 'a,
+        b: genericstream out 'a,
+        c: genericstream<pd> in 'b,
+        d: genericstream<pd> out 'b,
+    ) {
+        impl: {
+            a -- b;
+            c -- d;
+        }
+    };
+
+    streamlet s = <
+        'a,
+        'b,
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = 0; < 9 and > 2,
+        pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or in(7, 9, 111) or < 99,
+    >() {
+        impl: {
+            a = gs<'a, 'b, pa, pb, pc + 1, pd>;
+            b = gs<'b = 'b, 'a = 'a, pa, pb, pd = pd, pc = pc - 1>;
+            a.a -- b.b;
+            a.b -- b.a;
+            a.c -- b.d;
+            a.d -- b.c;
+        }
+    }
+}

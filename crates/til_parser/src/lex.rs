@@ -62,6 +62,18 @@ pub enum TypeKeyword {
     Null,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ConditionKeyword {
+    /// and
+    And,
+    /// or
+    Or,
+    /// not
+    Not,
+    /// in
+    In,
+}
+
 impl fmt::Display for TypeKeyword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -86,6 +98,10 @@ pub enum Operator {
     Path,
     /// `*`
     All,
+    /// `>=`
+    GtEq,
+    /// `<=`
+    LtEq,
 }
 
 impl fmt::Display for Operator {
@@ -96,6 +112,8 @@ impl fmt::Display for Operator {
             Operator::Connect => write!(f, "--"),
             Operator::Path => write!(f, "::"),
             Operator::All => write!(f, "*"),
+            Operator::GtEq => write!(f, ">="),
+            Operator::LtEq => write!(f, "<="),
         }
     }
 }
@@ -258,10 +276,12 @@ mod tests {
             }
         }
 
+        let err_len = errs.len();
         println!("Errors:");
         for err in errs {
             println!("{}", err);
         }
+        assert_eq!(0, err_len);
     }
 
     #[test]
@@ -272,5 +292,10 @@ mod tests {
     #[test]
     fn test_sample_til() {
         test_lex("sample.til")
+    }
+
+    #[test]
+    fn test_generics_til() {
+        test_lex("generics.til")
     }
 }
