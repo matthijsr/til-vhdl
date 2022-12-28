@@ -80,6 +80,20 @@ pub fn eval_generic_param_assignment(
     }
 }
 
+pub fn eval_generic_param_assignments_list(
+    list: &Vec<(Option<Name>, Spanned<GenericParameterValueExpr>)>,
+    parent_params: &InsertionOrderedMap<Name, GenericParameter>,
+) -> Result<Vec<(Option<Name>, GenericParamValue)>, EvalError> {
+    list.iter()
+        .map(|(opt_name, res_val)| {
+            Ok((
+                opt_name.clone(),
+                eval_generic_param_assignment(res_val, parent_params)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, EvalError>>()
+}
+
 pub fn eval_generic_param_assignments(
     expr: &Spanned<GenericParameterAssignments>,
     parent_params: &InsertionOrderedMap<Name, GenericParameter>,
@@ -89,14 +103,8 @@ pub fn eval_generic_param_assignments(
             span: expr.1.clone(),
             msg: "There's an issue with the parameter assignments".to_string(),
         }),
-        GenericParameterAssignments::List(assignments) => assignments
-            .iter()
-            .map(|(opt_name, res_val)| {
-                Ok((
-                    opt_name.clone(),
-                    eval_generic_param_assignment(res_val, parent_params)?,
-                ))
-            })
-            .collect::<Result<Vec<_>, EvalError>>(),
+        GenericParameterAssignments::List(assignments) => {
+            eval_generic_param_assignments_list(assignments, parent_params)
+        }
     }
 }
