@@ -1,0 +1,103 @@
+namespace generics::space {
+    type genericstream<
+        d: dimensionality = 3
+    > = Stream (
+        data: Bits(8),
+        throughput: 2.0,
+        dimensionality: d,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+
+    type stream_assigned1 = genericstream<8 / 2>;
+    type stream_assigned2 = genericstream<4 % 10>;
+    type stream_assigned3 = genericstream<4 * 2>;
+    type stream_assigned4 = genericstream<6 - 2>;
+    type stream_assigned5 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2>;
+    type stream_assigned6 = genericstream<d = 6 - 2 * 3 + 4 / 2 - 1 + 2>;
+    type stream_assigned7 = genericstream<d = 6 - 2 * 3 + 4 / 2 - 1 + 2,>;
+    type stream_assigned8 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2,>;
+    type stream_assigned9 = genericstream<(6 - 2) * 3 + 4 / 2 - (1 + 2),>;
+
+    type stream_reassigned1<d: dimensionality = 4> = genericstream<d>;
+    type stream_reassigned2<d: dimensionality = 4> = genericstream<d,>;
+    type stream_reassigned3<d: dimensionality = 4> = genericstream<d = d>;
+    type stream_reassigned4<d: dimensionality = 4> = genericstream<d = d,>;
+    type stream_reassigned5<d: dimensionality = 4> = genericstream<d + 1>;
+    type stream_reassigned6<d: dimensionality = 4> = genericstream<d + d - d>;
+
+    streamlet just_params = <
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = -1,
+        pd: dimensionality = 3,
+    >(
+        a: in genericstream,
+        b: out genericstream,
+        c: in genericstream<pd>,
+        d: out genericstream<pd>,
+    ) {
+        impl: {
+            a -- b;
+            c -- d;
+        }
+    };
+
+    streamlet gs = <
+        'a,
+        'b,
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = -1,
+        pd: dimensionality = 3,
+    >(
+        a: in genericstream 'a,
+        b: out genericstream 'a,
+        c: in genericstream<pd> 'b,
+        d: out genericstream<pd> 'b,
+    ) {
+        impl: {
+            a -- b;
+            c -- d;
+        }
+    };
+
+    streamlet s = <
+        'a,
+        'b,
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = 0,
+        pd: dimensionality = 3,
+    >() {
+        impl: {
+            a = gs<'a, 'b, pa, pb, pc + 1, pd>;
+            b = gs<'b = 'b, 'a = 'a, pa, pb, pd = pd, pc = pc - 1>;
+            a.a -- b.b;
+            a.b -- b.a;
+            a.c -- b.d;
+            a.d -- b.c;
+        }
+    };
+
+    streamlet s_just_params = <
+        'a,
+        'b,
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = 0,
+        pd: dimensionality = 3,
+    >() {
+        impl: {
+            a = gs<pa, pb, pc + 1, pd>;
+            b = gs<pa, pb, pd = pd, pc = pc - 1>;
+            a.a -- b.b;
+            a.b -- b.a;
+            a.c -- b.d;
+            a.d -- b.c;
+        }
+    };
+}

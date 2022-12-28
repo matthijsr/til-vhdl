@@ -65,6 +65,11 @@ fn evaluation_parse() -> Result<()> {
 }
 
 #[test]
+fn simple_generics_parse() -> Result<()> {
+    parse_to_output("tests/til_files/simple_generics.til", "simple_generics")
+}
+
+#[test]
 fn playground() -> Result<()> {
     let mut _db = Database::default();
     let db = &mut _db;
