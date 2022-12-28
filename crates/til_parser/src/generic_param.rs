@@ -3,7 +3,7 @@ use til_query::ir::generics::{
     behavioral::integer::IntegerGeneric,
     interface::InterfaceGenericKind,
     param_value::{
-        combination::{GenericParamValueOps, MathOperator},
+        combination::{GenericParamValueOps, MathCombination, MathOperator},
         GenericParamValue,
     },
     GenericKind, GenericParameter,
@@ -95,87 +95,93 @@ pub fn generic_parameters(
 pub fn generic_parameter_assignment(
 ) -> impl Parser<Token, Spanned<Result<GenericParamValue, Error>>, Error = Simple<Token>> + Clone {
     recursive(|param_assignment| {
-        let integer_value = param_integer().map(|x| Ok(GenericParamValue::from(x)));
+        let integer_value =
+            param_integer().map_with_span(|x, span| (Ok(GenericParamValue::from(x)), span));
 
         let negative = just(Token::Op(Operator::Sub))
             .ignore_then(param_assignment.clone())
-            .map(
-                |(x, _): Spanned<Result<GenericParamValue, Error>>| match x {
-                    Ok(x) => x.g_negative().map(|x| GenericParamValue::from(x)),
-                    Err(e) => Err(e),
+            .map_with_span(
+                |(x, inner_span): Spanned<Result<GenericParamValue, Error>>, span| match x {
+                    Ok(x) => (x.g_negative().map(|x| GenericParamValue::from(x)), span),
+                    Err(e) => (Err(e), inner_span),
                 },
             );
 
-        let single_value = integer_value.clone().or(negative.clone());
-
         // TODO: Ref parameter values
 
-        let math_op = just(Token::Op(Operator::Add))
-            .to(MathOperator::Add)
-            .or(just(Token::Op(Operator::Sub)).to(MathOperator::Subtract))
-            .or(just(Token::Op(Operator::Mul)).to(MathOperator::Multiply))
-            .or(just(Token::Op(Operator::Div)).to(MathOperator::Divide))
-            .or(just(Token::Op(Operator::Mod)).to(MathOperator::Modulo));
-
-        let math_combination = single_value
-            .clone()
-            .then(math_op.clone())
-            .then(single_value.clone())
-            .map(|((l, o), r)| {
-                match o {
-                    MathOperator::Add => l?.g_add(r?),
-                    MathOperator::Subtract => l?.g_sub(r?),
-                    MathOperator::Multiply => l?.g_mul(r?),
-                    MathOperator::Divide => l?.g_div(r?),
-                    MathOperator::Modulo => l?.g_mod(r?),
-                }
-                .map(|x| GenericParamValue::from(x))
-            });
-
-        let parens = math_combination
-            .clone()
-            .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
+        let atom = integer_value
+            .or(negative)
+            .or(param_assignment
+                .clone()
+                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
+                .map_with_span(
+                    |(x, inner_span): Spanned<Result<GenericParamValue, Error>>, span| match x {
+                        Ok(x) => (x.try_add_parens(), span),
+                        Err(e) => (Err(e), inner_span),
+                    },
+                ))
             .recover_with(nested_delimiters(
                 Token::Ctrl('('),
                 Token::Ctrl(')'),
                 [],
-                // TODO: Would be nice to include the span in the error somehow
-                |_| {
-                    Err(Error::ParsingError(
-                        "Nesting delimiter fallback".to_string(),
-                    ))
+                |span| {
+                    (
+                        Err(Error::ParsingError(
+                            "Nesting delimiter fallback".to_string(),
+                        )),
+                        span,
+                    )
                 },
             ));
 
-        let single_value = parens.clone().or(single_value);
+        // Multiplication, division and modulo (remainder) have the same precedence
+        let op = just(Token::Op(Operator::Mul))
+            .to(MathOperator::Multiply)
+            .or(just(Token::Op(Operator::Div)).to(MathOperator::Divide))
+            .or(just(Token::Op(Operator::Mod)).to(MathOperator::Modulo));
 
-        // TODO: This isn't actually correct, it should be (left-associative) recursive
-        // But doing it that way resulted in a stack overflow.
-        // I suspect there's probably a way to tell chumsky how to do it correctly.
-        // Specifically, I think the issue is that when you get something like "1 + 1 + 1", Chumsky doesn't know whether to interpret it as:
-        // "(1 + 1) + 1" or "1 + (1 + 1)"
-        // The correct usage may involve using foldl, like shown here: https://github.com/zesterer/chumsky/blob/6107b2f98a22e8d22a6ee64b0ab4f727166d6769/examples/nano_rust.rs
-        let math_combination = single_value
+        let product = atom
             .clone()
-            .then(math_op)
-            .then(single_value.clone())
-            .map(|((l, o), r)| {
-                match o {
-                    MathOperator::Add => l?.g_add(r?),
-                    MathOperator::Subtract => l?.g_sub(r?),
-                    MathOperator::Multiply => l?.g_mul(r?),
-                    MathOperator::Divide => l?.g_div(r?),
-                    MathOperator::Modulo => l?.g_mod(r?),
-                }
-                .map(|x| GenericParamValue::from(x))
-            });
+            .then(op.then(param_assignment).repeated())
+            .foldl(|l, (op, r)| parse_math_combination(l, op, r));
 
-        parens
-            .or(math_combination)
-            .or(negative)
-            .or(integer_value)
-            .map_with_span(|x, span| (x, span))
+        // Sum and subtraction have the same precedence (but a lower precedence than products)
+        let op = just(Token::Op(Operator::Add))
+            .to(MathOperator::Add)
+            .or(just(Token::Op(Operator::Sub)).to(MathOperator::Subtract));
+
+        let sum = product
+            .clone()
+            .then(op.then(product).repeated())
+            .foldl(|l, (op, r)| parse_math_combination(l, op, r));
+
+        sum
     })
+}
+
+fn parse_math_combination(
+    l: (Result<GenericParamValue, Error>, std::ops::Range<usize>),
+    op: MathOperator,
+    r: (Result<GenericParamValue, Error>, std::ops::Range<usize>),
+) -> (Result<GenericParamValue, Error>, std::ops::Range<usize>) {
+    let span = l.1.start..r.1.end;
+    match (l.0, r.0) {
+        (Ok(l), Ok(r)) => (
+            MathCombination::Combination(Box::new(l), op, Box::new(r))
+                .verify_integer()
+                .map(|x| GenericParamValue::from(x)),
+            span,
+        ),
+        (Ok(_), Err(e)) => (Err(e), r.1),
+        (Err(e), Ok(_)) => (Err(e), l.1),
+        (Err(le), Err(re)) => (
+            Err(Error::ParsingError(format!(
+                "Both left and right values are invalid. Left: {} ; Right: {}",
+                le, re
+            ))),
+            span,
+        ),
+    }
 }
 
 pub fn generic_parameter_assignments() -> impl Parser<

@@ -78,6 +78,27 @@ impl MathCombination {
         }
     }
 
+    pub fn verify_integer(self) -> Result<Self> {
+        fn fail_if_not_int(val: &GenericParamValue) -> Result<()> {
+            if val.is_integer() {
+                Ok(())
+            } else {
+                Err(Error::InvalidArgument(format!("{} is not an integer", val)))
+            }
+        }
+
+        match &self {
+            MathCombination::Parentheses(_) => (),
+            MathCombination::Negative(n) => fail_if_not_int(n.as_ref())?,
+            MathCombination::Combination(l, _, r) => {
+                fail_if_not_int(l.as_ref())?;
+                fail_if_not_int(r.as_ref())?
+            }
+        };
+
+        Ok(self)
+    }
+
     pub fn reduce(&self) -> GenericParamValue {
         match self {
             MathCombination::Parentheses(p) => match p.reduce() {

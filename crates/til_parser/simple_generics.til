@@ -14,8 +14,13 @@ namespace generics::space {
 
     type stream_assigned1 = genericstream<8 / 2>;
     type stream_assigned2 = genericstream<4 % 10>;
-    type stream_assigned2 = genericstream<4 * 2>;
-    type stream_assigned2 = genericstream<6 - 2>;
+    type stream_assigned3 = genericstream<4 * 2>;
+    type stream_assigned4 = genericstream<6 - 2>;
+    type stream_assigned5 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2>;
+    type stream_assigned6 = genericstream<d = 6 - 2 * 3 + 4 / 2 - 1 + 2>;
+    type stream_assigned7 = genericstream<d = 6 - 2 * 3 + 4 / 2 - 1 + 2,>;
+    type stream_assigned8 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2,>;
+    type stream_assigned9 = genericstream<(6 - 2) * 3 + 4 / 2 - (1 + 2),>;
 
 //    streamlet gs = <
 //        'a,

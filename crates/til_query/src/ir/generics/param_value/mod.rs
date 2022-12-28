@@ -1,5 +1,7 @@
 use core::fmt;
 
+use tydi_common::error::{Error, Result};
+
 use self::{
     combination::{Combination, MathCombination},
     ref_value::RefValue,
@@ -18,6 +20,20 @@ pub enum GenericParamValue {
 }
 
 impl GenericParamValue {
+    pub fn try_add_parens(self) -> Result<Self> {
+        match self {
+            GenericParamValue::Integer(_) | GenericParamValue::Ref(_) => {
+                Err(Error::InvalidArgument(format!(
+                    "Single values should not be enclosed by parentheses. {} is not suitable.",
+                    self
+                )))
+            }
+            GenericParamValue::Combination(c) => match c {
+                Combination::Math(m) => Ok(MathCombination::parentheses(m).into()),
+            },
+        }
+    }
+
     // Performed at the end, if there are any (pointless) parentheses remaining, this will remove them
     pub fn remove_outer_parens(self) -> Self {
         match self {
