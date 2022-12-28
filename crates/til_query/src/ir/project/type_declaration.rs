@@ -29,13 +29,7 @@ impl TypeDeclaration {
         name: impl TryResult<PathName>,
         typ: Id<LogicalType>,
     ) -> Result<Self> {
-        let result = Self {
-            name: name.try_result()?,
-            typ,
-            parameter_assignments: None,
-        };
-        result.verify_parameters(db)?;
-        Ok(result)
+        Self::try_new(db, name, typ, Vec::<GenericParameter>::new())
     }
 
     pub fn try_new(
@@ -52,10 +46,18 @@ impl TypeDeclaration {
                 GenericParameterAssignment::Default(param),
             )?;
         }
-        let result = Self {
-            name: name.try_result()?,
-            typ,
-            parameter_assignments: Some(parameter_assignments),
+        let result = if parameter_assignments.len() > 0 {
+            Self {
+                name: name.try_result()?,
+                typ,
+                parameter_assignments: Some(parameter_assignments),
+            }
+        } else {
+            Self {
+                name: name.try_result()?,
+                typ,
+                parameter_assignments: None,
+            }
         };
         result.verify_parameters(db)?;
         Ok(result)
@@ -184,6 +186,20 @@ impl TypeDeclaration {
         } else {
             Ok(())
         }
+    }
+
+    pub fn parameters(&self) -> InsertionOrderedMap<Name, GenericParameter> {
+        let mut result = InsertionOrderedMap::new();
+        if let Some(assignments) = self.parameter_assignments().clone() {
+            for (name, assignment) in assignments {
+                match assignment {
+                    GenericParameterAssignment::Default(p) => result.try_insert(name, p).unwrap(),
+                    // TODO: May need to throw an error here, this shouldn't happen.
+                    GenericParameterAssignment::Assigned(_, _) => (),
+                }
+            }
+        }
+        result
     }
 }
 

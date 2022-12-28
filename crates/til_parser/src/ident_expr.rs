@@ -30,12 +30,8 @@ pub fn label() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + C
 
 pub fn path_name() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> + Clone {
     name()
-        .chain(
-            just(Token::Op(Operator::Path))
-                .ignore_then(name())
-                .repeated()
-                .at_least(1),
-        )
+        .separated_by(just(Token::Op(Operator::Path)))
+        .at_least(2)
         .labelled("path name")
 }
 

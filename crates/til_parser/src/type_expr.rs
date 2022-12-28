@@ -2,6 +2,9 @@ use chumsky::prelude::*;
 
 use crate::{
     expr::{val, Value},
+    generic_param::{
+        generic_parameter_assignment, generic_parameter_assignments, GenericParameterAssignments,
+    },
     ident_expr::{ident_expr, label, IdentExpr},
     lex::{Token, TypeKeyword},
     Spanned,
@@ -11,6 +14,7 @@ use crate::{
 pub enum TypeExpr {
     Error,
     Identifier(IdentExpr),
+    Assigned(IdentExpr, Spanned<GenericParameterAssignments>),
     Definition(Box<Spanned<LogicalTypeDef>>),
 }
 
@@ -47,11 +51,8 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
 
         // A group of types
         let fields_def = typ_el
-            .clone()
-            .chain(just(Token::Ctrl(',')).ignore_then(typ_el).repeated())
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
+            .separated_by(just(Token::Ctrl(',')))
+            .allow_trailing()
             .map_with_span(|fields, span| (FieldsDef::Fields(fields), span))
             .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
             .recover_with(nested_delimiters(
@@ -73,16 +74,15 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
                 type_def
                     .clone()
                     .map(|(t, span)| (StreamProp::Type(t), span))
-                    .or(val().map(|(v, span)| (StreamProp::Value(v), span))),
+                    .or(val().map(|(v, span)| (StreamProp::Value(v), span)))
+                    .or(generic_parameter_assignment()
+                        .map(|(g, span)| (StreamProp::Value(Value::GenericValue(g)), span))),
             )
             .map(|(lab, prop)| (lab, prop));
 
         let stream_props = stream_prop
-            .clone()
-            .chain(just(Token::Ctrl(',')).ignore_then(stream_prop).repeated())
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
+            .separated_by(just(Token::Ctrl(',')))
+            .allow_trailing()
             .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
             .map_with_span(|props, span| (StreamProps::Props(props), span))
             .recover_with(nested_delimiters(
@@ -118,8 +118,26 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
             .map_with_span(|x, span| (x, span))
             .map(|x| TypeExpr::Definition(Box::new(x)));
 
+        let ident_typ = ident_expr()
+            .then(
+                generic_parameter_assignments()
+                    .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
+                    .map_with_span(|x, span| (GenericParameterAssignments::List(x), span))
+                    .recover_with(nested_delimiters(
+                        Token::Ctrl('<'),
+                        Token::Ctrl('>'),
+                        [],
+                        |span| (GenericParameterAssignments::Error, span),
+                    ))
+                    .or_not(),
+            )
+            .map(|(i, a)| match a {
+                Some(a) => TypeExpr::Assigned(i, a),
+                None => TypeExpr::Identifier(i),
+            });
+
         logical_type_def
-            .or(ident_expr().map(TypeExpr::Identifier))
+            .or(ident_typ)
             .map_with_span(|t, span| (t, span))
             .recover_with(nested_delimiters(
                 Token::Ctrl('('),

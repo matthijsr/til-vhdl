@@ -1,6 +1,8 @@
 use chumsky::{prelude::Simple, Parser};
+use tydi_common::name::Name;
 
 use crate::{
+    generic_param::{generic_parameter_assignments, GenericParameterValueExpr},
     ident_expr::{domain_name, ident_expr, name, IdentExpr},
     lex::{Operator, Token},
     Spanned,
@@ -10,10 +12,15 @@ use chumsky::prelude::*;
 use std::hash::Hash;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DomainAssignments {
+pub enum InterfaceParamAssignments {
     Error,
     None,
-    List(Vec<(Option<Spanned<String>>, Spanned<String>)>),
+    JustDomains(Vec<(Option<Spanned<String>>, Spanned<String>)>),
+    JustParams(Vec<(Option<Name>, Spanned<GenericParameterValueExpr>)>),
+    Assignments(
+        Vec<(Option<Spanned<String>>, Spanned<String>)>,
+        Vec<(Option<Name>, Spanned<GenericParameterValueExpr>)>,
+    ),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -23,7 +30,7 @@ pub enum StructStat {
     Instance(
         Spanned<String>,
         Spanned<IdentExpr>,
-        Spanned<DomainAssignments>,
+        Spanned<InterfaceParamAssignments>,
     ),
     Connection(Spanned<PortSel>, Spanned<PortSel>),
 }
@@ -34,12 +41,12 @@ pub enum PortSel {
     Instance(Spanned<String>, Spanned<String>),
 }
 
-pub fn domain_assignments(
-) -> impl Parser<Token, Spanned<DomainAssignments>, Error = Simple<Token>> + Clone {
+pub fn interface_assignments(
+) -> impl Parser<Token, Spanned<InterfaceParamAssignments>, Error = Simple<Token>> + Clone {
     let domain_assignment = domain_name()
         .clone()
         .then(
-            just(Token::Op(Operator::Declare))
+            just(Token::Op(Operator::Eq))
                 .ignore_then(domain_name())
                 .or_not(),
         )
@@ -50,21 +57,32 @@ pub fn domain_assignments(
             None => (None, left),
         });
 
-    domain_assignment
+    let domain_assignments = domain_assignment
+        .separated_by(just(Token::Ctrl(',')))
+        .at_least(1);
+
+    let just_domain_assignments = domain_assignments
         .clone()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(domain_assignment)
-                .repeated(),
-        )
-        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .allow_trailing()
+        .map(|x| InterfaceParamAssignments::JustDomains(x));
+
+    let just_param_assignments =
+        generic_parameter_assignments().map(|x| InterfaceParamAssignments::JustParams(x));
+
+    let both = domain_assignments
+        .then_ignore(just(Token::Ctrl(',')))
+        .then(generic_parameter_assignments())
+        .map(|(d, p)| InterfaceParamAssignments::Assignments(d, p));
+
+    both.or(just_param_assignments)
+        .or(just_domain_assignments)
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
         .or_not()
         .map_with_span(|x, span| {
             (
                 match x {
-                    Some(list) => DomainAssignments::List(list),
-                    None => DomainAssignments::None,
+                    Some(a) => a,
+                    None => InterfaceParamAssignments::None,
                 },
                 span,
             )
@@ -73,7 +91,7 @@ pub fn domain_assignments(
             Token::Ctrl('<'),
             Token::Ctrl('>'),
             [],
-            |span| (DomainAssignments::Error, span),
+            |span| (InterfaceParamAssignments::Error, span),
         ))
 }
 
@@ -81,9 +99,9 @@ pub fn struct_parser() -> impl Parser<Token, Spanned<StructStat>, Error = Simple
     let ident = ident_expr();
 
     let instance = name()
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(ident.clone().map_with_span(|i, span| (i, span)))
-        .then(domain_assignments())
+        .then(interface_assignments())
         .map(|((i_name, streamlet_name), domain_assignments)| {
             StructStat::Instance(i_name, streamlet_name, domain_assignments)
         });

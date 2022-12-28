@@ -75,27 +75,68 @@ impl fmt::Display for TypeKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ConditionKeyword {
+    /// and
+    And,
+    /// or
+    Or,
+    /// not
+    Not,
+    /// one_of
+    OneOf,
+}
+
+impl fmt::Display for ConditionKeyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConditionKeyword::And => write!(f, "and"),
+            ConditionKeyword::Or => write!(f, "or"),
+            ConditionKeyword::Not => write!(f, "not"),
+            ConditionKeyword::OneOf => write!(f, "one_of"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operator {
     /// `=`
-    Declare,
+    Eq,
     /// `.`
     Select,
     /// `--`
     Connect,
     /// `::`
     Path,
+    /// `>=`
+    GtEq,
+    /// `<=`
+    LtEq,
+    /// `+`
+    Add,
+    /// `-`
+    Sub,
     /// `*`
-    All,
+    Mul,
+    /// `/`
+    Div,
+    /// `%`
+    Mod,
 }
 
 impl fmt::Display for Operator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Operator::Declare => write!(f, "="),
+            Operator::Eq => write!(f, "="),
             Operator::Select => write!(f, "."),
             Operator::Connect => write!(f, "--"),
             Operator::Path => write!(f, "::"),
-            Operator::All => write!(f, "*"),
+            Operator::GtEq => write!(f, ">="),
+            Operator::LtEq => write!(f, "<="),
+            Operator::Add => write!(f, "+"),
+            Operator::Sub => write!(f, "-"),
+            Operator::Mul => write!(f, "*"),
+            Operator::Div => write!(f, "/"),
+            Operator::Mod => write!(f, "%"),
         }
     }
 }
@@ -122,7 +163,7 @@ pub enum Token {
     Ctrl(char),
     /// Documentation delineated by /* */
     Documentation(String),
-    /// Integer or floating point number
+    /// Natural or non-negative floating point number
     Num(String),
     /// Version number, e.g. 7.2.1
     Version(String),
@@ -130,6 +171,8 @@ pub enum Token {
     Boolean(bool),
     /// `in` and `out` for ports
     PortMode(InterfaceDirection),
+    /// Words pertaining to conditions
+    Condition(ConditionKeyword),
 }
 
 impl fmt::Display for Token {
@@ -149,6 +192,7 @@ impl fmt::Display for Token {
             Token::Version(s) => write!(f, "{}", s),
             Token::Boolean(b) => write!(f, "{}", b),
             Token::PortMode(p) => write!(f, "{}", p),
+            Token::Condition(c) => write!(f, "{}", c),
         }
     }
 }
@@ -178,11 +222,17 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         .map(Token::Path);
 
     let op = just("=")
-        .to(Operator::Declare)
+        .to(Operator::Eq)
         .or(just(".").to(Operator::Select))
         .or(just("--").to(Operator::Connect))
         .or(just("::").to(Operator::Path))
-        .or(just("*").to(Operator::All))
+        .or(just(">=").to(Operator::GtEq))
+        .or(just("<=").to(Operator::LtEq))
+        .or(just("+").to(Operator::Add))
+        .or(just("-").to(Operator::Sub))
+        .or(just("*").to(Operator::Mul))
+        .or(just("/").to(Operator::Div))
+        .or(just("%").to(Operator::Mod))
         .map(Token::Op);
 
     let ctrl = one_of("(){}:,;'<>").map(|c| Token::Ctrl(c));
@@ -217,6 +267,10 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "false" => Token::Boolean(false),
         "in" => Token::PortMode(InterfaceDirection::In),
         "out" => Token::PortMode(InterfaceDirection::Out),
+        "and" => Token::Condition(ConditionKeyword::And),
+        "or" => Token::Condition(ConditionKeyword::Or),
+        "not" => Token::Condition(ConditionKeyword::Not),
+        "one_of" => Token::Condition(ConditionKeyword::OneOf),
         _ => Token::Identifier(ident),
     });
 
@@ -258,10 +312,12 @@ mod tests {
             }
         }
 
+        let err_len = errs.len();
         println!("Errors:");
         for err in errs {
             println!("{}", err);
         }
+        assert_eq!(0, err_len);
     }
 
     #[test]
@@ -272,5 +328,15 @@ mod tests {
     #[test]
     fn test_sample_til() {
         test_lex("sample.til")
+    }
+
+    #[test]
+    fn test_generics_til() {
+        test_lex("generics.til")
+    }
+
+    #[test]
+    fn test_simple_generics_til() {
+        test_lex("simple_generics.til")
     }
 }

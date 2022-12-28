@@ -4,6 +4,7 @@ use std::hash::Hash;
 use crate::{
     doc_expr::{doc_expr, DocExpr},
     expr::{doc_parser, expr_parser, Expr},
+    generic_param::{generic_parameters, GenericParameterList},
     ident_expr::{ident_expr, name, path_name, IdentExpr},
     impl_expr::{impl_def_expr, ImplDefExpr},
     interface_expr::{interface_expr, InterfaceExpr},
@@ -14,7 +15,11 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
-    TypeDecl(Spanned<String>, Spanned<TypeExpr>),
+    TypeDecl(
+        Spanned<String>,
+        Spanned<TypeExpr>,
+        Spanned<GenericParameterList>,
+    ),
     ImplDecl(DocExpr, Spanned<String>, Spanned<ImplDefExpr>),
     InterfaceDecl(Spanned<String>, Spanned<InterfaceExpr>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
@@ -67,25 +72,41 @@ pub fn namespaces_parser() -> impl Parser<Token, Vec<Namespace>, Error = Simple<
 
     let type_decl = just(Token::Decl(DeclKeyword::LogicalType))
         .ignore_then(name())
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then(
+            generic_parameters()
+                .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
+                .map(|x| GenericParameterList::List(x))
+                .or_not()
+                .map_with_span(|x, span| match x {
+                    Some(x) => (x, span),
+                    None => (GenericParameterList::None, span),
+                })
+                .recover_with(nested_delimiters(
+                    Token::Ctrl('<'),
+                    Token::Ctrl('>'),
+                    [],
+                    |span| (GenericParameterList::Error, span),
+                )),
+        )
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(type_expr())
-        .map(|(n, e)| Decl::TypeDecl(n, e));
+        .map(|((n, g), e)| Decl::TypeDecl(n, e, g));
 
     let impl_decl = doc_expr()
         .then(just(Token::Decl(DeclKeyword::Implementation)).ignore_then(name()))
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(impl_def_expr())
         .map(|((doc, name), body)| Decl::ImplDecl(doc, name, body));
 
     let interface_decl = just(Token::Decl(DeclKeyword::Interface))
         .ignore_then(name())
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(interface_expr())
         .map(|(n, e)| Decl::InterfaceDecl(n, e));
 
     let streamlet_decl = just(Token::Decl(DeclKeyword::Streamlet))
         .ignore_then(name())
-        .then_ignore(just(Token::Op(Operator::Declare)))
+        .then_ignore(just(Token::Op(Operator::Eq)))
         .then(expr_parser());
     let doc_streamlet_decl = doc_parser()
         .then(streamlet_decl.clone())
@@ -152,5 +173,15 @@ mod tests {
     #[test]
     fn test_test_nspace_til() {
         test_namespace_parse(source("test_nspace.til"))
+    }
+
+    #[test]
+    fn test_generics_til() {
+        test_namespace_parse(source("generics.til"))
+    }
+
+    #[test]
+    fn test_simple_generics_til() {
+        test_namespace_parse(source("simple_generics.til"))
     }
 }

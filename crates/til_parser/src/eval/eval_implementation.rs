@@ -2,7 +2,6 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use til_query::ir::{
     connection::InterfaceReference,
-    generics::param_value::GenericParamValue,
     implementation::{link::Link, structure::Structure, Implementation},
     project::{interface::Interface, type_declaration::TypeDeclaration},
     streamlet::Streamlet,
@@ -19,11 +18,13 @@ use crate::{
     doc_expr::DocExpr,
     eval::eval_ident,
     impl_expr::ImplBodyExpr,
-    struct_parse::{DomainAssignments, PortSel, StructStat},
+    struct_parse::{InterfaceParamAssignments, PortSel, StructStat},
     Spanned,
 };
 
-use super::{eval_common_error, eval_name, EvalError};
+use super::{
+    eval_common_error, eval_name, eval_params::eval_generic_param_assignments_list, EvalError,
+};
 
 pub fn eval_struct_stat(
     db: &dyn Ir,
@@ -74,36 +75,53 @@ pub fn eval_struct_stat(
                 "streamlet",
             )?;
             match &domain_assignments.0 {
-                DomainAssignments::Error => Err(EvalError {
+                InterfaceParamAssignments::Error => Err(EvalError {
                     span: stat.1.clone(),
                     msg: "Invalid domain assignments (ERROR)".to_string(),
                 }),
-                DomainAssignments::None => eval_common_error(
+                InterfaceParamAssignments::None => eval_common_error(
                     structure
                         .try_add_streamlet_instance_default(db, name, streamlet)
                         .map(|_| ()),
                     name_span,
                 ),
-                DomainAssignments::List(list) => {
-                    let mut name_list = vec![];
-                    for (left, right) in list.iter() {
-                        let left = if let Some(left) = left {
-                            Some(eval_name(&left.0, &left.1)?)
-                        } else {
-                            None
-                        };
-                        let right = eval_name(&right.0, &right.1)?;
-                        name_list.push((left, right));
-                    }
+                InterfaceParamAssignments::JustDomains(domains) => {
+                    let name_list = eval_domains(domains)?;
                     eval_common_error(
                         structure
-                            .try_add_streamlet_instance(
+                            .try_add_streamlet_instance_parameters_default(
+                                db, name, streamlet, name_list,
+                            )
+                            .map(|_| ()),
+                        name_span,
+                    )
+                }
+                InterfaceParamAssignments::JustParams(param_assignments) => {
+                    let assignments = eval_generic_param_assignments_list(
+                        param_assignments,
+                        structure.interface(db).parameters(),
+                    )?;
+                    eval_common_error(
+                        structure
+                            .try_add_streamlet_instance_domains_default(
                                 db,
                                 name,
                                 streamlet,
-                                name_list,
-                                Vec::<(Option<Name>, GenericParamValue)>::new(),
+                                assignments,
                             )
+                            .map(|_| ()),
+                        name_span,
+                    )
+                }
+                InterfaceParamAssignments::Assignments(domains, param_assignments) => {
+                    let name_list = eval_domains(domains)?;
+                    let assignments = eval_generic_param_assignments_list(
+                        param_assignments,
+                        structure.interface(db).parameters(),
+                    )?;
+                    eval_common_error(
+                        structure
+                            .try_add_streamlet_instance(db, name, streamlet, name_list, assignments)
                             .map(|_| ()),
                         name_span,
                     )
@@ -134,6 +152,25 @@ pub fn eval_struct_stat(
             Ok(())
         }
     }
+}
+
+fn eval_domains(
+    list: &Vec<(
+        Option<(String, std::ops::Range<usize>)>,
+        (String, std::ops::Range<usize>),
+    )>,
+) -> Result<Vec<(Option<Name>, Name)>, EvalError> {
+    let mut name_list = vec![];
+    for (left, right) in list.iter() {
+        let left = if let Some(left) = left {
+            Some(eval_name(&left.0, &left.1)?)
+        } else {
+            None
+        };
+        let right = eval_name(&right.0, &right.1)?;
+        name_list.push((left, right));
+    }
+    Ok(name_list)
 }
 
 pub fn eval_implementation_expr(

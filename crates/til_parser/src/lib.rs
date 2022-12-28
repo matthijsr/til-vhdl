@@ -1,6 +1,7 @@
 pub mod doc_expr;
 pub mod eval;
 pub mod expr;
+pub mod generic_param;
 pub mod ident_expr;
 pub mod impl_expr;
 pub mod interface_expr;

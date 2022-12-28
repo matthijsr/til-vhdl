@@ -78,6 +78,59 @@ impl MathCombination {
         }
     }
 
+    pub fn verify_integer(self) -> Result<Self> {
+        fn fail_if_not_int(val: &GenericParamValue) -> Result<()> {
+            if val.is_integer() {
+                Ok(())
+            } else {
+                Err(Error::InvalidArgument(format!("{} is not an integer", val)))
+            }
+        }
+
+        match &self {
+            MathCombination::Parentheses(_) => (),
+            MathCombination::Negative(n) => fail_if_not_int(n.as_ref())?,
+            MathCombination::Combination(l, _, r) => {
+                fail_if_not_int(l.as_ref())?;
+                fail_if_not_int(r.as_ref())?
+            }
+        };
+
+        Ok(self)
+    }
+
+    fn precedence(
+        l: Box<GenericParamValue>,
+        op: MathOperator,
+    ) -> (
+        Option<(Box<GenericParamValue>, MathOperator)>,
+        Box<GenericParamValue>,
+    ) {
+        match op {
+            MathOperator::Add | MathOperator::Subtract => (None, l),
+            MathOperator::Multiply | MathOperator::Divide | MathOperator::Modulo => {
+                match l.as_ref() {
+                    GenericParamValue::Integer(_) => (None, l),
+                    GenericParamValue::Ref(_) => (None, l),
+                    GenericParamValue::Combination(c) => match c {
+                        Combination::Math(m) => match m {
+                            MathCombination::Parentheses(_) => (None, l),
+                            MathCombination::Negative(_) => (None, l),
+                            MathCombination::Combination(f_l, f_op, r) => match f_op {
+                                MathOperator::Add | MathOperator::Subtract => {
+                                    (Some((f_l.clone(), *f_op)), r.clone())
+                                }
+                                MathOperator::Multiply
+                                | MathOperator::Divide
+                                | MathOperator::Modulo => (None, l),
+                            },
+                        },
+                    },
+                }
+            }
+        }
+    }
+
     pub fn reduce(&self) -> GenericParamValue {
         match self {
             MathCombination::Parentheses(p) => match p.reduce() {
@@ -115,8 +168,19 @@ impl MathCombination {
                 },
             },
             MathCombination::Combination(l, op, r) => {
+                let (p, l) = Self::precedence(l.clone(), *op);
+                // Test for precedence and re-order combination if needed
+                if let Some((f_l, f_op)) = p {
+                    return MathCombination::Combination(
+                        f_l,
+                        f_op,
+                        Box::new(MathCombination::Combination(l.clone(), *op, r.clone()).reduce()),
+                    )
+                    .reduce();
+                }
                 let mut l = l.reduce();
                 let mut r = r.reduce();
+
                 if l == 0 && r == 0 {
                     // TODO: Technically incorrect for division and mod, I think?
                     return GenericParamValue::Integer(0);
