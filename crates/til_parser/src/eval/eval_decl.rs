@@ -18,13 +18,14 @@ use crate::{
         eval_implementation::eval_implementation_expr, eval_interface::eval_interface_expr,
         eval_streamlet::eval_streamlet_expr,
     },
-    generic_param::GenericParameterList,
     impl_expr::ImplDefExpr,
     namespace::Decl,
     Span,
 };
 
-use super::{eval_ident, eval_name, eval_type::eval_type_expr, EvalError};
+use super::{
+    eval_ident, eval_name, eval_params::eval_generic_params, eval_type::eval_type_expr, EvalError,
+};
 
 pub fn eval_declaration(
     db: &dyn Ir,
@@ -52,37 +53,13 @@ pub fn eval_declaration(
         Decl::TypeDecl((n, s), expr, params) => {
             let name = eval_name(n, s)?;
             let type_id = eval_type_expr(db, (&expr.0, &expr.1), types, type_imports)?;
-            let type_decl = match params {
-                GenericParameterList::None => {
-                    TypeDeclaration::try_new_no_params(db, namespace.with_child(&name), type_id)
-                        .map_err(|err| EvalError {
-                            span: s.clone(),
-                            msg: format!("Something went wrong declaring type {}: {}", n, err),
-                        })
-                }
-                GenericParameterList::Error(e_span) => Err(EvalError {
-                    span: e_span.clone(),
-                    msg: "There was an issue with the parameter list".to_string(),
-                }),
-                GenericParameterList::List(params) => {
-                    let params = params
-                        .iter()
-                        .map(|(param, span)| match param {
-                            Ok(param) => Ok(param.clone()),
-                            Err(err) => Err(EvalError {
-                                span: span.clone(),
-                                msg: format!("There was an issue with a parameter: {}", err),
-                            }),
-                        })
-                        .collect::<Result<Vec<_>, EvalError>>()?;
-
-                    TypeDeclaration::try_new(db, namespace.with_child(&name), type_id, params)
-                        .map_err(|err| EvalError {
-                            span: s.clone(),
-                            msg: format!("Something went wrong declaring type {}: {}", n, err),
-                        })
-                }
-            }?;
+            let generic_params = eval_generic_params(params)?;
+            let type_decl =
+                TypeDeclaration::try_new(db, namespace.with_child(&name), type_id, generic_params)
+                    .map_err(|err| EvalError {
+                        span: s.clone(),
+                        msg: format!("Something went wrong declaring type {}: {}", n, err),
+                    })?;
             if let Some(_) = types.insert(name, type_decl) {
                 Err(dup_id(n, s, "type"))
             } else {

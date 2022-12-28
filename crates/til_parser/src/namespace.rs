@@ -15,7 +15,11 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
-    TypeDecl(Spanned<String>, Spanned<TypeExpr>, GenericParameterList),
+    TypeDecl(
+        Spanned<String>,
+        Spanned<TypeExpr>,
+        Spanned<GenericParameterList>,
+    ),
     ImplDecl(DocExpr, Spanned<String>, Spanned<ImplDefExpr>),
     InterfaceDecl(Spanned<String>, Spanned<InterfaceExpr>),
     StreamletDecl(Option<String>, Spanned<String>, Box<Spanned<Expr>>),
@@ -72,17 +76,17 @@ pub fn namespaces_parser() -> impl Parser<Token, Vec<Namespace>, Error = Simple<
             generic_parameters()
                 .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
                 .map(|x| GenericParameterList::List(x))
+                .or_not()
+                .map_with_span(|x, span| match x {
+                    Some(x) => (x, span),
+                    None => (GenericParameterList::None, span),
+                })
                 .recover_with(nested_delimiters(
                     Token::Ctrl('<'),
                     Token::Ctrl('>'),
                     [],
-                    |span| GenericParameterList::Error(span),
-                ))
-                .or_not()
-                .map(|x| match x {
-                    Some(x) => x,
-                    None => GenericParameterList::None,
-                }),
+                    |span| (GenericParameterList::Error, span),
+                )),
         )
         .then_ignore(just(Token::Op(Operator::Eq)))
         .then(type_expr())

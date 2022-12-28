@@ -1,27 +1,19 @@
 use chumsky::prelude::*;
-use til_query::ir::generics::param_value::GenericParamValue;
-use tydi_common::{error::Error, name::Name};
 
 use crate::{
     expr::{val, Value},
-    generic_param::generic_parameter_assignments,
+    generic_param::{generic_parameter_assignments, GenericParameterAssignments},
     ident_expr::{ident_expr, label, IdentExpr},
     lex::{Token, TypeKeyword},
-    Span, Spanned,
+    Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeExpr {
     Error,
     Identifier(IdentExpr),
-    Assigned(IdentExpr, GenericParameterAssignments),
+    Assigned(IdentExpr, Spanned<GenericParameterAssignments>),
     Definition(Box<Spanned<LogicalTypeDef>>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GenericParameterAssignments {
-    Error(Span),
-    List(Vec<(Option<Name>, Spanned<Result<GenericParamValue, Error>>)>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -126,12 +118,12 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
             .then(
                 generic_parameter_assignments()
                     .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
-                    .map(|x| GenericParameterAssignments::List(x))
+                    .map_with_span(|x, span| (GenericParameterAssignments::List(x), span))
                     .recover_with(nested_delimiters(
                         Token::Ctrl('<'),
                         Token::Ctrl('>'),
                         [],
-                        |span| GenericParameterAssignments::Error(span),
+                        |span| (GenericParameterAssignments::Error, span),
                     ))
                     .or_not(),
             )

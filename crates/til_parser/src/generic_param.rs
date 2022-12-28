@@ -2,24 +2,41 @@ use chumsky::prelude::*;
 use til_query::ir::generics::{
     behavioral::integer::IntegerGeneric,
     interface::InterfaceGenericKind,
-    param_value::{
-        combination::{GenericParamValueOps, MathCombination, MathOperator},
-        GenericParamValue,
-    },
+    param_value::{combination::MathOperator, GenericParamValue},
     GenericKind, GenericParameter,
 };
 use tydi_common::{error::Error, name::Name};
 
 use crate::{
     lex::{Operator, Token},
-    Span, Spanned,
+    Spanned,
 };
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum GenericParameterValueExpr {
+    Error,
+    Integer(i32),
+    Ref(Name),
+    Combination(
+        Box<Spanned<GenericParameterValueExpr>>,
+        MathOperator,
+        Box<Spanned<GenericParameterValueExpr>>,
+    ),
+    Parentheses(Box<Spanned<GenericParameterValueExpr>>),
+    Negative(Box<Spanned<GenericParameterValueExpr>>),
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GenericParameterList {
     None,
-    Error(Span),
+    Error,
     List(Vec<Spanned<Result<GenericParameter, Error>>>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum GenericParameterAssignments {
+    Error,
+    List(Vec<(Option<Name>, Spanned<GenericParameterValueExpr>)>),
 }
 
 pub fn param_name() -> impl Parser<Token, Name, Error = Simple<Token>> + Clone {
@@ -93,45 +110,31 @@ pub fn generic_parameters(
 }
 
 pub fn generic_parameter_assignment(
-) -> impl Parser<Token, Spanned<Result<GenericParamValue, Error>>, Error = Simple<Token>> + Clone {
+) -> impl Parser<Token, Spanned<GenericParameterValueExpr>, Error = Simple<Token>> + Clone {
     recursive(|param_assignment| {
         let integer_value =
-            param_integer().map_with_span(|x, span| (Ok(GenericParamValue::from(x)), span));
+            param_integer().map_with_span(|x, span| (GenericParameterValueExpr::Integer(x), span));
 
         let negative = just(Token::Op(Operator::Sub))
             .ignore_then(param_assignment.clone())
-            .map_with_span(
-                |(x, inner_span): Spanned<Result<GenericParamValue, Error>>, span| match x {
-                    Ok(x) => (x.g_negative().map(|x| GenericParamValue::from(x)), span),
-                    Err(e) => (Err(e), inner_span),
-                },
-            );
+            .map_with_span(|x, span| (GenericParameterValueExpr::Negative(Box::new(x)), span));
 
-        // TODO: Ref parameter values
+        let ref_n = param_name().map_with_span(|n, span| (GenericParameterValueExpr::Ref(n), span));
 
         let atom = integer_value
             .or(negative)
+            .or(ref_n)
             .or(param_assignment
                 .clone()
                 .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
-                .map_with_span(
-                    |(x, inner_span): Spanned<Result<GenericParamValue, Error>>, span| match x {
-                        Ok(x) => (x.try_add_parens(), span),
-                        Err(e) => (Err(e), inner_span),
-                    },
-                ))
+                .map_with_span(|x, span| {
+                    (GenericParameterValueExpr::Parentheses(Box::new(x)), span)
+                }))
             .recover_with(nested_delimiters(
                 Token::Ctrl('('),
                 Token::Ctrl(')'),
                 [],
-                |span| {
-                    (
-                        Err(Error::ParsingError(
-                            "Nesting delimiter fallback".to_string(),
-                        )),
-                        span,
-                    )
-                },
+                |span| (GenericParameterValueExpr::Error, span),
             ));
 
         // Multiplication, division and modulo (remainder) have the same precedence
@@ -143,7 +146,7 @@ pub fn generic_parameter_assignment(
         let product = atom
             .clone()
             .then(op.then(param_assignment).repeated())
-            .foldl(|l, (op, r)| parse_math_combination(l, op, r));
+            .foldl(parse_math_combination);
 
         // Sum and subtraction have the same precedence (but a lower precedence than products)
         let op = just(Token::Op(Operator::Add))
@@ -153,42 +156,26 @@ pub fn generic_parameter_assignment(
         let sum = product
             .clone()
             .then(op.then(product).repeated())
-            .foldl(|l, (op, r)| parse_math_combination(l, op, r));
+            .foldl(parse_math_combination);
 
         sum
     })
 }
 
 fn parse_math_combination(
-    l: (Result<GenericParamValue, Error>, std::ops::Range<usize>),
-    op: MathOperator,
-    r: (Result<GenericParamValue, Error>, std::ops::Range<usize>),
-) -> (Result<GenericParamValue, Error>, std::ops::Range<usize>) {
+    l: Spanned<GenericParameterValueExpr>,
+    (op, r): (MathOperator, Spanned<GenericParameterValueExpr>),
+) -> Spanned<GenericParameterValueExpr> {
     let span = l.1.start..r.1.end;
-    match (l.0, r.0) {
-        (Ok(l), Ok(r)) => (
-            MathCombination::Combination(Box::new(l), op, Box::new(r))
-                .verify_integer()
-                .map(|x| GenericParamValue::from(x)),
-            span,
-        ),
-        (Ok(_), Err(e)) => (Err(e), r.1),
-        (Err(e), Ok(_)) => (Err(e), l.1),
-        (Err(le), Err(re)) => (
-            Err(Error::ParsingError(format!(
-                "Both left and right values are invalid. Left: {} ; Right: {}",
-                le, re
-            ))),
-            span,
-        ),
-    }
+    (
+        GenericParameterValueExpr::Combination(Box::new(l), op, Box::new(r)),
+        span,
+    )
 }
 
-pub fn generic_parameter_assignments() -> impl Parser<
-    Token,
-    Vec<(Option<Name>, Spanned<Result<GenericParamValue, Error>>)>,
-    Error = Simple<Token>,
-> + Clone {
+pub fn generic_parameter_assignments(
+) -> impl Parser<Token, Vec<(Option<Name>, Spanned<GenericParameterValueExpr>)>, Error = Simple<Token>>
+       + Clone {
     let assignment = param_name()
         .then_ignore(just(Token::Op(Operator::Eq)))
         .or_not()

@@ -22,6 +22,13 @@ namespace generics::space {
     type stream_assigned8 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2,>;
     type stream_assigned9 = genericstream<(6 - 2) * 3 + 4 / 2 - (1 + 2),>;
 
+    type stream_reassigned1<d: dimensionality = 4> = genericstream<d>;
+    type stream_reassigned2<d: dimensionality = 4> = genericstream<d,>;
+    type stream_reassigned3<d: dimensionality = 4> = genericstream<d = d>;
+    type stream_reassigned4<d: dimensionality = 4> = genericstream<d = d,>;
+    type stream_reassigned5<d: dimensionality = 4> = genericstream<d + 1>;
+    type stream_reassigned6<d: dimensionality = 4> = genericstream<d + d - d>;
+
 //    streamlet gs = <
 //        'a,
 //        'b,

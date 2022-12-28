@@ -187,6 +187,20 @@ impl TypeDeclaration {
             Ok(())
         }
     }
+
+    pub fn parameters(&self) -> InsertionOrderedMap<Name, GenericParameter> {
+        let mut result = InsertionOrderedMap::new();
+        if let Some(assignments) = self.parameter_assignments().clone() {
+            for (name, assignment) in assignments {
+                match assignment {
+                    GenericParameterAssignment::Default(p) => result.try_insert(name, p).unwrap(),
+                    // TODO: May need to throw an error here, this shouldn't happen.
+                    GenericParameterAssignment::Assigned(_, _) => (),
+                }
+            }
+        }
+        result
+    }
 }
 
 impl Identify for TypeDeclaration {
