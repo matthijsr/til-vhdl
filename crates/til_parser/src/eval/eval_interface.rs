@@ -23,7 +23,7 @@ use tydi_intern::Id;
 
 use crate::{
     eval::eval_ident,
-    interface_expr::{DomainList, InterfaceDef, InterfaceExpr, PortsDef},
+    interface_expr::{InterfaceDef, InterfaceExpr, InterfaceParameters, PortsDef},
     Spanned,
 };
 
@@ -52,28 +52,32 @@ pub fn eval_interface_expr(
                     msg: "Invalid expression for ports definition".to_string(),
                 }),
                 PortsDef::Def(ports_def) => {
-                    let mut result = if let Some(domain_list) = domain_list {
-                        match &domain_list.0 {
-                            DomainList::Error => Err(EvalError {
-                                span: domain_list.1.clone(),
-                                msg: "Domain list error".to_string(),
+                    let mut result = if let Some(interface_parameters) = domain_list {
+                        match &interface_parameters.0 {
+                            InterfaceParameters::Error => Err(EvalError {
+                                span: interface_parameters.1.clone(),
+                                msg: "Interface parameter list error".to_string(),
                             }),
-                            DomainList::List(list) => {
-                                let mut doms = InsertionOrderedSet::new();
-                                for dom in list {
-                                    if !doms.insert(eval_name(&dom.0, &dom.1)?) {
-                                        return Err(EvalError {
-                                            span: dom.1.clone(),
-                                            msg: format!(
-                                                "Duplicate domain in Interface, \"{}\"",
-                                                dom.0
-                                            ),
-                                        });
-                                    }
-                                }
+                            InterfaceParameters::JustDomains(domains) => eval_common_error(
+                                Interface::new_domains(eval_domains(domains)?.iter()),
+                                &interface_parameters.1,
+                            ),
+                            InterfaceParameters::JustGenericParams(generic_parameters) => {
                                 eval_common_error(
+                                    Interface::new_parameters(eval_params(generic_parameters)?),
+                                    &interface_parameters.1,
+                                )
+                            }
+                            InterfaceParameters::Parameters(domains, generic_parameters) => {
+                                let doms = eval_domains(domains)?;
+                                let params = eval_params(generic_parameters)?;
+                                let doms_iface = eval_common_error(
                                     Interface::new_domains(doms.iter()),
-                                    &domain_list.1,
+                                    &interface_parameters.1,
+                                )?;
+                                eval_common_error(
+                                    doms_iface.with_parameters(params),
+                                    &interface_parameters.1,
                                 )
                             }
                         }
@@ -125,6 +129,37 @@ pub fn eval_interface_expr(
             },
         },
     }
+}
+
+fn eval_params(
+    generic_parameters: &Vec<(
+        Result<til_query::ir::generics::GenericParameter, tydi_common::error::Error>,
+        std::ops::Range<usize>,
+    )>,
+) -> Result<Vec<til_query::ir::generics::GenericParameter>, EvalError> {
+    let params = generic_parameters
+        .iter()
+        .map(|(x, param_span)| {
+            x.clone().map_err(|e| EvalError {
+                span: param_span.clone(),
+                msg: format!("Parameter error: {}", e),
+            })
+        })
+        .collect::<Result<Vec<_>, EvalError>>()?;
+    Ok(params)
+}
+
+fn eval_domains(domains: &Vec<Spanned<String>>) -> Result<InsertionOrderedSet<Name>, EvalError> {
+    let mut doms = InsertionOrderedSet::new();
+    for dom in domains {
+        if !doms.insert(eval_name(&dom.0, &dom.1)?) {
+            return Err(EvalError {
+                span: dom.1.clone(),
+                msg: format!("Duplicate domain in Interface, \"{}\"", dom.0),
+            });
+        }
+    }
+    Ok(doms)
 }
 
 #[cfg(test)]

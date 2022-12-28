@@ -1,8 +1,10 @@
 use chumsky::prelude::*;
-use til_query::ir::physical_properties::InterfaceDirection;
+use til_query::ir::{generics::GenericParameter, physical_properties::InterfaceDirection};
+use tydi_common::error::Error;
 
 use crate::{
     doc_expr::{doc_expr, DocExpr},
+    generic_param::generic_parameters,
     ident_expr::{domain_name, ident_expr, label, IdentExpr},
     lex::Token,
     type_expr::{type_expr, TypeExpr},
@@ -30,15 +32,20 @@ pub enum PortsDef {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DomainList {
+pub enum InterfaceParameters {
     Error,
-    List(Vec<Spanned<String>>),
+    JustDomains(Vec<Spanned<String>>),
+    JustGenericParams(Vec<Spanned<Result<GenericParameter, Error>>>),
+    Parameters(
+        Vec<Spanned<String>>,
+        Vec<Spanned<Result<GenericParameter, Error>>>,
+    ),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum InterfaceDef {
     Error,
-    Def(Option<Spanned<DomainList>>, Spanned<PortsDef>),
+    Def(Option<Spanned<InterfaceParameters>>, Spanned<PortsDef>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -47,18 +54,34 @@ pub enum InterfaceExpr {
     Definition(Spanned<InterfaceDef>),
 }
 
-pub fn domain_list() -> impl Parser<Token, Spanned<DomainList>, Error = Simple<Token>> + Clone {
-    domain_name()
+pub fn interface_parameters(
+) -> impl Parser<Token, Spanned<InterfaceParameters>, Error = Simple<Token>> + Clone {
+    let domains = domain_name()
         .separated_by(just(Token::Ctrl(',')))
-        .at_least(1)
+        .at_least(1);
+
+    let just_domains = domains
+        .clone()
         .allow_trailing()
+        .map(|x| InterfaceParameters::JustDomains(x));
+
+    let just_params = generic_parameters().map(|x| InterfaceParameters::JustGenericParams(x));
+
+    let both = domains
+        .clone()
+        .then_ignore(just(Token::Ctrl(',')))
+        .then(generic_parameters())
+        .map(|(d, g)| InterfaceParameters::Parameters(d, g));
+
+    both.or(just_params)
+        .or(just_domains)
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
-        .map_with_span(|list, span| (DomainList::List(list), span))
+        .map_with_span(|x, span| (x, span))
         .recover_with(nested_delimiters(
             Token::Ctrl('<'),
             Token::Ctrl('>'),
             [],
-            |span| (DomainList::Error, span),
+            |span| (InterfaceParameters::Error, span),
         ))
 }
 
@@ -99,10 +122,10 @@ pub fn ports_def() -> impl Parser<Token, Spanned<PortsDef>, Error = Simple<Token
 
 pub fn interface_expr() -> impl Parser<Token, Spanned<InterfaceExpr>, Error = Simple<Token>> + Clone
 {
-    let interface_def = domain_list()
+    let interface_def = interface_parameters()
         .or_not()
         .then(ports_def())
-        .map(|(domains, ports)| InterfaceDef::Def(domains, ports))
+        .map(|(parameters, ports)| InterfaceDef::Def(parameters, ports))
         .map_with_span(|x, span| (x, span))
         .recover_with(nested_delimiters(
             Token::Ctrl('<'),

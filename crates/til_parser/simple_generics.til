@@ -29,25 +29,42 @@ namespace generics::space {
     type stream_reassigned5<d: dimensionality = 4> = genericstream<d + 1>;
     type stream_reassigned6<d: dimensionality = 4> = genericstream<d + d - d>;
 
-//    streamlet gs = <
-//        'a,
-//        'b,
-//        pa: natural = 2,
-//        pb: positive = 1,
-//        pc: integer = -1,
-//        pd: dimensionality = 3,
-//    >(
-//        a: genericstream in 'a,
-//        b: genericstream out 'a,
-//        c: genericstream<pd> in 'b,
-//        d: genericstream<pd> out 'b,
-//    ) {
-//        impl: {
-//            a -- b;
-//            c -- d;
-//        }
-//    };
-//
+    streamlet just_params = <
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = -1,
+        pd: dimensionality = 3,
+    >(
+        a: in genericstream,
+        b: out genericstream,
+        c: in genericstream<pd>,
+        d: out genericstream<pd>,
+    ) {
+        impl: {
+            a -- b;
+            c -- d;
+        }
+    };
+
+    streamlet gs = <
+        'a,
+        'b,
+        pa: natural = 2,
+        pb: positive = 1,
+        pc: integer = -1,
+        pd: dimensionality = 3,
+    >(
+        a: in genericstream 'a,
+        b: out genericstream 'a,
+        c: in genericstream<pd> 'b,
+        d: out genericstream<pd> 'b,
+    ) {
+        impl: {
+            a -- b;
+            c -- d;
+        }
+    };
+
 //    streamlet s = <
 //        'a,
 //        'b,

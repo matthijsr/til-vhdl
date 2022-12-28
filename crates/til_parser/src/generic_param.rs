@@ -106,6 +106,7 @@ pub fn generic_parameters(
     generic_param_expr()
         .separated_by(just(Token::Ctrl(',')))
         .allow_trailing()
+        .at_least(1)
         .labelled("generic parameters")
 }
 
