@@ -51,13 +51,9 @@ pub fn domain_assignments(
         });
 
     domain_assignment
-        .clone()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(domain_assignment)
-                .repeated(),
-        )
-        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
+        .at_least(1)
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
         .or_not()
         .map_with_span(|x, span| {

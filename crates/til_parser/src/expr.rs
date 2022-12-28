@@ -180,13 +180,8 @@ pub fn expr_parser() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>>
 
     // Then require at least one property
     let streamlet_props = streamlet_prop
-        .clone()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(streamlet_prop)
-                .repeated(),
-        )
-        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
         .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
         .map_with_span(|p, span| (Expr::StreamletProps(p), span))
         .recover_with(nested_delimiters(

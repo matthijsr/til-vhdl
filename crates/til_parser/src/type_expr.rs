@@ -57,11 +57,8 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
 
         // A group of types
         let fields_def = typ_el
-            .clone()
-            .chain(just(Token::Ctrl(',')).ignore_then(typ_el).repeated())
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
+            .separated_by(just(Token::Ctrl(',')))
+            .allow_trailing()
             .map_with_span(|fields, span| (FieldsDef::Fields(fields), span))
             .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
             .recover_with(nested_delimiters(
@@ -88,11 +85,8 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
             .map(|(lab, prop)| (lab, prop));
 
         let stream_props = stream_prop
-            .clone()
-            .chain(just(Token::Ctrl(',')).ignore_then(stream_prop).repeated())
-            .then_ignore(just(Token::Ctrl(',')).or_not())
-            .or_not()
-            .map(|item| item.unwrap_or_else(Vec::new))
+            .separated_by(just(Token::Ctrl(',')))
+            .allow_trailing()
             .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
             .map_with_span(|props, span| (StreamProps::Props(props), span))
             .recover_with(nested_delimiters(

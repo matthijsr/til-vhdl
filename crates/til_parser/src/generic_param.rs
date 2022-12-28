@@ -87,12 +87,8 @@ pub fn generic_parameters(
 ) -> impl Parser<Token, Vec<Spanned<Result<GenericParameter, Error>>>, Error = Simple<Token>> + Clone
 {
     generic_param_expr()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(generic_param_expr())
-                .repeated(),
-        )
-        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
         .labelled("generic parameters")
 }
 
@@ -193,12 +189,7 @@ pub fn generic_parameter_assignments() -> impl Parser<
         .then(generic_parameter_assignment());
 
     assignment
-        .clone()
-        .chain(
-            just(Token::Ctrl(','))
-                .ignore_then(assignment.clone())
-                .repeated(),
-        )
-        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
         .labelled("generic parameter assignments")
 }

@@ -49,8 +49,9 @@ pub enum InterfaceExpr {
 
 pub fn domain_list() -> impl Parser<Token, Spanned<DomainList>, Error = Simple<Token>> + Clone {
     domain_name()
-        .chain(just(Token::Ctrl(',')).ignore_then(domain_name()).repeated())
-        .then_ignore(just(Token::Ctrl(',')).or_not())
+        .separated_by(just(Token::Ctrl(',')))
+        .at_least(1)
+        .allow_trailing()
         .delimited_by(just(Token::Ctrl('<')), just(Token::Ctrl('>')))
         .map_with_span(|list, span| (DomainList::List(list), span))
         .recover_with(nested_delimiters(
@@ -84,11 +85,8 @@ pub fn ports_def() -> impl Parser<Token, Spanned<PortsDef>, Error = Simple<Token
         .map_with_span(|p, span| (p, span));
 
     port_def
-        .clone()
-        .chain(just(Token::Ctrl(',')).ignore_then(port_def).repeated())
-        .then_ignore(just(Token::Ctrl(',')).or_not())
-        .or_not()
-        .map(|item| item.unwrap_or_else(Vec::new))
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
         .map_with_span(|ports, span| (PortsDef::Def(ports), span))
         .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
         .recover_with(nested_delimiters(
