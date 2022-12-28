@@ -2,7 +2,9 @@ use chumsky::prelude::*;
 
 use crate::{
     expr::{val, Value},
-    generic_param::{generic_parameter_assignments, GenericParameterAssignments},
+    generic_param::{
+        generic_parameter_assignment, generic_parameter_assignments, GenericParameterAssignments,
+    },
     ident_expr::{ident_expr, label, IdentExpr},
     lex::{Token, TypeKeyword},
     Spanned,
@@ -72,7 +74,9 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
                 type_def
                     .clone()
                     .map(|(t, span)| (StreamProp::Type(t), span))
-                    .or(val().map(|(v, span)| (StreamProp::Value(v), span))),
+                    .or(val().map(|(v, span)| (StreamProp::Value(v), span)))
+                    .or(generic_parameter_assignment()
+                        .map(|(g, span)| (StreamProp::Value(Value::GenericValue(g)), span))),
             )
             .map(|(lab, prop)| (lab, prop));
 

@@ -15,7 +15,7 @@ use til_query::{
 };
 use tydi_common::{
     error::TryResult,
-    map::InsertionOrderedSet,
+    map::{InsertionOrderedSet},
     name::{Name, PathName},
     traits::Documents,
 };
@@ -100,6 +100,7 @@ pub fn eval_interface_expr(
                                     (&port_def.props.0.typ.0, &port_def.props.0.typ.1),
                                     types,
                                     type_imports,
+                                    result.parameters(),
                                 )?
                                 .get(db)
                                 .try_result(),

@@ -1,3 +1,5 @@
+use core::fmt;
+
 use chumsky::prelude::*;
 use til_query::ir::generics::{
     behavioral::integer::IntegerGeneric,
@@ -24,6 +26,21 @@ pub enum GenericParameterValueExpr {
     ),
     Parentheses(Box<Spanned<GenericParameterValueExpr>>),
     Negative(Box<Spanned<GenericParameterValueExpr>>),
+}
+
+impl fmt::Display for GenericParameterValueExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GenericParameterValueExpr::Error => write!(f, "GenericParameterValueExpr::Error"),
+            GenericParameterValueExpr::Integer(i) => write!(f, "{}", i),
+            GenericParameterValueExpr::Ref(r) => write!(f, "{}", r),
+            GenericParameterValueExpr::Combination(l_box, op, r_box) => {
+                write!(f, "{} {} {}", &l_box.0, op, &r_box.0)
+            }
+            GenericParameterValueExpr::Parentheses(p) => write!(f, "({})", &p.0),
+            GenericParameterValueExpr::Negative(n) => write!(f, "-{}", &n.0),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

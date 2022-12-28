@@ -99,7 +99,7 @@ pub fn eval_struct_stat(
                 InterfaceParamAssignments::JustParams(param_assignments) => {
                     let assignments = eval_generic_param_assignments_list(
                         param_assignments,
-                        &db.lookup_intern_streamlet(streamlet).parameters(db),
+                        structure.interface(db).parameters(),
                     )?;
                     eval_common_error(
                         structure
@@ -117,7 +117,7 @@ pub fn eval_struct_stat(
                     let name_list = eval_domains(domains)?;
                     let assignments = eval_generic_param_assignments_list(
                         param_assignments,
-                        &db.lookup_intern_streamlet(streamlet).parameters(db),
+                        structure.interface(db).parameters(),
                     )?;
                     eval_common_error(
                         structure

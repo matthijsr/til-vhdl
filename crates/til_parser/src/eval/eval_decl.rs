@@ -52,14 +52,19 @@ pub fn eval_declaration(
     match decl {
         Decl::TypeDecl((n, s), expr, params) => {
             let name = eval_name(n, s)?;
-            let type_id = eval_type_expr(db, (&expr.0, &expr.1), types, type_imports)?;
             let generic_params = eval_generic_params(params)?;
-            let type_decl =
-                TypeDeclaration::try_new(db, namespace.with_child(&name), type_id, generic_params)
-                    .map_err(|err| EvalError {
-                        span: s.clone(),
-                        msg: format!("Something went wrong declaring type {}: {}", n, err),
-                    })?;
+            let type_id =
+                eval_type_expr(db, (&expr.0, &expr.1), types, type_imports, &generic_params)?;
+            let type_decl = TypeDeclaration::try_new(
+                db,
+                namespace.with_child(&name),
+                type_id,
+                generic_params.into_iter().map(|(_, v)| v),
+            )
+            .map_err(|err| EvalError {
+                span: s.clone(),
+                msg: format!("Something went wrong declaring type {}: {}", n, err),
+            })?;
             if let Some(_) = types.insert(name, type_decl) {
                 Err(dup_id(n, s, "type"))
             } else {

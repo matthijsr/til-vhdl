@@ -367,7 +367,13 @@ pub fn create_instance(
                                 name: PathName::try_new([instance_name.clone(), name.clone()])?
                                     .with_children(stream_name.clone()),
                                 clock: *parent_domains
-                                    .get(port.physical_properties().domain())?
+                                    .get(port.physical_properties().domain())
+                                    .map_err(|e| {
+                                        Error::ProjectError(format!(
+                                            "clk on stream: {}, on port {}, on instance {}: {}",
+                                            stream_name, name, instance_name, e
+                                        ))
+                                    })?
                                     .clock(),
                                 signal_list: stream
                                     .signal_list()
@@ -408,11 +414,19 @@ pub fn create_instance(
         map_domain(
             &mut port_mapping,
             base_domain,
-            parent_domains.get(
-                instance
-                    .domain_assignments()
-                    .get_assignment(base_domain_name.as_ref())?,
-            )?,
+            parent_domains
+                .get(
+                    instance
+                        .domain_assignments()
+                        .get_assignment(base_domain_name.as_ref())?,
+                )
+                .map_err(|e| {
+                    Error::ProjectError(format!(
+                        "clk on streamlet {}: {}",
+                        vhdl_streamlet.identifier(),
+                        e
+                    ))
+                })?,
         )?;
     }
 
@@ -589,7 +603,15 @@ impl VhdlStreamlet {
         let entity_port_obj = |p| ObjectDeclaration::from_port(arch_db, &p, true);
         for (name, port) in self.interface() {
             let clk = *entity_domains
-                .get(port.physical_properties().domain())?
+                .get(port.physical_properties().domain())
+                .map_err(|e| {
+                    Error::ProjectError(format!(
+                        "clk on port {}, on streamlet {}: {}",
+                        name,
+                        self.identifier(),
+                        e
+                    ))
+                })?
                 .clock();
             ports.try_insert(
                 InterfaceReference::new(None, name.clone()),

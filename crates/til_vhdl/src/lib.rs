@@ -55,8 +55,8 @@ pub fn canonical(db: &dyn Ir) -> Result<()> {
     let mut package = Package::new_named(db.project_ref().identifier())?;
     let mut streamlet_component_names = vec![];
 
+    let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     for streamlet in streamlets.iter() {
-        let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
         let mut streamlet = streamlet.canonical(db, &mut arch_db, "")?;
         let component = streamlet.to_component();
         streamlet_component_names.push((streamlet, component.vhdl_name().clone()));
@@ -68,7 +68,6 @@ pub fn canonical(db: &dyn Ir) -> Result<()> {
     pkg.push(format!("{}_pkg", package.vhdl_name()));
     pkg.set_extension("vhd");
 
-    let mut arch_db = tydi_vhdl::architecture::arch_storage::db::Database::default();
     arch_db.set_default_package(package);
 
     std::fs::write(pkg.as_path(), arch_db.default_package().declare(&arch_db)?)?;

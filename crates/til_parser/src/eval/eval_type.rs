@@ -7,15 +7,20 @@ use std::{
 use til_query::{
     common::{
         logical::logicaltype::{
+            genericproperty::GenericProperty,
             stream::{Stream, Synchronicity, Throughput},
             LogicalType,
         },
         physical::complexity::Complexity,
         stream_direction::StreamDirection,
     },
-    ir::{project::type_declaration::TypeDeclaration, traits::InternSelf, Ir},
+    ir::{
+        generics::GenericParameter, project::type_declaration::TypeDeclaration, traits::InternSelf,
+        Ir,
+    },
 };
 use tydi_common::{
+    map::InsertionOrderedMap,
     name::{Name, PathName},
     numbers::NonNegative,
 };
@@ -23,19 +28,22 @@ use tydi_intern::Id;
 
 use crate::{
     expr::Value,
-    type_expr::{
-        FieldsDef, LogicalTypeDef, StreamProp, StreamProps, TypeExpr,
-    },
+    ident_expr::IdentExpr,
+    type_expr::{FieldsDef, LogicalTypeDef, StreamProp, StreamProps, TypeExpr},
     Span, Spanned,
 };
 
-use super::{eval_common_error, eval_ident, eval_name, EvalError, eval_params::eval_generic_param_assignments};
+use super::{
+    eval_common_error, eval_ident, eval_name,
+    eval_params::{eval_generic_param_assignments, eval_generic_param_value},
+    EvalError,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StreamTypeDef {
     data: Option<Id<LogicalType>>,
     throughput: Option<Throughput>,
-    dimensionality: Option<NonNegative>,
+    dimensionality: Option<GenericProperty<NonNegative>>,
     synchronicity: Option<Synchronicity>,
     complexity: Option<Complexity>,
     direction: Option<StreamDirection>,
@@ -48,6 +56,7 @@ pub fn eval_type_expr(
     expr: (&TypeExpr, &Span),
     types: &HashMap<Name, TypeDeclaration>,
     type_imports: &HashMap<PathName, TypeDeclaration>,
+    parent_params: &InsertionOrderedMap<Name, GenericParameter>,
 ) -> Result<Id<LogicalType>, EvalError> {
     let eval_fields =
         |fields: &Spanned<FieldsDef>| -> Result<Vec<(Name, Id<LogicalType>)>, EvalError> {
@@ -70,7 +79,13 @@ pub fn eval_type_expr(
                             dups.insert(name.clone());
                             result.push((
                                 name,
-                                eval_type_expr(db, (&el_expr.0, &el_expr.1), types, type_imports)?,
+                                eval_type_expr(
+                                    db,
+                                    (&el_expr.0, &el_expr.1),
+                                    types,
+                                    type_imports,
+                                    parent_params,
+                                )?,
                             ));
                         }
                     }
@@ -137,6 +152,7 @@ pub fn eval_type_expr(
                                             (typ, &prop.1),
                                             types,
                                             type_imports,
+                                            parent_params,
                                         )?);
                                     }
                                     _ => {
@@ -180,8 +196,29 @@ pub fn eval_type_expr(
                         "dimensionality" => {
                             if stream.dimensionality == None {
                                 match &prop.0 {
+                                    StreamProp::Type(TypeExpr::Identifier(IdentExpr::Name((
+                                        n,
+                                        s,
+                                    )))) => {
+                                        stream.dimensionality =
+                                            Some(GenericProperty::Parameterized(eval_name(n, s)?));
+                                    }
                                     StreamProp::Value(Value::NonNegative(i)) => {
-                                        stream.dimensionality = Some(*i);
+                                        stream.dimensionality = Some(GenericProperty::Fixed(*i));
+                                    }
+                                    StreamProp::Value(Value::GenericValue(g)) => {
+                                        let val =
+                                            eval_generic_param_value(g, &prop.1, &parent_params)?;
+                                        stream.dimensionality =
+                                            Some(GenericProperty::try_from(val).map_err(|e| {
+                                                EvalError {
+                                                    span: prop.1.clone(),
+                                                    msg: format!(
+                                                        "Unable to assign to dimensionality: {}",
+                                                        e
+                                                    ),
+                                                }
+                                            })?);
                                     }
                                     _ => return invalid_prop("dimensionality", prop),
                                 }
@@ -262,6 +299,7 @@ pub fn eval_type_expr(
                                             (typ, &prop.1),
                                             types,
                                             type_imports,
+                                            parent_params,
                                         )?);
                                     }
                                     _ => {
@@ -361,7 +399,7 @@ pub fn eval_type_expr(
         },
         TypeExpr::Assigned(ident, assignments) => {
             let ident_typ = eval_ident(ident, &expr.1, types, type_imports, "type")?;
-            let parameter_assignments = eval_generic_param_assignments(assignments, &ident_typ.parameters())?;
+            let parameter_assignments = eval_generic_param_assignments(assignments, parent_params)?;
             ident_typ
                 .with_assignments(parameter_assignments)
                 .map_err(|err| EvalError {
@@ -406,7 +444,13 @@ pub(crate) mod tests {
                 type_expr().parse_recovery(Stream::from_iter(len..len + 1, tokens.into_iter()));
 
             if let Some(expr) = ast {
-                match eval_type_expr(db, (&expr.0, &expr.1), types, &HashMap::new()) {
+                match eval_type_expr(
+                    db,
+                    (&expr.0, &expr.1),
+                    types,
+                    &HashMap::new(),
+                    &InsertionOrderedMap::new(),
+                ) {
                     Ok(def) => {
                         types.insert(
                             name.clone(),
