@@ -40,6 +40,7 @@ impl GenericParameterAssignment {
         match self {
             GenericParameterAssignment::Default(param) => {
                 let param_value: GenericParamValue = param_value.try_result()?;
+                // println!("Param value: {}", param_value);
                 let param_value = param_value.reduce().remove_outer_parens();
                 if param.valid_value(param_value.clone())? {
                     Ok(GenericParameterAssignment::Assigned(

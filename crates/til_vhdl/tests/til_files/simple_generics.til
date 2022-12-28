@@ -12,23 +12,24 @@ namespace generics::space {
         keep: false,
     );
 
-    // Okay, there's clearly some math issues going on
-    // type stream_assigned1 = genericstream<8 / 2>;
-    // type stream_assigned2 = genericstream<4 % 10>;
-    // type stream_assigned3 = genericstream<4 * 2>;
-    // type stream_assigned4 = genericstream<6 - 2>;
+    type stream_assigned1 = genericstream<8 / 2>;
+    type stream_assigned2 = genericstream<4 % 10>;
+    type stream_assigned3 = genericstream<4 * 2>;
+    type stream_assigned4 = genericstream<6 - 2>;
+    // No quick solution for folding precedence after the fact, unfortunately
+    // So for the time being, we'll ignore this
     // type stream_assigned5 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2>;
     // type stream_assigned6 = genericstream<d = 6 - 2 * 3 + 4 / 2 - 1 + 2>;
     // type stream_assigned7 = genericstream<d = 6 - 2 * 3 + 4 / 2 - 1 + 2,>;
     // type stream_assigned8 = genericstream<6 - 2 * 3 + 4 / 2 - 1 + 2,>;
     // type stream_assigned9 = genericstream<(6 - 2) * 3 + 4 / 2 - (1 + 2),>;
-    // 
-    // type stream_reassigned1<d: dimensionality = 4> = genericstream<d>;
-    // type stream_reassigned2<d: dimensionality = 4> = genericstream<d,>;
-    // type stream_reassigned3<d: dimensionality = 4> = genericstream<d = d>;
-    // type stream_reassigned4<d: dimensionality = 4> = genericstream<d = d,>;
-    // type stream_reassigned5<d: dimensionality = 4> = genericstream<d + 1>;
-    // type stream_reassigned6<d: dimensionality = 4> = genericstream<d + d - d>;
+    
+    type stream_reassigned1<d: dimensionality = 4> = genericstream<d>;
+    type stream_reassigned2<d: dimensionality = 4> = genericstream<d,>;
+    type stream_reassigned3<d: dimensionality = 4> = genericstream<d = d>;
+    type stream_reassigned4<d: dimensionality = 4> = genericstream<d = d,>;
+    type stream_reassigned5<d: dimensionality = 4> = genericstream<d + 1>;
+    type stream_reassigned6<d: dimensionality = 4> = genericstream<d + d - d>;
 
     streamlet just_params = <
         pa: natural = 2,
