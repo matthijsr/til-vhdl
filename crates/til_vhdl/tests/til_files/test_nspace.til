@@ -14,6 +14,18 @@ namespace my::test::space {
     );
     type stream2 = stream;
 
+    // Generics on types
+    type generic_dim_stream<d: dimensionality = 3; >= 3 and < 10> = Stream (
+        data: rgb,
+        throughput: 2.0,
+        dimensionality: d,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+
     #documentation#
     streamlet comp1 = (
         # some doc # a: in stream,
@@ -146,5 +158,12 @@ Newline.# {
             doms.x -- x;
             doms.y -- y;
         }
+    };
+
+    streamlet generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
+        x: in generic_dim_stream<some_dim>,
+        y: out generic_dim_stream<some_dim>,
+    ) {
+        impl: "tests/til_files/test_nspace_src"
     };
 }

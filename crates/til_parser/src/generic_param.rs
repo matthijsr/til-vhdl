@@ -2,7 +2,10 @@ use core::fmt;
 
 use chumsky::prelude::*;
 use til_query::ir::generics::{
-    behavioral::integer::IntegerGeneric,
+    behavioral::{integer::IntegerGeneric, BehavioralGenericKind},
+    condition::{
+        integer_condition::IntegerCondition, AppliesCondition, GenericCondition, TestValue,
+    },
     interface::InterfaceGenericKind,
     param_value::{combination::MathOperator, GenericParamValue},
     GenericKind, GenericParameter,
@@ -10,8 +13,8 @@ use til_query::ir::generics::{
 use tydi_common::{error::Error, name::Name};
 
 use crate::{
-    lex::{Operator, Token},
-    Spanned,
+    lex::{ConditionKeyword, Operator, Token},
+    Span, Spanned,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -54,6 +57,18 @@ pub enum GenericParameterList {
 pub enum GenericParameterAssignments {
     Error,
     List(Vec<(Option<Name>, Spanned<GenericParameterValueExpr>)>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum GenericConditionExpr<T: TestValue> {
+    Error(Span),
+    Condition(GenericCondition<T>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum GenericConditionCombiningKeyword {
+    And,
+    Or,
 }
 
 pub fn param_name() -> impl Parser<Token, Name, Error = Simple<Token>> + Clone {
@@ -105,6 +120,9 @@ pub fn param_integer() -> impl Parser<Token, i32, Error = Simple<Token>> + Clone
 
 pub fn generic_param_expr(
 ) -> impl Parser<Token, Spanned<Result<GenericParameter, Error>>, Error = Simple<Token>> + Clone {
+    // NOTE: It would make more sense to combine the default assignment and condition into the "kind" expression
+    // As this would let us choose the right kind of (expected) value and condition.
+    // However, at this time we only support integers, so there's not need to get fancy.
     param_name()
         .then_ignore(just(Token::Ctrl(':')))
         .then(param_kind())
@@ -112,9 +130,44 @@ pub fn generic_param_expr(
             just(Token::Op(Operator::Eq))
                 .ignore_then(param_integer().map(|i| GenericParamValue::from(i))),
         )
-        .map_with_span(|((name, kind), default_value), span| {
-            (GenericParameter::try_new(name, kind, default_value), span)
-        })
+        .then(
+            just(Token::Ctrl(';'))
+                .ignore_then(generic_param_integer_condition())
+                .or_not(),
+        )
+        .map_with_span(
+            |(((name, kind), default_value), opt_condition), span| match opt_condition {
+                Some(cond_expr) => match cond_expr {
+                    GenericConditionExpr::Error(s) => (
+                        Err(Error::ParsingError(
+                            "Something went wrong parsing the condition".to_string(),
+                        )),
+                        s,
+                    ),
+                    GenericConditionExpr::Condition(c) => {
+                        let kind_res = match kind {
+                            GenericKind::Behavioral(b) => match b {
+                                BehavioralGenericKind::Integer(i) => {
+                                    i.with_condition(c).map(|x| GenericKind::from(x))
+                                }
+                            },
+                            GenericKind::Interface(i) => match i {
+                                InterfaceGenericKind::Dimensionality(d) => {
+                                    d.with_condition(c).map(|x| GenericKind::from(x))
+                                }
+                            },
+                        };
+                        match kind_res {
+                            Ok(kind) => {
+                                (GenericParameter::try_new(name, kind, default_value), span)
+                            }
+                            Err(e) => (Err(e), span),
+                        }
+                    }
+                },
+                None => (GenericParameter::try_new(name, kind, default_value), span),
+            },
+        )
 }
 
 pub fn generic_parameters(
@@ -204,4 +257,98 @@ pub fn generic_parameter_assignments(
         .allow_trailing()
         .at_least(1)
         .labelled("generic parameter assignments")
+}
+
+pub fn generic_param_integer_condition(
+) -> impl Parser<Token, GenericConditionExpr<IntegerCondition>, Error = Simple<Token>> + Clone {
+    recursive(|condition| {
+        let gt = just(Token::Ctrl('>'))
+            .ignore_then(param_integer())
+            .map(|x| GenericConditionExpr::Condition(IntegerCondition::Gt(x).into()));
+        let lt = just(Token::Ctrl('<'))
+            .ignore_then(param_integer())
+            .map(|x| GenericConditionExpr::Condition(IntegerCondition::Lt(x).into()));
+        let gteq = just(Token::Op(Operator::GtEq))
+            .ignore_then(param_integer())
+            .map(|x| GenericConditionExpr::Condition(IntegerCondition::GtEq(x).into()));
+        let lteq = just(Token::Op(Operator::LtEq))
+            .ignore_then(param_integer())
+            .map(|x| GenericConditionExpr::Condition(IntegerCondition::LtEq(x).into()));
+        let eq = just(Token::Op(Operator::Eq))
+            .ignore_then(param_integer())
+            .map(|x| GenericConditionExpr::Condition(IntegerCondition::Eq(x).into()));
+        let one_of = just(Token::Condition(ConditionKeyword::OneOf)).ignore_then(
+            param_integer()
+                .separated_by(just(Token::Ctrl(',')))
+                .allow_trailing()
+                .at_least(1)
+                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
+                .map(|x| GenericConditionExpr::Condition(IntegerCondition::IsIn(x).into()))
+                .recover_with(nested_delimiters(
+                    Token::Ctrl('('),
+                    Token::Ctrl(')'),
+                    [(Token::Ctrl('<'), Token::Ctrl('>'))],
+                    |span: Span| GenericConditionExpr::Error(span),
+                )),
+        );
+
+        let atom = gteq
+            .or(lteq)
+            .or(gt)
+            .or(lt)
+            .or(eq)
+            .or(one_of)
+            .or(condition
+                .clone()
+                .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')))
+                .map(|x| match x {
+                    GenericConditionExpr::Error(e) => GenericConditionExpr::Error(e),
+                    GenericConditionExpr::Condition(c) => {
+                        GenericConditionExpr::Condition(GenericCondition::Parentheses(Box::new(c)))
+                    }
+                }))
+            .recover_with(nested_delimiters(
+                Token::Ctrl('('),
+                Token::Ctrl(')'),
+                [(Token::Ctrl('<'), Token::Ctrl('>'))],
+                |span: Span| GenericConditionExpr::Error(span),
+            ));
+
+        // If people want to do multiple nots for whatever reason, at least parenthesize them...
+        let not = just(Token::Condition(ConditionKeyword::Not)).ignore_then(atom.clone());
+        let atom = atom.or(not);
+
+        // And and Or have the same precedence
+        let op = just(Token::Condition(ConditionKeyword::And))
+            .to(GenericConditionCombiningKeyword::And)
+            .or(just(Token::Condition(ConditionKeyword::Or))
+                .to(GenericConditionCombiningKeyword::Or));
+
+        let combination = atom
+            .clone()
+            .then(op.then(atom).repeated())
+            .foldl(|l, (op, r)| match (l, r) {
+                (GenericConditionExpr::Error(ls), GenericConditionExpr::Error(rs)) => {
+                    GenericConditionExpr::Error(ls.start..rs.end)
+                }
+                (GenericConditionExpr::Error(s), GenericConditionExpr::Condition(_)) => {
+                    GenericConditionExpr::Error(s)
+                }
+                (GenericConditionExpr::Condition(_), GenericConditionExpr::Error(s)) => {
+                    GenericConditionExpr::Error(s)
+                }
+                (GenericConditionExpr::Condition(l), GenericConditionExpr::Condition(r)) => {
+                    match op {
+                        GenericConditionCombiningKeyword::And => GenericConditionExpr::Condition(
+                            GenericCondition::And(Box::new(l), Box::new(r)),
+                        ),
+                        GenericConditionCombiningKeyword::Or => GenericConditionExpr::Condition(
+                            GenericCondition::Or(Box::new(l), Box::new(r)),
+                        ),
+                    }
+                }
+            });
+
+        combination
+    })
 }
