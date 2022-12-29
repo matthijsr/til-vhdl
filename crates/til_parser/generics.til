@@ -26,10 +26,10 @@ namespace generics::space {
         pc: integer = -1; < 10 and > -2,
         pd: dimensionality = 3; (> 2 and (not = 5 or = 4)) or >= 10 or <= 100 or one_of(7, 9, 111) or < 99,
     >(
-        a: genericstream in 'a,
-        b: genericstream out 'a,
-        c: genericstream<pd> in 'b,
-        d: genericstream<pd> out 'b,
+        a: in genericstream 'a,
+        b: out genericstream 'a,
+        c: in genericstream<pd> 'b,
+        d: out genericstream<pd> 'b,
     ) {
         impl: {
             a -- b;
@@ -53,5 +53,5 @@ namespace generics::space {
             a.c -- b.d;
             a.d -- b.c;
         }
-    }
+    };
 }
