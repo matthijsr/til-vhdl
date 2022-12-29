@@ -163,7 +163,7 @@ pub fn generic_parameter_assignment(
 
         let product = atom
             .clone()
-            .then(op.then(param_assignment).repeated())
+            .then(op.then(atom).repeated())
             .foldl(parse_math_combination);
 
         // Sum and subtraction have the same precedence (but a lower precedence than products)
