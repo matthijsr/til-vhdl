@@ -65,6 +65,11 @@ fn evaluation_parse() -> Result<()> {
 }
 
 #[test]
+fn generics_parse() -> Result<()> {
+    parse_to_output("tests/til_files/generics.til", "generics")
+}
+
+#[test]
 fn simple_generics_parse() -> Result<()> {
     parse_to_output("tests/til_files/simple_generics.til", "simple_generics")
 }
