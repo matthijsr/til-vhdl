@@ -14,18 +14,6 @@ namespace my::test::space {
     );
     type stream2 = stream;
 
-    // Generics on types
-    type generic_dim_stream<d: dimensionality = 3; >= 3 and < 10> = Stream (
-        data: rgb,
-        throughput: 2.0,
-        dimensionality: d,
-        synchronicity: Sync,
-        complexity: 4,
-        direction: Forward,
-        user: Null,
-        keep: false,
-    );
-
     #documentation#
     streamlet comp1 = (
         # some doc # a: in stream,
@@ -160,9 +148,54 @@ Newline.# {
         }
     };
 
+
+    // Generics on types
+    type generic_dim_stream<d: dimensionality = 3; >= 3 and < 10> = Stream (
+        data: rgb,
+        throughput: 2.0,
+        dimensionality: d,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+
     streamlet generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
         x: in generic_dim_stream<some_dim>,
         y: out generic_dim_stream<some_dim>,
+    ) {
+        impl: "tests/til_files/test_nspace_src"
+    };
+
+    streamlet fixed_generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
+        x: in generic_dim_stream<3>,
+        y: out generic_dim_stream<3>,
+    ) {
+        impl: "tests/til_files/test_nspace_src"
+    };
+
+    type high_complexity_generic_dim_stream<d: dimensionality = 3; >= 3 and < 10> = Stream (
+        data: rgb,
+        throughput: 2.0,
+        dimensionality: d,
+        synchronicity: Sync,
+        complexity: 8,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+
+    streamlet high_complexity_generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
+        x: in high_complexity_generic_dim_stream<some_dim + 1>,
+        y: out high_complexity_generic_dim_stream<some_dim + 1>,
+    ) {
+        impl: "tests/til_files/test_nspace_src"
+    };
+
+    streamlet high_complexity_fixed_generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
+        x: in high_complexity_generic_dim_stream<3>,
+        y: out high_complexity_generic_dim_stream<3>,
     ) {
         impl: "tests/til_files/test_nspace_src"
     };

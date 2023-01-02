@@ -98,4 +98,17 @@ namespace generics::space {
             a.d -- b.c;
         }
     };
+
+    type genericstream_with_combined_property<
+        d: dimensionality = 3
+    > = Stream (
+        data: Bits(8),
+        throughput: 2.0,
+        dimensionality: d + 1,
+        synchronicity: Sync,
+        complexity: 4,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
 }
