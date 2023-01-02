@@ -7,7 +7,6 @@ use til_query::common::{
 use tydi_common::numbers::{NonNegative, Positive, PositiveReal};
 
 use crate::{
-    generic_param::GenericParameterValueExpr,
     ident_expr::{ident_expr, IdentExpr},
     impl_expr::{streamlet_impl_expr, StreamletImplExpr},
     interface_expr::{interface_expr, InterfaceExpr},
@@ -89,7 +88,6 @@ pub enum Value {
     PositiveReal(HashablePositiveReal),
     Version(String),
     Boolean(bool),
-    GenericValue(GenericParameterValueExpr),
 }
 
 impl fmt::Display for Value {
@@ -103,7 +101,6 @@ impl fmt::Display for Value {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Negative(n) => write!(f, "{}", n),
             Value::NegativeReal(ff) => write!(f, "{}", ff),
-            Value::GenericValue(g) => write!(f, "{}", g),
         }
     }
 }

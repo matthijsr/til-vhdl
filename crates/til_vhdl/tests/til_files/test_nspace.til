@@ -178,7 +178,7 @@ Newline.# {
     type high_complexity_generic_dim_stream<d: dimensionality = 3; >= 3 and < 10> = Stream (
         data: rgb,
         throughput: 2.0,
-        dimensionality: d,
+        dimensionality: d + 1,
         synchronicity: Sync,
         complexity: 8,
         direction: Forward,
@@ -187,7 +187,7 @@ Newline.# {
     );
 
     streamlet high_complexity_generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
-        x: in high_complexity_generic_dim_stream<some_dim + 1>,
+        x: in high_complexity_generic_dim_stream<some_dim>,
         y: out high_complexity_generic_dim_stream<some_dim + 1>,
     ) {
         impl: "tests/til_files/test_nspace_src"

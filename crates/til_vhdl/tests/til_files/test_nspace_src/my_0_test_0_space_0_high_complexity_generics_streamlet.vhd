@@ -22,7 +22,7 @@ entity my_0_test_0_space_0_high_complexity_generics_streamlet_com is
     y_valid : out std_logic;
     y_ready : in std_logic;
     y_data : out std_logic_vector(53 downto 0);
-    y_last : out std_logic_vector(((some_dim + 1) * 2) - 1 downto 0);
+    y_last : out std_logic_vector(((some_dim + 2) * 2) - 1 downto 0);
     y_stai : out std_logic;
     y_endi : out std_logic;
     y_strb : out std_logic_vector(1 downto 0)

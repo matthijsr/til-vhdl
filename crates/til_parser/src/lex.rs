@@ -98,6 +98,41 @@ impl fmt::Display for ConditionKeyword {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum StreamPropertyKeyword {
+    /// data
+    Data,
+    /// throughput
+    Throughput,
+    /// dimensionality
+    Dimensionality,
+    /// synchronicity
+    Synchronicity,
+    /// complexity
+    Complexity,
+    /// direction
+    Direction,
+    /// user
+    User,
+    /// keep
+    Keep,
+}
+
+impl fmt::Display for StreamPropertyKeyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamPropertyKeyword::Data => write!(f, "data"),
+            StreamPropertyKeyword::Throughput => write!(f, "throughput"),
+            StreamPropertyKeyword::Dimensionality => write!(f, "dimensionality"),
+            StreamPropertyKeyword::Synchronicity => write!(f, "synchronicity"),
+            StreamPropertyKeyword::Complexity => write!(f, "complexity"),
+            StreamPropertyKeyword::Direction => write!(f, "direction"),
+            StreamPropertyKeyword::User => write!(f, "user"),
+            StreamPropertyKeyword::Keep => write!(f, "keep"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operator {
     /// `=`
     Eq,
@@ -173,6 +208,9 @@ pub enum Token {
     PortMode(InterfaceDirection),
     /// Words pertaining to conditions
     Condition(ConditionKeyword),
+    /// Stream properties: data, throughput, dimensionality, synchronicity,
+    /// complexity, direction, user, keep
+    StreamProperty(StreamPropertyKeyword),
 }
 
 impl fmt::Display for Token {
@@ -193,6 +231,7 @@ impl fmt::Display for Token {
             Token::Boolean(b) => write!(f, "{}", b),
             Token::PortMode(p) => write!(f, "{}", p),
             Token::Condition(c) => write!(f, "{}", c),
+            Token::StreamProperty(s) => write!(f, "{}", s),
         }
     }
 }
@@ -271,6 +310,14 @@ pub fn lexer() -> impl Parser<char, Vec<(Token, Span)>, Error = Simple<char>> {
         "or" => Token::Condition(ConditionKeyword::Or),
         "not" => Token::Condition(ConditionKeyword::Not),
         "one_of" => Token::Condition(ConditionKeyword::OneOf),
+        "data" => Token::StreamProperty(StreamPropertyKeyword::Data),
+        "throughput" => Token::StreamProperty(StreamPropertyKeyword::Throughput),
+        "dimensionality" => Token::StreamProperty(StreamPropertyKeyword::Dimensionality),
+        "synchronicity" => Token::StreamProperty(StreamPropertyKeyword::Synchronicity),
+        "complexity" => Token::StreamProperty(StreamPropertyKeyword::Complexity),
+        "direction" => Token::StreamProperty(StreamPropertyKeyword::Direction),
+        "user" => Token::StreamProperty(StreamPropertyKeyword::User),
+        "keep" => Token::StreamProperty(StreamPropertyKeyword::Keep),
         _ => Token::Identifier(ident),
     });
 

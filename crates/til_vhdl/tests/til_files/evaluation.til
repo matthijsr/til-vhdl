@@ -1,7 +1,7 @@
 namespace evaluation {
     type axi4stream = Stream (
         data: Union (
-            data: Bits(8),
+            t_data: Bits(8),
             null: Null, // Equivalent to TSTRB
         ),
         throughput: 128.0, // Data bus width
