@@ -167,7 +167,11 @@ mod tests {
             Vec::new()
         };
 
+        let errs_len = errs.len();
+        let parse_err_len = parse_errs.len();
         report_errors(&src, errs, parse_errs);
+        assert_eq!(errs_len, 0);
+        assert_eq!(parse_err_len, 0);
     }
 
     #[test]

@@ -26,6 +26,26 @@ use tydi_vhdl::{
 
 use crate::common::logical::logicaltype::genericproperty::generic_property_to_relation;
 
+pub fn physical_bitcount_to_bitvector(
+    db: &dyn Arch,
+    bitcount: &PhysicalBitCount,
+    parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
+) -> Result<ObjectType> {
+    // Subtract 1 from the actual bitcount to get the inclusive "high" of the array
+    let relation = match bitcount {
+        PhysicalBitCount::Combination(_, _, _) => {
+            Relation::parentheses(physical_bitcount_to_relation(db, bitcount, parent_params)?)?
+                .r_subtract(db, 1)?
+                .into()
+        }
+        PhysicalBitCount::Fixed(f) => Relation::from(u32_to_i32(f.get() - 1)?),
+        PhysicalBitCount::Parameterized(n) => Relation::from(*(parent_params.try_get(n)?))
+            .r_subtract(db, 1)?
+            .into(),
+    };
+    ObjectType::relation_bit_vector(db, relation, 0)
+}
+
 pub fn physical_bitcount_to_relation(
     db: &dyn Arch,
     bitcount: &PhysicalBitCount,
@@ -85,11 +105,7 @@ pub fn physical_stream_to_vhdl(
             Port::try_new(
                 cat!(prefix, n),
                 mode,
-                ObjectType::relation_bit_vector(
-                    arch_db,
-                    physical_bitcount_to_relation(arch_db, &x, parent_params)?,
-                    0,
-                )?,
+                physical_bitcount_to_bitvector(arch_db, &x, parent_params)?,
             )
         }
     })?;

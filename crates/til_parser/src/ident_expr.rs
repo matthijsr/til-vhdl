@@ -13,11 +13,9 @@ pub enum IdentExpr {
 }
 
 pub fn name() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {
-    filter_map(|span, tok| match tok {
-        Token::Identifier(ident) => Ok((ident, span)),
-        _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
-    })
-    .labelled("name")
+    let ident = select! { Token::Identifier(ident) => ident.clone() }.labelled("identifier");
+
+    ident.map_with_span(|x, span| (x, span)).labelled("name")
 }
 
 pub fn domain_name() -> impl Parser<Token, Spanned<String>, Error = Simple<Token>> + Clone {

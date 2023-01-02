@@ -4,9 +4,10 @@ use crate::{
     expr::{val, Value},
     generic_param::{
         generic_parameter_assignment, generic_parameter_assignments, GenericParameterAssignments,
+        GenericParameterValueExpr,
     },
     ident_expr::{ident_expr, label, IdentExpr},
-    lex::{Token, TypeKeyword},
+    lex::{StreamPropertyKeyword, Token, TypeKeyword},
     Spanned,
 };
 
@@ -34,15 +35,23 @@ pub enum FieldsDef {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum StreamProp {
-    Value(Value),
-    Type(TypeExpr),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StreamProps {
     Error,
-    Props(Vec<(Spanned<String>, Spanned<StreamProp>)>),
+    Props(Vec<Spanned<StreamProp>>),
+}
+
+// TODO: Could probably rule out invalid values sooner?
+// Then again, this is a bit more robus on parsing. (Lets us parse more, then fail on eval.)
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum StreamProp {
+    Data(Spanned<TypeExpr>),
+    Throughput(Spanned<Value>),
+    Dimensionality(Spanned<GenericParameterValueExpr>),
+    Synchronicity(Spanned<Value>),
+    Complexity(Spanned<Value>),
+    Direction(Spanned<Value>),
+    User(Spanned<TypeExpr>),
+    Keep(Spanned<Value>),
 }
 
 pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token>> + Clone {
@@ -68,17 +77,57 @@ pub fn type_expr() -> impl Parser<Token, Spanned<TypeExpr>, Error = Simple<Token
         })
         .delimited_by(just(Token::Ctrl('(')), just(Token::Ctrl(')')));
 
+        let data_prop = just(Token::StreamProperty(StreamPropertyKeyword::Data))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(type_def.clone())
+            .map(StreamProp::Data);
+
+        let throughput_prop = just(Token::StreamProperty(StreamPropertyKeyword::Throughput))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(val())
+            .map(StreamProp::Throughput);
+
+        let dimensionality_prop =
+            just(Token::StreamProperty(StreamPropertyKeyword::Dimensionality))
+                .ignore_then(just(Token::Ctrl(':')))
+                .ignore_then(generic_parameter_assignment())
+                .map(StreamProp::Dimensionality);
+
+        let synchronicity_prop = just(Token::StreamProperty(StreamPropertyKeyword::Synchronicity))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(val())
+            .map(StreamProp::Synchronicity);
+
+        let complexity_prop = just(Token::StreamProperty(StreamPropertyKeyword::Complexity))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(val())
+            .map(StreamProp::Complexity);
+
+        let direction_prop = just(Token::StreamProperty(StreamPropertyKeyword::Direction))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(val())
+            .map(StreamProp::Direction);
+
+        let user_prop = just(Token::StreamProperty(StreamPropertyKeyword::User))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(type_def.clone())
+            .map(StreamProp::User);
+
+        let keep_prop = just(Token::StreamProperty(StreamPropertyKeyword::Keep))
+            .ignore_then(just(Token::Ctrl(':')))
+            .ignore_then(val())
+            .map(StreamProp::Keep);
+
         // Stream properties are either values or types
-        let stream_prop = label()
-            .then(
-                type_def
-                    .clone()
-                    .map(|(t, span)| (StreamProp::Type(t), span))
-                    .or(val().map(|(v, span)| (StreamProp::Value(v), span)))
-                    .or(generic_parameter_assignment()
-                        .map(|(g, span)| (StreamProp::Value(Value::GenericValue(g)), span))),
-            )
-            .map(|(lab, prop)| (lab, prop));
+        let stream_prop = data_prop
+            .or(throughput_prop)
+            .or(dimensionality_prop)
+            .or(synchronicity_prop)
+            .or(complexity_prop)
+            .or(direction_prop)
+            .or(user_prop)
+            .or(keep_prop)
+            .map_with_span(|x, span| (x, span));
 
         let stream_props = stream_prop
             .separated_by(just(Token::Ctrl(',')))

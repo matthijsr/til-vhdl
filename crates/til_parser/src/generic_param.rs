@@ -13,7 +13,7 @@ use til_query::ir::generics::{
 use tydi_common::{error::Error, name::Name};
 
 use crate::{
-    lex::{ConditionKeyword, Operator, Token},
+    lex::{ConditionKeyword, Operator, StreamPropertyKeyword, Token},
     Span, Spanned,
 };
 
@@ -87,12 +87,14 @@ pub fn param_kind() -> impl Parser<Token, GenericKind, Error = Simple<Token>> + 
             "integer" => Ok(GenericKind::from(IntegerGeneric::integer())),
             "natural" => Ok(GenericKind::from(IntegerGeneric::natural())),
             "positive" => Ok(GenericKind::from(IntegerGeneric::positive())),
-            "dimensionality" => Ok(GenericKind::from(InterfaceGenericKind::dimensionality())),
             _ => Err(Simple::custom(
                 span,
                 format!("{} is not a valid parameter type.", ident),
             )),
         },
+        Token::StreamProperty(StreamPropertyKeyword::Dimensionality) => {
+            Ok(GenericKind::from(InterfaceGenericKind::dimensionality()))
+        }
         _ => Err(Simple::expected_input_found(span, Vec::new(), Some(tok))),
     })
 }
