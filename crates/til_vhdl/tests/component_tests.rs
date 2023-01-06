@@ -74,8 +74,8 @@ package default is
       a_valid : in std_logic;
       a_ready : out std_logic;
       a_data : in std_logic_vector(3 downto 0);
-      a_last : in std_logic;
-      a_strb : in std_logic
+      a_last : in std_logic_vector(0 downto 0);
+      a_strb : in std_logic_vector(0 downto 0)
     );
   end component test_com;
 
@@ -98,8 +98,8 @@ entity test_com is
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(3 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0)
   );
 end test_com;
 
@@ -190,7 +190,7 @@ end component test_com;"#,
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0);
-    a_endi : in std_logic
+    a_endi : in std_logic_vector(0 downto 0)
   );
 end component test_com;"#,
         complexity_decls[4],
@@ -204,8 +204,8 @@ end component test_com;"#,
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0);
-    a_stai : in std_logic;
-    a_endi : in std_logic
+    a_stai : in std_logic_vector(0 downto 0);
+    a_endi : in std_logic_vector(0 downto 0)
   );
 end component test_com;"#,
         complexity_decls[5],
@@ -219,8 +219,8 @@ end component test_com;"#,
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(7 downto 0);
-    a_stai : in std_logic;
-    a_endi : in std_logic;
+    a_stai : in std_logic_vector(0 downto 0);
+    a_endi : in std_logic_vector(0 downto 0);
     a_strb : in std_logic_vector(1 downto 0)
   );
 end component test_com;"#,
@@ -529,13 +529,13 @@ fn basic_comp_arch() -> Result<()> {
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic;
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic;
-    b_strb : out std_logic
+    b_last : out std_logic_vector(0 downto 0);
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end component test_com;"#,
         streamlet.to_component().declare(arch_db)?
@@ -554,13 +554,13 @@ package default is
       a_valid : in std_logic;
       a_ready : out std_logic;
       a_data : in std_logic_vector(4 downto 0);
-      a_last : in std_logic;
-      a_strb : in std_logic;
+      a_last : in std_logic_vector(0 downto 0);
+      a_strb : in std_logic_vector(0 downto 0);
       b_valid : out std_logic;
       b_ready : in std_logic;
       b_data : out std_logic_vector(4 downto 0);
-      b_last : out std_logic;
-      b_strb : out std_logic
+      b_last : out std_logic_vector(0 downto 0);
+      b_strb : out std_logic_vector(0 downto 0)
     );
   end component test_com;
 
@@ -582,13 +582,13 @@ entity test_com is
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic;
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic;
-    b_strb : out std_logic
+    b_last : out std_logic_vector(0 downto 0);
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end test_com;
 
@@ -635,13 +635,13 @@ fn basic_comp_arch_with_behav_params() -> Result<()> {
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic;
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic;
-    b_strb : out std_logic
+    b_last : out std_logic_vector(0 downto 0);
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end component test_com;"#,
         streamlet.to_component().declare(arch_db)?
@@ -665,13 +665,13 @@ package default is
       a_valid : in std_logic;
       a_ready : out std_logic;
       a_data : in std_logic_vector(4 downto 0);
-      a_last : in std_logic;
-      a_strb : in std_logic;
+      a_last : in std_logic_vector(0 downto 0);
+      a_strb : in std_logic_vector(0 downto 0);
       b_valid : out std_logic;
       b_ready : in std_logic;
       b_data : out std_logic_vector(4 downto 0);
-      b_last : out std_logic;
-      b_strb : out std_logic
+      b_last : out std_logic_vector(0 downto 0);
+      b_strb : out std_logic_vector(0 downto 0)
     );
   end component test_com;
 
@@ -698,13 +698,13 @@ entity test_com is
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic;
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic;
-    b_strb : out std_logic
+    b_last : out std_logic_vector(0 downto 0);
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end test_com;
 
@@ -750,12 +750,12 @@ fn basic_comp_arch_with_interface_params() -> Result<()> {
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
     a_last : in std_logic_vector((pa + 1) - 1 downto 0);
-    a_strb : in std_logic;
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
     b_last : out std_logic_vector((pa + 1) - 1 downto 0);
-    b_strb : out std_logic
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end component test_com;"#,
         streamlet.to_component().declare(arch_db)?
@@ -778,12 +778,12 @@ package default is
       a_ready : out std_logic;
       a_data : in std_logic_vector(4 downto 0);
       a_last : in std_logic_vector((pa + 1) - 1 downto 0);
-      a_strb : in std_logic;
+      a_strb : in std_logic_vector(0 downto 0);
       b_valid : out std_logic;
       b_ready : in std_logic;
       b_data : out std_logic_vector(4 downto 0);
       b_last : out std_logic_vector((pa + 1) - 1 downto 0);
-      b_strb : out std_logic
+      b_strb : out std_logic_vector(0 downto 0)
     );
   end component test_com;
 
@@ -809,12 +809,12 @@ entity test_com is
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
     a_last : in std_logic_vector((pa + 1) - 1 downto 0);
-    a_strb : in std_logic;
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
     b_last : out std_logic_vector((pa + 1) - 1 downto 0);
-    b_strb : out std_logic
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end test_com;
 
@@ -866,13 +866,13 @@ entity parent_com is
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic;
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic;
-    b_strb : out std_logic
+    b_last : out std_logic_vector(0 downto 0);
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end parent_com;
 
@@ -880,13 +880,13 @@ architecture structural of parent_com is
   signal a_0_a_valid : std_logic;
   signal a_0_a_ready : std_logic;
   signal a_0_a_data : std_logic_vector(4 downto 0);
-  signal a_0_a_last : std_logic;
-  signal a_0_a_strb : std_logic;
+  signal a_0_a_last : std_logic_vector(0 downto 0);
+  signal a_0_a_strb : std_logic_vector(0 downto 0);
   signal a_0_b_valid : std_logic;
   signal a_0_b_ready : std_logic;
   signal a_0_b_data : std_logic_vector(4 downto 0);
-  signal a_0_b_last : std_logic;
-  signal a_0_b_strb : std_logic;
+  signal a_0_b_last : std_logic_vector(0 downto 0);
+  signal a_0_b_strb : std_logic_vector(0 downto 0);
 begin
   a: inner_com port map(
     clk => clk,
@@ -983,13 +983,13 @@ entity parent_com is
     a_valid : in std_logic;
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
-    a_last : in std_logic;
-    a_strb : in std_logic;
+    a_last : in std_logic_vector(0 downto 0);
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
-    b_last : out std_logic;
-    b_strb : out std_logic
+    b_last : out std_logic_vector(0 downto 0);
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end parent_com;
 
@@ -997,13 +997,13 @@ architecture structural of parent_com is
   signal a_0_a_valid : std_logic;
   signal a_0_a_ready : std_logic;
   signal a_0_a_data : std_logic_vector(4 downto 0);
-  signal a_0_a_last : std_logic;
-  signal a_0_a_strb : std_logic;
+  signal a_0_a_last : std_logic_vector(0 downto 0);
+  signal a_0_a_strb : std_logic_vector(0 downto 0);
   signal a_0_b_valid : std_logic;
   signal a_0_b_ready : std_logic;
   signal a_0_b_data : std_logic_vector(4 downto 0);
-  signal a_0_b_last : std_logic;
-  signal a_0_b_strb : std_logic;
+  signal a_0_b_last : std_logic_vector(0 downto 0);
+  signal a_0_b_strb : std_logic_vector(0 downto 0);
 begin
   a: inner_com generic map(
     pa => 20,
@@ -1094,12 +1094,12 @@ entity parent_com is
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
     a_last : in std_logic_vector((pa + 1) - 1 downto 0);
-    a_strb : in std_logic;
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
     b_last : out std_logic_vector((pa + 1) - 1 downto 0);
-    b_strb : out std_logic
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end parent_com;
 
@@ -1108,12 +1108,12 @@ architecture structural of parent_com is
   signal a_0_a_ready : std_logic;
   signal a_0_a_data : std_logic_vector(4 downto 0);
   signal a_0_a_last : std_logic_vector((pa + 2) - 1 downto 0);
-  signal a_0_a_strb : std_logic;
+  signal a_0_a_strb : std_logic_vector(0 downto 0);
   signal a_0_b_valid : std_logic;
   signal a_0_b_ready : std_logic;
   signal a_0_b_data : std_logic_vector(4 downto 0);
   signal a_0_b_last : std_logic_vector((pa + 2) - 1 downto 0);
-  signal a_0_b_strb : std_logic;
+  signal a_0_b_strb : std_logic_vector(0 downto 0);
 begin
   a: inner_com generic map(
     pa => pa + 1
@@ -1183,12 +1183,12 @@ entity test_com is
     a_ready : out std_logic;
     a_data : in std_logic_vector(4 downto 0);
     a_last : in std_logic_vector(pa - 1 downto 0);
-    a_strb : in std_logic;
+    a_strb : in std_logic_vector(0 downto 0);
     b_valid : out std_logic;
     b_ready : in std_logic;
     b_data : out std_logic_vector(4 downto 0);
     b_last : out std_logic_vector((pa + 2) - 1 downto 0);
-    b_strb : out std_logic
+    b_strb : out std_logic_vector(0 downto 0)
   );
 end test_com;
 
@@ -1197,22 +1197,22 @@ architecture Behaviour of test_com is
   signal first_0_a_ready : std_logic;
   signal first_0_a_data : std_logic_vector(4 downto 0);
   signal first_0_a_last : std_logic_vector(pa - 1 downto 0);
-  signal first_0_a_strb : std_logic;
+  signal first_0_a_strb : std_logic_vector(0 downto 0);
   signal first_0_b_valid : std_logic;
   signal first_0_b_ready : std_logic;
   signal first_0_b_data : std_logic_vector(4 downto 0);
   signal first_0_b_last : std_logic_vector((pa + 1) - 1 downto 0);
-  signal first_0_b_strb : std_logic;
+  signal first_0_b_strb : std_logic_vector(0 downto 0);
   signal second_0_a_valid : std_logic;
   signal second_0_a_ready : std_logic;
   signal second_0_a_data : std_logic_vector(4 downto 0);
   signal second_0_a_last : std_logic_vector((pa + 1) - 1 downto 0);
-  signal second_0_a_strb : std_logic;
+  signal second_0_a_strb : std_logic_vector(0 downto 0);
   signal second_0_b_valid : std_logic;
   signal second_0_b_ready : std_logic;
   signal second_0_b_data : std_logic_vector(4 downto 0);
   signal second_0_b_last : std_logic_vector((pa + 2) - 1 downto 0);
-  signal second_0_b_strb : std_logic;
+  signal second_0_b_strb : std_logic_vector(0 downto 0);
 begin
   first: instance_com generic map(
     pa => pa

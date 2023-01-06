@@ -16,13 +16,13 @@ entity my_0_test_0_space_0_fixed_generics_streamlet_com is
     x_ready : out std_logic;
     x_data : in std_logic_vector(53 downto 0);
     x_last : in std_logic_vector(2 downto 0);
-    x_endi : in std_logic;
+    x_endi : in std_logic_vector(0 downto 0);
     x_strb : in std_logic_vector(1 downto 0);
     y_valid : out std_logic;
     y_ready : in std_logic;
     y_data : out std_logic_vector(53 downto 0);
     y_last : out std_logic_vector(2 downto 0);
-    y_endi : out std_logic;
+    y_endi : out std_logic_vector(0 downto 0);
     y_strb : out std_logic_vector(1 downto 0)
   );
 end my_0_test_0_space_0_fixed_generics_streamlet_com;
