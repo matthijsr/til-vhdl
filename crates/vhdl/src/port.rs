@@ -103,6 +103,15 @@ impl Port {
         &self.typ
     }
 
+    pub fn set_typ(&mut self, typ: ObjectType) {
+        self.typ = typ
+    }
+
+    pub fn with_typ(mut self, typ: ObjectType) -> Self {
+        self.set_typ(typ);
+        self
+    }
+
     // /// Returns true if the port type contains reversed fields.
     // pub fn has_reversed(&self) -> bool {
     //     self.typ.has_reversed()

@@ -31,6 +31,9 @@ pub fn physical_bitcount_to_bitvector(
     bitcount: &PhysicalBitCount,
     parent_params: &InsertionOrderedMap<Name, Id<ObjectDeclaration>>,
 ) -> Result<ObjectType> {
+    if let Some(f) = bitcount.try_eval() {
+        return ObjectType::bit_vector(u32_to_i32(f.get() - 1)?, 0);
+    }
     // Subtract 1 from the actual bitcount to get the inclusive "high" of the array
     let relation = match bitcount {
         PhysicalBitCount::Combination(_, _, _) => {
@@ -94,23 +97,30 @@ pub fn physical_stream_to_vhdl(
         StreamDirection::Reverse => Mode::Out,
     };
 
-    // TODO: NEED TO IMPLEMENT ARRAYS WITH RANGE BASED ON RELATIONS
-
     let signal_list: SignalList<PhysicalBitCount> = physical_stream.into();
     let mut signal_list = signal_list.try_map_named(|n, x| {
-        if let Some(f) = x.try_eval() {
-            // As the prefix is either a VhdlName or empty, and all signal names are valid
-            Port::try_new(cat!(prefix, n), mode, f)
-        } else {
-            Port::try_new(
-                cat!(prefix, n),
-                mode,
-                physical_bitcount_to_bitvector(arch_db, &x, parent_params)?,
-            )
-        }
+        Port::try_new(
+            cat!(prefix, n),
+            mode,
+            physical_bitcount_to_bitvector(arch_db, &x, parent_params)?,
+        )
     })?;
 
     signal_list.set_ready(signal_list.ready().as_ref().map(|ready| ready.reversed()))?;
+
+    // For readability, make ready and valid single bits (if they exist)
+    signal_list.set_ready(
+        signal_list
+            .ready()
+            .as_ref()
+            .map(|ready| ready.clone().with_typ(ObjectType::Bit)),
+    )?;
+    signal_list.set_valid(
+        signal_list
+            .valid()
+            .as_ref()
+            .map(|valid| valid.clone().with_typ(ObjectType::Bit)),
+    )?;
 
     let user_bit_count = if let Some(u) = physical_stream.user_bit_count() {
         if let Some(f) = u.try_eval() {
@@ -311,8 +321,8 @@ mod tests {
 a_test_0_sub_ready : in std_logic
 a_test_0_sub_data : out std_logic_vector(9 downto 0)
 a_test_0_sub_last : out std_logic_vector(5 downto 0)
-a_test_0_sub_stai : out std_logic
-a_test_0_sub_endi : out std_logic
+a_test_0_sub_stai : out std_logic_vector(0 downto 0)
+a_test_0_sub_endi : out std_logic_vector(0 downto 0)
 a_test_0_sub_strb : out std_logic_vector(1 downto 0)"#,
             result,
             "output with pathname"
@@ -332,8 +342,8 @@ a_test_0_sub_strb : out std_logic_vector(1 downto 0)"#,
 a_ready : in std_logic
 a_data : out std_logic_vector(9 downto 0)
 a_last : out std_logic_vector(5 downto 0)
-a_stai : out std_logic
-a_endi : out std_logic
+a_stai : out std_logic_vector(0 downto 0)
+a_endi : out std_logic_vector(0 downto 0)
 a_strb : out std_logic_vector(1 downto 0)"#,
             result,
             "output without pathname"
