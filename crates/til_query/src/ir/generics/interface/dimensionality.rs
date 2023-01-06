@@ -38,7 +38,7 @@ impl TestValue for DimensionalityGeneric {
     fn valid_value(&self, value: impl TryResult<GenericParamValue>) -> Result<bool> {
         let generic_value: GenericParamValue = value.try_result()?;
         if let GenericParamValue::Integer(value) = generic_value {
-            if value < 2 {
+            if value < 1 {
                 Ok(false)
             } else {
                 self.condition().valid_value(value)
@@ -54,7 +54,7 @@ impl TestValue for DimensionalityGeneric {
     }
 
     fn describe_condition(&self) -> String {
-        let base = "(Dimensionality, implicit: >= 2)";
+        let base = "(Dimensionality, implicit: >= 1)";
         if let GenericCondition::None = self.condition() {
             base.to_string()
         } else {

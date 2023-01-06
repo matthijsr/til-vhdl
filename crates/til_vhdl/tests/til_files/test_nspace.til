@@ -193,9 +193,40 @@ Newline.# {
         impl: "tests/til_files/test_nspace_src"
     };
 
+    streamlet increasing_dim_mapping = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
+        x: in high_complexity_generic_dim_stream<some_dim>,
+        y: out high_complexity_generic_dim_stream<some_dim + 2>,
+    ) {
+        impl: {
+            first = high_complexity_generics_streamlet<some_param, some_dim>;
+            second = high_complexity_generics_streamlet<some_param, some_dim + 1>;
+            first.x -- x;
+            first.y -- second.x;
+            second.y -- y;
+        }
+    };
+
     streamlet high_complexity_fixed_generics_streamlet = <some_param: integer = 0, some_dim: dimensionality = 4; >= 3 and < 8>(
         x: in high_complexity_generic_dim_stream<3>,
         y: out high_complexity_generic_dim_stream<3>,
+    ) {
+        impl: "tests/til_files/test_nspace_src"
+    };
+
+    type low_dim_generic_stream<d: dimensionality = 1> = Stream (
+        data: rgb,
+        throughput: 1.0,
+        dimensionality: d,
+        synchronicity: Sync,
+        complexity: 8,
+        direction: Forward,
+        user: Null,
+        keep: false,
+    );
+
+    streamlet low_dim_fixed_generics_streamlet = <some_param: integer = 0>(
+        x: in low_dim_generic_stream<1>,
+        y: out low_dim_generic_stream<1>,
     ) {
         impl: "tests/til_files/test_nspace_src"
     };
