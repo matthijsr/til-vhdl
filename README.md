@@ -47,8 +47,8 @@ link_relative_to_file = true
 
 The main (required) configuration items are:
 * **name**: The name of the project, used for the backend's output and for (currently unsupported by the parser) imports between projects.
-* **files**: The TIL files that the project consits of, as an array of paths relative to the project file. They will be parsed in the order they're declared.
+* **files**: The TIL files that the project consists of, as an array of paths relative to the project file. They will be parsed in the order they're declared.
 * **output_path**: The output directory of the backend, as a path relative to the project file.
 
 Additional, optional configuration items are part of the `[config]` subsection. There is currently only one additional config item:
-* **link_relative_to_file**: Defines how *links* should be interpreted. **By default, linked implementation paths are relative to the project file**, setting this config item to *true* makes it so linked implementation paths are relative to the TIL file they're defined in.
+* **link_relative_to_file**: Defines how *links* should be interpreted. **By default, linked implementation paths are relative to the project file**, setting this config item to `true``  makes it so linked implementation paths are relative to the TIL file they're defined in.
