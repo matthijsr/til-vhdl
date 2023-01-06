@@ -51,4 +51,4 @@ The main (required) configuration items are:
 * **output_path**: The output directory of the backend, as a path relative to the project file.
 
 Additional, optional configuration items are part of the `[config]` subsection. There is currently only one additional config item:
-* **link_relative_to_file**: Defines how *links* should be interpreted. **By default, linked implementation paths are relative to the project file**, setting this config item to `true``  makes it so linked implementation paths are relative to the TIL file they're defined in.
+* **link_relative_to_file**: Defines how *links* should be interpreted. **By default, linked implementation paths are relative to the project file**, setting this config item to `true`  makes it so linked implementation paths are relative to the TIL file they're defined in.
